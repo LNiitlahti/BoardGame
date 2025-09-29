@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Setup - Board Game System</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        /* Page-specific styles for setup */
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .setup-container {
+            margin-bottom: 40px;
+        }
+
+        .url-display {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .url-list {
+            list-style: none;
+            padding: 0;
+            margin: 10px 0;
+        }
+
+        .url-list li {
+            margin: 8px 0;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
+            border-left: 3px solid #ffd700;
+        }
+
+        .url-list .team-url {
+            border-left-color: #4ade80;
+        }
+
+        .copy-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            margin-left: 10px;
+            transition: all 0.2s ease;
+        }
+
+        .copy-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #ffd700;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .success-checkmark {
+            color: #4ade80;
+            font-size: 1.2rem;
+            margin-right: 10px;
+        }
+
+        .game-preview {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .preview-section {
+            margin-bottom: 15px;
+        }
+
+        .preview-section h4 {
+            color: #ffd700;
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+
+        .preview-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .preview-tag {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="setup-container">
+        <div class="header">
+            <h1>🎯 Game Setup</h1>
+            <p>Initialize your turn-based board game tournament</p>
+        </div>
+
+        <div class="setup-form">
+            <div class="status-message" id="statusMessage"></div>
+
+            <div class="form-group">
+                <label for="gameId">🆔 Game Session ID</label>
+                <input type="text" id="gameId" placeholder="Enter unique game session ID (e.g., lan-tournament-2024)" required>
+                <small style="color: rgba(255,255,255,0.7);">This will be used to generate team URLs and identify your game session</small>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="playerCount">👥 Number of Players</label>
+                    <select id="playerCount">
+                        <option value="4">4 Players (2 Teams)</option>
+                        <option value="6" selected>6 Players (3 Teams)</option>
+                        <option value="8">8 Players (4 Teams)</option>
+                        <option value="10">10 Players (5 Teams)</option>
+                        <option value="12">12 Players (5 Teams)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="winCondition">🏆 Win Condition (Points)</label>
+                    <input type="number" id="winCondition" value="50" min="10" max="200" step="5">
+                    <small style="color: rgba(255,255,255,0.7);">First team to reach this score wins</small>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="playerNames">📝 Player Names</label>
+                <textarea id="playerNames" rows="3" placeholder="Enter player names separated by commas (e.g., Alice, Bob, Charlie, Diana, Eve, Frank)"></textarea>
+                
+                <div class="player-preview" id="playerPreview" style="display: none;">
+                    <strong>📊 Team Distribution Preview:</strong>
+                    <div class="team-preview" id="teamPreview"></div>
+                </div>
+            </div>
+
+            <div class="advanced-options">
+                <h3>⚙️ Advanced Configuration</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="gameTypes">🎮 Available Games</label>
+                        <textarea id="gameTypes" rows="2" placeholder="CS2, Dota2, Valorant, StarCraft2">CS2, Dota2, Valorant, StarCraft2, Predecessor</textarea>
+                        <small style="color: rgba(255,255,255,0.7);">Games that teams can compete in</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="playTypes">⚔️ Match Types</label>
+                        <textarea id="playTypes" rows="2" placeholder="1v1, 2v2, 3v3, 5v5">1v1, 2v2, 3v3, 5v5</textarea>
+                        <small style="color: rgba(255,255,255,0.7);">Available match formats</small>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="heartHexes">❤️ Heart Hex Coordinates</label>
+                    <input type="text" id="heartHexes" value="q2r-4, q4r-2, q2r2, q-2r4, q-4r2, q-2r-2" placeholder="Comma separated hex coordinates">
+                    <small style="color: rgba(255,255,255,0.7);">Special hexes that provide bonus points when controlled</small>
+                </div>
+
+                <div class="game-preview" id="gamePreview" style="display: none;">
+                    <h4>🔍 Game Configuration Preview</h4>
+                    <div class="preview-section">
+                        <h4>Games:</h4>
+                        <div class="preview-list" id="gamesPreview"></div>
+                    </div>
+                    <div class="preview-section">
+                        <h4>Match Types:</h4>
+                        <div class="preview-list" id="typesPreview"></div>
+                    </div>
+                    <div class="preview-section">
+                        <h4>Heart Hexes:</h4>
+                        <div class="preview-list" id="hexesPreview"></div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn primary" onclick="createGame()" id="createBtn">
+                🚀 Create Game Session
+            </button>
+
+            <button class="btn" onclick="loadExistingGame()">
+                📂 Load Existing Game
+            </button>
+
+            <div class="url-display" id="urlDisplay" style="display: none;">
+                <h4 style="color: #ffd700; margin-bottom: 15px;">
+                    <span class="success-checkmark">✅</span>
+                    Game Created Successfully!
+                </h4>
+                <p style="margin-bottom: 15px; color: #4ade80;">
+                    Share these URLs with your teams and administrators:
+                </p>
+                <ul class="url-list" id="urlList"></ul>
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.2);">
+                    <button class="btn" onclick="downloadBackup()">💾 Download Backup</button>
+                    <button class="btn" onclick="copyAllUrls()">📋 Copy All URLs</button>
+                    <button class="btn" onclick="startNewGame()" style="background: rgba(255,255,255,0.2);">🔄 Create Another Game</button>
+                </div>
+            </div>
+
+            <input type="file" id="gameFile" accept=".json" style="display: none;">
+
+            <div class="navigation-links">
+                <a href="admin-panel.html" id="adminLink">📊 Admin Panel</a>
+                <a href="game-board.html" id="gameBoardLink">🎮 Game Board</a>
+                <a href="team-portal.html" id="teamPortalLink">👥 Team Portal</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include the main game engine -->
+    <script src="scripts/main.js"></script>
+    <script>
+        let gameEngine = null;
+        let currentGameData = null;
+
+        // Auto-update team preview when inputs change
+        document.getElementById('playerNames').addEventListener('input', updatePreviews);
+        document.getElementById('playerCount').addEventListener('change', updatePreviews);
+        document.getElementById('gameTypes').addEventListener('input', updateGamePreview);
+        document.getElementById('playTypes').addEventListener('input', updateGamePreview);
+        document.getElementById('heartHexes').addEventListener('input', updateGamePreview);
+
+        function updatePreviews() {
+            updateTeamPreview();
+            updateGamePreview();
+        }
+
+        function updateTeamPreview() {
+            const playerCount = parseInt(document.getElementById('playerCount').value);
+            const playerNames = document.getElementById('playerNames').value
+                .split(',')
+                .map(name => name.trim())
+                .filter(name => name);
+
+            const preview = document.getElementById('playerPreview');
+            const teamPreview = document.getElementById('teamPreview');
+
+            if (playerNames.length === 0) {
+                preview.style.display = 'none';
+                return;
+            }
+
+            if (playerNames.length !== playerCount) {
+                teamPreview.innerHTML = `
+                    <div style="color: #f87171; padding: 10px; background: rgba(248, 113, 113, 0.1); border-radius: 5px; margin-top: 10px;">
+                        ⚠️ Expected ${playerCount} players, got ${playerNames.length}
+                    </div>
+                `;
+                preview.style.display = 'block';
+                return;
+            }
+
+            // Create team distribution
+            const teamCount = Math.min(5, Math.ceil(playerCount / 2));
+            const teams = [];
+            
+            for (let i = 1; i <= teamCount; i++) {
+                teams.push({
+                    id: i,
+                    players: []
+                });
+            }
+
+            // Distribute players to teams
+            playerNames.forEach((name, index) => {
+                const teamIndex = Math.floor(index / Math.ceil(playerCount / teamCount));
+                if (teams[teamIndex]) {
+                    teams[teamIndex].players.push(name);
+                }
+            });
+
+            // Generate team preview
+            teamPreview.innerHTML = teams.map(team => `
+                <div class="team-card team${team.id}" style="margin-top: 10px; padding: 12px; font-size: 0.9rem;">
+                    <strong>Team ${team.id}</strong><br>
+                    <span style="opacity: 0.9;">${team.players.join(' & ')}</span>
+                </div>
+            `).join('');
+
+            preview.style.display = 'block';
+        }
+
+        function updateGamePreview() {
+            const gameTypes = document.getElementById('gameTypes').value
+                .split(',')
+                .map(game => game.trim())
+                .filter(game => game);
+            
+            const playTypes = document.getElementById('playTypes').value
+                .split(',')
+                .map(type => type.trim())
+                .filter(type => type);
+            
+            const heartHexes = document.getElementById('heartHexes').value
+                .split(',')
+                .map(hex => hex.trim())
+                .filter(hex => hex);
+
+            const preview = document.getElementById('gamePreview');
+            
+            if (gameTypes.length === 0 && playTypes.length === 0 && heartHexes.length === 0) {
+                preview.style.display = 'none';
+                return;
+            }
+
+            document.getElementById('gamesPreview').innerHTML = gameTypes.map(game => 
+                `<span class="preview-tag">${game}</span>`
+            ).join('');
+
+            document.getElementById('typesPreview').innerHTML = playTypes.map(type => 
+                `<span class="preview-tag">${type}</span>`
+            ).join('');
+
+            document.getElementById('hexesPreview').innerHTML = heartHexes.map(hex => 
+                `<span class="preview-tag">${hex}</span>`
+            ).join('');
+
+            preview.style.display = 'block';
+        }
+
+        function showStatus(message, type = 'success') {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.className = `status-message ${type}`;
+            statusEl.style.display = 'block';
+            
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 5000);
+        }
+
+        function createGame() {
+            const gameId = document.getElementById('gameId').value.trim();
+            const playerCount = parseInt(document.getElementById('playerCount').value);
+            const playerNames = document.getElementById('playerNames').value
+                .split(',')
+                .map(name => name.trim())
+                .filter(name => name);
+            const winCondition = parseInt(document.getElementById('winCondition').value);
+            const gameTypes = document.getElementById('gameTypes').value
+                .split(',')
+                .map(game => game.trim())
+                .filter(game => game);
+            const playTypes = document.getElementById('playTypes').value
+                .split(',')
+                .map(type => type.trim())
+                .filter(type => type);
+            const heartHexes = document.getElementById('heartHexes').value
+                .split(',')
+                .map(hex => hex.trim())
+                .filter(hex => hex);
+
+            // Validation
+            if (!gameId) {
+                showStatus('Please enter a Game Session ID', 'error');
+                return;
+            }
+
+            if (!/^[a-zA-Z0-9-_]+$/.test(gameId)) {
+                showStatus('Game ID can only contain letters, numbers, hyphens, and underscores', 'error');
+                return;
+            }
+
+            if (playerNames.length !== playerCount) {
+                showStatus(`Expected ${playerCount} players, got ${playerNames.length}`, 'error');
+                return;
+            }
+
+            if (winCondition < 10 || winCondition > 200) {
+                showStatus('Win condition must be between 10 and 200 points', 'error');
+                return;
+            }
+
+            if (gameTypes.length === 0) {
+                showStatus('Please specify at least one game type', 'error');
+                return;
+            }
+
+            if (playTypes.length === 0) {
+                showStatus('Please specify at least one play type', 'error');
+                return;
+            }
+
+            // Check if game already exists
+            const existingGame = localStorage.getItem(`game_${gameId}`);
+            if (existingGame) {
+                if (!confirm(`A game with ID "${gameId}" already exists. Do you want to overwrite it?`)) {
+                    return;
+                }
+            }
+
+            // Show loading
+            const createBtn = document.getElementById('createBtn');
+            const originalText = createBtn.innerHTML;
+            createBtn.innerHTML = '<span class="loading-spinner"></span>Creating Game...';
+            createBtn.disabled = true;
+
+            try {
+                // Create game engine and initialize
+                gameEngine = createGameEngine();
+                
+                const gameConfig = {
+                    gameId,
+                    playerNames,
+                    winCondition,
+                    gameTypes,
+                    playTypes,
+                    heartHexes
+                };
+
+                const gameState = gameEngine.initializeGame(gameConfig);
+                currentGameData = gameState;
+
+                // Show success
+                showStatus(`Game "${gameId}" created successfully!`, 'success');
+                displayGameUrls(gameId, gameState.teams);
+
+                // Update navigation links
+                updateNavigationLinks(gameId);
+
+            } catch (error) {
+                showStatus('Error creating game: ' + error.message, 'error');
+                console.error('Game creation error:', error);
+            } finally {
+                // Reset button
+                createBtn.innerHTML = originalText;
+                createBtn.disabled = false;
+            }
+        }
+
+        function displayGameUrls(gameId, teams) {
+            const urlDisplay = document.getElementById('urlDisplay');
+            const urlList = document.getElementById('urlList');
+            const baseUrl = window.location.origin + window.location.pathname.replace('setup.html', '');
+            
+            let urlsHtml = '';
+            
+            // Admin and board URLs
+            urlsHtml += `
+                <li>
+                    <strong>📊 Admin Panel:</strong><br>
+                    <code>${baseUrl}admin-panel.html?game=${gameId}</code>
+                    <button class="copy-btn" onclick="copyToClipboard('${baseUrl}admin-panel.html?game=${gameId}')">📋 Copy</button>
+                </li>
+                <li>
+                    <strong>🎮 Game Board (Public View):</strong><br>
+                    <code>${baseUrl}game-board.html?game=${gameId}</code>
+                    <button class="copy-btn" onclick="copyToClipboard('${baseUrl}game-board.html?game=${gameId}')">📋 Copy</button>
+                </li>
+            `;
+            
+            // Team URLs
+            teams.forEach(team => {
+                const teamUrl = `${baseUrl}team-portal.html?game=${gameId}&team=${team.id}`;
+                urlsHtml += `
+                    <li class="team-url">
+                        <strong>👥 ${team.name}:</strong> ${team.players.map(p => p.name).join(' & ')}<br>
+                        <code>${teamUrl}</code>
+                        <button class="copy-btn" onclick="copyToClipboard('${teamUrl}')">📋 Copy</button>
+                    </li>
+                `;
+            });
+            
+            urlList.innerHTML = urlsHtml;
+            urlDisplay.style.display = 'block';
+            
+            // Scroll to URLs
+            urlDisplay.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showStatus('URL copied to clipboard!', 'success');
+            }).catch(() => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showStatus('URL copied to clipboard!', 'success');
+            });
+        }
+
+        function copyAllUrls() {
+            const urlList = document.getElementById('urlList');
+            const urls = Array.from(urlList.querySelectorAll('code')).map(code => code.textContent);
+            const allUrls = urls.join('\n');
+            
+            copyToClipboard(allUrls);
+        }
+
+        function downloadBackup() {
+            if (!currentGameData) {
+                showStatus('No game data to backup', 'error');
+                return;
+            }
+
+            const dataStr = JSON.stringify(currentGameData, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `game-setup-${currentGameData.gameId}-${new Date().toISOString().slice(0, 10)}.json`;
+            link.click();
+            
+            showStatus('Backup file downloaded!', 'success');
+        }
+
+        function startNewGame() {
+            if (confirm('Are you sure you want to create a new game? Current URLs will be replaced.')) {
+                // Reset form
+                document.getElementById('gameId').value = '';
+                document.getElementById('playerNames').value = '';
+                document.getElementById('urlDisplay').style.display = 'none';
+                document.getElementById('playerPreview').style.display = 'none';
+                document.getElementById('gamePreview').style.display = 'none';
+                
+                // Reset game data
+                currentGameData = null;
+                gameEngine = null;
+                
+                // Scroll to top
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        function loadExistingGame() {
+            document.getElementById('gameFile').click();
+        }
+
+        function updateNavigationLinks(gameId) {
+            if (gameId) {
+                document.getElementById('adminLink').href = `admin-panel.html?game=${gameId}`;
+                document.getElementById('gameBoardLink').href = `game-board.html?game=${gameId}`;
+                document.getElementById('teamPortalLink').href = `team-portal.html?game=${gameId}`;
+            }
+        }
+
+        // Handle file loading
+        document.getElementById('gameFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const gameState = JSON.parse(e.target.result);
+                    
+                    // Populate form fields
+                    document.getElementById('gameId').value = gameState.gameId || '';
+                    document.getElementById('playerCount').value = gameState.players.length;
+                    document.getElementById('playerNames').value = gameState.players.map(p => p.name).join(', ');
+                    document.getElementById('winCondition').value = gameState.winCondition;
+                    document.getElementById('gameTypes').value = gameState.gameTypes ? gameState.gameTypes.join(', ') : '';
+                    document.getElementById('playTypes').value = gameState.playTypes ? gameState.playTypes.join(', ') : '';
+                    document.getElementById('heartHexes').value = gameState.heartHexes ? gameState.heartHexes.join(', ') : '';
+
+                    updatePreviews();
+                    showStatus('Game configuration loaded successfully!', 'success');
+
+                } catch (error) {
+                    showStatus('Error loading game file: ' + error.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // Initialize form
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check for existing game ID in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const gameId = urlParams.get('game');
+            if (gameId) {
+                document.getElementById('gameId').value = gameId;
+            }
+
+            // Auto-generate game ID if empty
+            if (!document.getElementById('gameId').value) {
+                const now = new Date();
+                const dateStr = now.toISOString().slice(0, 10);
+                document.getElementById('gameId').value = `game-${dateStr}`;
+            }
+
+            // Initialize previews
+            updatePreviews();
+        });
+    </script>
+</body>
+</html>

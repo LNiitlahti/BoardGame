@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>God Mode - Complete Board Game System</title>
+    <style>
+        /* =================================
+           GOD MODE STYLES
+        ================================= */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: white;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Background effects */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: 
+                radial-gradient(circle at 20% 80%, rgba(255, 215, 0, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 69, 0, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(138, 43, 226, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1920px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .god-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 30px;
+            background: rgba(255, 215, 0, 0.1);
+            border: 2px solid #ffd700;
+            border-radius: 20px;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 0 50px rgba(255, 215, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .god-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255, 215, 0, 0.1), transparent);
+            animation: godGlow 4s linear infinite;
+            pointer-events: none;
+        }
+
+        .god-header h1 {
+            font-size: 3.5rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 50%, #ff6b35 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .god-header p {
+            font-size: 1.3rem;
+            color: rgba(255, 215, 0, 0.9);
+            font-weight: 600;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Tab System */
+        .god-tabs {
+            display: flex;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 5px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .god-tab {
+            flex: 1;
+            padding: 15px 20px;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            position: relative;
+        }
+
+        .god-tab:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .god-tab.active {
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+            color: #1a1a2e;
+            box-shadow: 0 5px 20px rgba(255, 215, 0, 0.4);
+        }
+
+        .god-tab-content {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .god-tab-content.active {
+            display: block;
+        }
+
+        /* Grid Layouts */
+        .god-grid {
+            display: grid;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .god-grid.setup {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .god-grid.dashboard {
+            grid-template-columns: 300px 1fr 300px;
+        }
+
+        .god-grid.admin {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        /* Panel Components */
+        .god-panel {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(12px);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .god-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #ffd700, #ff6b35, #8a2be2);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .god-panel:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 215, 0, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .god-panel:hover::before {
+            opacity: 1;
+        }
+
+        .god-panel h3 {
+            color: #ffd700;
+            margin-bottom: 20px;
+            font-size: 1.4rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Board Area */
+        .god-board-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 600px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 20px;
+            padding: 30px;
+            position: relative;
+        }
+
+        .hex-grid {
+            position: relative;
+            width: 700px;
+            height: 700px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hex {
+            position: absolute;
+            width: 50px;
+            height: 45px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .hex-inner {
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .hex:hover .hex-inner {
+            background: rgba(255, 255, 255, 0.25);
+            transform: scale(1.1);
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+        }
+
+        /* Hex Types */
+        .hex.starting-location .hex-inner {
+            background: rgba(255, 215, 0, 0.5);
+            border-color: #ffd700;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+        }
+
+        .hex.heart-hex .hex-inner {
+            background: rgba(255, 20, 147, 0.5);
+            border-color: #ff1493;
+            box-shadow: 0 0 15px rgba(255, 20, 147, 0.3);
+        }
+
+        .hex.center .hex-inner {
+            background: rgba(138, 43, 226, 0.6);
+            border-color: #8a2be2;
+            box-shadow: 0 0 20px rgba(138, 43, 226, 0.4);
+        }
+
+        .hex.high-value .hex-inner {
+            background: rgba(255, 69, 0, 0.5);
+            border-color: #ff4500;
+            box-shadow: 0 0 15px rgba(255, 69, 0, 0.3);
+        }
+
+        /* Team Colors */
+        .hex.team1 .hex-inner { 
+            background: rgba(255, 68, 68, 0.9);
+            border-color: #ff4444;
+            color: white;
+            font-weight: 800;
+        }
+        .hex.team2 .hex-inner { 
+            background: rgba(68, 255, 68, 0.9);
+            border-color: #44ff44;
+            color: black;
+            font-weight: 800;
+        }
+        .hex.team3 .hex-inner { 
+            background: rgba(68, 68, 255, 0.9);
+            border-color: #4444ff;
+            color: white;
+            font-weight: 800;
+        }
+        .hex.team4 .hex-inner { 
+            background: rgba(255, 255, 68, 0.9);
+            border-color: #ffff44;
+            color: black;
+            font-weight: 800;
+        }
+        .hex.team5 .hex-inner { 
+            background: rgba(255, 68, 255, 0.9);
+            border-color: #ff44ff;
+            color: white;
+            font-weight: 800;
+        }
+
+        .hex.can-place .hex-inner {
+            background: rgba(0, 255, 0, 0.6) !important;
+            border-color: #00ff00 !important;
+            animation: pulse-green 1s infinite;
+            transform: scale(1.15);
+        }
+
+        /* Forms */
+        .god-form-group {
+            margin-bottom: 20px;
+        }
+
+        .god-form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #ffd700;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .god-form-group input,
+        .god-form-group select,
+        .god-form-group textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .god-form-group input:focus,
+        .god-form-group select:focus,
+        .god-form-group textarea:focus {
+            outline: none;
+            border-color: #ffd700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .god-form-group input::placeholder,
+        .god-form-group textarea::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        /* Buttons */
+        .god-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .god-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .god-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+        }
+
+        .god-btn:hover::before {
+            left: 100%;
+        }
+
+        .god-btn.primary {
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+            color: #1a1a2e;
+            font-weight: 700;
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.3);
+        }
+
+        .god-btn.danger {
+            background: linear-gradient(135deg, #ff4444 0%, #cc3333 100%);
+        }
+
+        .god-btn.success {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+        }
+
+        /* Status Messages */
+        .god-status {
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin: 15px 0;
+            font-weight: 600;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            border: 1px solid;
+            display: none;
+        }
+
+        .god-status.success {
+            background: rgba(74, 222, 128, 0.2);
+            border-color: #4ade80;
+            color: #4ade80;
+        }
+
+        .god-status.error {
+            background: rgba(248, 113, 113, 0.2);
+            border-color: #f87171;
+            color: #f87171;
+        }
+
+        .god-status.warning {
+            background: rgba(251, 191, 36, 0.2);
+            border-color: #fbbf24;
+            color: #fbbf24;
+        }
+
+        .god-status.info {
+            background: rgba(96, 165, 250, 0.2);
+            border-color: #60a5fa;
+            color: #60a5fa;
+        }
+
+        /* Live Updates */
+        .god-live-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            background: rgba(74, 222, 128, 0.2);
+            border: 2px solid #4ade80;
+            color: #4ade80;
+            border-radius: 25px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .god-live-indicator.disconnected {
+            background: rgba(248, 113, 113, 0.2);
+            border-color: #f87171;
+            color: #f87171;
+        }
+
+        .god-live-indicator .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background: currentColor;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        /* Activity Feed */
+        .god-activity {
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .god-activity-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border-left: 4px solid;
+            transition: all 0.3s ease;
+        }
+
+        .god-activity-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+
+        .god-activity-item.game-win {
+            border-left-color: #4ade80;
+        }
+
+        .god-activity-item.plate-place {
+            border-left-color: #60a5fa;
+        }
+
+        .god-activity-item.heart-capture {
+            border-left-color: #ff1493;
+        }
+
+        .god-activity-item.system {
+            border-left-color: #ffd700;
+        }
+
+        .god-activity-timestamp {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.85rem;
+            margin-top: 5px;
+        }
+
+        /* Team Cards */
+        .god-team-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            border-left: 5px solid;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .god-team-card:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .god-team-card.team1 { border-left-color: #ff4444; }
+        .god-team-card.team2 { border-left-color: #44ff44; }
+        .god-team-card.team3 { border-left-color: #4444ff; }
+        .god-team-card.team4 { border-left-color: #ffff44; }
+        .god-team-card.team5 { border-left-color: #ff44ff; }
+
+        .god-team-card.active-turn {
+            background: rgba(255, 215, 0, 0.2);
+            border: 2px solid #ffd700;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
+        }
+
+        .god-team-card.active-turn::before {
+            content: '👑';
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 1.5rem;
+            animation: float 2s ease-in-out infinite;
+        }
+
+        /* Animations */
+        @keyframes godGlow {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.7; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+
+        @keyframes pulse-green {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1400px) {
+            .god-grid.dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .hex-grid {
+                width: 600px;
+                height: 600px;
+            }
+            
+            .hex {
+                width: 42px;
+                height: 38px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .god-header h1 {
+                font-size: 2.5rem;
+            }
+            
+            .god-tabs {
+                flex-direction: column;
+            }
+            
+            .god-grid.setup,
+            .god-grid.admin {
+                grid-template-columns: 1fr;
+            }
+            
+            .hex-grid {
+                width: 400px;
+                height: 400px;
+            }
+            
+            .hex {
+                width: 32px;
+                height: 28px;
+            }
+            
+            .hex-inner {
+                font-size: 8px;
+            }
+        }
+
+        /* Special Effects */
+        .god-winner-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            backdrop-filter: blur(10px);
+        }
+
+        .god-winner-content {
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+            color: #1a1a2e;
+            padding: 50px;
+            border-radius: 30px;
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: 900;
+            animation: celebrate 1s ease;
+            box-shadow: 0 0 100px rgba(255, 215, 0, 0.8);
+        }
+
+        @keyframes celebrate {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            25% { transform: scale(1.1) rotate(2deg); }
+            75% { transform: scale(1.1) rotate(-2deg); }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 215, 0, 0.5);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 215, 0, 0.7);
+        }
+    </style>
+</head>
+<body>
+    <!-- Live Status Indicator -->
+    <div id="liveIndicator" class="god-live-indicator">
+        <div class="pulse-dot"></div>
+        <span id="liveStatus">Initializing...</span>
+    </div>
+
+    <!-- Winner Overlay (hidden by default) -->
+    <div id="winnerOverlay" class="god-winner-overlay" style="display: none;">
+        <div class="god-winner-content">
+            <div id="winnerText">🏆 VICTORY! 🏆</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="god-header">
+            <h1>👑 GOD MODE</h1>
+            <p>Complete Board Game System Control</p>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="god-tabs">
+            <button class="god-tab active" onclick="showGodTab('setup')">🔧 Setup & Config</button>
+            <button class="god-tab" onclick="showGodTab('dashboard')">🎮 Live Dashboard</button>
+            <button class="god-tab" onclick="showGodTab('admin')">👑 Game Management</button>
+            <button class="god-tab" onclick="showGodTab('analytics')">📊 Analytics</button>
+        </div>
+
+        <!-- Status Messages -->
+        <div id="godStatus" class="god-status"></div>
+
+        <!-- Setup Tab -->
+        <div id="setup-tab" class="god-tab-content active">
+            <div class="god-grid setup">
+                <div class="god-panel">
+                    <h3>🚀 Initialize New Game</h3>
+                    
+                    <div class="god-form-group">
+                        <label for="setupGameId">Game Session ID</label>
+                        <input type="text" id="setupGameId" placeholder="my-awesome-tournament-2024">
+                    </div>
+                    
+                    <div class="god-form-group">
+                        <label for="setupPlayerCount">Number of Players</label>
+                        <select id="setupPlayerCount" onchange="updateSetupPreview()">
+                            <option value="4">4 Players (2 Teams)</option>
+                            <option value="6" selected>6 Players (3 Teams)</option>
+                            <option value="8">8 Players (4 Teams)</option>
+                            <option value="10">10 Players (5 Teams)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="god-form-group">
+                        <label for="setupPlayerNames">Player Names</label>
+                        <textarea id="setupPlayerNames" rows="3" placeholder="Alice, Bob, Charlie, Diana, Eve, Frank" oninput="updateSetupPreview()"></textarea>
+                    </div>
+                    
+                    <div class="god-form-group">
+                        <label for="setupWinCondition">Win Condition (Points)</label>
+                        <input type="number" id="setupWinCondition" value="50" min="10" max="200">
+                    </div>
+                    
+                    <button class="god-btn primary" onclick="createGodGame()">👑 Create Game</button>
+                    <button class="god-btn" onclick="loadExistingGodGame()">📂 Load Game</button>
+                </div>
+                
+                <div class="god-panel">
+                    <h3>🔍 Game Preview</h3>
+                    <div id="setupPreview">
+                        <p style="text-align: center; color: rgba(255,255,255,0.6); font-style: italic;">
+                            Enter player names to see team distribution
+                        </p>
+                    </div>
+                    
+                    <div style="margin-top: 20px;">
+                        <h4 style="color: #ffd700; margin-bottom: 10px;">Quick Actions</h4>
+                        <button class="god-btn" onclick="generateRandomPlayers()">🎲 Generate Random Players</button>
+                        <button class="god-btn" onclick="loadGameTemplate()">📋 Load Template</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard-tab" class="god-tab-content">
+            <div class="god-grid dashboard">
+                <!-- Left Sidebar -->
+                <div class="god-panel">
+                    <h3>🏆 Team Rankings</h3>
+                    <div id="dashboardTeams">
+                        <p style="text-align: center; color: rgba(255,255,255,0.6);">No active game</p>
+                    </div>
+                    
+                    <h3 style="margin-top: 30px;">⏱️ Current Turn</h3>
+                    <div id="dashboardCurrentTurn" style="padding: 15px; background: rgba(255,255,255,0.05); border-radius: 10px; text-align: center;">
+                        <p style="color: rgba(255,255,255,0.6);">Waiting for game...</p>
+                    </div>
+                </div>
+                
+                <!-- Main Board -->
+                <div class="god-board-area">
+                    <h3 style="color: #ffd700; margin-bottom: 20px; text-align: center;">🗺️ Live Game Board</h3>
+                    <div class="hex-grid" id="dashboardHexGrid">
+                        <div style="text-align: center; color: rgba(255,255,255,0.6);">
+                            <h4>No Game Loaded</h4>
+                            <p>Create or load a game to see the board</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Board Controls -->
+                    <div style="margin-top: 20px; text-align: center;">
+                        <button class="god-btn" onclick="refreshDashboard()">🔄 Refresh</button>
+                        <button class="god-btn" onclick="toggleBoardAutoRefresh()">
+                            <span id="autoRefreshText">📡 Auto: ON</span>
+                        </button>
+                        <button class="god-btn success" onclick="enableGodMode()">👑 Enable God Mode</button>
+                    </div>
+                </div>
+                
+                <!-- Right Sidebar -->
+                <div class="god-panel">
+                    <h3>📰 Live Activity</h3>
+                    <div class="god-activity" id="dashboardActivity">
+                        <div class="god-activity-item system">
+                            <div>🎯 God Mode Active</div>
+                            <div class="god-activity-timestamp">System ready</div>
+                        </div>
+                    </div>
+                    
+                    <h3 style="margin-top: 30px;">📊 Quick Stats</h3>
+                    <div id="dashboardStats" style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: center;">
+                            <div>
+                                <div style="font-size: 1.5rem; color: #ffd700; font-weight: bold;" id="statGamesPlayed">0</div>
+                                <div style="font-size: 0.8rem; opacity: 0.7;">Games Played</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 1.5rem; color: #ffd700; font-weight: bold;" id="statRound">0</div>
+                                <div style="font-size: 0.8rem; opacity: 0.7;">Current Round</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 1.5rem; color: #ffd700; font-weight: bold;" id="statPlates">0</div>
+                                <div style="font-size: 0.8rem; opacity: 0.7;">Plates on Board</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 1.5rem; color: #ffd700; font-weight: bold;" id="statHearts">0</div>
+                                <div style="font-size: 0.8rem; opacity: 0.7;">Hearts Controlled</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Tab -->
+        <div id="admin-tab" class="god-tab-content">
+            <div class="god-grid admin">
+                <div class="god-panel">
+                    <h3>🎮 Add Game Result</h3>
+                    
+                    <div class="god-form-group">
+                        <label for="adminGame">Game</label>
+                        <select id="adminGame">
+                            <option value="CS2">Counter-Strike 2</option>
+                            <option value="Dota2">Dota 2</option>
+                            <option value="Valorant">Valorant</option>
+                            <option value="StarCraft2">StarCraft 2</option>
+                            <option value="Predecessor">Predecessor</option>
+                        </select>
+                    </div>
+                    
+                    <div class="god-form-group">
+                        <label for="adminPlayType">Match Type</label>
+                        <select id="adminPlayType">
+                            <option value="1v1">1v1</option>
+                            <option value="2v2">2v2</option>
+                            <option value="3v3">3v3</option>
+                            <option value="5v5">5v5</option>
+                        </select>
+                    </div>
+                    
+                    <div class="god-form-group">
+                        <label for="adminWinner">Winning Team</label>
+                        <select id="adminWinner">
+                            <option value="">Select winning team...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="god-form-group">
+                        <label for="adminNotes">Notes (Optional)</label>
+                        <textarea id="adminNotes" rows="2" placeholder="Match details, special events..."></textarea>
+                    </div>
+                    
+                    <button class="god-btn primary" onclick="addGameResult()">🏆 Add Result</button>
+                </div>
+                
+                <div class="god-panel">
+                    <h3>📍 Manual Plate Placement</h3>
+                    
+                    <div class="god-form-group">
+                        <label for="plateTeam">Team</label>
+                        <select id="plateTeam">
+                            <option value="">Select team...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="god-form-group">
+                        <label for="plateCoord">Hex Coordinate</label>
+                        <input type="text" id="plateCoord" placeholder="q0r0">
+                        <small style="color: rgba(255,255,255,0.6);">Click on board or enter manually</small>
+                    </div>
+                    
+                    <button class="god-btn success" onclick="forcePlacePlate()">📍 Force Place Plate</button>
+                    <button class="god-btn" onclick="showValidPlacements()">🎯 Show Valid Positions</button>
+                    
+                    <div style="margin-top: 20px;">
+                        <h4 style="color: #ffd700; margin-bottom: 10px;">Dangerous Actions</h4>
+                        <button class="god-btn danger" onclick="removePlate()">🗑️ Remove Plate</button>
+                        <button class="god-btn danger" onclick="resetBoard()">🔄 Reset Board</button>
+                    </div>
+                </div>
+                
+                <div class="god-panel">
+                    <h3>⚔️ Heart Hex Control</h3>
+                    
+                    <div id="heartControlList">
+                        <p style="text-align: center; color: rgba(255,255,255,0.6);">No hearts controlled</p>
+                    </div>
+                    
+                    <div class="god-form-group" style="margin-top: 20px;">
+                        <label for="heartHex">Heart Hex</label>
+                        <select id="heartHex">
+                            <option value="q0r0">q0r0 (Mountain Heart - +2/turn)</option>
+                            <option value="q2r-4">q2r-4 (Side Heart - +1/turn)</option>
+                            <option value="q4r-2">q4r-2 (Side Heart - +1/turn)</option>
+                            <option value="q2r2">q2r2 (Side Heart - +1/turn)</option>
+                            <option value="q-2r4">q-2r4 (Side Heart - +1/turn)</option>
+                            <option value="q-4r2">q-4r2 (Side Heart - +1/turn)</option>
+                            <option value="q-2r-2">q-2r-2 (Side Heart - +1/turn)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="god-form-group">
+                        <label for="heartTeam">Controlling Team</label>
+                        <select id="heartTeam">
+                            <option value="">No control</option>
+                        </select>
+                    </div>
+                    
+                    <button class="god-btn primary" onclick="setHeartControl()">⚔️ Set Control</button>
+                </div>
+                
+                <div class="god-panel">
+                    <h3>🎯 Game Management</h3>
+                    
+                    <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                        <h4 style="color: #ffd700; margin-bottom: 10px;">Current Game</h4>
+                        <div id="currentGameInfo">No game loaded</div>
+                    </div>
+                    
+                    <button class="god-btn" onclick="skipCurrentTurn()">⏭️ Skip Turn</button>
+                    <button class="god-btn" onclick="forceCalculatePoints()">🔢 Recalculate Points</button>
+                    <button class="god-btn" onclick="exportGameState()">💾 Export Game</button>
+                    
+                    <div style="margin-top: 20px;">
+                        <h4 style="color: #ff4444; margin-bottom: 10px;">Danger Zone</h4>
+                        <button class="god-btn danger" onclick="endGameManually()">🏁 Force End Game</button>
+                        <button class="god-btn danger" onclick="resetGameCompletely()">💀 Reset Everything</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Tab -->
+        <div id="analytics-tab" class="god-tab-content">
+            <div class="god-grid admin">
+                <div class="god-panel">
+                    <h3>📈 Game Statistics</h3>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px;">
+                        <div style="text-align: center; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 10px;">
+                            <div style="font-size: 2rem; color: #4ade80; font-weight: bold;" id="analyticsGames">0</div>
+                            <div>Total Games</div>
+                        </div>
+                        <div style="text-align: center; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 10px;">
+                            <div style="font-size: 2rem; color: #60a5fa; font-weight: bold;" id="analyticsRounds">0</div>
+                            <div>Rounds Completed</div>
+                        </div>
+                        <div style="text-align: center; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 10px;">
+                            <div style="font-size: 2rem; color: #fbbf24; font-weight: bold;" id="analyticsPlates">0</div>
+                            <div>Plates Placed</div>
+                        </div>
+                        <div style="text-align: center; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 10px;">
+                            <div style="font-size: 2rem; color: #f87171; font-weight: bold;" id="analyticsHearts">0</div>
+                            <div>Hearts Controlled</div>
+                        </div>
+                    </div>
+                    
+                    <h4 style="color: #ffd700; margin-bottom: 15px;">Game Type Distribution</h4>
+                    <div id="gameTypeStats" style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
+                        <p style="text-align: center; color: rgba(255,255,255,0.6);">No games played yet</p>
+                    </div>
+                </div>
+                
+                <div class="god-panel">
+                    <h3>🏆 Team Performance</h3>
+                    
+                    <div id="teamPerformance">
+                        <p style="text-align: center; color: rgba(255,255,255,0.6);">No team data available</p>
+                    </div>
+                </div>
+                
+                <div class="god-panel">
+                    <h3>📊 Advanced Analytics</h3>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <h4 style="color: #ffd700; margin-bottom: 10px;">Win Rate by Game Type</h4>
+                        <div id="winRateByGame" style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
+                            <p style="text-align: center; color: rgba(255,255,255,0.6);">Insufficient data</p>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 style="color: #ffd700; margin-bottom: 10px;">Board Control Analysis</h4>
+                        <div id="boardControlAnalysis" style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
+                            <p style="text-align: center; color: rgba(255,255,255,0.6);">No board data</p>
+                        </div>
+                    </div>
+                    
+                    <button class="god-btn" onclick="generateDetailedReport()" style="margin-top: 20px; width: 100%;">📋 Generate Detailed Report</button>
+                </div>
+                
+                <div class="god-panel">
+                    <h3>📜 Game History</h3>
+                    
+                    <div class="god-activity" id="gameHistoryList" style="max-height: 300px;">
+                        <p style="text-align: center; color: rgba(255,255,255,0.6);">No games in history</p>
+                    </div>
+                    
+                    <div style="margin-top: 20px; text-align: center;">
+                        <button class="god-btn" onclick="clearGameHistory()">🗑️ Clear History</button>
+                        <button class="god-btn" onclick="exportGameHistory()">💾 Export History</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden file input -->
+    <input type="file" id="gameFileInput" accept=".json" style="display: none;">
+
+    <script>
+        // =================================
+        // GOD MODE GAME ENGINE
+        // =================================
+        
+        let godEngine = null;
+        let currentGameId = null;
+        let autoRefresh = true;
+        let refreshInterval = null;
+        let godModeEnabled = false;
+        
+        // Initialize God Mode
+        document.addEventListener('DOMContentLoaded', function() {
+            updateLiveStatus('initializing', 'Initializing God Mode...');
+            
+            // Check for game ID in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const gameId = urlParams.get('game');
+            
+            if (gameId) {
+                currentGameId = gameId;
+                loadGodGame(gameId);
+            } else {
+                updateLiveStatus('ready', 'Ready for Action');
+            }
+            
+            // Auto-generate game ID for setup
+            if (!document.getElementById('setupGameId').value) {
+                const now = new Date();
+                const dateStr = now.toISOString().slice(0, 10);
+                document.getElementById('setupGameId').value = `god-game-${dateStr}`;
+            }
+            
+            // Start auto-refresh
+            startAutoRefresh();
+        });
+
+        // =================================
+        // TAB MANAGEMENT
+        // =================================
+        
+        function showGodTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.god-tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.god-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+            
+            // Refresh content based on tab
+            if (tabName === 'dashboard') {
+                refreshDashboard();
+            } else if (tabName === 'analytics') {
+                refreshAnalytics();
+            }
+        }
+
+        // =================================
+        // STATUS MANAGEMENT
+        // =================================
+        
+        function updateLiveStatus(status, message) {
+            const indicator = document.getElementById('liveIndicator');
+            const statusText = document.getElementById('liveStatus');
+            
+            indicator.className = `god-live-indicator ${status === 'ready' || status === 'connected' ? '' : 'disconnected'}`;
+            statusText.textContent = message;
+        }
+        
+        function showGodStatus(message, type = 'info', duration = 5000) {
+            const status = document.getElementById('godStatus');
+            status.textContent = message;
+            status.className = `god-status ${type}`;
+            status.style.display = 'block';
+            
+            setTimeout(() => {
+                status.style.display = 'none';
+            }, duration);
+        }
+
+        // =================================
+        // SETUP FUNCTIONS
+        // =================================
+        
+        function updateSetupPreview() {
+            const playerCount = parseInt(document.getElementById('setupPlayerCount').value);
+            const playerNames = document.getElementById('setupPlayerNames').value
+                .split(',')
+                .map(name => name.trim())
+                .filter(name => name);
+                
+            const preview = document.getElementById('setupPreview');
+            
+            if (playerNames.length === 0) {
+                preview.innerHTML = '<p style="text-align: center; color: rgba(255,255,255,0.6); font-style: italic;">Enter player names to see team distribution</p>';
+                return;
+            }
+            
+            if (playerNames.length !== playerCount) {
+                preview.innerHTML = `
+                    <div style="color: #f87171; padding: 15px; background: rgba(248, 113, 113, 0.1); border-radius: 10px;">
+                        ⚠️ Expected ${playerCount} players, got ${playerNames.length}
+                    </div>
+                `;
+                return;
+            }
+            
+            // Create team distribution
+            const teamCount = Math.min(5, Math.ceil(playerCount / 2));
+            const teams = [];
+            
+            for (let i = 1; i <= teamCount; i++) {
+                teams.push({ id: i, players: [] });
+            }
+            
+            // Distribute players
+            playerNames.forEach((name, index) => {
+                const teamIndex = Math.floor(index / Math.ceil(playerCount / teamCount));
+                if (teams[teamIndex]) {
+                    teams[teamIndex].players.push(name);
+                }
+            });
+            
+            preview.innerHTML = `
+                <h4 style="color: #ffd700; margin-bottom: 15px;">Team Distribution</h4>
+                ${teams.map(team => `
+                    <div class="god-team-card team${team.id}" style="margin-bottom: 10px; padding: 15px;">
+                        <strong>Team ${team.id}</strong><br>
+                        <span style="opacity: 0.9;">${team.players.join(' & ')}</span>
+                    </div>
+                `).join('')}
+            `;
+        }
+        
+        function generateRandomPlayers() {
+            const names = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Henry', 'Ivy', 'Jack'];
+            const playerCount = parseInt(document.getElementById('setupPlayerCount').value);
+            const selectedNames = names.slice(0, playerCount);
+            
+            document.getElementById('setupPlayerNames').value = selectedNames.join(', ');
+            updateSetupPreview();
+            showGodStatus('Random players generated!', 'success', 3000);
+        }
+        
+        function loadGameTemplate() {
+            const templates = {
+                'LAN Tournament': {
+                    players: 'Juha, Förs, Ville, Elmo, Teemu, Rony',
+                    winCondition: 50
+                },
+                'Office Competition': {
+                    players: 'Alice, Bob, Charlie, Diana, Eve, Frank',
+                    winCondition: 30
+                },
+                'Weekend Gaming': {
+                    players: 'Player1, Player2, Player3, Player4',
+                    winCondition: 25
+                }
+            };
+            
+            const templateName = prompt('Select template:\n1. LAN Tournament\n2. Office Competition\n3. Weekend Gaming\n\nEnter number (1-3):');
+            const templateKeys = Object.keys(templates);
+            const selectedTemplate = templates[templateKeys[parseInt(templateName) - 1]];
+            
+            if (selectedTemplate) {
+                document.getElementById('setupPlayerNames').value = selectedTemplate.players;
+                document.getElementById('setupWinCondition').value = selectedTemplate.winCondition;
+                document.getElementById('setupPlayerCount').value = selectedTemplate.players.split(',').length;
+                updateSetupPreview();
+                showGodStatus('Template loaded successfully!', 'success', 3000);
+            }
+        }
+        
+        function createGodGame() {
+            const gameId = document.getElementById('setupGameId').value.trim();
+            const playerCount = parseInt(document.getElementById('setupPlayerCount').value);
+            const playerNames = document.getElementById('setupPlayerNames').value
+                .split(',')
+                .map(name => name.trim())
+                .filter(name => name);
+            const winCondition = parseInt(document.getElementById('setupWinCondition').value);
+            
+            // Validation
+            if (!gameId) {
+                showGodStatus('Please enter a Game Session ID', 'error');
+                return;
+            }
+            
+            if (playerNames.length !== playerCount) {
+                showGodStatus(`Expected ${playerCount} players, got ${playerNames.length}`, 'error');
+                return;
+            }
+            
+            updateLiveStatus('creating', 'Creating Game...');
+            
+            try {
+                // Create game engine
+                if (typeof BoardGameEngine !== 'undefined') {
+                    godEngine = new BoardGameEngine();
+                } else {
+                    throw new Error('Game engine not loaded');
+                }
+                
+                const gameConfig = {
+                    gameId,
+                    playerNames,
+                    winCondition,
+                    gameTypes: ['CS2', 'Dota2', 'Valorant', 'StarCraft2', 'Predecessor'],
+                    playTypes: ['1v1', '2v2', '3v3', '5v5'],
+                    heartHexes: ['q2r-4', 'q4r-2', 'q2r2', 'q-2r4', 'q-4r2', 'q-2r-2']
+                };
+                
+                const gameState = godEngine.initializeGame(gameConfig);
+                currentGameId = gameId;
+                
+                // Update all interfaces
+                updateAllInterfaces();
+                
+                showGodStatus(`Game "${gameId}" created successfully!`, 'success');
+                updateLiveStatus('connected', 'Game Active');
+                
+                // Switch to dashboard
+                showGodTab('dashboard');
+                
+            } catch (error) {
+                console.error('Error creating game:', error);
+                showGodStatus('Error creating game: ' + error.message, 'error');
+                updateLiveStatus('error', 'Creation Failed');
+            }
+        }
+        
+        function loadExistingGodGame() {
+            document.getElementById('gameFileInput').click();
+        }
+        
+        function loadGodGame(gameId) {
+            updateLiveStatus('loading', 'Loading Game...');
+            
+            try {
+                if (typeof loadGameFromStorage !== 'undefined') {
+                    godEngine = loadGameFromStorage(gameId);
+                } else {
+                    throw new Error('Game loader not available');
+                }
+                
+                if (!godEngine) {
+                    throw new Error(`Game "${gameId}" not found`);
+                }
+                
+                currentGameId = gameId;
+                updateAllInterfaces();
+                updateLiveStatus('connected', 'Game Loaded');
+                showGodStatus(`Game "${gameId}" loaded successfully!`, 'success');
+                
+            } catch (error) {
+                console.error('Error loading game:', error);
+                updateLiveStatus('error', 'Load Failed');
+                showGodStatus('Error loading game: ' + error.message, 'error');
+            }
+        }
+
+        // =================================
+        // DASHBOARD FUNCTIONS
+        // =================================
+        
+        function refreshDashboard() {
+            if (!godEngine || !godEngine.gameState) {
+                updateDashboardEmpty();
+                return;
+            }
+            
+            const gameState = godEngine.gameState;
+            
+            // Update teams
+            updateDashboardTeams(gameState);
+            
+            // Update current turn
+            updateDashboardTurn(gameState);
+            
+            // Update hex board
+            updateDashboardBoard(gameState);
+            
+            // Update activity
+            updateDashboardActivity(gameState);
+            
+            // Update stats
+            updateDashboardStats(gameState);
+        }
+        
+        function updateDashboardEmpty() {
+            document.getElementById('dashboardTeams').innerHTML = '<p style="text-align: center; color: rgba(255,255,255,0.6);">No active game</p>';
+            document.getElementById('dashboardCurrentTurn').innerHTML = '<p style="color: rgba(255,255,255,0.6);">Waiting for game...</p>';
+            document.getElementById('dashboardHexGrid').innerHTML = `
+                <div style="text-align: center; color: rgba(255,255,255,0.6);">
+                    <h4>No Game Loaded</h4>
+                    <p>Create or load a game to see the board</p>
+                </div>
+            `;
+        }
+        
+        function updateDashboardTeams(gameState) {
+            const teams = [...gameState.teams].sort((a, b) => b.points - a.points);
+            const container = document.getElementById('dashboardTeams');
+            
+            container.innerHTML = teams.map((team, index) => {
+                const rankIcon = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+                const isActiveTurn = gameState.currentTurn && team.id === gameState.currentTurn.teamId;
+                
+                return `
+                    <div class="god-team-card team${team.id} ${isActiveTurn ? 'active-turn' : ''}" style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: between; align-items: center;">
+                            <div>
+                                <strong>${rankIcon} ${team.name}</strong><br>
+                                <small>${team.players.map(p => p.name).join(' & ')}</small>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 1.3rem; font-weight: bold; color: #ffd700;">${team.points}</div>
+                                <div style="font-size: 0.8rem; opacity: 0.8;">${team.gamesWon || 0} wins</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function updateDashboardTurn(gameState) {
+            const container = document.getElementById('dashboardCurrentTurn');
+            
+            if (gameState.currentTurn && gameState.gamePhase === 'playing') {
+                const team = gameState.teams.find(t => t.id === gameState.currentTurn.teamId);
+                if (team) {
+                    container.innerHTML = `
+                        <div style="color: #ffd700; font-weight: bold; margin-bottom: 8px;">👑 ${team.name}'s Turn</div>
+                        <div style="color: rgba(255,255,255,0.9); margin-bottom: 8px;">${team.players.map(p => p.name).join(' & ')}</div>
+                        <div style="font-size: 0.9rem; opacity: 0.8;">
+                            ${gameState.currentTurn.needsPlacement ? '📍 Needs to place plate' : '✅ Turn complete'}
+                        </div>
+                    `;
+                    return;
+                }
+            }
+            
+            if (gameState.gamePhase === 'finished') {
+                container.innerHTML = '<div style="color: #4ade80; font-weight: bold;">🏆 Game Finished</div>';
+            } else {
+                container.innerHTML = '<div style="color: rgba(255,255,255,0.6);">⏳ Waiting for next game result...</div>';
+            }
+        }
+        
+        function updateDashboardBoard(gameState) {
+            const hexGrid = document.getElementById('dashboardHexGrid');
+            hexGrid.innerHTML = '';
+            
+            // Generate hex coordinates
+            const coordinates = generateHexCoordinates();
+            
+            coordinates.forEach(([q, r]) => {
+                const hex = document.createElement('div');
+                hex.className = getHexClasses(q, r, gameState);
+                hex.id = `dash-hex-${q}-${r}`;
+                
+                const [x, y] = hexToPixel(q, r, 25, 350, 350);
+                hex.style.left = `${x}px`;
+                hex.style.top = `${y}px`;
+                
+                const hexInner = document.createElement('div');
+                hexInner.className = 'hex-inner';
+                
+                // Set hex content
+                const coord = `q${q}r${r}`;
+                const board = gameState.board instanceof Map ? gameState.board : new Map(Object.entries(gameState.board || {}));
+                const occupier = board.get(coord);
+                
+                if (occupier) {
+                    const team = gameState.teams.find(t => t.id === occupier);
+                    hexInner.textContent = team ? team.name.slice(-1) : occupier;
+                } else {
+                    hexInner.textContent = `${q},${r}`;
+                }
+                
+                // Add click handler for god mode
+                hex.addEventListener('click', () => handleBoardClick(q, r));
+                
+                hex.appendChild(hexInner);
+                hexGrid.appendChild(hex);
+            });
+        }
+        
+        function updateDashboardActivity(gameState) {
+            const container = document.getElementById('dashboardActivity');
+            const activities = [];
+            
+            // Add recent game results
+            const recentGames = (gameState.gameHistory || []).slice(-5).reverse();
+            recentGames.forEach(game => {
+                const team = gameState.teams.find(t => t.id === game.winningTeamId);
+                if (team) {
+                    activities.push({
+                        type: 'game-win',
+                        content: `🎮 ${team.name} won ${game.game} ${game.playType}`,
+                        timestamp: game.timestamp
+                    });
+                }
+            });
+            
+            // Add system events
+            activities.push({
+                type: 'system',
+                content: '👑 God Mode Active',
+                timestamp: new Date().toISOString()
+            });
+            
+            if (activities.length === 0) {
+                container.innerHTML = `
+                    <div class="god-activity-item system">
+                        <div>🎯 God Mode Active</div>
+                        <div class="god-activity-timestamp">System ready</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = activities.map(activity => `
+                <div class="god-activity-item ${activity.type}">
+                    <div>${activity.content}</div>
+                    <div class="god-activity-timestamp">${formatTimestamp(activity.timestamp)}</div>
+                </div>
+            `).join('');
+        }
+        
+        function updateDashboardStats(gameState) {
+            document.getElementById('statGamesPlayed').textContent = gameState.gamesPlayed || 0;
+            document.getElementById('statRound').textContent = gameState.currentRound || 0;
+            
+            // Count plates
+            let plateCount = 0;
+            if (gameState.board instanceof Map) {
+                plateCount = gameState.board.size;
+            } else if (gameState.board) {
+                plateCount = Object.keys(gameState.board).length;
+            }
+            document.getElementById('statPlates').textContent = plateCount;
+            
+            // Count hearts
+            let heartCount = 0;
+            if (gameState.heartHex
