@@ -1,5 +1,5 @@
 # Sensitive Firebase configuration
-scripts/firebase.js
+BoardGame/scripts/firebase.js
 
 # Dependencies
 node_modules/
