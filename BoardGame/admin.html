@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Board Game System</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        /* Admin-specific styles */
+        .admin-header {
+            background: rgba(255, 215, 0, 0.2);
+            border: 2px solid #ffd700;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .admin-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .admin-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .admin-section h3 {
+            color: #ffd700;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .game-result-form {
+            display: grid;
+            gap: 15px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .team-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .team-selection {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .team-selection.selected {
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.1);
+        }
+
+        .team-selection h4 {
+            margin-bottom: 10px;
+            color: #ffd700;
+        }
+
+        .player-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .player-tag {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stats-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            border-left: 4px solid #ffd700;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ffd700;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .recent-games {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .game-entry {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 3px solid #ffd700;
+        }
+
+        .game-entry .game-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .game-entry .timestamp {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.8rem;
+        }
+
+        .winner-badge {
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 0.9rem;
+        }
+
+        .turn-management {
+            background: rgba(255, 215, 0, 0.1);
+            border: 2px solid #ffd700;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+
+        .current-turn-info {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .turn-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .team-rankings {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .ranking-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+
+        .ranking-item.first { border-left-color: #ffd700; }
+        .ranking-item.second { border-left-color: #c0c0c0; }
+        .ranking-item.third { border-left-color: #cd7f32; }
+
+        .ranking-position {
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin-right: 10px;
+        }
+
+        .team-info {
+            flex: 1;
+        }
+
+        .team-name {
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .team-players {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .team-score {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #ffd700;
+        }
+
+        .export-section {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-indicator.active {
+            background: #4ade80;
+            box-shadow: 0 0 8px #4ade80;
+        }
+
+        .status-indicator.waiting {
+            background: #ffd700;
+            box-shadow: 0 0 8px #ffd700;
+        }
+
+        .status-indicator.finished {
+            background: #6b7280;
+        }
+
+        @media (max-width: 768px) {
+            .admin-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .form-row, .team-selector {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-dashboard {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="admin-header">
+            <h1>👑 Admin Panel</h1>
+            <p id="gameTitle">Game Management Console</p>
+            <div style="margin-top: 10px;">
+                <span class="status-indicator" id="gameStatus"></span>
+                <span id="gameStatusText">Loading...</span>
+            </div>
+        </div>
+
+        <!-- Status Messages -->
+        <div class="status-message" id="statusMessage" style="display: none;"></div>
+
+        <!-- Turn Management -->
+        <div class="turn-management" id="turnManagement" style="display: none;">
+            <div class="current-turn-info">
+                <h3>⏰ Active Turn</h3>
+                <div id="currentTurnInfo">No active turn</div>
+            </div>
+            <div class="turn-actions">
+                <button class="btn btn-small" onclick="completeTurn()">✅ Complete Turn</button>
+                <button class="btn btn-small" onclick="skipTurn()">⏭️ Skip Turn</button>
+                <button class="btn btn-small" onclick="viewBoard()">🎮 View Board</button>
+            </div>
+        </div>
+
+        <!-- Main Admin Grid -->
+        <div class="admin-grid">
+            <!-- Game Results Section -->
+            <div class="admin-section">
+                <h3>🎮 Add Game Result</h3>
+                <form class="game-result-form" onsubmit="addGameResult(event)">
+                    <div class="form-row">
+                        <div>
+                            <label for="gameType">Game:</label>
+                            <select id="gameType" required>
+                                <option value="">Select Game</option>
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+                        <div>
+                            <label for="playType">Match Type:</label>
+                            <select id="playType" required>
+                                <option value="">Select Type</option>
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label>Select Winning Team:</label>
+                        <div class="team-selector" id="teamSelector">
+                            <!-- Team options populated dynamically -->
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="gameNotes">Notes (optional):</label>
+                        <textarea id="gameNotes" rows="2" placeholder="Additional notes about the match..."></textarea>
+                    </div>
+
+                    <button type="submit" class="btn primary" id="addResultBtn">
+                        🏆 Add Game Result
+                    </button>
+                </form>
+            </div>
+
+            <!-- Game Statistics -->
+            <div class="admin-section">
+                <h3>📊 Game Statistics</h3>
+                <div class="stats-dashboard">
+                    <div class="stat-item">
+                        <div class="stat-number" id="totalGames">0</div>
+                        <div class="stat-label">Games Played</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="totalRounds">0</div>
+                        <div class="stat-label">Current Round</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="activeTurns">0</div>
+                        <div class="stat-label">Active Turns</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="totalPlayers">0</div>
+                        <div class="stat-label">Total Players</div>
+                    </div>
+                </div>
+
+                <!-- Team Rankings -->
+                <div class="team-rankings">
+                    <h4 style="color: #ffd700; margin-bottom: 15px;">🏆 Team Rankings</h4>
+                    <div id="teamRankings">
+                        <!-- Rankings populated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Games -->
+            <div class="admin-section">
+                <h3>📜 Recent Games</h3>
+                <div class="recent-games" id="recentGames">
+                    <!-- Recent games populated dynamically -->
+                </div>
+                <div class="action-buttons">
+                    <button class="btn btn-small" onclick="refreshData()">🔄 Refresh</button>
+                    <button class="btn btn-small" onclick="clearHistory()">🗑️ Clear History</button>
+                </div>
+            </div>
+
+            <!-- Game Management -->
+            <div class="admin-section">
+                <h3>⚙️ Game Management</h3>
+                <div class="action-buttons">
+                    <button class="btn btn-small" onclick="viewBoard()">🎮 View Game Board</button>
+                    <button class="btn btn-small" onclick="openTeamPortal()">👥 Team Portals</button>
+                    <button class="btn btn-small" onclick="forceRecalculate()">🔢 Recalculate Scores</button>
+                    <button class="btn btn-small" onclick="resetCurrentTurn()">🔄 Reset Turn</button>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <h4 style="color: #ffd700; margin-bottom: 10px;">🔧 Advanced Actions</h4>
+                    <div class="action-buttons">
+                        <button class="btn btn-small" onclick="exportGameData()">📤 Export Data</button>
+                        <button class="btn btn-small" onclick="importGameData()">📥 Import Data</button>
+                        <button class="btn btn-small danger" onclick="resetGame()">⚠️ Reset Game</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Section -->
+        <div class="export-section">
+            <h3 style="color: #ffd700; margin-bottom: 15px;">💾 Backup & Export</h3>
+            <div class="action-buttons">
+                <button class="btn" onclick="downloadBackup()">💾 Download Backup</button>
+                <button class="btn" onclick="downloadStatistics()">📊 Export Statistics</button>
+                <button class="btn" onclick="downloadTeamUrls()">🔗 Export Team URLs</button>
+            </div>
+            <div style="margin-top: 15px; color: rgba(255, 255, 255, 0.7); font-size: 0.9rem;">
+                <p>💡 <strong>Tip:</strong> Regular backups help prevent data loss. Export statistics for analysis.</p>
+            </div>
+        </div>
+
+        <!-- Hidden file input for imports -->
+        <input type="file" id="importFile" accept=".json" style="display: none;" onchange="handleFileImport(event)">
+
+        <!-- Game Log -->
+        <div class="admin-section" style="margin-top: 30px;">
+            <h3>📋 Game Log</h3>
+            <div class="game-log" id="gameLog">
+                <div style="color: #ffd700;">👑 Admin Panel Ready</div>
+                <div>Waiting for game initialization...</div>
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-small" onclick="clearLog()">🗑️ Clear Log</button>
+                <button class="btn btn-small" onclick="downloadLog()">📄 Download Log</button>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="navigation">
+            <a href="setup.html" id="setupLink">🔧 Setup</a>
+            <a href="game.html" id="gameBoardLink">🎮 Game Board</a>
+            <a href="team.html" id="teamPortalLink">👥 Team Portal</a>
+        </div>
+    </div>
+
+    <!-- Include main game engine -->
+    <script src="scripts/main.js"></script>
+    <script>
+        let gameEngine = null;
+        let selectedWinningTeam = null;
+        let gameLog = [];
+
+        // Initialize admin panel
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeAdminPanel();
+        });
+
+        function initializeAdminPanel() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const gameId = urlParams.get('game');
+
+            if (!gameId) {
+                showStatus('No game ID provided. Please create or load a game first.', 'error');
+                return;
+            }
+
+            try {
+                // Try to load existing game
+                gameEngine = loadGameFromStorage(gameId);
+                
+                if (!gameEngine || !gameEngine.gameState.initialized) {
+                    showStatus(`Game "${gameId}" not found. Please check the game ID or create a new game.`, 'error');
+                    return;
+                }
+
+                // Setup event listeners
+                setupEventListeners();
+                
+                // Initialize UI
+                updateAdminInterface();
+                populateGameOptions();
+                
+                addLog(`Admin panel loaded for game: ${gameId}`);
+                showStatus(`Game "${gameId}" loaded successfully!`, 'success');
+
+            } catch (error) {
+                addLog(`Error loading game: ${error.message}`);
+                showStatus('Error loading game: ' + error.message, 'error');
+            }
+        }
+
+        function setupEventListeners() {
+            if (!gameEngine) return;
+
+            gameEngine.on('gameResultAdded', (data) => {
+                addLog(`Game result added: ${data.result.game} - ${data.winningTeam.name} wins`);
+                updateAdminInterface();
+                showStatus(`Game result added successfully!`, 'success');
+            });
+
+            gameEngine.on('turnStarted', (data) => {
+                addLog(`Turn started for Team ${data.teamId}`);
+                updateAdminInterface();
+            });
+
+            gameEngine.on('turnCompleted', (data) => {
+                addLog(`Turn completed for Team ${data.completedTurn.teamId}`);
+                updateAdminInterface();
+            });
+
+            gameEngine.on('gameEnded', (data) => {
+                addLog(`🎉 GAME OVER! ${data.winner.name} wins with ${data.winner.points} points!`);
+                updateAdminInterface();
+                showStatus(`🎉 ${data.winner.name} wins the tournament!`, 'success');
+            });
+
+            gameEngine.on('error', (data) => {
+                addLog(`Error: ${data.message}`);
+                showStatus('Error: ' + data.message, 'error');
+            });
+        }
+
+        function populateGameOptions() {
+            if (!gameEngine) return;
+
+            const gameState = gameEngine.gameState;
+            
+            // Populate game types
+            const gameTypeSelect = document.getElementById('gameType');
+            gameTypeSelect.innerHTML = '<option value="">Select Game</option>';
+            gameState.gameTypes.forEach(game => {
+                const option = document.createElement('option');
+                option.value = game;
+                option.textContent = game;
+                gameTypeSelect.appendChild(option);
+            });
+
+            // Populate play types
+            const playTypeSelect = document.getElementById('playType');
+            playTypeSelect.innerHTML = '<option value="">Select Type</option>';
+            gameState.playTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type;
+                option.textContent = type;
+                playTypeSelect.appendChild(option);
+            });
+
+            // Populate team selector
+            const teamSelector = document.getElementById('teamSelector');
+            teamSelector.innerHTML = '';
+            gameState.teams.forEach(team => {
+                const teamDiv = document.createElement('div');
+                teamDiv.className = 'team-selection';
+                teamDiv.onclick = () => selectWinningTeam(team.id);
+                teamDiv.innerHTML = `
+                    <h4>Team ${team.id}</h4>
+                    <div class="player-list">
+                        ${team.players.map(p => `<span class="player-tag">${p.name}</span>`).join('')}
+                    </div>
+                    <div style="font-size: 0.9rem; color: rgba(255,255,255,0.7);">
+                        Points: ${team.points} | Wins: ${team.gamesWon}
+                    </div>
+                `;
+                teamDiv.dataset.teamId = team.id;
+                teamSelector.appendChild(teamDiv);
+            });
+        }
+
+        function selectWinningTeam(teamId) {
+            // Clear previous selection
+            document.querySelectorAll('.team-selection').forEach(el => {
+                el.classList.remove('selected');
+            });
+
+            // Select new team
+            const teamElement = document.querySelector(`[data-team-id="${teamId}"]`);
+            if (teamElement) {
+                teamElement.classList.add('selected');
+                selectedWinningTeam = teamId;
+            }
+        }
+
+        function addGameResult(event) {
+            event.preventDefault();
+
+            if (!gameEngine) {
+                showStatus('Game engine not initialized', 'error');
+                return;
+            }
+
+            const gameType = document.getElementById('gameType').value;
+            const playType = document.getElementById('playType').value;
+            const notes = document.getElementById('gameNotes').value.trim();
+
+            if (!gameType || !playType || !selectedWinningTeam) {
+                showStatus('Please fill in all required fields and select a winning team', 'error');
+                return;
+            }
+
+            try {
+                const gameResult = {
+                    game: gameType,
+                    playType: playType,
+                    winningTeamId: selectedWinningTeam,
+                    notes: notes
+                };
+
+                gameEngine.addGameResult(gameResult);
+
+                // Reset form
+                document.getElementById('gameType').value = '';
+                document.getElementById('playType').value = '';
+                document.getElementById('gameNotes').value = '';
+                selectedWinningTeam = null;
+                document.querySelectorAll('.team-selection').forEach(el => {
+                    el.classList.remove('selected');
+                });
+
+            } catch (error) {
+                showStatus('Error adding game result: ' + error.message, 'error');
+            }
+        }
+
+        function updateAdminInterface() {
+            if (!gameEngine) return;
+
+            const gameState = gameEngine.gameState;
+            const stats = gameEngine.getGameStats();
+
+            // Update header
+            document.getElementById('gameTitle').textContent = `Game: ${gameState.gameId}`;
+            
+            // Update status indicator
+            const statusIndicator = document.getElementById('gameStatus');
+            const statusText = document.getElementById('gameStatusText');
+            
+            if (gameState.gamePhase === 'playing') {
+                statusIndicator.className = 'status-indicator active';
+                statusText.textContent = 'Game Active';
+            } else if (gameState.gamePhase === 'finished') {
+                statusIndicator.className = 'status-indicator finished';
+                statusText.textContent = 'Game Finished';
+            } else {
+                statusIndicator.className = 'status-indicator waiting';
+                statusText.textContent = 'Waiting to Start';
+            }
+
+            // Update statistics
+            document.getElementById('totalGames').textContent = stats.gamesPlayed;
+            document.getElementById('totalRounds').textContent = stats.currentRound;
+            document.getElementById('activeTurns').textContent = stats.activeTurns;
+            document.getElementById('totalPlayers').textContent = stats.totalPlayers;
+
+            // Update turn management
+            const turnManagement = document.getElementById('turnManagement');
+            const currentTurnInfo = document.getElementById('currentTurnInfo');
+            
+            if (gameState.currentTurn) {
+                turnManagement.style.display = 'block';
+                const team = gameEngine.getTeam(gameState.currentTurn.teamId);
+                const startTime = new Date(gameState.currentTurn.startTime).toLocaleTimeString();
+                currentTurnInfo.innerHTML = `
+                    <strong>${team.name}</strong> (${team.players.map(p => p.name).join(' & ')})<br>
+                    <small>Turn started at ${startTime}</small>
+                `;
+            } else {
+                turnManagement.style.display = 'none';
+            }
+
+            // Update team rankings
+            updateTeamRankings();
+            
+            // Update recent games
+            updateRecentGames();
+        }
+
+        function updateTeamRankings() {
+            if (!gameEngine) return;
+
+            const rankings = gameEngine.getTeamRankings();
+            const rankingsContainer = document.getElementById('teamRankings');
+            
+            rankingsContainer.innerHTML = rankings.map((team, index) => {
+                let rankClass = '';
+                let medal = '';
+                if (index === 0) { rankClass = 'first'; medal = '🥇'; }
+                else if (index === 1) { rankClass = 'second'; medal = '🥈'; }
+                else if (index === 2) { rankClass = 'third'; medal = '🥉'; }
+                else { medal = `${index + 1}.`; }
+
+                return `
+                    <div class="ranking-item ${rankClass}">
+                        <span class="ranking-position">${medal}</span>
+                        <div class="team-info">
+                            <div class="team-name">${team.name}</div>
+                            <div class="team-players">${team.players.map(p => p.name).join(' & ')}</div>
+                        </div>
+                        <div class="team-score">${team.points} pts</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateRecentGames() {
+            if (!gameEngine) return;
+
+            const recentGames = gameEngine.getRecentGames(10);
+            const container = document.getElementById('recentGames');
+            
+            if (recentGames.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: rgba(255,255,255,0.6); padding: 20px;">No games played yet</div>';
+                return;
+            }
+
+            container.innerHTML = recentGames.map(game => {
+                const winningTeam = gameEngine.getTeam(game.winningTeamId);
+                const timestamp = new Date(game.timestamp).toLocaleTimeString();
+                
+                return `
+                    <div class="game-entry">
+                        <div class="game-info">
+                            <strong>${game.game} (${game.playType})</strong>
+                            <span class="winner-badge">🏆 ${winningTeam.name}</span>
+                        </div>
+                        <div class="timestamp">${timestamp}</div>
+                        ${game.notes ? `<div style="margin-top: 5px; font-size: 0.85rem; color: rgba(255,255,255,0.8);">${game.notes}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function completeTurn() {
+            if (!gameEngine || !gameEngine.gameState.currentTurn) {
+                showStatus('No active turn to complete', 'error');
+                return;
+            }
+
+            try {
+                gameEngine.completeTurn();
+                showStatus('Turn completed successfully', 'success');
+            } catch (error) {
+                showStatus('Error completing turn: ' + error.message, 'error');
+            }
+        }
+
+        function skipTurn() {
+            if (!gameEngine || !gameEngine.gameState.currentTurn) {
+                showStatus('No active turn to skip', 'error');
+                return;
+            }
+
+            if (confirm('Are you sure you want to skip the current turn?')) {
+                try {
+                    gameEngine.skipTurn();
+                    showStatus('Turn skipped', 'success');
+                } catch (error) {
+                    showStatus('Error skipping turn: ' + error.message, 'error');
+                }
+            }
+        }
+
+        function resetCurrentTurn() {
+            if (!gameEngine) return;
+
+            if (confirm('Reset the current turn? This will clear the active turn state.')) {
+                gameEngine.gameState.currentTurn = null;
+                gameEngine.saveToStorage();
+                updateAdminInterface();
+                addLog('Current turn reset by admin');
+                showStatus('Current turn reset', 'success');
+            }
+        }
+
+        function forceRecalculate() {
+            if (!gameEngine) return;
+
+            try {
+                gameEngine.calculatePoints();
+                updateAdminInterface();
+                addLog('Scores recalculated by admin');
+                showStatus('Scores recalculated successfully', 'success');
+            } catch (error) {
+                showStatus('Error recalculating scores: ' + error.message, 'error');
+            }
+        }
+
+        function refreshData() {
+            updateAdminInterface();
+            addLog('Admin interface refreshed');
+            showStatus('Data refreshed', 'success');
+        }
+
+        function clearHistory() {
+            if (!gameEngine) return;
+
+            if (confirm('Clear all game history? This cannot be undone.')) {
+                gameEngine.gameState.gameHistory = [];
+                gameEngine.gameState.gamesPlayed = 0;
+                gameEngine.gameState.currentRound = 0;
+                gameEngine.saveToStorage();
+                updateAdminInterface();
+                addLog('Game history cleared by admin');
+                showStatus('Game history cleared', 'success');
+            }
+        }
+
+        function resetGame() {
+            if (!gameEngine) return;
+
+            if (confirm('Reset the entire game? This will clear all progress and cannot be undone.')) {
+                if (confirm('Are you absolutely sure? This will delete all game data.')) {
+                    try {
+                        gameEngine.resetGame();
+                        updateAdminInterface();
+                        populateGameOptions();
+                        addLog('Game reset by admin');
+                        showStatus('Game reset successfully', 'success');
+                    } catch (error) {
+                        showStatus('Error resetting game: ' + error.message, 'error');
+                    }
+                }
+            }
+        }
+
+        function viewBoard() {
+            const gameId = gameEngine?.gameState?.gameId;
+            if (gameId) {
+                window.open(`game.html?game=${gameId}`, '_blank');
+            }
+        }
+
+        function openTeamPortal() {
+            const gameId = gameEngine?.gameState?.gameId;
+            if (gameId) {
+                window.open(`team.html?game=${gameId}`, '_blank');
+            }
+        }
+
+        function exportGameData() {
+            if (!gameEngine) return;
+
+            try {
+                const exportData = gameEngine.exportGameState();
+                downloadFile(exportData, `game-export-${gameEngine.gameState.gameId}-${new Date().toISOString().slice(0, 10)}.json`);
+                addLog('Game data exported');
+                showStatus('Game data exported successfully', 'success');
+            } catch (error) {
+                showStatus('Error exporting data: ' + error.message, 'error');
+            }
+        }
+
+        function importGameData() {
+            document.getElementById('importFile').click();
+        }
+
+        function handleFileImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    
+                    if (confirm('Import this game data? Current game will be overwritten.')) {
+                        gameEngine.loadGame(importedData.gameId, importedData);
+                        updateAdminInterface();
+                        populateGameOptions();
+                        addLog('Game data imported successfully');
+                        showStatus('Game data imported successfully', 'success');
+                    }
+                } catch (error) {
+                    showStatus('Error importing data: ' + error.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function downloadBackup() {
+            if (!gameEngine) return;
+
+            try {
+                const backupData = gameEngine.exportGameState();
+                const filename = `backup-${gameEngine.gameState.gameId}-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+                downloadFile(backupData, filename);
+                addLog('Backup downloaded');
+                showStatus('Backup downloaded successfully', 'success');
+            } catch (error) {
+                showStatus('Error creating backup: ' + error.message, 'error');
+            }
+        }
+
+        function downloadStatistics() {
+            if (!gameEngine) return;
+
+            try {
+                const stats = gameEngine.getGameStats();
+                const rankings = gameEngine.getTeamRankings();
+                const recentGames = gameEngine.getRecentGames(50);
+                
+                const statisticsData = {
+                    gameId: gameEngine.gameState.gameId,
+                    exportedAt: new Date().toISOString(),
+                    gameStatistics: stats,
+                    teamRankings: rankings,
+                    gameHistory: recentGames,
+                    players: gameEngine.gameState.players,
+                    teams: gameEngine.gameState.teams.map(team => ({
+                        ...team,
+                        winRate: team.gamesWon / Math.max(stats.gamesPlayed, 1) * 100
+                    }))
+                };
+
+                const statsJson = JSON.stringify(statisticsData, null, 2);
+                const filename = `statistics-${gameEngine.gameState.gameId}-${new Date().toISOString().slice(0, 10)}.json`;
+                downloadFile(statsJson, filename);
+                addLog('Statistics exported');
+                showStatus('Statistics exported successfully', 'success');
+            } catch (error) {
+                showStatus('Error exporting statistics: ' + error.message, 'error');
+            }
+        }
+
+        function downloadTeamUrls() {
+            if (!gameEngine) return;
+
+            try {
+                const gameId = gameEngine.gameState.gameId;
+                const baseUrl = window.location.origin + window.location.pathname.replace('admin.html', '');
+
+                const urls = {
+                    gameInfo: {
+                        gameId: gameId,
+                        createdAt: gameEngine.gameState.createdAt,
+                        exportedAt: new Date().toISOString()
+                    },
+                    adminPanel: `${baseUrl}admin.html?game=${gameId}`,
+                    gameBoard: `${baseUrl}game.html?game=${gameId}`,
+                    setup: `${baseUrl}setup.html?game=${gameId}`,
+                    teams: {}
+                };
+
+                gameEngine.gameState.teams.forEach(team => {
+                    urls.teams[`team${team.id}`] = {
+                        teamName: team.name,
+                        players: team.players.map(p => p.name),
+                        url: `${baseUrl}team.html?game=${gameId}&team=${team.id}`
+                    };
+                });
+
+                const urlsJson = JSON.stringify(urls, null, 2);
+                const filename = `team-urls-${gameId}.json`;
+                downloadFile(urlsJson, filename);
+                addLog('Team URLs exported');
+                showStatus('Team URLs exported successfully', 'success');
+            } catch (error) {
+                showStatus('Error exporting URLs: ' + error.message, 'error');
+            }
+        }
+
+        function downloadLog() {
+            const logText = gameLog.join('\n');
+            const filename = `game-log-${gameEngine?.gameState?.gameId || 'unknown'}-${new Date().toISOString().slice(0, 10)}.txt`;
+            downloadFile(logText, filename, 'text/plain');
+            showStatus('Game log downloaded', 'success');
+        }
+
+        function clearLog() {
+            gameLog = [];
+            document.getElementById('gameLog').innerHTML = `
+                <div style="color: #ffd700;">👑 Admin Panel Ready</div>
+                <div>Log cleared...</div>
+            `;
+            showStatus('Game log cleared', 'success');
+        }
+
+        function addLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            gameLog.push(logEntry);
+            
+            const gameLogEl = document.getElementById('gameLog');
+            const logDiv = document.createElement('div');
+            logDiv.innerHTML = `<span style="color: #888;">[${timestamp}]</span> ${message}`;
+            gameLogEl.appendChild(logDiv);
+            gameLogEl.scrollTop = gameLogEl.scrollHeight;
+
+            // Keep log size manageable
+            if (gameLog.length > 1000) {
+                gameLog = gameLog.slice(-500);
+                // Clear and rebuild visible log
+                gameLogEl.innerHTML = `
+                    <div style="color: #ffd700;">👑 Admin Panel Ready</div>
+                    <div style="color: #888;">[Log truncated to last 500 entries]</div>
+                `;
+                gameLog.slice(-50).forEach(entry => {
+                    const div = document.createElement('div');
+                    div.textContent = entry;
+                    gameLogEl.appendChild(div);
+                });
+            }
+        }
+
+        function showStatus(message, type = 'success') {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.className = `status-message ${type}`;
+            statusEl.style.display = 'block';
+            
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 5000);
+        }
+
+        // Utility function for downloading files
+        function downloadFile(content, filename, contentType = 'application/json') {
+            const blob = new Blob([content], { type: contentType });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+
+        // Auto-refresh data every 30 seconds
+        setInterval(() => {
+            if (gameEngine && gameEngine.gameState.initialized) {
+                updateAdminInterface();
+            }
+        }, 30000);
+
+        // Update navigation links when game is loaded
+        function updateNavigationLinks() {
+            if (!gameEngine) return;
+            
+            const gameId = gameEngine.gameState.gameId;
+            document.getElementById('setupLink').href = `setup.html?game=${gameId}`;
+            document.getElementById('gameBoardLink').href = `game.html?game=${gameId}`;
+            document.getElementById('teamPortalLink').href = `team.html?game=${gameId}`;
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'r':
+                        e.preventDefault();
+                        refreshData();
+                        break;
+                    case 's':
+                        e.preventDefault();
+                        downloadBackup();
+                        break;
+                    case 'e':
+                        e.preventDefault();
+                        exportGameData();
+                        break;
+                }
+            }
+        });
+
+        // Page visibility API to refresh when tab becomes active
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && gameEngine && gameEngine.gameState.initialized) {
+                updateAdminInterface();
+                addLog('Page became active, data refreshed');
+            }
+        });
+
+        // Initialize tooltips and help text
+        function initializeHelp() {
+            // Add helpful tooltips to various elements
+            const elements = [
+                { id: 'addResultBtn', tooltip: 'Ctrl+Enter to quickly add result' },
+                { selector: '.team-selection', tooltip: 'Click to select winning team' },
+                { id: 'gameType', tooltip: 'Choose the game that was played' },
+                { id: 'playType', tooltip: 'Select match format (1v1, 2v2, etc.)' }
+            ];
+
+            elements.forEach(({ id, selector, tooltip }) => {
+                const element = id ? document.getElementById(id) : document.querySelector(selector);
+                if (element) {
+                    element.title = tooltip;
+                }
+            });
+        }
+
+        // Enhanced form validation
+        document.getElementById('gameType').addEventListener('change', validateForm);
+        document.getElementById('playType').addEventListener('change', validateForm);
+
+        function validateForm() {
+            const gameType = document.getElementById('gameType').value;
+            const playType = document.getElementById('playType').value;
+            const addButton = document.getElementById('addResultBtn');
+            
+            const isValid = gameType && playType && selectedWinningTeam;
+            addButton.disabled = !isValid;
+            
+            if (isValid) {
+                addButton.style.opacity = '1';
+            } else {
+                addButton.style.opacity = '0.7';
+            }
+        }
+
+        // Allow Enter key to submit form
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                if (!document.getElementById('addResultBtn').disabled) {
+                    const form = document.querySelector('.game-result-form');
+                    addGameResult({ preventDefault: () => {} });
+                }
+            }
+        });
+
+        // Initialize everything when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeHelp();
+            
+            // Update navigation links periodically
+            setInterval(() => {
+                if (gameEngine) {
+                    updateNavigationLinks();
+                }
+            }, 5000);
+            
+            addLog('Admin panel initialized and ready');
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (gameEngine) {
+                gameEngine.saveToStorage();
+            }
+        });
+    </script>
+</body>
+</html>
