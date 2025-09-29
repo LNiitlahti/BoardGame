@@ -6,8 +6,10 @@
  * Now uses Firebase Firestore instead of localStorage
  */
 
-class BoardGameEngine {
+class BoardGameEngine extends EventEmitter {
     constructor() {
+        super(); // Initialize EventEmitter
+        
         this.gameState = {
             gameId: null,
             players: [],
@@ -27,7 +29,6 @@ class BoardGameEngine {
             initialized: false
         };
 
-        this.eventListeners = new Map();
         this.autoSaveInterval = null;
     }
 
@@ -74,6 +75,26 @@ class BoardGameEngine {
 
     async loadGame(gameId) {
         try {
+            // Wait for Firebase to be ready
+            if (!window.firebaseDB) {
+                await new Promise(resolve => {
+                    const checkInterval = setInterval(() => {
+                        if (window.firebaseDB) {
+                            clearInterval(checkInterval);
+                            resolve();
+                        }
+                    }, 100);
+                    
+                    // Timeout after 10 seconds
+                    setTimeout(() => {
+                        clearInterval(checkInterval);
+                        if (!window.firebaseDB) {
+                            throw new Error('Firebase not initialized');
+                        }
+                    }, 10000);
+                });
+            }
+            
             const gameRef = window.firebaseDoc(window.firebaseDB, "games", gameId);
 
             window.firebaseOnSnapshot(gameRef, (docSnap) => {
@@ -357,33 +378,4 @@ class BoardGameEngine {
         this.gameState.board.forEach((teamId, coord) => { if (!this.getTeam(teamId)) errors.push(`Invalid team ${teamId} on board at ${coord}`); });
         return { valid: errors.length === 0, errors };
     }
-
-    // ================================
-    // EVENT SYSTEM
-    // ================================
-
-    /**
-     * Register an event listener for a custom event.
-     * @param {string} event - Event name.
-     * @param {function} callback - Callback function to execute when event is emitted.
-     */
-    on(event, callback) {
-        if (!this.eventListeners.has(event)) this.eventListeners.set(event, []);
-        this.eventListeners.get(event).push(callback);
-    }
-
-    /**
-     * Remove an event listener for a custom event.
-     * @param {string} event - Event name.
-     * @param {function} callback - Callback function to remove.
-     */
-    off(event, callback) {
-        if (this.eventListeners.has(event)) {
-            const listeners = this.eventListeners.get(event);
-            const index = listeners.indexOf(callback);
-            if (index !== -1) listeners.splice(index, 1);
-        }
-    }
 }
-
-

@@ -3,1202 +3,352 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Team Portal - Board Game System</title>
-    <link rel="stylesheet" href="css/styles.css">
+    <title>Minimal Team View</title>
     <style>
-        /* Team-specific styles */
-        .team-portal {
-            display: grid;
-            grid-template-columns: 1fr 600px 1fr;
-            gap: 30px;
-            padding: 20px;
-            max-width: 1600px;
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
             margin: 0 auto;
-            min-height: 100vh;
+            padding: 20px;
+            background-color: #f5f5f5;
         }
-
-        .team-sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .team-board {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            position: relative;
-        }
-
-        /* Turn indicator */
-        .turn-indicator {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            padding: 15px 30px;
-            border-radius: 10px;
-            font-weight: 700;
-            font-size: 1.1rem;
-            text-align: center;
-            border: 2px solid;
-            backdrop-filter: blur(10px);
-        }
-
-        .turn-indicator.active {
-            background: rgba(255, 215, 0, 0.9);
-            border-color: #ffd700;
+        h1 {
             color: #333;
-            animation: pulse-glow 2s infinite;
         }
-
-        .turn-indicator.waiting {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(255, 255, 255, 0.3);
-            color: white;
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
         }
-
-        .turn-indicator.finished {
-            background: rgba(74, 222, 128, 0.2);
-            border-color: #4ade80;
-            color: #4ade80;
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
         }
-
-        @keyframes pulse-glow {
-            0%, 100% { 
-                box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
-                transform: translateX(-50%) scale(1);
-            }
-            50% { 
-                box-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
-                transform: translateX(-50%) scale(1.02);
-            }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
         }
-
-        /* Board area */
-        .hex-board {
-            position: relative;
-            width: 600px;
-            height: 600px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 20px;
-            backdrop-filter: blur(10px);
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .panel {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .panel h2 {
+            margin-top: 0;
+            color: #444;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .team-selector {
             margin: 20px 0;
         }
-
-        .hex {
-            position: absolute;
-            width: 45px;
-            height: 40px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .hex-inner {
+        .team-selector select {
             width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 9px;
-            font-weight: bold;
-            transition: all 0.3s ease;
-            position: relative;
-        }
-
-        .hex:hover .hex-inner {
-            background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.05);
-        }
-
-        /* Hex types */
-        .hex.starting-location .hex-inner {
-            background: rgba(255, 215, 0, 0.4);
-            border-color: #ffd700;
-        }
-
-        .hex.heart-hex .hex-inner {
-            background: rgba(255, 20, 147, 0.4);
-            border-color: #ff1493;
-        }
-
-        .hex.center .hex-inner {
-            background: rgba(138, 43, 226, 0.5);
-            border-color: #8a2be2;
-        }
-
-        .hex.high-value .hex-inner {
-            background: rgba(255, 69, 0, 0.4);
-            border-color: #ff4500;
-        }
-
-        /* Can place indicator */
-        .hex.can-place .hex-inner {
-            background: rgba(0, 255, 0, 0.4) !important;
-            border-color: #00ff00 !important;
-            animation: pulse-green 1s infinite;
-            cursor: pointer;
-            transform: scale(1.1);
-        }
-
-        .hex.can-place:hover .hex-inner {
-            background: rgba(0, 255, 0, 0.6) !important;
-            transform: scale(1.15);
-        }
-
-        @keyframes pulse-green {
-            0%, 100% { 
-                opacity: 0.7;
-                box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
-            }
-            50% { 
-                opacity: 1;
-                box-shadow: 0 0 20px rgba(0, 255, 0, 0.8);
-            }
-        }
-
-        /* Team colors for occupied hexes */
-        .hex.team1 .hex-inner { 
-            background: rgba(255, 68, 68, 0.9);
-            border-color: #ff4444;
-            color: white;
-            font-weight: 800;
-        }
-        .hex.team2 .hex-inner { 
-            background: rgba(68, 255, 68, 0.9);
-            border-color: #44ff44;
-            color: black;
-            font-weight: 800;
-        }
-        .hex.team3 .hex-inner { 
-            background: rgba(68, 68, 255, 0.9);
-            border-color: #4444ff;
-            color: white;
-            font-weight: 800;
-        }
-        .hex.team4 .hex-inner { 
-            background: rgba(255, 255, 68, 0.9);
-            border-color: #ffff44;
-            color: black;
-            font-weight: 800;
-        }
-        .hex.team5 .hex-inner { 
-            background: rgba(255, 68, 255, 0.9);
-            border-color: #ff44ff;
-            color: white;
-            font-weight: 800;
-        }
-
-        /* Team info panel */
-        .team-info {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 25px;
-            border-radius: 15px;
-            border-left: 4px solid;
-            backdrop-filter: blur(15px);
-            margin-bottom: 20px;
-        }
-
-        /* Action panel */
-        .action-panel {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 20px;
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-            text-align: center;
-        }
-
-        .action-panel.active {
-            background: rgba(255, 215, 0, 0.2);
-            border: 2px solid #ffd700;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
-        }
-
-        .place-plate-btn {
-            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 10px;
-            font-size: 1.1rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin: 10px 0;
-            width: 100%;
-        }
-
-        .place-plate-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(74, 222, 128, 0.4);
-        }
-
-        .place-plate-btn:disabled {
-            background: rgba(255, 255, 255, 0.2);
-            color: rgba(255, 255, 255, 0.5);
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .skip-turn-btn {
-            background: rgba(248, 113, 113, 0.2);
-            border: 2px solid #f87171;
-            color: #f87171;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            margin-top: 10px;
-        }
-
-        .skip-turn-btn:hover {
-            background: rgba(248, 113, 113, 0.3);
-        }
-
-        /* Instructions */
-        .instructions {
-            background: rgba(96, 165, 250, 0.1);
-            border: 1px solid #60a5fa;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-
-        .instructions h4 {
-            color: #60a5fa;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        /* Status messages */
-        .status-message {
-            padding: 15px;
-            border-radius: 10px;
-            margin: 15px 0;
-            text-align: center;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-
-        .status-message.success {
-            background: rgba(74, 222, 128, 0.2);
-            border: 1px solid #4ade80;
-            color: #4ade80;
-        }
-
-        .status-message.error {
-            background: rgba(248, 113, 113, 0.2);
-            border: 1px solid #f87171;
-            color: #f87171;
-        }
-
-        .status-message.info {
-            background: rgba(96, 165, 250, 0.2);
-            border: 1px solid #60a5fa;
-            color: #60a5fa;
-        }
-
-        /* Opponent info */
-        .opponent-info {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-        }
-
-        .opponent-team {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
             padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 8px;
-            border-left: 3px solid;
-            background: rgba(255, 255, 255, 0.05);
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
         }
-
-        /* Heart hex control */
-        .heart-control {
-            background: rgba(255, 20, 147, 0.1);
-            border: 1px solid #ff1493;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
+        .player-list {
+            list-style: none;
+            padding: 0;
         }
-
-        .heart-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .player-list li {
             padding: 8px;
             margin: 5px 0;
-            border-radius: 6px;
-            background: rgba(255, 255, 255, 0.05);
+            background-color: #f9f9f9;
+            border-left: 3px solid #4CAF50;
+            border-radius: 3px;
         }
-
-        /* Game log */
-        .team-log {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 15px;
-            border-radius: 10px;
-            height: 250px;
-            overflow-y: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
+        .stat {
+            display: inline-block;
+            margin-right: 20px;
+            font-weight: bold;
         }
-
-        .log-entry {
-            padding: 5px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
         }
-
-        .log-entry.own-team {
-            color: #4ade80;
+        .nav-links {
+            margin: 20px 0;
         }
-
-        .log-entry.opponent {
-            color: #f87171;
-        }
-
-        .log-timestamp {
-            color: rgba(255, 255, 255, 0.6);
-            font-size: 11px;
-        }
-
-        /* Connection status */
-        .connection-status {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
+        .nav-links a {
+            display: inline-block;
             padding: 10px 15px;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            z-index: 1000;
-            backdrop-filter: blur(10px);
+            margin-right: 10px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
         }
-
-        .connection-status.connected {
-            background: rgba(74, 222, 128, 0.2);
-            border: 1px solid #4ade80;
-            color: #4ade80;
-        }
-
-        .connection-status.error {
-            background: rgba(248, 113, 113, 0.2);
-            border: 1px solid #f87171;
-            color: #f87171;
-        }
-
-        /* Responsive design */
-        @media (max-width: 1200px) {
-            .team-portal {
-                grid-template-columns: 1fr;
-                grid-template-rows: auto auto;
-                gap: 20px;
-            }
-            
-            .hex-board {
-                width: 500px;
-                height: 500px;
-            }
-            
-            .hex {
-                width: 38px;
-                height: 34px;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .team-portal {
-                padding: 10px;
-            }
-            
-            .hex-board {
-                width: 400px;
-                height: 400px;
-            }
-            
-            .hex {
-                width: 30px;
-                height: 26px;
-            }
-            
-            .hex-inner {
-                font-size: 7px;
-            }
-            
-            .turn-indicator {
-                position: relative;
-                transform: none;
-                margin-bottom: 20px;
-            }
+        .nav-links a:hover {
+            background-color: #45a049;
         }
     </style>
 </head>
 <body>
-    <!-- Turn Indicator -->
-    <div id="turnIndicator" class="turn-indicator waiting">
-        ⏳ Loading team information...
+    <h1>Team Dashboard</h1>
+    
+    <div id="connectionStatus" class="status warning">
+        Connecting to Firebase...
     </div>
-
-    <!-- Connection Status -->
-    <div id="connectionStatus" class="connection-status connected">
-        🟢 Connected
+    
+    <div class="nav-links" id="navLinks" style="display: none;">
+        <a href="#" id="setupLink">Setup</a>
+        <a href="#" id="gameLink">Game Board</a>
+        <a href="#" id="adminLink">Admin</a>
     </div>
-
-    <div class="team-portal">
-        <!-- Left Sidebar -->
-        <div class="team-sidebar">
-            <!-- Team Info -->
-            <div id="teamInfo" class="team-info team1">
-                <h3>👥 Team Information</h3>
-                <div id="teamDetails">
-                    <div><strong>Team:</strong> <span id="teamName">Loading...</span></div>
-                    <div><strong>Players:</strong> <span id="teamPlayers">Loading...</span></div>
-                    <div><strong>Points:</strong> <span id="teamPoints">0</span></div>
-                    <div><strong>Games Won:</strong> <span id="teamWins">0</span></div>
-                    <div><strong>Plates on Board:</strong> <span id="teamPlates">0</span></div>
-                </div>
-            </div>
-
-            <!-- Action Panel -->
-            <div id="actionPanel" class="action-panel">
-                <h4>🎯 Team Actions</h4>
-                <div id="actionContent">
-                    <div class="instructions">
-                        <h4>📋 Instructions</h4>
-                        <p>Win a game to earn the right to place a plate on the board. When it's your turn, click on a green highlighted hex to place your plate.</p>
-                    </div>
-                    
-                    <button id="placePlateBtn" class="place-plate-btn" disabled>
-                        📍 Select Placement Location
-                    </button>
-                    
-                    <button id="skipTurnBtn" class="skip-turn-btn" style="display: none;" onclick="skipTurn()">
-                        ⏭️ Skip Turn
-                    </button>
-                </div>
-            </div>
-
-            <!-- Game Status -->
-            <div class="panel">
-                <h3>📊 Game Status</h3>
-                <div id="gameStatus">
-                    <div class="stat-item">
-                        <div class="stat-label">Current Round</div>
-                        <div class="stat-number" id="currentRound">1</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Games Played</div>
-                        <div class="stat-number" id="gamesPlayed">0</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">Win Condition</div>
-                        <div class="stat-number" id="winCondition">50</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Controls -->
-            <div class="panel">
-                <h4>🎮 Controls</h4>
-                <button class="btn" onclick="refreshGame()">🔄 Refresh Game</button>
-                <button class="btn" onclick="toggleAutoRefresh()" id="autoRefreshBtn">📡 Auto: ON</button>
-                <div style="margin-top: 10px; font-size: 0.8rem; color: rgba(255,255,255,0.7);">
-                    Last updated: <span id="lastUpdate">-</span>
-                </div>
-            </div>
+    
+    <div class="team-selector" id="teamSelector" style="display: none;">
+        <label for="teamSelect"><strong>Select Your Team:</strong></label>
+        <select id="teamSelect">
+            <option value="">-- Choose Team --</option>
+        </select>
+    </div>
+    
+    <div id="content" style="display: none;">
+        <div class="panel" id="teamInfo">
+            <h2>Team Information</h2>
+            <div class="loading">Select a team above</div>
         </div>
-
-        <!-- Main Board Area -->
-        <div class="team-board">
-            <div class="header">
-                <h1 id="gameTitle">🎯 Team Portal</h1>
-                <p id="gameSubtitle">Your Game Board</p>
-            </div>
-
-            <!-- Status Messages -->
-            <div id="statusMessage" class="status-message" style="display: none;"></div>
-
-            <!-- Hex Board -->
-            <div class="hex-board" id="hexBoard">
-                <!-- Hex grid will be generated here -->
-            </div>
-
-            <!-- Board Legend -->
-            <div class="legend">
-                <h4>🗺️ Board Legend</h4>
-                <div class="legend-grid">
-                    <div class="legend-item">
-                        <div class="legend-hex starting"></div>
-                        <span>Starting Corner</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-hex heart"></div>
-                        <span>Heart Hex (+1/turn)</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-hex center"></div>
-                        <span>Mountain Heart (+2/turn)</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-hex high-value"></div>
-                        <span>High Value (+2 points)</span>
-                    </div>
-                </div>
-            </div>
+        
+        <div class="panel" id="gameStatus">
+            <h2>Game Status</h2>
+            <div class="loading">Loading game status...</div>
         </div>
-
-        <!-- Right Sidebar -->
-        <div class="team-sidebar">
-            <!-- Opponent Teams -->
-            <div class="panel">
-                <h3>🏁 Team Rankings</h3>
-                <div id="opponentTeams">
-                    <!-- Opponent teams will be populated here -->
-                </div>
-            </div>
-
-            <!-- Heart Hex Control -->
-            <div class="heart-control">
-                <h4>❤️ Heart Hex Control</h4>
-                <div id="heartControl">
-                    <div style="text-align: center; color: rgba(255,255,255,0.7); font-style: italic;">
-                        No heart hexes controlled yet
-                    </div>
-                </div>
-            </div>
-
-            <!-- Recent Activity -->
-            <div class="panel">
-                <h3>📰 Recent Activity</h3>
-                <div class="team-log" id="teamLog">
-                    <div class="log-entry">
-                        <div>🎮 Team portal initialized</div>
-                        <div class="log-timestamp">Waiting for game activity...</div>
-                    </div>
-                </div>
-            </div>
+        
+        <div class="panel" id="teamHistory">
+            <h2>Team History</h2>
+            <div class="loading">Loading team history...</div>
         </div>
     </div>
-
-    <!-- Include scripts -->
-    <script src="scripts/main.js"></script>
+    
+    <!-- Load Firebase scripts directly -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
     <script>
-        // Team portal state
-        let gameEngine = null;
+        let db = null;
         let gameId = null;
-        let teamId = null;
-        let team = null;
-        let autoRefresh = true;
-        let refreshInterval = null;
-        let selectedHex = null;
-        const REFRESH_RATE = 3000; // 3 seconds
-
-        // Initialize team portal
-        document.addEventListener('DOMContentLoaded', function() {
-            // Get game and team ID from URL
+        let currentTeamId = null;
+        
+        // Get URL parameters
+        function getUrlParams() {
             const urlParams = new URLSearchParams(window.location.search);
-            gameId = urlParams.get('game');
-            teamId = parseInt(urlParams.get('team'));
+            gameId = urlParams.get('gameId');
+            const teamId = urlParams.get('teamId');
             
-            if (!gameId || !teamId) {
-                showError('Invalid URL: Missing game ID or team ID');
-                return;
+            if (!gameId) {
+                document.getElementById('connectionStatus').textContent = 'No game ID provided in URL';
+                document.getElementById('connectionStatus').className = 'status error';
+                return false;
             }
-
-            // Set page title
-            document.title = `Team ${teamId} Portal - ${gameId}`;
-            document.getElementById('gameTitle').textContent = `🎯 Team ${teamId} Portal`;
-            document.getElementById('gameSubtitle').textContent = gameId;
-
-            // Load game
-            loadGame();
             
-            // Start auto-refresh
-            if (autoRefresh) {
-                startAutoRefresh();
-            }
-        });
-
-        function loadGame() {
-            try {
-                gameEngine = loadGameFromStorage(gameId);
-                
-                if (!gameEngine) {
-                    throw new Error(`Game "${gameId}" not found`);
-                }
-
-                team = gameEngine.gameState.teams.find(t => t.id === teamId);
-                if (!team) {
-                    throw new Error(`Team ${teamId} not found in game`);
-                }
-
-                updateDisplay();
-                setConnectionStatus('connected', '🟢 Connected');
-                
-            } catch (error) {
-                console.error('Failed to load game:', error);
-                setConnectionStatus('error', '🔴 Connection Error');
-                showError('Failed to load game: ' + error.message);
-            }
+            return { gameId, teamId };
         }
-
-        function updateDisplay() {
-            if (!gameEngine || !team) return;
-
-            const gameState = gameEngine.gameState;
+        
+        // Update navigation links
+        function updateNavLinks() {
+            const setupLink = document.getElementById('setupLink');
+            const gameLink = document.getElementById('gameLink');
+            const adminLink = document.getElementById('adminLink');
             
-            // Update team info
-            updateTeamInfo();
+            setupLink.href = `minimal-setup.html`;
+            gameLink.href = `game.html?gameId=${gameId}${currentTeamId ? `&teamId=${currentTeamId}` : ''}`;
+            adminLink.href = `admin.html?gameId=${gameId}`;
             
-            // Update turn indicator
-            updateTurnIndicator(gameState);
-            
-            // Update action panel
-            updateActionPanel(gameState);
-            
-            // Update hex board
-            updateHexBoard(gameState);
-            
-            // Update opponent teams
-            updateOpponentTeams(gameState);
-            
-            // Update heart control
-            updateHeartControl(gameState);
-            
-            // Update game status
-            updateGameStatus(gameState);
-            
-            // Update activity log
-            updateActivityLog(gameState);
-            
-            // Update last update time
-            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+            document.getElementById('navLinks').style.display = 'block';
         }
-
-        function updateTeamInfo() {
-            const teamInfo = document.getElementById('teamInfo');
-            teamInfo.className = `team-info team${team.id}`;
-            
-            document.getElementById('teamName').textContent = team.name;
-            document.getElementById('teamPlayers').textContent = team.players.map(p => p.name).join(' & ');
-            document.getElementById('teamPoints').textContent = team.points || 0;
-            document.getElementById('teamWins').textContent = team.gamesWon || 0;
-            
-            // Count team's plates on board
-            let plateCount = 0;
-            if (gameEngine.gameState.board.forEach) {
-                gameEngine.gameState.board.forEach((occupier) => {
-                    if (occupier === team.id) plateCount++;
+        
+        // Load game data and populate team selector
+        function loadGameData() {
+            db.collection('games').doc(gameId).get()
+                .then((doc) => {
+                    if (!doc.exists) {
+                        throw new Error('Game not found');
+                    }
+                    
+                    const gameData = doc.data();
+                    
+                    // Populate team selector
+                    const teamSelect = document.getElementById('teamSelect');
+                    teamSelect.innerHTML = '<option value="">-- Choose Team --</option>';
+                    
+                    if (gameData.teams) {
+                        gameData.teams.forEach(team => {
+                            const option = document.createElement('option');
+                            option.value = team.id;
+                            option.textContent = `${team.name} (${team.points} points)`;
+                            teamSelect.appendChild(option);
+                        });
+                    }
+                    
+                    document.getElementById('teamSelector').style.display = 'block';
+                    document.getElementById('content').style.display = 'block';
+                    
+                    // If teamId in URL, auto-select it
+                    const params = getUrlParams();
+                    if (params.teamId) {
+                        teamSelect.value = params.teamId;
+                        loadTeamData(params.teamId, gameData);
+                    }
+                    
+                    // Load game status
+                    loadGameStatus(gameData);
+                })
+                .catch((error) => {
+                    console.error('Error loading game:', error);
+                    document.getElementById('connectionStatus').textContent = 'Error loading game: ' + error.message;
+                    document.getElementById('connectionStatus').className = 'status error';
                 });
-            } else if (gameEngine.gameState.board) {
-                Object.values(gameEngine.gameState.board).forEach((occupier) => {
-                    if (occupier === team.id) plateCount++;
-                });
-            }
-            document.getElementById('teamPlates').textContent = plateCount;
         }
-
-        function updateTurnIndicator(gameState) {
-            const indicator = document.getElementById('turnIndicator');
+        
+        // Load specific team data
+        function loadTeamData(teamId, gameData) {
+            currentTeamId = teamId;
+            updateNavLinks();
             
-            if (gameState.gamePhase === 'finished') {
-                indicator.className = 'turn-indicator finished';
-                indicator.textContent = '🏆 Game Finished';
+            const team = gameData.teams.find(t => t.id == teamId);
+            
+            if (!team) {
+                document.getElementById('teamInfo').innerHTML = '<h2>Team Information</h2><p>Team not found</p>';
                 return;
             }
             
-            if (gameState.currentTurn && gameState.currentTurn.teamId === teamId) {
-                indicator.className = 'turn-indicator active';
-                indicator.innerHTML = `
-                    🎯 YOUR TURN!<br>
-                    <small>Click on a green hex to place your plate</small>
-                `;
-            } else {
-                indicator.className = 'turn-indicator waiting';
-                if (gameState.currentTurn) {
-                    const currentTeam = gameState.teams.find(t => t.id === gameState.currentTurn.teamId);
-                    indicator.innerHTML = `
-                        ⏳ Waiting for ${currentTeam ? currentTeam.name : 'other team'}<br>
-                        <small>Win a game to get your turn</small>
-                    `;
-                } else {
-                    indicator.innerHTML = `
-                        ⏳ Waiting for game start<br>
-                        <small>Play and win games to earn turns</small>
-                    `;
-                }
-            }
-        }
-
-        function updateActionPanel(gameState) {
-            const panel = document.getElementById('actionPanel');
-            const placeBtnEl = document.getElementById('placePlateBtn');
-            const skipBtnEl = document.getElementById('skipTurnBtn');
+            // Display team info
+            let teamHtml = `
+                <h2>${team.name}</h2>
+                <div class="stat">Team Points: ${team.points}</div>
+                <div class="stat">Games Won: ${team.gamesWon || 0}</div>
+                <h3>Players:</h3>
+                <ul class="player-list">
+            `;
             
-            const isMyTurn = gameState.currentTurn && gameState.currentTurn.teamId === teamId;
-            const needsPlacement = isMyTurn && gameState.currentTurn.needsPlacement;
-            
-            if (isMyTurn) {
-                panel.classList.add('active');
-                
-                if (needsPlacement) {
-                    placeBtnEl.disabled = false;
-                    placeBtnEl.textContent = '📍 Click Green Hex to Place';
-                    skipBtnEl.style.display = 'block';
-                } else {
-                    placeBtnEl.disabled = true;
-                    placeBtnEl.textContent = '✅ Plate Placed';
-                    skipBtnEl.style.display = 'none';
-                }
-            } else {
-                panel.classList.remove('active');
-                placeBtnEl.disabled = true;
-                placeBtnEl.textContent = '⏳ Wait for Your Turn';
-                skipBtnEl.style.display = 'none';
-            }
-        }
-
-        function updateHexBoard(gameState) {
-            const hexBoard = document.getElementById('hexBoard');
-            
-            // Clear existing hexes
-            hexBoard.innerHTML = '';
-            
-            // Generate hex coordinates
-            const coordinates = generateHexCoordinates();
-            const validPlacements = gameEngine.getValidPlacements(teamId);
-            const canPlace = gameState.currentTurn && 
-                           gameState.currentTurn.teamId === teamId && 
-                           gameState.currentTurn.needsPlacement;
-            
-            coordinates.forEach(([q, r]) => {
-                const hex = document.createElement('div');
-                hex.className = getHexClasses(q, r, gameState, validPlacements, canPlace);
-                hex.id = `hex-${q}-${r}`;
-                
-                const [x, y] = hexToPixel(q, r, 22, 300, 300);
-                hex.style.left = `${x}px`;
-                hex.style.top = `${y}px`;
-                
-                const hexInner = document.createElement('div');
-                hexInner.className = 'hex-inner';
-                
-                // Set hex content
-                const coord = `q${q}r${r}`;
-                const occupier = gameState.board.get ? gameState.board.get(coord) : gameState.board[coord];
-                
-                if (occupier) {
-                    const occupierTeam = gameState.teams.find(t => t.id === occupier);
-                    hexInner.textContent = occupierTeam ? occupierTeam.name.slice(-1) : occupier;
-                } else {
-                    hexInner.textContent = `${q},${r}`;
-                }
-                
-                // Add click handler for placement
-                if (hex.classList.contains('can-place')) {
-                    hex.addEventListener('click', () => handleHexClick(q, r));
-                }
-                
-                hex.appendChild(hexInner);
-                hexBoard.appendChild(hex);
+            team.players.forEach(player => {
+                teamHtml += `<li>${player.name} - ${player.points} points</li>`;
             });
+            
+            teamHtml += '</ul>';
+            document.getElementById('teamInfo').innerHTML = teamHtml;
+            
+            // Load team history
+            loadTeamHistory(teamId, gameData);
         }
-
-        function getHexClasses(q, r, gameState, validPlacements, canPlace) {
-            const coord = `q${q}r${r}`;
-            let classes = ['hex'];
+        
+        // Load game status
+        function loadGameStatus(gameData) {
+            let statusHtml = '<h2>Game Status</h2>';
+            statusHtml += `<p><strong>Game ID:</strong> ${gameData.gameId}</p>`;
+            statusHtml += `<p><strong>Current Round:</strong> ${gameData.currentRound}</p>`;
+            statusHtml += `<p><strong>Games Played:</strong> ${gameData.gamesPlayed}</p>`;
+            statusHtml += `<p><strong>Win Condition:</strong> ${gameData.winCondition} points</p>`;
+            statusHtml += `<p><strong>Game Phase:</strong> ${gameData.gamePhase}</p>`;
             
-            // Add hex type classes
-            const hexType = getHexType(q, r, gameState);
-            classes.push(hexType);
-            
-            // Add team class if occupied
-            const occupier = gameState.board.get ? gameState.board.get(coord) : gameState.board[coord];
-            if (occupier) {
-                classes.push(`team${occupier}`);
+            if (gameData.currentTurn) {
+                statusHtml += `<p><strong>Current Turn:</strong> Team ${gameData.currentTurn}</p>`;
             }
             
-            // Add can-place class if valid placement location
-            if (canPlace && validPlacements.some(p => p.coord === coord)) {
-                classes.push('can-place');
-            }
-            
-            return classes.join(' ');
+            document.getElementById('gameStatus').innerHTML = statusHtml;
         }
-
-        function getHexType(q, r, gameState) {
-            const coord = `q${q}r${r}`;
+        
+        // Load team history
+        function loadTeamHistory(teamId, gameData) {
+            let historyHtml = '<h2>Team History</h2>';
             
-            // Starting locations
-            const startingLocs = ['q0r-5', 'q5r-5', 'q5r0', 'q0r5', 'q-5r5', 'q-5r0'];
-            if (startingLocs.includes(coord)) return 'starting-location';
-            
-            // Heart hexes
-            const heartHexes = gameState.heartHexes || [];
-            const isHeartHex = Array.isArray(heartHexes) ? heartHexes.includes(coord) : heartHexes.has ? heartHexes.has(coord) : false;
-            if (isHeartHex) return 'heart-hex';
-            
-            // Center hex
-            if (coord === 'q0r0') return 'center';
-            
-            // High-value hexes
-            const highValueLocs = ['q2r-4', 'q4r-2', 'q2r2', 'q-2r4', 'q-4r2', 'q-2r-2'];
-            if (highValueLocs.includes(coord)) return 'high-value';
-            
-            return 'normal';
-        }
-
-        function handleHexClick(q, r) {
-            const coord = `q${q}r${r}`;
-            
-            if (!gameEngine.gameState.currentTurn || gameEngine.gameState.currentTurn.teamId !== teamId) {
-                showMessage('It\'s not your turn!', 'error');
-                return;
-            }
-            
-            if (!gameEngine.gameState.currentTurn.needsPlacement) {
-                showMessage('You have already placed your plate this turn!', 'error');
-                return;
-            }
-            
-            try {
-                // Place the plate
-                gameEngine.placePlate(q, r, teamId);
+            if (!gameData.gameHistory || gameData.gameHistory.length === 0) {
+                historyHtml += '<p>No games played yet</p>';
+            } else {
+                // Filter history for this team
+                const teamHistory = gameData.gameHistory.filter(game => 
+                    game.winner == teamId || 
+                    (game.teams && game.teams.includes(parseInt(teamId)))
+                );
                 
-                // Complete the turn
-                gameEngine.completeTurn();
-                
-                // Show success message
-                showMessage(`Plate placed at ${coord}!`, 'success');
-                
-                // Update display
-                updateDisplay();
-                
-                // Log the action
-                addLogEntry(`✅ Placed plate at ${coord}`, 'own-team');
-                
-            } catch (error) {
-                showMessage('Cannot place plate here: ' + error.message, 'error');
-                console.error('Plate placement error:', error);
-            }
-        }
-
-        function skipTurn() {
-            if (!gameEngine.gameState.currentTurn || gameEngine.gameState.currentTurn.teamId !== teamId) {
-                showMessage('It\'s not your turn!', 'error');
-                return;
-            }
-            
-            if (confirm('Are you sure you want to skip your turn? You will lose the opportunity to place a plate.')) {
-                try {
-                    gameEngine.skipTurn();
-                    showMessage('Turn skipped', 'info');
-                    updateDisplay();
-                    addLogEntry('⏭️ Skipped turn', 'own-team');
-                } catch (error) {
-                    showMessage('Error skipping turn: ' + error.message, 'error');
-                }
-            }
-        }
-
-        function updateOpponentTeams(gameState) {
-            const container = document.getElementById('opponentTeams');
-            const teams = [...gameState.teams].sort((a, b) => b.points - a.points);
-            
-            container.innerHTML = teams.map((t, index) => {
-                const isCurrentTeam = t.id === teamId;
-                const isCurrentTurn = gameState.currentTurn && t.id === gameState.currentTurn.teamId;
-                
-                let className = `opponent-team team${t.id}`;
-                if (isCurrentTurn) className += ' active-turn';
-                
-                const rankIcon = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
-                const turnIndicator = isCurrentTurn ? ' 🎯' : '';
-                const youIndicator = isCurrentTeam ? ' (YOU)' : '';
-                
-                return `
-                    <div class="${className}">
-                        <div>
-                            <strong>${rankIcon} ${t.name}${youIndicator}${turnIndicator}</strong><br>
-                            <small>${t.players.map(p => p.name).join(' & ')}</small>
-                        </div>
-                        <div style="text-align: right;">
-                            <div style="font-size: 1.1rem; font-weight: bold;">${t.points}</div>
-                            <div style="font-size: 0.8rem; opacity: 0.8;">${t.gamesWon || 0} wins</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function updateHeartControl(gameState) {
-            const container = document.getElementById('heartControl');
-            const heartControl = gameState.heartHexControl || {};
-            const controlEntries = Object.entries(heartControl);
-            
-            if (controlEntries.length === 0) {
-                container.innerHTML = `
-                    <div style="text-align: center; color: rgba(255,255,255,0.7); font-style: italic;">
-                        No heart hexes controlled yet
-                    </div>
-                `;
-                return;
-            }
-            
-            container.innerHTML = controlEntries.map(([coord, controllingTeamId]) => {
-                const controllingTeam = gameState.teams.find(t => t.id === controllingTeamId);
-                const isCenterHeart = coord === 'q0r0';
-                const points = isCenterHeart ? '+2' : '+1';
-                const isOwnTeam = controllingTeamId === teamId;
-                
-                return `
-                    <div class="heart-item">
-                        <div>
-                            <strong style="color: ${isOwnTeam ? '#4ade80' : '#f87171'}">
-                                ${controllingTeam ? controllingTeam.name : `Team ${controllingTeamId}`}
-                                ${isOwnTeam ? ' (YOU)' : ''}
-                            </strong>
-                            <br><small>${coord} ${isCenterHeart ? '(Mountain Heart)' : '(Side Heart)'}</small>
-                        </div>
-                        <div style="color: ${isOwnTeam ? '#4ade80' : '#f87171'}; font-weight: bold;">
-                            ${points}/turn
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function updateGameStatus(gameState) {
-            document.getElementById('currentRound').textContent = gameState.currentRound || 0;
-            document.getElementById('gamesPlayed').textContent = gameState.gamesPlayed || 0;
-            document.getElementById('winCondition').textContent = gameState.winCondition || 50;
-        }
-
-        function updateActivityLog(gameState) {
-            const log = document.getElementById('teamLog');
-            const activities = [];
-            
-            // Get recent game results
-            const recentGames = (gameState.gameHistory || []).slice(-10).reverse();
-            
-            recentGames.forEach(game => {
-                const winningTeam = gameState.teams.find(t => t.id === game.winningTeamId);
-                if (winningTeam) {
-                    const isOwnTeam = game.winningTeamId === teamId;
-                    activities.push({
-                        type: isOwnTeam ? 'own-team' : 'opponent',
-                        content: `${isOwnTeam ? '🎉' : '🎮'} ${winningTeam.name} won ${game.game} ${game.playType}`,
-                        timestamp: game.timestamp
+                if (teamHistory.length === 0) {
+                    historyHtml += '<p>No games played by this team yet</p>';
+                } else {
+                    historyHtml += '<ul class="player-list">';
+                    teamHistory.forEach(game => {
+                        const isWinner = game.winner == teamId;
+                        historyHtml += `
+                            <li>
+                                <strong>${game.gameType || 'Unknown'}</strong> - 
+                                ${game.playType || 'Unknown'} - 
+                                ${isWinner ? '🏆 WON' : '❌ LOST'}
+                                ${game.hex ? ` (Hex: ${game.hex})` : ''}
+                            </li>
+                        `;
                     });
+                    historyHtml += '</ul>';
                 }
-            });
-            
-            // Add plate placement activities
-            let ownPlateCount = 0;
-            if (gameState.board.forEach) {
-                gameState.board.forEach((occupier) => {
-                    if (occupier === teamId) ownPlateCount++;
-                });
-            } else if (gameState.board) {
-                Object.values(gameState.board).forEach((occupier) => {
-                    if (occupier === teamId) ownPlateCount++;
-                });
             }
             
-            if (ownPlateCount > 0) {
-                activities.push({
-                    type: 'own-team',
-                    content: `📍 Your team has ${ownPlateCount} plate${ownPlateCount > 1 ? 's' : ''} on board`,
-                    timestamp: new Date().toISOString()
-                });
-            }
-            
-            // If no activities, show default
-            if (activities.length === 0) {
-                log.innerHTML = `
-                    <div class="log-entry">
-                        <div>🎮 Team portal initialized</div>
-                        <div class="log-timestamp">Waiting for game activity...</div>
-                    </div>
-                `;
+            document.getElementById('teamHistory').innerHTML = historyHtml;
+        }
+        
+        // Initialize Firebase and load data
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check URL params first
+            if (!getUrlParams()) {
                 return;
             }
             
-            log.innerHTML = activities.map(activity => `
-                <div class="log-entry ${activity.type}">
-                    <div>${activity.content}</div>
-                    <div class="log-timestamp">${formatTimestamp(activity.timestamp)}</div>
-                </div>
-            `).join('');
+            const firebaseConfig = {
+                apiKey: "AIzaSyCJsd9NmSaV9QYcIC2pVH7PkRB9iKiYxf8",
+                authDomain: "boardgame-7b9f0.firebaseapp.com",
+                projectId: "boardgame-7b9f0",
+                storageBucket: "boardgame-7b9f0.firebasestorage.app",
+                messagingSenderId: "1001331148981",
+                appId: "1:1001331148981:web:5094c89e3b6cf056c696fc",
+                measurementId: "G-22Y0E9VTPV"
+            };
             
-            // Scroll to bottom
-            log.scrollTop = log.scrollHeight;
-        }
-
-        function addLogEntry(message, type = 'info') {
-            const log = document.getElementById('teamLog');
-            const entry = document.createElement('div');
-            entry.className = `log-entry ${type}`;
-            entry.innerHTML = `
-                <div>${message}</div>
-                <div class="log-timestamp">${new Date().toLocaleTimeString()}</div>
-            `;
-            log.appendChild(entry);
-            log.scrollTop = log.scrollHeight;
-        }
-
-        function showMessage(message, type = 'info') {
-            const messageEl = document.getElementById('statusMessage');
-            messageEl.textContent = message;
-            messageEl.className = `status-message ${type}`;
-            messageEl.style.display = 'block';
-            
-            setTimeout(() => {
-                messageEl.style.display = 'none';
-            }, 5000);
-        }
-
-        function showError(message) {
-            showMessage(message, 'error');
-            const actionPanel = document.getElementById('actionPanel');
-            actionPanel.innerHTML = `
-                <h4>❌ Error</h4>
-                <div style="color: #f87171; margin: 15px 0;">${message}</div>
-                <button class="btn" onclick="loadGame()">🔄 Retry</button>
-            `;
-        }
-
-        function setConnectionStatus(status, text) {
-            const statusEl = document.getElementById('connectionStatus');
-            statusEl.className = `connection-status ${status}`;
-            statusEl.textContent = text;
-        }
-
-        function refreshGame() {
-            loadGame();
-            showMessage('Game refreshed', 'success');
-        }
-
-        function toggleAutoRefresh() {
-            autoRefresh = !autoRefresh;
-            const btn = document.getElementById('autoRefreshBtn');
-            
-            if (autoRefresh) {
-                btn.textContent = '📡 Auto: ON';
-                startAutoRefresh();
-            } else {
-                btn.textContent = '📡 Auto: OFF';
-                stopAutoRefresh();
-            }
-        }
-
-        function startAutoRefresh() {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-            }
-            
-            refreshInterval = setInterval(() => {
-                if (autoRefresh) {
-                    loadGame();
-                }
-            }, REFRESH_RATE);
-        }
-
-        function stopAutoRefresh() {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-                refreshInterval = null;
-            }
-        }
-
-        // Utility functions
-        function generateHexCoordinates() {
-            const coordinates = [];
-            for (let q = -5; q <= 5; q++) {
-                const r1 = Math.max(-5, -q - 5);
-                const r2 = Math.min(5, -q + 5);
-                for (let r = r1; r <= r2; r++) {
-                    coordinates.push([q, r]);
-                }
-            }
-            return coordinates;
-        }
-
-        function hexToPixel(q, r, size = 20, centerX = 300, centerY = 300) {
-            const x = size * 3/2 * q;
-            const y = size * Math.sqrt(3) * (r + q/2);
-            return [x + centerX, y + centerY];
-        }
-
-        function formatTimestamp(timestamp) {
             try {
-                return new Date(timestamp).toLocaleTimeString();
-            } catch {
-                return 'Now';
-            }
-        }
-
-        // Cleanup on page unload
-        window.addEventListener('beforeunload', function() {
-            stopAutoRefresh();
-        });
-
-        // Handle visibility change (pause refresh when tab is hidden)
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden) {
-                stopAutoRefresh();
-            } else if (autoRefresh) {
-                startAutoRefresh();
-                loadGame(); // Refresh immediately when tab becomes visible
-            }
-        });
-
-        // Add keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            // R key - refresh
-            if (e.key === 'r' || e.key === 'R') {
-                e.preventDefault();
-                refreshGame();
-            }
-            
-            // A key - toggle auto-refresh
-            if (e.key === 'a' || e.key === 'A') {
-                e.preventDefault();
-                toggleAutoRefresh();
-            }
-            
-            // S key - skip turn (if available)
-            if (e.key === 's' || e.key === 'S') {
-                const skipBtn = document.getElementById('skipTurnBtn');
-                if (skipBtn.style.display !== 'none') {
-                    e.preventDefault();
-                    skipTurn();
-                }
-            }
-        });
-
-        // Add click-to-copy for coordinates (for debugging)
-        document.addEventListener('click', function(e) {
-            if (e.ctrlKey && e.target.closest('.hex')) {
-                const hex = e.target.closest('.hex');
-                const coord = hex.id.replace('hex-', '').replace('-', 'r');
-                navigator.clipboard.writeText(`q${coord}`).then(() => {
-                    showMessage(`Copied coordinate: q${coord}`, 'info');
+                // Initialize Firebase
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                
+                // Update connection status
+                const connectionStatus = document.getElementById('connectionStatus');
+                connectionStatus.textContent = 'Firebase connected successfully!';
+                connectionStatus.className = 'status success';
+                
+                // Update nav links
+                updateNavLinks();
+                
+                // Load game data
+                loadGameData();
+                
+                // Set up team selector listener
+                document.getElementById('teamSelect').addEventListener('change', function(e) {
+                    const selectedTeamId = e.target.value;
+                    if (selectedTeamId) {
+                        // Reload game data to get fresh data
+                        db.collection('games').doc(gameId).get()
+                            .then((doc) => {
+                                if (doc.exists) {
+                                    loadTeamData(selectedTeamId, doc.data());
+                                }
+                            });
+                    }
                 });
+                
+            } catch (error) {
+                console.error('Error initializing Firebase:', error);
+                
+                const connectionStatus = document.getElementById('connectionStatus');
+                connectionStatus.textContent = 'Error initializing Firebase: ' + error.message;
+                connectionStatus.className = 'status error';
             }
         });
     </script>

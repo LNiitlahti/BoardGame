@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Game Setup</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .player-input {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Minimal Game Setup</h1>
+    
+    <div id="connectionStatus" class="status warning">
+        Connecting to Firebase...
+    </div>
+    
+    <form id="setupForm">
+        <div class="form-group">
+            <label for="gameId">Game ID:</label>
+            <input type="text" id="gameId" value="test_game_1" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="numPlayers">Number of Players:</label>
+            <input type="number" id="numPlayers" min="2" max="10" value="2" onchange="updatePlayerInputs()">
+        </div>
+        
+        <div id="playerInputs">
+            <!-- Player inputs will be generated here -->
+        </div>
+        
+        <div class="form-group">
+            <label for="winCondition">Win Condition (points):</label>
+            <input type="number" id="winCondition" min="10" max="100" value="50">
+        </div>
+        
+        <button type="submit" disabled>Create Game</button>
+    </form>
+    
+    <div id="gamesList">
+        <h2>Existing Games</h2>
+        <div id="existingGames">
+            <p>Loading existing games...</p>
+        </div>
+        <button id="loadGamesBtn" disabled>Load Games</button>
+    </div>
+    
+    <!-- Load Firebase scripts directly -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <script>
+        // Update player input fields when number changes
+        function updatePlayerInputs() {
+            const numPlayers = parseInt(document.getElementById('numPlayers').value);
+            const playerInputs = document.getElementById('playerInputs');
+            playerInputs.innerHTML = '';
+            
+            for (let i = 1; i <= numPlayers; i++) {
+                const playerDiv = document.createElement('div');
+                playerDiv.className = 'player-input';
+                
+                playerDiv.innerHTML = `
+                    <label for="player${i}">Player ${i} Name:</label>
+                    <input type="text" id="player${i}" value="Player ${i}">
+                `;
+                
+                playerInputs.appendChild(playerDiv);
+            }
+        }
+        
+        // Create a new game
+        function createGame(db) {
+            const gameId = document.getElementById('gameId').value.trim();
+            const numPlayers = parseInt(document.getElementById('numPlayers').value);
+            const winCondition = parseInt(document.getElementById('winCondition').value);
+            
+            // Collect player names
+            const playerNames = [];
+            for (let i = 1; i <= numPlayers; i++) {
+                const playerName = document.getElementById(`player${i}`).value.trim();
+                playerNames.push(playerName);
+            }
+            
+            // Create teams
+            const teamCount = Math.min(5, Math.ceil(numPlayers / 2));
+            const teams = [];
+            
+            for (let i = 1; i <= teamCount; i++) {
+                const teamPlayers = playerNames
+                    .slice((i - 1) * Math.ceil(numPlayers / teamCount), i * Math.ceil(numPlayers / teamCount))
+                    .map((name, index) => ({
+                        id: ((i - 1) * Math.ceil(numPlayers / teamCount)) + index + 1,
+                        name: name,
+                        team: i,
+                        points: 0
+                    }));
+                
+                teams.push({
+                    id: i,
+                    name: `Team ${i}`,
+                    players: teamPlayers,
+                    points: 0,
+                    gamesWon: 0
+                });
+            }
+            
+            // Game state
+            const gameState = {
+                gameId: gameId,
+                players: playerNames.map((name, index) => ({
+                    id: index + 1,
+                    name: name,
+                    team: Math.floor(index / Math.ceil(numPlayers / teamCount)) + 1,
+                    points: 0
+                })),
+                teams: teams,
+                board: {},
+                heartHexes: ['q2r-4', 'q4r-2', 'q2r2', 'q-2r4', 'q-4r2', 'q-2r-2'],
+                heartHexControl: {},
+                currentRound: 0,
+                gamesPlayed: 0,
+                winCondition: winCondition,
+                gameHistory: [],
+                currentTurn: null,
+                gamePhase: 'playing',
+                gameTypes: ['CS2', 'Dota2', 'Valorant', 'StarCraft2', 'Predecessor'],
+                playTypes: ['1v1', '2v2', '3v3', '5v5'],
+                createdAt: new Date().toISOString(),
+                initialized: true
+            };
+            
+            // Save to Firestore
+            db.collection('games').doc(gameId).set(gameState)
+                .then(() => {
+                    alert(`Game "${gameId}" created successfully!`);
+                    
+                    // Show link to the game
+                    const existingGames = document.getElementById('existingGames');
+                    existingGames.innerHTML = `
+                        <div class="status success">
+                            Game created successfully! 
+                            <a href="game.html?gameId=${gameId}">Open Game</a> | 
+                            <a href="admin.html?gameId=${gameId}">Admin Panel</a>
+                        </div>
+                    `;
+                    
+                    // Load the games list
+                    loadGames(db);
+                })
+                .catch((error) => {
+                    alert(`Error creating game: ${error.message}`);
+                    console.error('Error creating game:', error);
+                });
+        }
+        
+        // Load existing games
+        function loadGames(db) {
+            const existingGames = document.getElementById('existingGames');
+            existingGames.innerHTML = '<p>Loading...</p>';
+            
+            db.collection('games').get()
+                .then((querySnapshot) => {
+                    if (querySnapshot.empty) {
+                        existingGames.innerHTML = '<p>No games found</p>';
+                        return;
+                    }
+                    
+                    let gamesHtml = '<ul>';
+                    
+                    querySnapshot.forEach((doc) => {
+                        const game = doc.data();
+                        gamesHtml += `
+                            <li>
+                                <strong>${game.gameId}</strong> - 
+                                Created: ${new Date(game.createdAt).toLocaleString()} - 
+                                <a href="game.html?gameId=${game.gameId}">Open</a> | 
+                                <a href="admin.html?gameId=${game.gameId}">Admin</a>
+                            </li>
+                        `;
+                    });
+                    
+                    gamesHtml += '</ul>';
+                    existingGames.innerHTML = gamesHtml;
+                })
+                .catch((error) => {
+                    existingGames.innerHTML = `<p>Error loading games: ${error.message}</p>`;
+                    console.error('Error loading games:', error);
+                });
+        }
+
+        // Initialize Firebase directly with the config rather than trying to parse it
+        document.addEventListener('DOMContentLoaded', function() {
+            const firebaseConfig = {
+                apiKey: "AIzaSyCJsd9NmSaV9QYcIC2pVH7PkRB9iKiYxf8",
+                authDomain: "boardgame-7b9f0.firebaseapp.com",
+                projectId: "boardgame-7b9f0",
+                storageBucket: "boardgame-7b9f0.firebasestorage.app",
+                messagingSenderId: "1001331148981",
+                appId: "1:1001331148981:web:5094c89e3b6cf056c696fc",
+                measurementId: "G-22Y0E9VTPV"
+            };
+            
+            try {
+                // Initialize Firebase
+                firebase.initializeApp(firebaseConfig);
+                const db = firebase.firestore();
+                
+                // Update connection status
+                const connectionStatus = document.getElementById('connectionStatus');
+                connectionStatus.textContent = 'Firebase connected successfully!';
+                connectionStatus.className = 'status success';
+                
+                // Enable buttons
+                document.querySelector('#setupForm button').disabled = false;
+                document.getElementById('loadGamesBtn').disabled = false;
+                
+                // Set up event listeners
+                document.getElementById('setupForm').addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    createGame(db);
+                });
+                
+                document.getElementById('loadGamesBtn').addEventListener('click', function() {
+                    loadGames(db);
+                });
+                
+                // Load initial games
+                loadGames(db);
+                
+            } catch (error) {
+                console.error('Error initializing Firebase:', error);
+                
+                const connectionStatus = document.getElementById('connectionStatus');
+                connectionStatus.textContent = 'Error initializing Firebase: ' + error.message;
+                connectionStatus.className = 'status error';
+            }
+        });
+        
+        // Initialize player inputs right away (doesn't need Firebase)
+        updatePlayerInputs();
+    </script>
+</body>
+</html>
