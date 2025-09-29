@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Connection Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        code {
+            background-color: #f8f9fa;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-family: monospace;
+        }
+        #firebaseConfig {
+            width: 100%;
+            height: 150px;
+            font-family: monospace;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Firebase Connection Test</h1>
+        
+        <div id="connectionStatus" class="status warning">
+            Firebase connection status: <span id="statusText">Not connected</span>
+        </div>
+        
+        <div>
+            <h2>1. Enter Your Firebase Configuration</h2>
+            <p>Paste your Firebase configuration object below:</p>
+            <textarea id="firebaseConfig" placeholder="// Paste your Firebase config object here
+{
+  apiKey: '...',
+  authDomain: '...',
+  projectId: '...',
+  storageBucket: '...',
+  messagingSenderId: '...',
+  appId: '...'
+}"></textarea>
+            <button id="initFirebaseBtn">Initialize Firebase</button>
+        </div>
+        
+        <div>
+            <h2>2. Test Connection</h2>
+            <button id="testConnectionBtn" disabled>Test Connection</button>
+        </div>
+        
+        <div id="testResults" style="margin-top: 20px;">
+            <!-- Test results will appear here -->
+        </div>
+        
+        <div style="margin-top: 40px;">
+            <h2>How to Get Your Firebase Config</h2>
+            <ol>
+                <li>Go to the <a href="https://console.firebase.google.com/" target="_blank">Firebase Console</a></li>
+                <li>Select your project</li>
+                <li>Click the gear icon (⚙️) next to "Project Overview" to open Project settings</li>
+                <li>Scroll down to "Your apps" section</li>
+                <li>Select your web app or create a new one with the "Add app" button</li>
+                <li>In the "SDK setup and configuration" section, you'll find your Firebase config object</li>
+                <li>Copy the entire configuration object and paste it above</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js" type="module"></script>
+    
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import { getDatabase, ref, onValue, set } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js';
+        
+        let firebaseApp;
+        let database;
+        
+        // UI elements
+        const connectionStatus = document.getElementById('connectionStatus');
+        const statusText = document.getElementById('statusText');
+        const firebaseConfigInput = document.getElementById('firebaseConfig');
+        const initFirebaseBtn = document.getElementById('initFirebaseBtn');
+        const testConnectionBtn = document.getElementById('testConnectionBtn');
+        const testResults = document.getElementById('testResults');
+        
+        // Initialize Firebase when button is clicked
+        initFirebaseBtn.addEventListener('click', () => {
+            try {
+                // Get config from textarea and parse it
+                const configText = firebaseConfigInput.value;
+                const firebaseConfig = eval(`(${configText})`);
+                
+                // Initialize Firebase
+                firebaseApp = initializeApp(firebaseConfig);
+                
+                // Update status
+                connectionStatus.className = 'status info';
+                statusText.textContent = 'Initialized, ready to test connection';
+                
+                // Enable test button
+                testConnectionBtn.disabled = false;
+                
+                // Show success message
+                addResult('success', 'Firebase SDK initialized successfully');
+            } catch (error) {
+                // Show error message
+                connectionStatus.className = 'status error';
+                statusText.textContent = 'Error initializing Firebase';
+                addResult('error', 'Error initializing Firebase: ' + error.message);
+            }
+        });
+        
+        // Test connection when button is clicked
+        testConnectionBtn.addEventListener('click', async () => {
+            try {
+                // Get database reference
+                database = getDatabase(firebaseApp);
+                
+                // Create a unique test path for this session
+                const testId = 'connection_test_' + Date.now();
+                const testRef = ref(database, 'connection_tests/' + testId);
+                
+                // Update status
+                connectionStatus.className = 'status info';
+                statusText.textContent = 'Testing connection...';
+                
+                // Try writing test data
+                await set(testRef, {
+                    timestamp: Date.now(),
+                    message: 'Connection test successful'
+                });
+                
+                // Set up a listener to verify data was written
+                onValue(testRef, (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        // Success! Connection is working
+                        connectionStatus.className = 'status success';
+                        statusText.textContent = 'Connected successfully!';
+                        addResult('success', 'Firebase connection test successful!', data);
+                    }
+                }, (error) => {
+                    // Error reading data
+                    connectionStatus.className = 'status error';
+                    statusText.textContent = 'Error reading data';
+                    addResult('error', 'Error reading data: ' + error.message);
+                });
+            } catch (error) {
+                // Show error message
+                connectionStatus.className = 'status error';
+                statusText.textContent = 'Error testing connection';
+                addResult('error', 'Error testing connection: ' + error.message);
+            }
+        });
+        
+        // Helper function to add a result to the results container
+        function addResult(type, message, data = null) {
+            const resultElement = document.createElement('div');
+            resultElement.className = `status ${type}`;
+            
+            let html = `<p><strong>${message}</strong></p>`;
+            
+            if (data) {
+                html += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            }
+            
+            resultElement.innerHTML = html;
+            testResults.appendChild(resultElement);
+        }
+    </script>
+</body>
+</html>
