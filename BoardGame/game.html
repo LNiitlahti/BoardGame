@@ -3,1028 +3,235 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Game Board - Board Game System</title>
-    <link rel="stylesheet" href="css/styles.css">
+    <title>Game View</title>
     <style>
-        /* Game-specific styles */
-        .game-container {
-            display: grid;
-            grid-template-columns: 300px 1fr 300px;
-            gap: 20px;
-            height: 100vh;
-            padding: 20px;
-            max-width: 1600px;
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
             margin: 0 auto;
-        }
-
-        .left-sidebar, .right-sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            overflow-y: auto;
-        }
-
-        .board-section {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-        }
-
-        .hex-board {
-            position: relative;
-            width: 600px;
-            height: 600px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .hex {
-            position: absolute;
-            width: 45px;
-            height: 40px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .hex-inner {
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 9px;
-            font-weight: bold;
-            transition: all 0.3s ease;
-            position: relative;
-        }
-
-        .hex:hover .hex-inner {
-            background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.1);
-        }
-
-        /* Hex types */
-        .hex.starting-location .hex-inner {
-            background: rgba(255, 215, 0, 0.4);
-            border-color: #ffd700;
-        }
-
-        .hex.heart-hex .hex-inner {
-            background: rgba(255, 20, 147, 0.4);
-            border-color: #ff1493;
-        }
-
-        .hex.center .hex-inner {
-            background: rgba(138, 43, 226, 0.5);
-            border-color: #8a2be2;
-        }
-
-        .hex.high-value .hex-inner {
-            background: rgba(255, 69, 0, 0.4);
-            border-color: #ff4500;
-        }
-
-        /* Team colors */
-        .hex.team1 .hex-inner { 
-            background: rgba(255, 68, 68, 0.9);
-            border-color: #ff4444;
-            color: white;
-            font-weight: 800;
-        }
-        .hex.team2 .hex-inner { 
-            background: rgba(68, 255, 68, 0.9);
-            border-color: #44ff44;
-            color: black;
-            font-weight: 800;
-        }
-        .hex.team3 .hex-inner { 
-            background: rgba(68, 68, 255, 0.9);
-            border-color: #4444ff;
-            color: white;
-            font-weight: 800;
-        }
-        .hex.team4 .hex-inner { 
-            background: rgba(255, 255, 68, 0.9);
-            border-color: #ffff44;
-            color: black;
-            font-weight: 800;
-        }
-        .hex.team5 .hex-inner { 
-            background: rgba(255, 68, 255, 0.9);
-            border-color: #ff44ff;
-            color: white;
-            font-weight: 800;
-        }
-
-        /* Heart hex control indicators */
-        .hex.heart-controlled::after {
-            content: '♦';
-            position: absolute;
-            top: -8px;
-            right: -8px;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: bold;
-            z-index: 10;
-        }
-
-        .hex.team1.heart-controlled::after { background: #ff4444; color: white; }
-        .hex.team2.heart-controlled::after { background: #44ff44; color: black; }
-        .hex.team3.heart-controlled::after { background: #4444ff; color: white; }
-        .hex.team4.heart-controlled::after { background: #ffff44; color: black; }
-        .hex.team5.heart-controlled::after { background: #ff44ff; color: white; }
-
-        /* Game status */
-        .game-status {
-            background: rgba(255, 215, 0, 0.2);
-            border: 2px solid #ffd700;
             padding: 20px;
-            border-radius: 15px;
-            text-align: center;
-            margin-bottom: 20px;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
         }
-
-        .current-turn {
-            background: rgba(255, 215, 0, 0.3);
-            border: 2px solid #ffd700;
+        .status {
+            margin: 20px 0;
             padding: 15px;
-            border-radius: 10px;
-            animation: pulse 2s infinite;
-            margin-bottom: 20px;
+            border-radius: 5px;
         }
-
-        .waiting-turn {
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            animation: none;
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
         }
-
-        /* Team cards */
-        .team-card {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 15px;
-            border-radius: 10px;
-            border-left: 4px solid;
-            margin-bottom: 15px;
-            transition: all 0.3s ease;
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
         }
-
-        .team-card.active-turn {
-            background: rgba(255, 215, 0, 0.2);
-            border: 2px solid #ffd700;
-            transform: scale(1.02);
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
         }
-
-        /* Recent activity */
-        .activity-feed {
-            max-height: 300px;
-            overflow-y: auto;
+        .game-board {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+            background-color: #f9f9f9;
         }
-
-        .activity-item {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 8px;
-            border-left: 3px solid #ffd700;
-            font-size: 0.9rem;
-        }
-
-        .activity-item.win {
-            border-left-color: #4ade80;
-            background: rgba(74, 222, 128, 0.1);
-        }
-
-        .activity-item.placement {
-            border-left-color: #60a5fa;
-            background: rgba(96, 165, 250, 0.1);
-        }
-
-        .activity-item.capture {
-            border-left-color: #f87171;
-            background: rgba(248, 113, 113, 0.1);
-        }
-
-        .timestamp {
-            color: rgba(255, 255, 255, 0.6);
-            font-size: 0.8rem;
-            margin-top: 5px;
-        }
-
-        /* Legend */
-        .legend {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-
-        .legend-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.85rem;
-        }
-
-        .legend-hex {
-            width: 20px;
-            height: 18px;
-            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-        }
-
-        .legend-hex.starting { background: rgba(255, 215, 0, 0.5); }
-        .legend-hex.heart { background: rgba(255, 20, 147, 0.5); }
-        .legend-hex.center { background: rgba(138, 43, 226, 0.5); }
-        .legend-hex.high-value { background: rgba(255, 69, 0, 0.5); }
-
-        /* Game controls */
-        .game-controls {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 15px;
-            border-radius: 10px;
-            text-align: center;
-        }
-
-        .refresh-btn {
-            background: rgba(255, 215, 0, 0.2);
-            border: 2px solid #ffd700;
-            color: #ffd700;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            margin: 5px;
-        }
-
-        .refresh-btn:hover {
-            background: rgba(255, 215, 0, 0.3);
-            transform: translateY(-2px);
-        }
-
-        /* Connection status */
-        .connection-status {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            z-index: 1000;
-        }
-
-        .connection-status.connected {
-            background: rgba(74, 222, 128, 0.2);
-            border: 1px solid #4ade80;
-            color: #4ade80;
-        }
-
-        .connection-status.disconnected {
-            background: rgba(248, 113, 113, 0.2);
-            border: 1px solid #f87171;
-            color: #f87171;
-        }
-
-        .connection-status.loading {
-            background: rgba(251, 191, 36, 0.2);
-            border: 1px solid #fbbf24;
-            color: #fbbf24;
-        }
-
-        /* Responsive design */
-        @media (max-width: 1200px) {
-            .game-container {
-                grid-template-columns: 250px 1fr 250px;
-            }
-            
-            .hex-board {
-                width: 500px;
-                height: 500px;
-            }
-            
-            .hex {
-                width: 38px;
-                height: 34px;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .game-container {
-                grid-template-columns: 1fr;
-                grid-template-rows: auto auto auto;
-                height: auto;
-            }
-            
-            .hex-board {
-                width: 400px;
-                height: 400px;
-            }
-            
-            .hex {
-                width: 30px;
-                height: 26px;
-            }
-            
-            .hex-inner {
-                font-size: 7px;
-            }
-        }
-
-        /* Winner celebration */
-        .winner-banner {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-            animation: fadeIn 0.5s ease;
-        }
-
-        .winner-content {
-            background: rgba(255, 215, 0, 0.9);
-            color: #333;
-            padding: 40px;
-            border-radius: 20px;
-            text-align: center;
-            font-size: 2rem;
-            font-weight: 800;
-            animation: celebrate 1s ease;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        @keyframes celebrate {
-            0%, 100% { transform: scale(1) rotate(0deg); }
-            25% { transform: scale(1.1) rotate(1deg); }
-            75% { transform: scale(1.1) rotate(-1deg); }
+        .team-info {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
         }
     </style>
+    
+    <!-- Load Firebase SDKs directly -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
-    <!-- Connection Status -->
-    <div id="connectionStatus" class="connection-status loading">
-        🔄 Loading Game...
+    <h1>Game View</h1>
+    
+    <div id="connectionStatus" class="status warning">
+        Connecting to Firebase...
     </div>
-
-    <!-- Winner Banner (hidden by default) -->
-    <div id="winnerBanner" class="winner-banner" style="display: none;">
-        <div class="winner-content">
-            <div id="winnerText">🏆 GAME OVER 🏆</div>
-        </div>
+    
+    <div id="gameInfo">
+        <h2>Game Information</h2>
+        <p>Loading game data...</p>
     </div>
-
-    <div class="game-container">
-        <!-- Left Sidebar -->
-        <div class="left-sidebar">
-            <!-- Game Status -->
-            <div class="game-status">
-                <h3>🎯 Game Status</h3>
-                <div id="gameInfo">
-                    <div><strong>Phase:</strong> <span id="gamePhase">Loading...</span></div>
-                    <div><strong>Round:</strong> <span id="currentRound">-</span></div>
-                    <div><strong>Games Played:</strong> <span id="gamesPlayed">-</span></div>
-                    <div><strong>Win Condition:</strong> <span id="winCondition">-</span> points</div>
-                </div>
-            </div>
-
-            <!-- Current Turn -->
-            <div id="currentTurn" class="current-turn waiting-turn">
-                <h4>⏳ Current Turn</h4>
-                <div id="turnInfo">Waiting for game start...</div>
-            </div>
-
-            <!-- Teams Rankings -->
-            <div class="panel">
-                <h3>🏆 Team Rankings</h3>
-                <div id="teamRankings">
-                    <!-- Teams will be populated here -->
-                </div>
-            </div>
-
-            <!-- Game Controls -->
-            <div class="game-controls">
-                <h4>🎮 Controls</h4>
-                <button class="refresh-btn" onclick="refreshGame()">🔄 Refresh</button>
-                <button class="refresh-btn" onclick="toggleAutoRefresh()">
-                    <span id="autoRefreshText">📡 Auto: ON</span>
-                </button>
-                <div style="margin-top: 10px; font-size: 0.8rem; color: rgba(255,255,255,0.7);">
-                    Last updated: <span id="lastUpdate">-</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Main Board Area -->
-        <div class="board-section">
-            <div class="header">
-                <h1 id="gameTitle">🎯 Board Game</h1>
-                <p id="gameSubtitle">Live Game View</p>
-            </div>
-
-            <div class="hex-board" id="hexBoard">
-                <!-- Hex grid will be generated here -->
-            </div>
-
-            <!-- Board Legend -->
-            <div class="legend">
-                <h4>🗺️ Board Legend</h4>
-                <div class="legend-grid">
-                    <div class="legend-item">
-                        <div class="legend-hex starting"></div>
-                        <span>Starting Corner</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-hex heart"></div>
-                        <span>Heart Hex (+1/turn)</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-hex center"></div>
-                        <span>Mountain Heart (+2/turn)</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-hex high-value"></div>
-                        <span>High Value (+2 points)</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Right Sidebar -->
-        <div class="right-sidebar">
-            <!-- Recent Activity -->
-            <div class="panel">
-                <h3>📰 Recent Activity</h3>
-                <div class="activity-feed" id="activityFeed">
-                    <div class="activity-item">
-                        <div>🎮 Game initialized</div>
-                        <div class="timestamp">Waiting for first game...</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Heart Hex Control -->
-            <div class="panel">
-                <h3>❤️ Heart Hex Control</h3>
-                <div id="heartControl">
-                    <div style="text-align: center; color: rgba(255,255,255,0.7); font-style: italic;">
-                        No heart hexes controlled yet
-                    </div>
-                </div>
-            </div>
-
-            <!-- Game Statistics -->
-            <div class="panel">
-                <h3>📊 Statistics</h3>
-                <div id="gameStats">
-                    <div class="stat-item">
-                        <div class="stat-number" id="totalPlates">0</div>
-                        <div class="stat-label">Plates on Board</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number" id="heartsControlled">0</div>
-                        <div class="stat-label">Hearts Controlled</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number" id="averageScore">0</div>
-                        <div class="stat-label">Average Team Score</div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    
+    <div id="teamInfo">
+        <h2>Teams</h2>
+        <p>Loading team information...</p>
     </div>
-
-    <!-- Include scripts -->
-    <script src="scripts/main.js"></script>
+    
+    <div id="gameBoard" class="game-board">
+        <h2>Game Board</h2>
+        <p>Board visualization will appear here...</p>
+    </div>
+    
+    <div id="gameControls">
+        <h2>Game Controls</h2>
+        <button id="backToSetup">Back to Setup</button>
+    </div>
+    
     <script>
-        // Game state
-        let gameEngine = null;
-        let gameId = null;
-        let autoRefresh = true;
-        let refreshInterval = null;
-        const REFRESH_RATE = 5000; // 5 seconds
-
-        // Initialize game
-        document.addEventListener('DOMContentLoaded', function() {
-            // Get game ID from URL
+        // Get game ID from URL
+        function getGameIdFromUrl() {
             const urlParams = new URLSearchParams(window.location.search);
-            gameId = urlParams.get('game');
-            
-            if (!gameId) {
-                showError('No game ID provided in URL');
-                return;
-            }
-
-            // Set page title
-            document.title = `Live Game Board - ${gameId}`;
-            document.getElementById('gameTitle').textContent = `🎯 ${gameId}`;
-
-            // Load game
-            loadGame();
-            
-            // Start auto-refresh
-            if (autoRefresh) {
-                startAutoRefresh();
-            }
-        });
-
-        function loadGame() {
-            setConnectionStatus('loading', '🔄 Loading Game...');
-            
-            try {
-                gameEngine = loadGameFromStorage(gameId);
-                
-                if (!gameEngine) {
-                    throw new Error(`Game "${gameId}" not found`);
-                }
-
-                updateDisplay();
-                setConnectionStatus('connected', '🟢 Connected');
-                
-            } catch (error) {
-                console.error('Failed to load game:', error);
-                setConnectionStatus('disconnected', '🔴 Game Not Found');
-                showError('Failed to load game: ' + error.message);
-            }
+            return urlParams.get('gameId');
         }
-
-        function updateDisplay() {
-            if (!gameEngine || !gameEngine.gameState) return;
-
-            const gameState = gameEngine.gameState;
-            
-            // Update game info
-            updateGameInfo(gameState);
-            
-            // Update current turn
-            updateCurrentTurn(gameState);
-            
-            // Update team rankings
-            updateTeamRankings(gameState);
-            
-            // Update hex board
-            updateHexBoard(gameState);
-            
-            // Update activity feed
-            updateActivityFeed(gameState);
-            
-            // Update heart control
-            updateHeartControl(gameState);
-            
-            // Update statistics
-            updateStatistics(gameState);
-            
-            // Check for winner
-            checkGameEnd(gameState);
-            
-            // Update last update time
-            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
-        }
-
-        function updateGameInfo(gameState) {
-            document.getElementById('gamePhase').textContent = 
-                gameState.gamePhase === 'playing' ? '🎮 Active' : 
-                gameState.gamePhase === 'finished' ? '🏆 Finished' : '⏳ Setup';
-            document.getElementById('currentRound').textContent = gameState.currentRound || 0;
-            document.getElementById('gamesPlayed').textContent = gameState.gamesPlayed || 0;
-            document.getElementById('winCondition').textContent = gameState.winCondition || 50;
-        }
-
-        function updateCurrentTurn(gameState) {
-            const turnElement = document.getElementById('currentTurn');
-            const turnInfo = document.getElementById('turnInfo');
-            
-            if (gameState.currentTurn && gameState.gamePhase === 'playing') {
-                const team = gameState.teams.find(t => t.id === gameState.currentTurn.teamId);
-                if (team) {
-                    turnElement.className = 'current-turn';
-                    turnInfo.innerHTML = `
-                        <strong>🎯 ${team.name}</strong><br>
-                        <small>${team.players.map(p => p.name).join(' & ')}</small><br>
-                        <div style="margin-top: 8px; font-size: 0.9em;">
-                            ${gameState.currentTurn.needsPlacement ? '📍 Needs to place plate' : '✅ Turn complete'}
-                        </div>
-                    `;
-                    return;
-                }
-            }
-            
-            turnElement.className = 'current-turn waiting-turn';
-            if (gameState.gamePhase === 'finished') {
-                turnInfo.textContent = '🏆 Game Finished';
-            } else {
-                turnInfo.textContent = '⏳ Waiting for next game result...';
-            }
-        }
-
-        function updateTeamRankings(gameState) {
-            const container = document.getElementById('teamRankings');
-            const teams = [...gameState.teams].sort((a, b) => b.points - a.points);
-            
-            container.innerHTML = teams.map((team, index) => {
-                let className = `team-card team${team.id}`;
-                if (gameState.currentTurn && team.id === gameState.currentTurn.teamId) {
-                    className += ' active-turn';
-                }
-                
-                const rankIcon = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
-                
-                return `
-                    <div class="${className}">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <strong>${rankIcon} ${team.name}</strong><br>
-                                <small>${team.players.map(p => p.name).join(' & ')}</small>
-                            </div>
-                            <div style="text-align: right;">
-                                <div style="font-size: 1.2rem; font-weight: bold;">${team.points}</div>
-                                <div style="font-size: 0.8rem; opacity: 0.8;">${team.gamesWon} wins</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function updateHexBoard(gameState) {
-            const hexBoard = document.getElementById('hexBoard');
-            
-            // Clear existing hexes
-            hexBoard.innerHTML = '';
-            
-            // Generate hex coordinates
-            const coordinates = generateHexCoordinates();
-            
-            coordinates.forEach(([q, r]) => {
-                const hex = document.createElement('div');
-                hex.className = getHexClasses(q, r, gameState);
-                hex.id = `hex-${q}-${r}`;
-                
-                const [x, y] = hexToPixel(q, r, 22, 300, 300);
-                hex.style.left = `${x}px`;
-                hex.style.top = `${y}px`;
-                
-                const hexInner = document.createElement('div');
-                hexInner.className = 'hex-inner';
-                
-                // Set hex content
-                const coord = `q${q}r${r}`;
-                const occupier = gameState.board.get ? gameState.board.get(coord) : gameState.board[coord];
-                
-                if (occupier) {
-                    const team = gameState.teams.find(t => t.id === occupier);
-                    hexInner.textContent = team ? team.name.slice(-1) : occupier;
-                } else {
-                    hexInner.textContent = `${q},${r}`;
-                }
-                
-                hex.appendChild(hexInner);
-                hexBoard.appendChild(hex);
-            });
-        }
-
-        function getHexClasses(q, r, gameState) {
-            const coord = `q${q}r${r}`;
-            let classes = ['hex'];
-            
-            // Add hex type classes
-            const hexType = getHexType(q, r, gameState);
-            classes.push(hexType);
-            
-            // Add team class if occupied
-            const occupier = gameState.board.get ? gameState.board.get(coord) : gameState.board[coord];
-            if (occupier) {
-                classes.push(`team${occupier}`);
-                
-                // Check if heart hex is controlled
-                const heartHexes = gameState.heartHexes || [];
-                const isHeartHex = Array.isArray(heartHexes) ? heartHexes.includes(coord) : heartHexes.has ? heartHexes.has(coord) : false;
-                
-                if (isHeartHex) {
-                    classes.push('heart-controlled');
-                }
-            }
-            
-            return classes.join(' ');
-        }
-
-        function getHexType(q, r, gameState) {
-            const coord = `q${q}r${r}`;
-            
-            // Starting locations
-            const startingLocs = ['q0r-5', 'q5r-5', 'q5r0', 'q0r5', 'q-5r5', 'q-5r0'];
-            if (startingLocs.includes(coord)) return 'starting-location';
-            
-            // Heart hexes
-            const heartHexes = gameState.heartHexes || [];
-            const isHeartHex = Array.isArray(heartHexes) ? heartHexes.includes(coord) : heartHexes.has ? heartHexes.has(coord) : false;
-            if (isHeartHex) return 'heart-hex';
-            
-            // Center hex
-            if (coord === 'q0r0') return 'center';
-            
-            // High-value hexes
-            const highValueLocs = ['q2r-4', 'q4r-2', 'q2r2', 'q-2r4', 'q-4r2', 'q-2r-2'];
-            if (highValueLocs.includes(coord)) return 'high-value';
-            
-            return 'normal';
-        }
-
-        function updateActivityFeed(gameState) {
-            const feed = document.getElementById('activityFeed');
-            const activities = [];
-            
-            // Get recent game results
-            const recentGames = (gameState.gameHistory || []).slice(-10).reverse();
-            
-            recentGames.forEach(game => {
-                const team = gameState.teams.find(t => t.id === game.winningTeamId);
-                if (team) {
-                    activities.push({
-                        type: 'win',
-                        content: `🎮 ${team.name} won ${game.game} ${game.playType}`,
-                        timestamp: game.timestamp
+        
+        // Initialize Firebase with configuration
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load Firebase configuration from another script
+            fetch('scripts/firebase.js')
+                .then(response => response.text())
+                .then(text => {
+                    // Extract the Firebase configuration directly
+                    const configMatch = text.match(/const\s+firebaseConfig\s*=\s*(\{[\s\S]*?\});/);
+                    
+                    if (!configMatch || !configMatch[1]) {
+                        throw new Error('Could not find Firebase configuration in the file');
+                    }
+                    
+                    // Manually extract the configuration values
+                    const configText = configMatch[1];
+                    const apiKeyMatch = configText.match(/apiKey:\s*["']([^"']+)["']/);
+                    const authDomainMatch = configText.match(/authDomain:\s*["']([^"']+)["']/);
+                    const projectIdMatch = configText.match(/projectId:\s*["']([^"']+)["']/);
+                    const storageBucketMatch = configText.match(/storageBucket:\s*["']([^"']+)["']/);
+                    const messagingSenderIdMatch = configText.match(/messagingSenderId:\s*["']([^"']+)["']/);
+                    const appIdMatch = configText.match(/appId:\s*["']([^"']+)["']/);
+                    const measurementIdMatch = configText.match(/measurementId:\s*["']([^"']+)["']/);
+                    
+                    // Create the configuration object manually
+                    const firebaseConfig = {
+                        apiKey: apiKeyMatch ? apiKeyMatch[1] : '',
+                        authDomain: authDomainMatch ? authDomainMatch[1] : '',
+                        projectId: projectIdMatch ? projectIdMatch[1] : '',
+                        storageBucket: storageBucketMatch ? storageBucketMatch[1] : '',
+                        messagingSenderId: messagingSenderIdMatch ? messagingSenderIdMatch[1] : '',
+                        appId: appIdMatch ? appIdMatch[1] : '',
+                        measurementId: measurementIdMatch ? measurementIdMatch[1] : ''
+                    };
+                    
+                    // Initialize Firebase
+                    firebase.initializeApp(firebaseConfig);
+                    const db = firebase.firestore();
+                    
+                    // Update connection status
+                    const connectionStatus = document.getElementById('connectionStatus');
+                    connectionStatus.textContent = 'Firebase connected successfully!';
+                    connectionStatus.className = 'status success';
+                    
+                    // Get game ID from URL
+                    const gameId = getGameIdFromUrl();
+                    if (!gameId) {
+                        document.getElementById('gameInfo').innerHTML = `
+                            <h2>Game Information</h2>
+                            <p class="error">No game ID specified. <a href="minimal-setup.html">Go back to setup</a>.</p>
+                        `;
+                        return;
+                    }
+                    
+                    // Load game data
+                    loadGameData(db, gameId);
+                    
+                    // Set up back button
+                    document.getElementById('backToSetup').addEventListener('click', function() {
+                        window.location.href = 'minimal-setup.html';
                     });
-                }
-            });
-            
-            // Add plate placement activities (simulated from board state)
-            let plateCount = 0;
-            if (gameState.board.forEach) {
-                gameState.board.forEach((teamId, coord) => plateCount++);
-            } else if (gameState.board) {
-                plateCount = Object.keys(gameState.board).length;
-            }
-            
-            if (plateCount > 0) {
-                activities.push({
-                    type: 'placement',
-                    content: `📍 ${plateCount} plates placed on board`,
-                    timestamp: new Date().toISOString()
+                })
+                .catch(error => {
+                    console.error('Error loading Firebase configuration:', error);
+                    
+                    const connectionStatus = document.getElementById('connectionStatus');
+                    connectionStatus.textContent = 'Error connecting to Firebase: ' + error.message;
+                    connectionStatus.className = 'status error';
                 });
-            }
+        });
+        
+        // Load game data from Firestore
+        function loadGameData(db, gameId) {
+            db.collection('games').doc(gameId).get()
+                .then((doc) => {
+                    if (doc.exists) {
+                        const gameData = doc.data();
+                        displayGameInfo(gameData);
+                        displayTeamInfo(gameData.teams);
+                        displayGameBoard(gameData);
+                    } else {
+                        document.getElementById('gameInfo').innerHTML = `
+                            <h2>Game Information</h2>
+                            <p class="error">Game with ID "${gameId}" not found. <a href="minimal-setup.html">Go back to setup</a>.</p>
+                        `;
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error loading game data:', error);
+                    document.getElementById('gameInfo').innerHTML = `
+                        <h2>Game Information</h2>
+                        <p class="error">Error loading game: ${error.message}</p>
+                    `;
+                });
+        }
+        
+        // Display game information
+        function displayGameInfo(gameData) {
+            const gameInfo = document.getElementById('gameInfo');
+            gameInfo.innerHTML = `
+                <h2>Game: ${gameData.gameId}</h2>
+                <p><strong>Status:</strong> ${gameData.gamePhase}</p>
+                <p><strong>Created:</strong> ${new Date(gameData.createdAt).toLocaleString()}</p>
+                <p><strong>Win Condition:</strong> ${gameData.winCondition} points</p>
+                <p><strong>Games Played:</strong> ${gameData.gamesPlayed}</p>
+                <p><strong>Current Round:</strong> ${gameData.currentRound}</p>
+            `;
+        }
+        
+        // Display team information
+        function displayTeamInfo(teams) {
+            const teamInfo = document.getElementById('teamInfo');
+            teamInfo.innerHTML = '<h2>Teams</h2>';
             
-            // If no activities, show default
-            if (activities.length === 0) {
-                feed.innerHTML = `
-                    <div class="activity-item">
-                        <div>🎮 Game initialized</div>
-                        <div class="timestamp">Waiting for first game...</div>
-                    </div>
-                `;
+            if (!teams || teams.length === 0) {
+                teamInfo.innerHTML += '<p>No team information available</p>';
                 return;
             }
             
-            feed.innerHTML = activities.map(activity => `
-                <div class="activity-item ${activity.type}">
-                    <div>${activity.content}</div>
-                    <div class="timestamp">${formatTimestamp(activity.timestamp)}</div>
-                </div>
-            `).join('');
-        }
-
-        function updateHeartControl(gameState) {
-            const container = document.getElementById('heartControl');
-            const heartControl = gameState.heartHexControl || {};
-            const controlEntries = Object.entries(heartControl);
-            
-            if (controlEntries.length === 0) {
-                container.innerHTML = `
-                    <div style="text-align: center; color: rgba(255,255,255,0.7); font-style: italic;">
-                        No heart hexes controlled yet
-                    </div>
+            teams.forEach(team => {
+                const teamDiv = document.createElement('div');
+                teamDiv.className = 'team-info';
+                teamDiv.innerHTML = `
+                    <h3>${team.name} (${team.points} points)</h3>
+                    <p><strong>Games Won:</strong> ${team.gamesWon}</p>
+                    <p><strong>Players:</strong></p>
+                    <ul>
+                        ${team.players.map(player => `<li>${player.name}</li>`).join('')}
+                    </ul>
                 `;
-                return;
-            }
-            
-            container.innerHTML = controlEntries.map(([coord, teamId]) => {
-                const team = gameState.teams.find(t => t.id === teamId);
-                const isCenterHeart = coord === 'q0r0';
-                const points = isCenterHeart ? '+2' : '+1';
-                
-                return `
-                    <div class="team-card team${teamId}" style="margin-bottom: 10px; padding: 10px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <strong>${team ? team.name : `Team ${teamId}`}</strong>
-                                <br><small>${coord} ${isCenterHeart ? '(Mountain Heart)' : '(Side Heart)'}</small>
-                            </div>
-                            <div style="color: #4ade80; font-weight: bold;">
-                                ${points}/turn
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
+                teamInfo.appendChild(teamDiv);
+            });
         }
-
-        function updateStatistics(gameState) {
-            // Count total plates
-            let totalPlates = 0;
-            if (gameState.board.forEach) {
-                gameState.board.forEach(() => totalPlates++);
-            } else if (gameState.board) {
-                totalPlates = Object.keys(gameState.board).length;
-            }
+        
+        // Display game board (simple version)
+        function displayGameBoard(gameData) {
+            const gameBoard = document.getElementById('gameBoard');
+            gameBoard.innerHTML = '<h2>Game Board</h2>';
             
-            // Count hearts controlled
-            const heartsControlled = gameState.heartHexControl ? 
-                Object.keys(gameState.heartHexControl).length : 0;
-            
-            // Calculate average score
-            const totalScore = gameState.teams.reduce((sum, team) => sum + team.points, 0);
-            const averageScore = gameState.teams.length > 0 ? 
-                Math.round(totalScore / gameState.teams.length) : 0;
-            
-            document.getElementById('totalPlates').textContent = totalPlates;
-            document.getElementById('heartsControlled').textContent = heartsControlled;
-            document.getElementById('averageScore').textContent = averageScore;
-        }
-
-        function checkGameEnd(gameState) {
-            if (gameState.gamePhase === 'finished') {
-                const winner = gameState.teams.reduce((prev, current) => 
-                    (prev.points > current.points) ? prev : current
-                );
-                
-                if (winner) {
-                    showWinner(winner);
-                }
-            }
-        }
-
-        function showWinner(winner) {
-            const banner = document.getElementById('winnerBanner');
-            const text = document.getElementById('winnerText');
-            
-            text.innerHTML = `
-                🏆 GAME OVER 🏆<br>
-                <div style="font-size: 1.5rem; margin: 20px 0;">
-                    ${winner.name} WINS!
-                </div>
-                <div style="font-size: 1rem; opacity: 0.8;">
-                    ${winner.players.map(p => p.name).join(' & ')}<br>
-                    Final Score: ${winner.points} points
-                </div>
+            // Simple board representation for now
+            gameBoard.innerHTML += `
+                <p>This is a placeholder for the game board visualization.</p>
+                <p>The board has ${Object.keys(gameData.board).length} occupied spaces.</p>
+                <p>Heart hexes: ${gameData.heartHexes.join(', ')}</p>
             `;
             
-            banner.style.display = 'flex';
-            
-            // Auto-hide after 10 seconds
-            setTimeout(() => {
-                banner.style.display = 'none';
-            }, 10000);
+            // If you want to add a more sophisticated board visualization later,
+            // you can add it here
         }
-
-        function setConnectionStatus(status, text) {
-            const statusEl = document.getElementById('connectionStatus');
-            statusEl.className = `connection-status ${status}`;
-            statusEl.textContent = text;
-        }
-
-        function showError(message) {
-            const turnElement = document.getElementById('currentTurn');
-            turnElement.className = 'current-turn waiting-turn';
-            turnElement.innerHTML = `
-                <h4>❌ Error</h4>
-                <div style="color: #f87171;">${message}</div>
-                <button class="refresh-btn" onclick="loadGame()" style="margin-top: 10px;">
-                    🔄 Retry
-                </button>
-            `;
-        }
-
-        function refreshGame() {
-            loadGame();
-        }
-
-        function toggleAutoRefresh() {
-            autoRefresh = !autoRefresh;
-            const text = document.getElementById('autoRefreshText');
-            
-            if (autoRefresh) {
-                text.textContent = '📡 Auto: ON';
-                startAutoRefresh();
-            } else {
-                text.textContent = '📡 Auto: OFF';
-                stopAutoRefresh();
-            }
-        }
-
-        function startAutoRefresh() {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-            }
-            
-            refreshInterval = setInterval(() => {
-                if (autoRefresh) {
-                    loadGame();
-                }
-            }, REFRESH_RATE);
-        }
-
-        function stopAutoRefresh() {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-                refreshInterval = null;
-            }
-        }
-
-        // Utility functions
-        function generateHexCoordinates() {
-            const coordinates = [];
-            for (let q = -5; q <= 5; q++) {
-                const r1 = Math.max(-5, -q - 5);
-                const r2 = Math.min(5, -q + 5);
-                for (let r = r1; r <= r2; r++) {
-                    coordinates.push([q, r]);
-                }
-            }
-            return coordinates;
-        }
-
-        function hexToPixel(q, r, size = 20, centerX = 300, centerY = 300) {
-            const x = size * 3/2 * q;
-            const y = size * Math.sqrt(3) * (r + q/2);
-            return [x + centerX, y + centerY];
-        }
-
-        function formatTimestamp(timestamp) {
-            try {
-                return new Date(timestamp).toLocaleTimeString();
-            } catch {
-                return 'Now';
-            }
-        }
-
-        // Cleanup on page unload
-        window.addEventListener('beforeunload', function() {
-            stopAutoRefresh();
-        });
-
-        // Handle visibility change (pause refresh when tab is hidden)
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden) {
-                stopAutoRefresh();
-            } else if (autoRefresh) {
-                startAutoRefresh();
-                loadGame(); // Refresh immediately when tab becomes visible
-            }
-        });
-
-        // Add keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            // R key - refresh
-            if (e.key === 'r' || e.key === 'R') {
-                e.preventDefault();
-                refreshGame();
-            }
-            
-            // A key - toggle auto-refresh
-            if (e.key === 'a' || e.key === 'A') {
-                e.preventDefault();
-                toggleAutoRefresh();
-            }
-            
-            // Escape key - close winner banner
-            if (e.key === 'Escape') {
-                document.getElementById('winnerBanner').style.display = 'none';
-            }
-        });
-
-        // Click to close winner banner
-        document.getElementById('winnerBanner').addEventListener('click', function() {
-            this.style.display = 'none';
-        });
     </script>
 </body>
 </html>
