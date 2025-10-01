@@ -3,82 +3,772 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Board Game Setup</title>
-    <link rel="stylesheet" href="css/styles.css">
-</head>
-<body class="setup-page">
-    <header>
-        <h1>Board Game Setup</h1>
-        <div id="connectionStatus" class="status warning">Connecting to Firebase...</div>
-    </header>
+    <title>Tournament Setup</title>
     
-    <main class="container">
-        <section id="gameSetup">
-            <h2>Create New Game</h2>
-            <form id="setupForm">
-                <div class="form-group">
-                    <label for="gameId">Game ID:</label>
-                    <div class="input-group">
-                        <input type="text" id="gameId" name="gameId" required>
-                        <button type="button" id="generateIdBtn" class="btn small">Generate</button>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="numPlayers">Number of Players:</label>
-                    <input type="number" id="numPlayers" name="numPlayers" min="2" max="10" value="2">
-                </div>
-                
-                <div class="form-group" id="playerInputs">
-                    <!-- Player input fields will be generated here -->
-                </div>
-                
-                <div class="form-group">
-                    <label for="winCondition">Win Condition (points):</label>
-                    <input type="number" id="winCondition" name="winCondition" min="10" max="100" value="50">
-                </div>
-                
-                <div class="form-group">
-                    <label for="gameType">Game Types:</label>
-                    <select id="gameType" name="gameType" multiple>
-                        <option value="CS2" selected>CS2</option>
-                        <option value="Dota2" selected>Dota2</option>
-                        <option value="Valorant" selected>Valorant</option>
-                        <option value="StarCraft2" selected>StarCraft2</option>
-                        <option value="Predecessor" selected>Predecessor</option>
-                    </select>
-                    <small>Hold Ctrl/Cmd to select multiple</small>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="submit" class="btn primary">Create Game</button>
-                </div>
-            </form>
-        </section>
-        
-        <section id="existingGames">
-            <div class="section-header">
-                <h2>Existing Games</h2>
-                <button id="loadExistingBtn" class="btn small">Refresh</button>
-            </div>
-            <div class="games-list">
-                <p>Loading existing games...</p>
-            </div>
-        </section>
-    </main>
-    
-    <footer>
-        <p>Board Game System</p>
-    </footer>
-    
-    <!-- Load EventEmitter first -->
-    <script src="scripts/event-system.js"></script>
-    
-    <!-- Load Firebase -->
+    <!-- Load firebase-loader.js for authentication -->
     <script src="scripts/firebase-loader.js"></script>
     
-    <!-- Load game engine and setup controller -->
-    <script src="scripts/main-updated.js"></script>
-    <script src="scripts/setup-controller.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #00d4ff;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            color: #888;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .status {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+
+        .status.success { background: #10b981; color: white; }
+        .status.error { background: #ef4444; color: white; }
+        .status.warning { background: #f59e0b; color: white; }
+        .status.info { background: #3b82f6; color: white; }
+
+        .step-container {
+            display: none;
+        }
+
+        .step-container.active {
+            display: block;
+        }
+
+        .section {
+            background: #2a2a2a;
+            padding: 25px;
+            border-radius: 12px;
+            border: 2px solid #333;
+            margin-bottom: 20px;
+        }
+
+        .section h2 {
+            color: #00d4ff;
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 14px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px;
+            background: #1a1a1a;
+            border: 2px solid #444;
+            border-radius: 6px;
+            color: white;
+            font-size: 14px;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: #00d4ff;
+            border: none;
+            border-radius: 6px;
+            color: #1a1a1a;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #00b8e6;
+            transform: translateY(-2px);
+        }
+
+        button.secondary {
+            background: #666;
+            color: white;
+        }
+
+        button.secondary:hover {
+            background: #777;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .game-item {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #444;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .game-item:hover {
+            border-color: #00d4ff;
+        }
+
+        .game-item.selected {
+            border-color: #00d4ff;
+            background: #2d3748;
+        }
+
+        .game-item.custom {
+            border-style: dashed;
+        }
+
+        .teams-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .team-card {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+
+        .team-card.blue { border-color: #3b82f6; }
+        .team-card.red { border-color: #ef4444; }
+        .team-card.green { border-color: #10b981; }
+        .team-card.yellow { border-color: #f59e0b; }
+        .team-card.purple { border-color: #a855f7; }
+        .team-card.orange { border-color: #f97316; }
+
+        .team-card h3 {
+            margin-bottom: 10px;
+        }
+
+        .player-list {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .player-list li {
+            padding: 5px 0;
+            color: #aaa;
+        }
+
+        .color-selector {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .color-option {
+            padding: 10px;
+            border-radius: 6px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            text-align: center;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .color-option:hover {
+            border-color: white;
+        }
+
+        .color-option.selected {
+            border-color: #00d4ff;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        .player-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .match-preview {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 3px solid #00d4ff;
+        }
+
+        .match-preview h4 {
+            color: #00d4ff;
+            margin-bottom: 8px;
+        }
+
+        .progress-bar {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .progress-bar::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #444;
+            z-index: 0;
+        }
+
+        .progress-step {
+            background: #2a2a2a;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 2px solid #444;
+            position: relative;
+            z-index: 1;
+        }
+
+        .progress-step.active {
+            border-color: #00d4ff;
+            color: #00d4ff;
+        }
+
+        .progress-step.completed {
+            border-color: #10b981;
+            color: #10b981;
+        }
+
+        .match-format {
+            margin-top: 15px;
+        }
+
+        .match-format label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: #1a1a1a;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 8px;
+        }
+
+        .match-format input[type="radio"] {
+            width: auto;
+        }
+
+        .floating-logout {
+            position: fixed;
+            top: 20px;
+            left: 0;
+            z-index: 9999;
+            padding: 10px 15px;
+            background-color: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 0 6px 6px 0;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+            transform: translateX(-90%);
+            transition: transform 0.2s;
+        }
+
+        .floating-logout:hover {
+            transform: translateX(0);
+        }
+    </style>
+</head>
+<body>
+    <!-- Content wrapper with id="content" for restrict-access.js -->
+    <div id="content" class="container" style="display:none">
+        <button id="logoutBtn" class="floating-logout">Logout</button>
+
+        <h1>Tournament Setup</h1>
+        <p class="subtitle">Configure games, teams, and generate match schedule</p>
+
+        <div id="status" class="status warning">Connecting to Firebase...</div>
+
+        <div class="progress-bar">
+            <div class="progress-step active" id="step1-indicator">1. Games</div>
+            <div class="progress-step" id="step2-indicator">2. Teams</div>
+            <div class="progress-step" id="step3-indicator">3. Schedule</div>
+            <div class="progress-step" id="step4-indicator">4. Upload</div>
+        </div>
+
+        <!-- Step 1: Select Games -->
+        <div id="step1" class="step-container active">
+            <div class="section">
+                <h2>Step 1: Select Games</h2>
+                <p style="color: #aaa; margin-bottom: 15px;">Choose which games will be played in the tournament</p>
+                
+                <div class="game-grid" id="gameGrid">
+                    <!-- Games will be populated here -->
+                </div>
+
+                <div class="form-group" style="margin-top: 20px;">
+                    <label>Add Custom Game</label>
+                    <input type="text" id="customGameInput" placeholder="Enter game name">
+                    <button onclick="addCustomGame()" style="margin-top: 10px;" class="secondary">Add Custom Game</button>
+                </div>
+
+                <div class="button-group">
+                    <button onclick="nextStep(2)">Next: Teams</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Teams & Players -->
+        <div id="step2" class="step-container">
+            <div class="section">
+                <h2>Step 2: Teams & Players</h2>
+                <p style="color: #aaa; margin-bottom: 15px;">Add teams and their permanent rosters (cannot be changed during tournament)</p>
+                
+                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px;">
+                    <div>
+                        <h3 style="margin-bottom: 15px;">Add Team</h3>
+                        <div class="form-group">
+                            <label>Team Name *</label>
+                            <input type="text" id="teamName" placeholder="Team Alpha">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Team Color</label>
+                            <div class="color-selector">
+                                <div class="color-option selected" data-color="blue" style="background: #3b82f6;" onclick="selectTeamColor('blue')">Blue</div>
+                                <div class="color-option" data-color="red" style="background: #ef4444;" onclick="selectTeamColor('red')">Red</div>
+                                <div class="color-option" data-color="green" style="background: #10b981;" onclick="selectTeamColor('green')">Green</div>
+                                <div class="color-option" data-color="yellow" style="background: #f59e0b;" onclick="selectTeamColor('yellow')">Yellow</div>
+                                <div class="color-option" data-color="purple" style="background: #a855f7;" onclick="selectTeamColor('purple')">Purple</div>
+                                <div class="color-option" data-color="orange" style="background: #f97316;" onclick="selectTeamColor('orange')">Orange</div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Players (2 per team) *</label>
+                            <div class="player-inputs">
+                                <input type="text" id="player1" placeholder="Player 1">
+                                <input type="text" id="player2" placeholder="Player 2">
+                            </div>
+                        </div>
+
+                        <button onclick="addTeam()">Add Team</button>
+                    </div>
+
+                    <div>
+                        <h3 style="margin-bottom: 15px;">Teams (<span id="teamCount">0</span>)</h3>
+                        <div class="teams-grid" id="teamsGrid"></div>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button onclick="prevStep(1)" class="secondary">Back</button>
+                    <button onclick="nextStep(3)">Next: Schedule</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Match Schedule -->
+        <div id="step3" class="step-container">
+            <div class="section">
+                <h2>Step 3: Generate Match Schedule</h2>
+                <p style="color: #aaa; margin-bottom: 15px;">Configure and preview the tournament schedule</p>
+
+                <div class="form-group">
+                    <label>Match Format</label>
+                    <div class="match-format">
+                        <label>
+                            <input type="radio" name="matchFormat" value="round-robin" checked>
+                            Round Robin (Every team plays every other team)
+                        </label>
+                        <label>
+                            <input type="radio" name="matchFormat" value="random">
+                            Random Matchups (Shuffle and pair teams)
+                        </label>
+                    </div>
+                </div>
+
+                <button onclick="generateMatches()">Generate Schedule</button>
+
+                <div id="matchPreview" style="margin-top: 20px;"></div>
+
+                <div class="button-group">
+                    <button onclick="prevStep(2)" class="secondary">Back</button>
+                    <button onclick="nextStep(4)">Next: Upload</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4: Upload -->
+        <div id="step4" class="step-container">
+            <div class="section">
+                <h2>Step 4: Upload Tournament Data</h2>
+                <p style="color: #aaa; margin-bottom: 15px;">Review and upload to Firebase</p>
+
+                <div class="form-group">
+                    <label>Tournament ID</label>
+                    <input type="text" id="tournamentId" value="tournament_2025" placeholder="tournament_2025">
+                </div>
+
+                <div id="finalPreview" style="background: #1a1a1a; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <h3 style="margin-bottom: 10px;">Summary:</h3>
+                    <p id="summaryText"></p>
+                </div>
+
+                <div class="button-group">
+                    <button onclick="prevStep(3)" class="secondary">Back</button>
+                    <button onclick="uploadTournament()">Upload to Firebase</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let db;
+        let selectedGames = [];
+        let customGames = [];
+        let teams = [];
+        let matches = [];
+        let selectedTeamColor = 'blue';
+
+        const defaultGames = [
+            'Counter-Strike 2',
+            'StarCraft II',
+            'Predecessor',
+            'Dota 2',
+            'League of Legends',
+            'Valorant',
+            'Rocket League',
+            'Overwatch 2',
+            'Rainbow Six Siege',
+            'Apex Legends'
+        ];
+
+        // Wait for firebase-ready event before initializing
+        document.addEventListener('firebase-ready', function() {
+            console.log("Firebase ready, initializing setup...");
+            
+            db = firebase.firestore();
+            
+            showStatus('Firebase connected successfully!', 'success');
+            renderGames();
+            
+            // Set up logout button
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                firebase.auth().signOut().then(() => {
+                    window.location.href = 'index.html';
+                }).catch(err => console.error('Logout error:', err));
+            });
+        });
+
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+
+        function renderGames() {
+            const grid = document.getElementById('gameGrid');
+            const allGames = [...defaultGames, ...customGames];
+            
+            grid.innerHTML = allGames.map(game => `
+                <div class="game-item ${selectedGames.includes(game) ? 'selected' : ''} ${customGames.includes(game) ? 'custom' : ''}" 
+                     onclick="toggleGame('${game}')">
+                    ${game}
+                </div>
+            `).join('');
+        }
+
+        function toggleGame(game) {
+            const index = selectedGames.indexOf(game);
+            if (index > -1) {
+                selectedGames.splice(index, 1);
+            } else {
+                selectedGames.push(game);
+            }
+            renderGames();
+        }
+
+        function addCustomGame() {
+            const input = document.getElementById('customGameInput');
+            const gameName = input.value.trim();
+            
+            if (!gameName) {
+                showStatus('Please enter a game name', 'error');
+                return;
+            }
+            
+            if (customGames.includes(gameName) || defaultGames.includes(gameName)) {
+                showStatus('Game already exists', 'error');
+                return;
+            }
+            
+            customGames.push(gameName);
+            selectedGames.push(gameName);
+            input.value = '';
+            renderGames();
+            showStatus('Custom game added', 'success');
+        }
+
+        function selectTeamColor(color) {
+            selectedTeamColor = color;
+            document.querySelectorAll('.color-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            document.querySelector(`[data-color="${color}"]`).classList.add('selected');
+        }
+
+        function addTeam() {
+            const name = document.getElementById('teamName').value.trim();
+            const player1 = document.getElementById('player1').value.trim();
+            const player2 = document.getElementById('player2').value.trim();
+
+            if (!name || !player1 || !player2) {
+                showStatus('Team name and both players are required', 'error');
+                return;
+            }
+
+            const team = {
+                id: `team${teams.length + 1}`,
+                name,
+                color: selectedTeamColor,
+                players: [
+                    { name: player1, points: 0 },
+                    { name: player2, points: 0 }
+                ],
+                points: 0,
+                gamesWon: 0
+            };
+
+            teams.push(team);
+            renderTeams();
+            showStatus(`Team "${name}" added`, 'success');
+
+            // Clear inputs
+            document.getElementById('teamName').value = '';
+            document.getElementById('player1').value = '';
+            document.getElementById('player2').value = '';
+        }
+
+        function renderTeams() {
+            const grid = document.getElementById('teamsGrid');
+            document.getElementById('teamCount').textContent = teams.length;
+            
+            grid.innerHTML = teams.map(team => `
+                <div class="team-card ${team.color}">
+                    <h3>${team.name}</h3>
+                    <ul class="player-list">
+                        ${team.players.map(p => `<li>• ${p.name}</li>`).join('')}
+                    </ul>
+                </div>
+            `).join('');
+        }
+
+        function generateMatches() {
+            if (selectedGames.length === 0) {
+                showStatus('Please select at least one game', 'error');
+                return;
+            }
+
+            if (teams.length < 2) {
+                showStatus('Please add at least 2 teams', 'error');
+                return;
+            }
+
+            const format = document.querySelector('input[name="matchFormat"]:checked').value;
+            matches = [];
+
+            if (format === 'round-robin') {
+                // Generate round-robin matches
+                for (let i = 0; i < teams.length; i++) {
+                    for (let j = i + 1; j < teams.length; j++) {
+                        for (const game of selectedGames) {
+                            matches.push({
+                                game,
+                                team1: teams[i].id,
+                                team1Name: teams[i].name,
+                                team2: teams[j].id,
+                                team2Name: teams[j].name,
+                                status: 'waiting',
+                                round: matches.length + 1
+                            });
+                        }
+                    }
+                }
+            } else {
+                // Random matchups
+                const shuffledTeams = [...teams].sort(() => Math.random() - 0.5);
+                for (const game of selectedGames) {
+                    for (let i = 0; i < shuffledTeams.length - 1; i += 2) {
+                        if (shuffledTeams[i + 1]) {
+                            matches.push({
+                                game,
+                                team1: shuffledTeams[i].id,
+                                team1Name: shuffledTeams[i].name,
+                                team2: shuffledTeams[i + 1].id,
+                                team2Name: shuffledTeams[i + 1].name,
+                                status: 'waiting',
+                                round: matches.length + 1
+                            });
+                        }
+                    }
+                }
+            }
+
+            renderMatchPreview();
+            showStatus(`Generated ${matches.length} matches`, 'success');
+        }
+
+        function renderMatchPreview() {
+            const preview = document.getElementById('matchPreview');
+            
+            preview.innerHTML = `
+                <h3 style="margin-bottom: 15px;">Match Schedule (${matches.length} matches)</h3>
+                ${matches.map((match, i) => `
+                    <div class="match-preview">
+                        <h4>Match ${i + 1}: ${match.game}</h4>
+                        <p>${match.team1Name} vs ${match.team2Name}</p>
+                    </div>
+                `).join('')}
+            `;
+        }
+
+        function nextStep(step) {
+            // Validation
+            if (step === 2 && selectedGames.length === 0) {
+                showStatus('Please select at least one game', 'error');
+                return;
+            }
+            if (step === 3 && teams.length < 2) {
+                showStatus('Please add at least 2 teams', 'error');
+                return;
+            }
+            if (step === 4 && matches.length === 0) {
+                showStatus('Please generate matches first', 'error');
+                return;
+            }
+
+            // Hide all steps
+            document.querySelectorAll('.step-container').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.progress-step').forEach(el => {
+                el.classList.remove('active');
+            });
+
+            // Show current step
+            document.getElementById(`step${step}`).classList.add('active');
+            document.getElementById(`step${step}-indicator`).classList.add('active');
+
+            // Mark previous steps as completed
+            for (let i = 1; i < step; i++) {
+                document.getElementById(`step${i}-indicator`).classList.add('completed');
+            }
+
+            // Update summary if on final step
+            if (step === 4) {
+                document.getElementById('summaryText').innerHTML = `
+                    <strong>Games:</strong> ${selectedGames.length}<br>
+                    <strong>Teams:</strong> ${teams.length}<br>
+                    <strong>Matches:</strong> ${matches.length}<br>
+                    <strong>Players:</strong> ${teams.length * 2}
+                `;
+            }
+        }
+
+        function prevStep(step) {
+            nextStep(step);
+        }
+
+        function uploadTournament() {
+            const tournamentId = document.getElementById('tournamentId').value.trim();
+            
+            if (!tournamentId) {
+                showStatus('Tournament ID is required', 'error');
+                return;
+            }
+
+            const tournamentData = {
+                tournamentId,
+                games: selectedGames,
+                teams: teams,
+                matches: matches,
+                createdAt: Date.now(),
+                status: 'setup'
+            };
+
+            db.collection('tournaments').doc(tournamentId).set(tournamentData)
+                .then(() => {
+                    showStatus('Tournament uploaded successfully!', 'success');
+                    
+                    // Also create initial game state
+                    return db.collection('games').doc(tournamentId).set({
+                        gameId: tournamentId,
+                        name: `Tournament: ${tournamentId}`,
+                        gamePhase: 'setup',
+                        board: {},
+                        teams: teams,
+                        events: [{
+                            timestamp: Date.now(),
+                            text: 'Tournament created'
+                        }],
+                        upcomingMatches: matches,
+                        createdAt: Date.now()
+                    });
+                })
+                .then(() => {
+                    showStatus('Tournament and game state created! Redirecting...', 'success');
+                    setTimeout(() => {
+                        window.location.href = `view.html?gameId=${tournamentId}`;
+                    }, 2000);
+                })
+                .catch(error => {
+                    showStatus('Error uploading: ' + error.message, 'error');
+                });
+        }
+    </script>
+    
+    <!-- Restrict access script - checks authentication and shows content if logged in -->
+    <script src="scripts/restrict-access.js"></script>
 </body>
 </html>
