@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Data Uploader - Debug Tool</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #888;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .status {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+
+        .status.success {
+            background: #10b981;
+            color: white;
+        }
+
+        .status.error {
+            background: #ef4444;
+            color: white;
+        }
+
+        .status.warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .status.info {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .section {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid #333;
+        }
+
+        .section h2 {
+            color: #00d4ff;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 14px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            background: #1a1a1a;
+            border: 2px solid #444;
+            border-radius: 6px;
+            color: white;
+            font-size: 14px;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+
+        textarea {
+            min-height: 100px;
+            font-family: 'Courier New', monospace;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: #00d4ff;
+            border: none;
+            border-radius: 6px;
+            color: #1a1a1a;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #00b8e6;
+            transform: translateY(-2px);
+        }
+
+        button.secondary {
+            background: #666;
+            color: white;
+        }
+
+        button.secondary:hover {
+            background: #777;
+        }
+
+        button.danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        button.danger:hover {
+            background: #dc2626;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .team-list, .hex-list, .event-list {
+            margin-top: 10px;
+        }
+
+        .team-item, .hex-item, .event-item {
+            background: #1a1a1a;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            border-left: 4px solid #00d4ff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .team-item .info {
+            flex: 1;
+        }
+
+        .team-item .color-badge {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+
+        .remove-btn {
+            padding: 5px 10px;
+            font-size: 12px;
+            background: #ef4444;
+        }
+
+        .preview {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .preview pre {
+            color: #00d4ff;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .quick-actions button {
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .color-option {
+            padding: 8px;
+            border-radius: 6px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            text-align: center;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .color-option:hover {
+            border-color: white;
+        }
+
+        .color-option.selected {
+            border-color: #00d4ff;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        .inline-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Game Data Uploader</h1>
+        <p class="subtitle">Debug tool for testing view.html with different game states</p>
+
+        <div id="status" class="status warning">Connecting to Firebase...</div>
+
+        <div class="quick-actions">
+            <button onclick="loadGame()">Load Existing Game</button>
+            <button onclick="createSampleData()" class="secondary">Load Sample Data</button>
+            <button onclick="clearForm()" class="secondary">Clear Form</button>
+            <button onclick="viewGame()" class="secondary">View in view.html</button>
+        </div>
+
+        <div class="grid">
+            <!-- Game Info Section -->
+            <div class="section">
+                <h2>Game Information</h2>
+                <div class="form-group">
+                    <label>Game ID *</label>
+                    <input type="text" id="gameId" placeholder="test_game_1" value="test_game_1">
+                </div>
+                <div class="form-group">
+                    <label>Game Name</label>
+                    <input type="text" id="gameName" placeholder="My Test Game">
+                </div>
+                <div class="form-group">
+                    <label>Game Phase</label>
+                    <select id="gamePhase">
+                        <option value="setup">Setup</option>
+                        <option value="active" selected>Active</option>
+                        <option value="paused">Paused</option>
+                        <option value="ended">Ended</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Team Management -->
+            <div class="section">
+                <h2>Add Team</h2>
+                <div class="form-group">
+                    <label>Team Name</label>
+                    <input type="text" id="teamName" placeholder="Blue Team">
+                </div>
+                <div class="form-group">
+                    <label>Team Color</label>
+                    <div class="color-grid">
+                        <div class="color-option selected" data-color="blue" style="background: #3b82f6;" onclick="selectColor('blue')">Blue</div>
+                        <div class="color-option" data-color="red" style="background: #ef4444;" onclick="selectColor('red')">Red</div>
+                        <div class="color-option" data-color="green" style="background: #10b981;" onclick="selectColor('green')">Green</div>
+                        <div class="color-option" data-color="yellow" style="background: #f59e0b;" onclick="selectColor('yellow')">Yellow</div>
+                        <div class="color-option" data-color="purple" style="background: #a855f7;" onclick="selectColor('purple')">Purple</div>
+                        <div class="color-option" data-color="orange" style="background: #f97316;" onclick="selectColor('orange')">Orange</div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Points</label>
+                    <input type="number" id="teamPoints" value="0">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="teamIsActive" style="width: auto;">
+                        Is Active Team
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>Players (JSON array)</label>
+                    <textarea id="teamPlayers" placeholder='[{"name": "Player 1", "points": 10}, {"name": "Player 2", "points": 15}]'>[{"name": "Player 1", "points": 0}]</textarea>
+                </div>
+                <div class="inline-group">
+                    <div class="form-group">
+                        <label>Hand Cards</label>
+                        <input type="number" id="teamHandCount" value="3" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Deck Cards</label>
+                        <input type="number" id="teamDeckCount" value="10" min="0">
+                    </div>
+                </div>
+                <button onclick="addTeam()">Add Team</button>
+                <div class="team-list" id="teamList"></div>
+            </div>
+
+            <!-- Board State -->
+            <div class="section">
+                <h2>Board State</h2>
+                <div class="form-group">
+                    <label>Hex Coordinate (e.g., q0r0)</label>
+                    <input type="text" id="hexCoord" placeholder="q0r0">
+                </div>
+                <div class="form-group">
+                    <label>Team ID (from teams list)</label>
+                    <input type="text" id="hexTeamId" placeholder="team1">
+                </div>
+                <button onclick="addHex()">Add Hex</button>
+                <div class="hex-list" id="hexList"></div>
+            </div>
+
+            <!-- Events -->
+            <div class="section">
+                <h2>Events</h2>
+                <div class="form-group">
+                    <label>Event Text</label>
+                    <input type="text" id="eventText" placeholder="Team Blue placed on q0r0">
+                </div>
+                <button onclick="addEvent()">Add Event</button>
+                <div class="event-list" id="eventList"></div>
+            </div>
+
+            <!-- Preview & Actions -->
+            <div class="section full-width">
+                <h2>Data Preview</h2>
+                <div class="preview">
+                    <pre id="dataPreview">No data yet. Add teams, hexes, and events above.</pre>
+                </div>
+                <div class="button-group">
+                    <button onclick="uploadData()">Upload to Firebase</button>
+                    <button onclick="updatePreview()" class="secondary">Refresh Preview</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let db;
+        let selectedColor = 'blue';
+        let teams = [];
+        let boardState = {};
+        let events = [];
+
+        // Initialize Firebase
+        fetch('scripts/firebase.js')
+            .then(response => response.text())
+            .then(text => {
+                const configMatch = text.match(/const\s+firebaseConfig\s*=\s*(\{[\s\S]*?\});/);
+                if (!configMatch) throw new Error('Config not found');
+                
+                const configText = configMatch[1];
+                const firebaseConfig = {
+                    apiKey: configText.match(/apiKey:\s*["']([^"']+)["']/)[1],
+                    authDomain: configText.match(/authDomain:\s*["']([^"']+)["']/)[1],
+                    projectId: configText.match(/projectId:\s*["']([^"']+)["']/)[1],
+                    storageBucket: configText.match(/storageBucket:\s*["']([^"']+)["']/)[1],
+                    messagingSenderId: configText.match(/messagingSenderId:\s*["']([^"']+)["']/)[1],
+                    appId: configText.match(/appId:\s*["']([^"']+)["']/)[1]
+                };
+                
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                
+                showStatus('Firebase connected successfully!', 'success');
+            })
+            .catch(error => {
+                showStatus('Error connecting to Firebase: ' + error.message, 'error');
+            });
+
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+
+        function selectColor(color) {
+            selectedColor = color;
+            document.querySelectorAll('.color-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            document.querySelector(`[data-color="${color}"]`).classList.add('selected');
+        }
+
+        function addTeam() {
+            const name = document.getElementById('teamName').value;
+            const points = parseInt(document.getElementById('teamPoints').value) || 0;
+            const isActive = document.getElementById('teamIsActive').checked;
+            const playersText = document.getElementById('teamPlayers').value;
+            const handCount = parseInt(document.getElementById('teamHandCount').value) || 0;
+            const deckCount = parseInt(document.getElementById('teamDeckCount').value) || 0;
+
+            if (!name) {
+                showStatus('Team name is required', 'error');
+                return;
+            }
+
+            let players = [];
+            try {
+                players = JSON.parse(playersText);
+            } catch (e) {
+                showStatus('Invalid JSON for players', 'error');
+                return;
+            }
+
+            const team = {
+                name,
+                color: selectedColor,
+                isActive,
+                points,
+                players,
+                hand: Array(handCount).fill('card'),
+                deck: Array(deckCount).fill('card')
+            };
+
+            teams.push(team);
+            renderTeams();
+            updatePreview();
+            showStatus(`Team "${name}" added`, 'success');
+
+            // Clear form
+            document.getElementById('teamName').value = '';
+            document.getElementById('teamPoints').value = '0';
+            document.getElementById('teamIsActive').checked = false;
+        }
+
+        function removeTeam(index) {
+            teams.splice(index, 1);
+            renderTeams();
+            updatePreview();
+        }
+
+        function renderTeams() {
+            const list = document.getElementById('teamList');
+            list.innerHTML = teams.map((team, i) => `
+                <div class="team-item">
+                    <div class="info">
+                        <span class="color-badge" style="background: ${getColorHex(team.color)}"></span>
+                        <strong>${team.name}</strong> - ${team.points} pts, ${team.players.length} players
+                    </div>
+                    <button class="remove-btn" onclick="removeTeam(${i})">Remove</button>
+                </div>
+            `).join('');
+        }
+
+        function getColorHex(color) {
+            const colors = {
+                blue: '#3b82f6',
+                red: '#ef4444',
+                green: '#10b981',
+                yellow: '#f59e0b',
+                purple: '#a855f7',
+                orange: '#f97316'
+            };
+            return colors[color] || '#666';
+        }
+
+        function addHex() {
+            const coord = document.getElementById('hexCoord').value.trim();
+            const teamId = document.getElementById('hexTeamId').value.trim();
+
+            if (!coord || !teamId) {
+                showStatus('Both hex coordinate and team ID are required', 'error');
+                return;
+            }
+
+            boardState[coord] = teamId;
+            renderHexes();
+            updatePreview();
+            showStatus(`Hex ${coord} added`, 'success');
+
+            document.getElementById('hexCoord').value = '';
+        }
+
+        function removeHex(coord) {
+            delete boardState[coord];
+            renderHexes();
+            updatePreview();
+        }
+
+        function renderHexes() {
+            const list = document.getElementById('hexList');
+            list.innerHTML = Object.entries(boardState).map(([coord, teamId]) => `
+                <div class="hex-item">
+                    <div class="info">
+                        <strong>${coord}</strong> → ${teamId}
+                    </div>
+                    <button class="remove-btn" onclick="removeHex('${coord}')">Remove</button>
+                </div>
+            `).join('');
+        }
+
+        function addEvent() {
+            const text = document.getElementById('eventText').value.trim();
+            
+            if (!text) {
+                showStatus('Event text is required', 'error');
+                return;
+            }
+
+            events.push({
+                timestamp: Date.now(),
+                text: text
+            });
+
+            renderEvents();
+            updatePreview();
+            showStatus('Event added', 'success');
+
+            document.getElementById('eventText').value = '';
+        }
+
+        function removeEvent(index) {
+            events.splice(index, 1);
+            renderEvents();
+            updatePreview();
+        }
+
+        function renderEvents() {
+            const list = document.getElementById('eventList');
+            list.innerHTML = events.map((event, i) => `
+                <div class="event-item">
+                    <div class="info">
+                        ${event.text} <small>(${new Date(event.timestamp).toLocaleTimeString()})</small>
+                    </div>
+                    <button class="remove-btn" onclick="removeEvent(${i})">Remove</button>
+                </div>
+            `).join('');
+        }
+
+        function updatePreview() {
+            const gameData = buildGameData();
+            document.getElementById('dataPreview').textContent = JSON.stringify(gameData, null, 2);
+        }
+
+        function buildGameData() {
+            const gameId = document.getElementById('gameId').value || 'test_game_1';
+            const gameName = document.getElementById('gameName').value || gameId;
+            const gamePhase = document.getElementById('gamePhase').value;
+
+            return {
+                gameId,
+                name: gameName,
+                gamePhase,
+                board: boardState,
+                teams: teams,
+                events: events,
+                createdAt: Date.now(),
+                updatedAt: Date.now()
+            };
+        }
+
+        function uploadData() {
+            const gameId = document.getElementById('gameId').value;
+            if (!gameId) {
+                showStatus('Game ID is required', 'error');
+                return;
+            }
+
+            const gameData = buildGameData();
+
+            db.collection('games').doc(gameId).set(gameData)
+                .then(() => {
+                    showStatus(`Game "${gameId}" uploaded successfully!`, 'success');
+                })
+                .catch(error => {
+                    showStatus('Error uploading: ' + error.message, 'error');
+                });
+        }
+
+        function loadGame() {
+            const gameId = prompt('Enter Game ID to load:');
+            if (!gameId) return;
+
+            db.collection('games').doc(gameId).get()
+                .then(doc => {
+                    if (doc.exists) {
+                        const data = doc.data();
+                        
+                        document.getElementById('gameId').value = data.gameId || gameId;
+                        document.getElementById('gameName').value = data.name || '';
+                        document.getElementById('gamePhase').value = data.gamePhase || 'active';
+                        
+                        teams = data.teams || [];
+                        boardState = data.board || {};
+                        events = data.events || [];
+                        
+                        renderTeams();
+                        renderHexes();
+                        renderEvents();
+                        updatePreview();
+                        
+                        showStatus('Game loaded successfully', 'success');
+                    } else {
+                        showStatus('Game not found', 'error');
+                    }
+                })
+                .catch(error => {
+                    showStatus('Error loading: ' + error.message, 'error');
+                });
+        }
+
+        function createSampleData() {
+            teams = [
+                {
+                    name: "Blue Team",
+                    color: "blue",
+                    isActive: true,
+                    points: 45,
+                    players: [
+                        { name: "Player 1", points: 23 },
+                        { name: "Player 2", points: 22 }
+                    ],
+                    hand: ["card1", "card2", "card3"],
+                    deck: Array(12).fill("card")
+                },
+                {
+                    name: "Red Team",
+                    color: "red",
+                    isActive: false,
+                    points: 38,
+                    players: [
+                        { name: "Player 3", points: 19 },
+                        { name: "Player 4", points: 19 }
+                    ],
+                    hand: ["cardA", "cardB", "cardC", "cardD"],
+                    deck: Array(8).fill("card")
+                }
+            ];
+
+            boardState = {
+                "q0r0": "team1",
+                "q1r0": "team2",
+                "q-1r1": "team1",
+                "q0r-1": "team2",
+                "q2r-1": "team1"
+            };
+
+            events = [
+                { timestamp: Date.now() - 5000, text: "Game started" },
+                { timestamp: Date.now() - 4000, text: "Team Blue placed on q0r0" },
+                { timestamp: Date.now() - 3000, text: "Team Red drew 2 cards" },
+                { timestamp: Date.now() - 2000, text: "Team Blue scored 5 points" },
+                { timestamp: Date.now() - 1000, text: "Team Red placed on q1r0" }
+            ];
+
+            renderTeams();
+            renderHexes();
+            renderEvents();
+            updatePreview();
+            showStatus('Sample data loaded', 'success');
+        }
+
+        function clearForm() {
+            teams = [];
+            boardState = {};
+            events = [];
+            document.getElementById('gameName').value = '';
+            renderTeams();
+            renderHexes();
+            renderEvents();
+            updatePreview();
+            showStatus('Form cleared', 'info');
+        }
+
+        function viewGame() {
+            const gameId = document.getElementById('gameId').value;
+            window.open(`view.html?gameId=${gameId}`, '_blank');
+        }
+
+        // Initialize
+        updatePreview();
+    </script>
+</body>
+</html>
