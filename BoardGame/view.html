@@ -151,6 +151,8 @@
             align-items: center;
             justify-content: center;
             padding: 20px;
+            position: relative;
+            overflow: hidden;
         }
 
         .matches-section {
@@ -318,6 +320,12 @@
                 repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(139,111,71,0.03) 2px, rgba(139,111,71,0.03) 4px);
             pointer-events: none;
             border-radius: 4px;
+        }
+
+        #hexBoard {
+            width: 100%;
+            height: 100%;
+            position: relative;
         }
 
         .teams-footer {
@@ -623,7 +631,9 @@
 
             <section class="board-container">
                 <div class="board-section">
-                    <div id="game-board">Game Board Module Goes Here</div>
+                    <div id="game-board">
+                        <div id="hexBoard"></div>
+                    </div>
                 </div>
                 
                 <aside class="matches-section">
@@ -874,5 +884,28 @@
             </div>
         </footer>
     </div>
+
+    <!-- Board Module Scripts -->
+    <script src="scripts/board-module.js"></script>
+    <script src="scripts/board-renderer.js"></script>
+    
+    <script>
+        // Initialize the board when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            const hexBoardContainer = document.getElementById('hexBoard');
+            
+            // Create board module and renderer
+            const boardModule = new BoardModule();
+            const renderer = new BoardRenderer(hexBoardContainer, boardModule, {
+                responsive: true
+            });
+            
+            // Render the initial empty board
+            renderer.render();
+            
+            // Example: You can update the board with game data later
+            // renderer.render({ board: { 'q0r0': 'team1', 'q1r0': 'team2' } });
+        });
+    </script>
 </body>
 </html>
