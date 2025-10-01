@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile - Board Game</title>
+  <script src="scripts/firebase-loader.js"></script>
+  <script src="scripts/user-manager.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+      min-height: 100vh;
+      color: #ffffff;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 40px;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      border-radius: 15px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      animation: fadeInDown 0.6s ease;
+    }
+
+    .header-left h1 {
+      font-size: 2rem;
+      background: linear-gradient(135deg, #00d4ff 0%, #00ffc8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 5px;
+    }
+
+    .header-left p {
+      color: #aaa;
+      font-size: 0.9rem;
+    }
+
+    .header-right {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .user-info {
+      text-align: right;
+      margin-right: 15px;
+    }
+
+    .user-email {
+      font-size: 0.9rem;
+      color: #00d4ff;
+      font-weight: 600;
+    }
+
+    .user-role {
+      font-size: 0.8rem;
+      color: #aaa;
+    }
+
+    .admin-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+      color: #1a1a1a;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-left: 10px;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #00d4ff 0%, #00ffc8 100%);
+      border: none;
+      border-radius: 10px;
+      color: #1a1a1a;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 0.9rem;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(0, 212, 255, 0.4);
+    }
+
+    .btn.secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .btn.secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+      box-shadow: 0 10px 30px rgba(255, 255, 255, 0.2);
+    }
+
+    .btn.danger {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: white;
+    }
+
+    .btn.danger:hover {
+      box-shadow: 0 10px 30px rgba(239, 68, 68, 0.4);
+    }
+
+    /* Quick Actions */
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+      animation: fadeInUp 0.6s ease 0.2s backwards;
+    }
+
+    .action-card {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      border-radius: 15px;
+      padding: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      transition: all 0.3s ease;
+      cursor: pointer;
+      text-decoration: none;
+      color: white;
+      display: block;
+    }
+
+    .action-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      border-color: #00d4ff;
+    }
+
+    .action-card-icon {
+      font-size: 3rem;
+      margin-bottom: 15px;
+      display: block;
+    }
+
+    .action-card h3 {
+      color: #00d4ff;
+      margin-bottom: 10px;
+      font-size: 1.3rem;
+    }
+
+    .action-card p {
+      color: #aaa;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+      animation: fadeInUp 0.6s ease 0.3s backwards;
+    }
+
+    .stat-card {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      border-radius: 15px;
+      padding: 25px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-5px);
+      border-color: #00d4ff;
+    }
+
+    .stat-value {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: #00d4ff;
+      margin-bottom: 5px;
+    }
+
+    .stat-label {
+      color: #aaa;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Sections */
+    .section {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      border-radius: 15px;
+      padding: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      margin-bottom: 30px;
+      animation: fadeInUp 0.6s ease 0.4s backwards;
+    }
+
+    .section h2 {
+      color: #00d4ff;
+      margin-bottom: 20px;
+      font-size: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-content {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .admin-section {
+      background: rgba(255, 215, 0, 0.1);
+      border: 2px solid #ffd700;
+    }
+
+    /* Game Cards */
+    .game-card {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 20px;
+      border-radius: 10px;
+      border-left: 4px solid #00d4ff;
+      transition: all 0.3s ease;
+    }
+
+    .game-card:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateX(5px);
+    }
+
+    .game-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .game-card h4 {
+      color: white;
+      font-size: 1.1rem;
+    }
+
+    .game-status {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .game-status.active {
+      background: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+      border: 1px solid #10b981;
+    }
+
+    .game-status.setup {
+      background: rgba(245, 158, 11, 0.2);
+      color: #f59e0b;
+      border: 1px solid #f59e0b;
+    }
+
+    .game-status.finished {
+      background: rgba(107, 114, 128, 0.2);
+      color: #9ca3af;
+      border: 1px solid #6b7280;
+    }
+
+    .game-card-info {
+      color: #aaa;
+      font-size: 0.9rem;
+      margin-bottom: 15px;
+    }
+
+    .game-card-info div {
+      margin-bottom: 5px;
+    }
+
+    .game-card-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .game-card-actions .btn {
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      flex: 1;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #aaa;
+    }
+
+    .empty-state-icon {
+      font-size: 4rem;
+      margin-bottom: 20px;
+      opacity: 0.5;
+    }
+
+    .empty-state p {
+      margin-bottom: 20px;
+    }
+
+    /* User Table */
+    .user-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    .user-table th,
+    .user-table td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .user-table th {
+      background: rgba(255, 255, 255, 0.05);
+      color: #00d4ff;
+      font-weight: 600;
+    }
+
+    .user-table tr:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .toggle-admin {
+      padding: 6px 12px;
+      font-size: 0.8rem;
+    }
+
+    .admin-indicator {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .admin-indicator.yes {
+      background: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+      border: 1px solid #10b981;
+    }
+
+    .admin-indicator.no {
+      background: rgba(107, 114, 128, 0.2);
+      color: #9ca3af;
+      border: 1px solid #6b7280;
+    }
+
+    /* Animations */
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .header {
+        flex-direction: column;
+        gap: 20px;
+        text-align: center;
+      }
+
+      .header-right {
+        flex-direction: column;
+        width: 100%;
+      }
+
+      .user-info {
+        text-align: center;
+        margin-right: 0;
+      }
+
+      .quick-actions {
+        grid-template-columns: 1fr;
+      }
+
+      .section-content {
+        grid-template-columns: 1fr;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .user-table {
+        font-size: 0.85rem;
+      }
+
+      .user-table th,
+      .user-table td {
+        padding: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="content" class="container" style="display:none">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>🎮 Board Game Dashboard</h1>
+        <p>Welcome back to your tournament management system</p>
+      </div>
+      <div class="header-right">
+        <div class="user-info">
+          <div class="user-email">
+            <span id="userEmail">Loading...</span>
+            <span id="adminBadge" class="admin-badge" style="display: none;">ADMIN</span>
+          </div>
+          <div class="user-role">Tournament Manager</div>
+        </div>
+        <button class="btn danger" id="logoutBtn">Logout</button>
+      </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="statTournaments">0</div>
+        <div class="stat-label">Tournaments</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statGames">0</div>
+        <div class="stat-label">Active Games</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statCompleted">0</div>
+        <div class="stat-label">Completed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statTeams">0</div>
+        <div class="stat-label">Total Teams</div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+      <a href="setup.html" class="action-card">
+        <span class="action-card-icon">🎯</span>
+        <h3>New Tournament</h3>
+        <p>Set up a new tournament with teams, games, and match schedules</p>
+      </a>
+      
+      <a href="god.html" class="action-card" id="godModeLink">
+        <span class="action-card-icon">👑</span>
+        <h3>God Mode</h3>
+        <p>Full admin control panel for managing active games and tournaments</p>
+      </a>
+      
+      <a href="view.html" class="action-card">
+        <span class="action-card-icon">👁️</span>
+        <h3>Spectator View</h3>
+        <p>Watch live tournament boards and track game progress in real-time</p>
+      </a>
+    </div>
+
+    <!-- Admin Section (only visible to admins) -->
+    <div class="section admin-section" id="adminSection" style="display: none;">
+      <h2>
+        <span>👑</span>
+        Admin Controls - User Management
+      </h2>
+      <p style="color: #aaa; margin-bottom: 20px;">
+        Manage user roles and permissions. Only administrators can access this section.
+      </p>
+      <table class="user-table">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Admin Status</th>
+            <th>Created</th>
+            <th>Last Login</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="usersTableBody">
+          <tr>
+            <td colspan="5" style="text-align: center; padding: 40px;">Loading users...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Recent Games Section -->
+    <div class="section">
+      <h2>
+        <span>📊</span>
+        Recent Tournaments & Games
+      </h2>
+      <div class="section-content" id="recentGames">
+        <div class="empty-state">
+          <div class="empty-state-icon">🎲</div>
+          <p>No games found. Create your first tournament to get started!</p>
+          <a href="setup.html" class="btn">Create Tournament</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let auth;
+    let db;
+    let currentUser;
+    let userManager;
+
+    document.addEventListener('firebase-ready', function() {
+      console.log("Firebase ready, initializing profile...");
+      
+      auth = firebase.auth();
+      db = firebase.firestore();
+      userManager = new UserManager();
+
+      // Monitor auth state
+      auth.onAuthStateChanged(async user => {
+        if (!user) {
+          window.location.href = 'index.html';
+        } else {
+          currentUser = user;
+          await initializeProfile();
+        }
+      });
+
+      // Logout button
+      document.getElementById('logoutBtn').addEventListener('click', () => {
+        auth.signOut().then(() => {
+          window.location.href = 'index.html';
+        }).catch(err => console.error('Logout error:', err));
+      });
+    });
+
+    async function initializeProfile() {
+      // Display user email
+      document.getElementById('userEmail').textContent = currentUser.email;
+
+      // Initialize user manager and load role
+      await userManager.initialize(db, currentUser);
+      
+      // Update last login
+      await userManager.updateLastLogin();
+
+      // Check if admin and show/hide accordingly
+      if (userManager.isAdmin()) {
+        document.getElementById('adminBadge').style.display = 'inline-block';
+        document.getElementById('adminSection').style.display = 'block';
+        loadAllUsers();
+      } else {
+        // Hide God Mode for non-admins
+        const godModeLink = document.getElementById('godModeLink');
+        if (godModeLink) {
+          godModeLink.style.display = 'none';
+        }
+      }
+
+      // Load user's games and tournaments
+      loadGamesAndStats();
+    }
+
+    async function loadAllUsers() {
+      try {
+        const users = await userManager.getAllUsers();
+        const tbody = document.getElementById('usersTableBody');
+        
+        if (users.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;">No users found</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = users.map(user => {
+          const createdDate = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown';
+          const lastLoginDate = user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never';
+          const isCurrentUser = user.uid === currentUser.uid;
+          
+          return `
+            <tr>
+              <td>
+                ${user.email}
+                ${isCurrentUser ? '<small style="color: #00d4ff;"> (You)</small>' : ''}
+              </td>
+              <td>
+                <span class="admin-indicator ${user.isAdmin ? 'yes' : 'no'}">
+                  ${user.isAdmin ? '✓ Admin' : '○ User'}
+                </span>
+              </td>
+              <td>${createdDate}</td>
+              <td>${lastLoginDate}</td>
+              <td>
+                ${!isCurrentUser ? `
+                  <button class="btn toggle-admin ${user.isAdmin ? 'danger' : 'secondary'}" 
+                          onclick="toggleAdminStatus('${user.uid}', ${!user.isAdmin})">
+                    ${user.isAdmin ? 'Remove Admin' : 'Make Admin'}
+                  </button>
+                ` : '<small style="color: #aaa;">Cannot modify own role</small>'}
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (error) {
+        console.error('Error loading users:', error);
+        const tbody = document.getElementById('usersTableBody');
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: #ef4444;">Error loading users</td></tr>';
+      }
+    }
+
+    async function toggleAdminStatus(userId, makeAdmin) {
+      if (!confirm(`Are you sure you want to ${makeAdmin ? 'grant admin access to' : 'remove admin access from'} this user?`)) {
+        return;
+      }
+
+      try {
+        await userManager.setAdminStatus(userId, makeAdmin);
+        alert(`Admin status ${makeAdmin ? 'granted' : 'removed'} successfully!`);
+        loadAllUsers(); // Reload the table
+      } catch (error) {
+        console.error('Error toggling admin status:', error);
+        alert('Error updating admin status: ' + error.message);
+      }
+    }
+
+    async function loadGamesAndStats() {
+      try {
+        const gamesSnapshot = await db.collection('games').get();
+        const tournamentsSnapshot = await db.collection('tournaments').get();
+
+        const games = [];
+        const tournaments = [];
+
+        gamesSnapshot.forEach(doc => {
+          games.push({ id: doc.id, ...doc.data() });
+        });
+
+        tournamentsSnapshot.forEach(doc => {
+          tournaments.push({ id: doc.id, ...doc.data() });
+        });
+
+        const activeGames = games.filter(g => g.gamePhase === 'playing' || g.gamePhase === 'setup').length;
+        const completedGames = games.filter(g => g.gamePhase === 'finished').length;
+        const totalTeams = games.reduce((sum, g) => sum + (g.teams?.length || 0), 0);
+
+        document.getElementById('statTournaments').textContent = tournaments.length;
+        document.getElementById('statGames').textContent = activeGames;
+        document.getElementById('statCompleted').textContent = completedGames;
+        document.getElementById('statTeams').textContent = totalTeams;
+
+        displayRecentGames(games, tournaments);
+
+      } catch (error) {
+        console.error('Error loading games:', error);
+      }
+    }
+
+    function displayRecentGames(games, tournaments) {
+      const container = document.getElementById('recentGames');
+
+      const allItems = [
+        ...games.map(g => ({ ...g, type: 'game' })),
+        ...tournaments.map(t => ({ ...t, type: 'tournament' }))
+      ].sort((a, b) => {
+        const dateA = new Date(a.createdAt || 0);
+        const dateB = new Date(b.createdAt || 0);
+        return dateB - dateA;
+      }).slice(0, 6);
+
+      if (allItems.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">🎲</div>
+            <p>No games or tournaments found. Create your first tournament to get started!</p>
+            <a href="setup.html" class="btn">Create Tournament</a>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = allItems.map(item => {
+        const isGame = item.type === 'game';
+        const status = item.gamePhase || item.status || 'setup';
+        const statusClass = status === 'playing' ? 'active' : status === 'finished' ? 'finished' : 'setup';
+        const createdDate = item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Unknown';
+        const itemId = item.gameId || item.tournamentId || item.id;
+
+        return `
+          <div class="game-card">
+            <div class="game-card-header">
+              <h4>${isGame ? '🎮' : '🏆'} ${item.name || itemId}</h4>
+              <span class="game-status ${statusClass}">${status}</span>
+            </div>
+            <div class="game-card-info">
+              <div><strong>ID:</strong> ${itemId}</div>
+              <div><strong>Created:</strong> ${createdDate}</div>
+              ${item.teams ? `<div><strong>Teams:</strong> ${item.teams.length}</div>` : ''}
+              ${item.gamesPlayed ? `<div><strong>Games Played:</strong> ${item.gamesPlayed}</div>` : ''}
+            </div>
+            <div class="game-card-actions">
+              ${isGame ? `
+                <a href="view.html?gameId=${itemId}" class="btn secondary">View</a>
+                ${userManager.isAdmin() ? `<a href="god.html?game=${itemId}" class="btn">Manage</a>` : ''}
+              ` : `
+                <a href="view.html?gameId=${itemId}" class="btn secondary">View</a>
+              `}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  </script>
+
+  <script src="scripts/restrict-access.js"></script>
+</body>
+</html>
