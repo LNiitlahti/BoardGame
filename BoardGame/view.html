@@ -579,7 +579,7 @@
     <div class="container">
         <header class="header">
             <h1 class="game-title">Game Board</h1>
-            <div class="status-indicator status-green"></div>
+            <div id="firebase-status" class="status-indicator status-yellow" title="Connecting to Firebase..."></div>
         </header>
 
         <main class="main-content">
@@ -885,27 +885,292 @@
         </footer>
     </div>
 
+    <!-- Firebase Scripts -->
+    <script src="scripts/firebase-loader.js"></script>
+    
     <!-- Board Module Scripts -->
     <script src="scripts/board-module.js"></script>
     <script src="scripts/board-renderer.js"></script>
     
     <script>
+        let renderer;
+        let boardModule;
+        let gameId = new URLSearchParams(window.location.search).get('gameId') || 'default-game';
+        let firebaseReady = false;
+        
         // Initialize the board when page loads
         document.addEventListener('DOMContentLoaded', () => {
             const hexBoardContainer = document.getElementById('hexBoard');
             
             // Create board module and renderer
-            const boardModule = new BoardModule();
-            const renderer = new BoardRenderer(hexBoardContainer, boardModule, {
+            boardModule = new BoardModule();
+            renderer = new BoardRenderer(hexBoardContainer, boardModule, {
                 responsive: true
             });
             
             // Render the initial empty board
             renderer.render();
             
-            // Example: You can update the board with game data later
-            // renderer.render({ board: { 'q0r0': 'team1', 'q1r0': 'team2' } });
+            // Update status - waiting for Firebase
+            updateFirebaseStatus('yellow', 'Connecting to Firebase...');
+            
+            // Set timeout to show error if Firebase doesn't connect
+            setTimeout(() => {
+                if (!firebaseReady) {
+                    updateFirebaseStatus('red', 'Firebase connection timeout. Check console for errors.');
+                    console.error('Firebase failed to initialize within 10 seconds');
+                }
+            }, 10000);
         });
+        
+        // Wait for Firebase to be ready, then set up listeners
+        document.addEventListener('firebase-ready', () => {
+            console.log('Firebase is ready, setting up game listener...');
+            firebaseReady = true;
+            updateFirebaseStatus('green', 'Connected to Firebase');
+            setupGameListener();
+        });
+        
+        function updateFirebaseStatus(color, message) {
+            const statusIndicator = document.getElementById('firebase-status');
+            if (statusIndicator) {
+                statusIndicator.className = `status-indicator status-${color}`;
+                statusIndicator.title = message;
+            }
+        }
+        
+        function setupGameListener() {
+            const db = window.firebaseDB;
+            
+            if (!db) {
+                console.error('Firebase database not available');
+                updateFirebaseStatus('red', 'Firebase database not available');
+                return;
+            }
+            
+            // Listen to the game document
+            const gameRef = window.firebaseDoc(db, 'games', gameId);
+            
+            window.firebaseOnSnapshot(gameRef, (docSnapshot) => {
+                if (docSnapshot.exists) {
+                    const gameData = docSnapshot.data();
+                    console.log('Game data received:', gameData);
+                    
+                    // Update the board
+                    if (renderer && gameData.board) {
+                        renderer.render(gameData);
+                    }
+                    
+                    // Update teams display
+                    if (gameData.teams) {
+                        updateTeamsDisplay(gameData.teams);
+                    }
+                    
+                    // Update game title
+                    if (gameData.name || gameData.gameId) {
+                        document.querySelector('.game-title').textContent = gameData.name || gameData.gameId;
+                    }
+                    
+                    // Update status indicator based on game status
+                    updateStatusIndicator(gameData.gamePhase || gameData.status || 'active');
+                    
+                    // Update events
+                    if (gameData.events) {
+                        updateEventsDisplay(gameData.events);
+                    }
+                    
+                    // Update matches
+                    if (gameData.upcomingMatches) {
+                        updateMatchesDisplay(gameData.upcomingMatches);
+                    }
+                } else {
+                    console.warn('No game found with ID:', gameId);
+                    document.querySelector('.game-title').textContent = `Game Not Found: ${gameId}`;
+                    updateFirebaseStatus('red', `Game "${gameId}" not found`);
+                }
+            }, (error) => {
+                console.error('Error listening to game:', error);
+                updateFirebaseStatus('red', 'Error loading game data');
+            });
+        }
+        
+        function updateTeamsDisplay(teams) {
+            const teamsFooter = document.querySelector('.teams-footer');
+            if (!teams) return;
+            
+            // Clear existing teams
+            teamsFooter.innerHTML = '';
+            
+            // Handle both object and array formats
+            const teamsArray = Array.isArray(teams) ? teams : Object.values(teams);
+            
+            // Create team elements
+            teamsArray.forEach((teamData) => {
+                const teamElement = document.createElement('div');
+                teamElement.className = 'team';
+                teamElement.dataset.color = teamData.color || 'blue';
+                
+                if (teamData.isActive) {
+                    teamElement.classList.add('active');
+                }
+                
+                // Players section
+                let playersHTML = '<div class="team-players">';
+                if (teamData.players && Array.isArray(teamData.players)) {
+                    teamData.players.forEach(player => {
+                        playersHTML += `
+                            <div class="player-box">
+                                <span class="player-name">${player.name || 'Player'}</span>
+                                <span class="player-points">${player.points || 0} pts</span>
+                            </div>
+                        `;
+                    });
+                }
+                playersHTML += '</div>';
+                
+                // Team info section
+                const teamScore = teamData.points || teamData.score || 0;
+                const teamInfoHTML = `
+                    <div class="team-info">
+                        <div class="team-score">${teamScore} pts</div>
+                    </div>
+                `;
+                
+                // Cards section
+                const handCount = teamData.hand?.length || 0;
+                const deckCount = teamData.deck?.length || 0;
+                
+                let cardsHTML = '<div class="team-cards">';
+                cardsHTML += '<div class="card-group"><span class="card-label">Hand:</span><div class="cards">';
+                for (let i = 0; i < handCount; i++) {
+                    cardsHTML += '<div class="card"></div>';
+                }
+                cardsHTML += '</div></div>';
+                
+                cardsHTML += '<div class="card-group"><span class="card-label">Deck:</span><div class="cards">';
+                cardsHTML += '<div class="card deck"></div>';
+                cardsHTML += `<span class="card-count">${deckCount}</span>`;
+                cardsHTML += '</div></div></div>';
+                
+                teamElement.innerHTML = playersHTML + teamInfoHTML + cardsHTML;
+                teamsFooter.appendChild(teamElement);
+            });
+        }
+        
+        function updateStatusIndicator(status) {
+            // Don't override Firebase connection status
+            const indicator = document.getElementById('firebase-status');
+            if (!firebaseReady || !indicator) return;
+            
+            let color = 'green';
+            let message = 'Game active';
+            
+            switch(status) {
+                case 'active':
+                case 'playing':
+                case 'inProgress':
+                    color = 'green';
+                    message = 'Game in progress';
+                    break;
+                case 'paused':
+                case 'waiting':
+                case 'setup':
+                    color = 'yellow';
+                    message = 'Game paused';
+                    break;
+                case 'ended':
+                case 'completed':
+                case 'error':
+                    color = 'red';
+                    message = 'Game ended';
+                    break;
+            }
+            
+            updateFirebaseStatus(color, message);
+        }
+        
+        function updateEventsDisplay(events) {
+            const eventsList = document.querySelector('.events-list');
+            if (!events || !Array.isArray(events)) return;
+            
+            eventsList.innerHTML = '';
+            
+            // Show last 10 events
+            const recentEvents = events.slice(-10).reverse();
+            
+            recentEvents.forEach((event, index) => {
+                const eventElement = document.createElement('li');
+                eventElement.className = 'event';
+                
+                if (index === 0) {
+                    eventElement.classList.add('recent');
+                }
+                
+                const timestamp = event.timestamp ? new Date(event.timestamp).toLocaleTimeString() : '';
+                
+                eventElement.innerHTML = `
+                    <span class="event-time">${timestamp}</span>
+                    <span class="event-text">${event.text || event.message || 'Event occurred'}</span>
+                `;
+                
+                eventsList.appendChild(eventElement);
+            });
+        }
+        
+        function updateMatchesDisplay(matches) {
+            if (!matches || !Array.isArray(matches) || matches.length === 0) return;
+            
+            const matchesContainer = document.querySelector('.matches-container');
+            matchesContainer.innerHTML = '';
+            
+            // Find current match (first with status 'playing' or 'active')
+            const currentMatch = matches.find(m => m.status === 'playing' || m.status === 'active');
+            const upcomingMatches = matches.filter(m => m.status === 'waiting' || m.status === 'upcoming');
+            
+            // Current Match Section
+            if (currentMatch) {
+                const currentSection = document.createElement('div');
+                currentSection.className = 'match-category';
+                currentSection.innerHTML = `
+                    <h3>Current Match</h3>
+                    <div class="match-item active">
+                        <div class="match-header">
+                            <span class="match-game">${currentMatch.game}</span>
+                            <span class="match-format">Round ${currentMatch.round || 1}</span>
+                        </div>
+                        <div class="match-teams">
+                            <span class="match-team">${currentMatch.team1Name} vs ${currentMatch.team2Name}</span>
+                        </div>
+                    </div>
+                `;
+                matchesContainer.appendChild(currentSection);
+            }
+            
+            // Upcoming Matches Section
+            if (upcomingMatches.length > 0) {
+                const upcomingSection = document.createElement('div');
+                upcomingSection.className = 'match-category';
+                upcomingSection.innerHTML = '<h3>Upcoming Matches</h3>';
+                
+                // Show up to 5 upcoming matches
+                upcomingMatches.slice(0, 5).forEach(match => {
+                    const matchDiv = document.createElement('div');
+                    matchDiv.className = 'match-item';
+                    matchDiv.innerHTML = `
+                        <div class="match-header">
+                            <span class="match-game">${match.game}</span>
+                            <span class="match-format">Round ${match.round || 1}</span>
+                        </div>
+                        <div class="match-teams">
+                            <span class="match-team">${match.team1Name} vs ${match.team2Name}</span>
+                        </div>
+                    `;
+                    upcomingSection.appendChild(matchDiv);
+                });
+                
+                matchesContainer.appendChild(upcomingSection);
+            }
+        }
     </script>
 </body>
 </html>

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Webgame</title>
+  <script src="scripts/firebase-loader.js"></script>
+  <style>
+    #game { display: none; }
+    #loginForm, #registerForm { margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <h1>My Webgame</h1>
+
+  <!-- Login form -->
+  <div id="loginForm">
+    <h3>Login</h3>
+    <input type="email" id="loginEmail" placeholder="Email"><br>
+    <input type="password" id="loginPassword" placeholder="Password"><br>
+    <button id="loginBtn">Login</button>
+  </div>
+
+  <!-- Registration form -->
+  <div id="registerForm">
+    <h3>Register</h3>
+    <input type="email" id="registerEmail" placeholder="Email"><br>
+    <input type="password" id="registerPassword" placeholder="Password"><br>
+    <input type="text" id="referralCode" placeholder="Referral Code"><br>
+    <button id="registerBtn">Register</button>
+  </div>
+
+  <!-- Game container -->
+  <div id="game">
+    <h2>Welcome to the game!</h2>
+    <button id="logoutBtn">Logout</button>
+    <!-- Your actual game content/scripts go here -->
+  </div>
+
+  <script>
+    // Wait until firebase-loader.js finishes
+    document.addEventListener('firebase-ready', function() {
+      console.log("Firebase ready, setting up auth...");
+
+      const auth = firebase.auth();
+      const db = window.firebaseDB;
+
+      const loginForm = document.getElementById("loginForm");
+      const registerForm = document.getElementById("registerForm");
+      const gameDiv = document.getElementById("game");
+
+      // Monitor auth state
+      auth.onAuthStateChanged(user => {
+        if (user) {
+          console.log("User logged in:", user.uid);
+          loginForm.style.display = "none";
+          registerForm.style.display = "none";
+          gameDiv.style.display = "block";
+        } else {
+          console.log("No user logged in.");
+          loginForm.style.display = "block";
+          registerForm.style.display = "block";
+          gameDiv.style.display = "none";
+        }
+      });
+
+      // Login
+      document.getElementById("loginBtn").addEventListener("click", () => {
+        const email = document.getElementById("loginEmail").value;
+        const password = document.getElementById("loginPassword").value;
+        auth.signInWithEmailAndPassword(email, password)
+          .catch(err => alert("Login failed: " + err.message));
+      });
+
+      // Register with referral code
+      document.getElementById("registerBtn").addEventListener("click", () => {
+        const email = document.getElementById("registerEmail").value;
+        const password = document.getElementById("registerPassword").value;
+        const code = document.getElementById("referralCode").value.trim();
+
+        if (!code) {
+          alert("Referral code required!");
+          return;
+        }
+
+        // Check if referral code exists and unused
+        db.collection("referralCodes").doc(code).get().then(doc => {
+          if (!doc.exists) {
+            alert("Invalid referral code.");
+            return;
+          }
+          if (doc.data().used) {
+            alert("This referral code has already been used.");
+            return;
+          }
+
+          // Create the user
+          auth.createUserWithEmailAndPassword(email, password)
+            .then(cred => {
+              // Mark referral code as used
+              return db.collection("referralCodes").doc(code).set({
+                used: true,
+                assignedTo: cred.user.uid,
+                assignedEmail: email
+              }, { merge: true });
+            })
+            .then(() => {
+              alert("Registration successful!");
+            })
+            .catch(err => {
+              alert("Registration failed: " + err.message);
+            });
+        });
+      });
+
+      // Logout
+      document.getElementById("logoutBtn").addEventListener("click", () => {
+        auth.signOut();
+      });
+    });
+  </script>
+</body>
+</html>
