@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Board Test - Multiple Sizes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #1a1a1a;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        h1 {
+            color: #fff;
+            text-align: center;
+            margin-bottom: 30px;
+            font-family: system-ui, sans-serif;
+        }
+
+        .boards-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            min-height: calc(100vh - 100px);
+        }
+
+        .board-wrapper {
+            background: #2c3e50;
+            border: 2px solid #f00;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .board-wrapper.small {
+            width: 300px;
+            height: 300px;
+        }
+
+        .board-wrapper.medium {
+            width: 500px;
+            height: 500px;
+        }
+
+        .board-wrapper.large {
+            width: 1400px;
+            height: 1400px;
+        }
+
+        .board-label {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: system-ui, sans-serif;
+        }
+
+        .board-wrapper {
+            position: relative;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 1400px) {
+            .boards-container {
+                flex-direction: column;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .board-wrapper.small {
+                width: 250px;
+                height: 250px;
+            }
+
+            .board-wrapper.medium {
+                width: 350px;
+                height: 350px;
+            }
+
+            .board-wrapper.large {
+                width: 90vw;
+                height: 90vw;
+                max-width: 500px;
+                max-height: 500px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Board Scaling Test - Multiple Sizes</h1>
+    
+    <div class="boards-container">
+        <!-- Small Board -->
+        <div class="board-wrapper small">
+            <div class="board-label">Small (300×300)</div>
+            <div id="boardSmall"></div>
+        </div>
+
+        <!-- Medium Board -->
+        <div class="board-wrapper medium">
+            <div class="board-label">Medium (500×500)</div>
+            <div id="boardMedium"></div>
+        </div>
+
+        <!-- Large Board -->
+        <div class="board-wrapper large">
+            <div class="board-label">Large (700×700)</div>
+            <div id="boardLarge"></div>
+        </div>
+    </div>
+
+    <script src="scripts/board-module.js"></script>
+    <script src="scripts/board-renderer.js"></script>
+    
+    <script>
+        // Initialize board module (shared)
+        const boardModule = new BoardModule(1);
+
+        // Sample game data with some occupied hexes
+        const sampleGameData = {
+            board: {
+                'q0r0': 'team1',
+                'q1r0': 'team1',
+                'q0r1': 'team2',
+                'q-1r0': 'team2',
+                'q2r-2': 'team1',
+                'q-2r2': 'team2'
+            }
+        };
+
+        // Small board
+        const containerSmall = document.getElementById('boardSmall');
+        const rendererSmall = new BoardRenderer(containerSmall, boardModule, {
+            responsive: true
+        });
+        rendererSmall.render(sampleGameData);
+
+        // Medium board
+        const containerMedium = document.getElementById('boardMedium');
+        const rendererMedium = new BoardRenderer(containerMedium, boardModule, {
+            responsive: true
+        });
+        rendererMedium.render(sampleGameData);
+
+        // Large board
+        const containerLarge = document.getElementById('boardLarge');
+        const rendererLarge = new BoardRenderer(containerLarge, boardModule, {
+            responsive: true
+        });
+        rendererLarge.render(sampleGameData);
+
+        console.log('All boards initialized');
+        console.log('Small:', containerSmall.clientWidth, 'x', containerSmall.clientHeight);
+        console.log('Medium:', containerMedium.clientWidth, 'x', containerMedium.clientHeight);
+        console.log('Large:', containerLarge.clientWidth, 'x', containerLarge.clientHeight);
+    </script>
+</body>
+</html>

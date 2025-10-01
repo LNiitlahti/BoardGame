@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hex Board Template</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0px;
+            background: #2c3e50;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+    </style>
+</head>
+<body>
+    <!-- Container for the hex board -->
+    <div id="hexBoard"></div>
+
+    <!-- Load required scripts -->
+    <script src="scripts/board-module.js"></script>
+    <script src="scripts/board-renderer.js"></script>
+    
+    <script>
+        // Initialize board module
+        const boardModule = new BoardModule();
+        
+        // Get container
+        const container = document.getElementById('hexBoard');
+        
+        // Create renderer with responsive sizing
+        const renderer = new BoardRenderer(container, boardModule, {
+            size: 800,           // Max size
+            responsive: true     // Auto-scale to screen
+        });
+        
+        // Render empty board
+        renderer.render();
+        
+        // Example: render with game data
+        // const gameData = {
+        //     board: {
+        //         'q0r0': 'team1',
+        //         'q1r0': 'team1',
+        //         'q0r-5': 'team2'
+        //     }
+        // };
+        // renderer.render(gameData);
+        
+        // Example: fixed size (no responsive)
+        // const renderer = new BoardRenderer(container, boardModule, {
+        //     size: 600,
+        //     responsive: false
+        // });
+    </script>
+</body>
+</html>
