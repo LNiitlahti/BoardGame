@@ -105,12 +105,13 @@ class BoardRenderer {
             
             // Board native size is 750px
             const boardSize = 750;
-            const scale = Math.min(wrapperWidth / boardSize, wrapperHeight / boardSize, 2);
+            let scale = Math.min(wrapperWidth / boardSize, wrapperHeight / boardSize, 2);
+            scale *= 1.22; // Slightly larger scaling factor
             
             // Set container to board size and center it within wrapper
             this.container.style.width = `${boardSize}px`;
             this.container.style.height = `${boardSize}px`;
-            this.container.style.transform = `scale(${scale})`;
+            this.container.style.transform = `scale(${scale}) rotate(30deg)`;
             this.container.style.transformOrigin = 'center center';
             this.container.style.position = 'absolute';
             this.container.style.left = '50%';
@@ -128,11 +129,12 @@ class BoardRenderer {
                 const wrapperWidth = wrapper.clientWidth;
                 const wrapperHeight = wrapper.clientHeight;
                 const boardSize = 750;
-                const scale = Math.min(wrapperWidth / boardSize, wrapperHeight / boardSize, 2);
+                let scale = Math.min(wrapperWidth / boardSize, wrapperHeight / boardSize, 2);
+                scale *= 1.22;  // Slightly larger scaling factor
                 
                 this.container.style.width = `${boardSize}px`;
                 this.container.style.height = `${boardSize}px`;
-                this.container.style.transform = `scale(${scale})`;
+                this.container.style.transform = `scale(${scale}) rotate(30deg)`;
                 this.container.style.transformOrigin = 'center center';
                 this.container.style.position = 'absolute';
                 this.container.style.left = '50%';
