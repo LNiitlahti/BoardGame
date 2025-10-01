@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Board Game Viewer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            background: #2a2a2a;
+            padding: 15px 30px;
+            border-bottom: 3px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .game-title {
+            font-size: 28px;
+            font-weight: 700;
+            text-align: center;
+            color: #00d4ff;
+            flex: 1;
+        }
+
+        .status-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            box-shadow: 0 0 10px currentColor;
+            transition: all 0.3s ease;
+        }
+
+        .status-indicator.status-green {
+            background: #10b981;
+            box-shadow: 0 0 15px #10b981;
+        }
+
+        .status-indicator.status-yellow {
+            background: #f59e0b;
+            box-shadow: 0 0 15px #f59e0b;
+        }
+
+        .status-indicator.status-red {
+            background: #ef4444;
+            box-shadow: 0 0 15px #ef4444;
+        }
+
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .events-panel {
+            background: #2a2a2a;
+            border-radius: 12px;
+            padding: 20px;
+            width: 280px;
+            display: flex;
+            flex-direction: column;
+            max-height: 100%;
+            overflow: hidden;
+        }
+
+        .events-panel h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #00d4ff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            flex-shrink: 0;
+        }
+
+        .events-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overflow: hidden;
+            flex: 1;
+        }
+
+        .event {
+            background: #1a1a1a;
+            padding: 10px 12px;
+            border-radius: 6px;
+            border-left: 3px solid #555;
+            font-size: 12px;
+            line-height: 1.4;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .event-time {
+            font-size: 10px;
+            color: #666;
+            font-weight: 400;
+        }
+
+        .event-text {
+            color: #ccc;
+        }
+
+        .event.recent {
+            background: #2d3748;
+            border-left-color: #00d4ff;
+        }
+
+        .event.recent .event-text {
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .board-container {
+            flex: 1;
+            display: flex;
+            gap: 20px;
+        }
+
+        .board-section {
+            flex: 1;
+            background: #2a2a2a;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .matches-section {
+            width: 350px;
+            background: #2a2a2a;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            max-height: 100%;
+            overflow: hidden;
+        }
+
+        .matches-section h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #00d4ff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            flex-shrink: 0;
+        }
+
+        .matches-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .match-category {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .match-category h3 {
+            font-size: 14px;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .match-item {
+            background: #1a1a1a;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 3px solid #555;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .match-item.active {
+            border-left-color: #00d4ff;
+            background: #2d3748;
+        }
+
+        .match-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .match-game {
+            font-size: 13px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .match-format {
+            font-size: 11px;
+            color: #aaa;
+            background: #2a2a2a;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .match-teams {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 12px;
+        }
+
+        .match-team {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .match-player {
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: #2a2a2a;
+            border: 2px solid;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .match-player.blue {
+            border-color: #3b82f6;
+            color: #3b82f6;
+        }
+
+        .match-player.red {
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        .match-player.green {
+            border-color: #10b981;
+            color: #10b981;
+        }
+
+        .match-player.yellow {
+            border-color: #f59e0b;
+            color: #f59e0b;
+        }
+
+        .match-player.purple {
+            border-color: #a855f7;
+            color: #a855f7;
+        }
+
+        .match-player.orange {
+            border-color: #f97316;
+            color: #f97316;
+        }
+
+        .match-vs {
+            font-size: 10px;
+            color: #666;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        #game-board {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #2a1810 0%, #1a1008 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: #6b5d52;
+            border: 8px solid;
+            border-image: linear-gradient(135deg, #8b6f47 0%, #5d4a33 50%, #3d2f20 100%) 1;
+            box-shadow: 
+                inset 0 2px 4px rgba(0,0,0,0.5),
+                inset 0 -2px 4px rgba(139,111,71,0.2),
+                0 4px 8px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        #game-board::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: 
+                repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(139,111,71,0.03) 2px, rgba(139,111,71,0.03) 4px),
+                repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(139,111,71,0.03) 2px, rgba(139,111,71,0.03) 4px);
+            pointer-events: none;
+            border-radius: 4px;
+        }
+
+        .teams-footer {
+            display: flex;
+            gap: 15px;
+            padding: 20px;
+            background: #2a2a2a;
+            border-top: 3px solid #333;
+            overflow-x: auto;
+        }
+
+        .team {
+            background: #1a1a1a;
+            border-radius: 10px;
+            padding: 15px;
+            min-width: 200px;
+            flex: 1;
+            border: 3px solid transparent;
+            transition: all 0.3s ease;
+            display: grid;
+            grid-template-rows: auto auto auto;
+            gap: 12px;
+        }
+
+        .team-players {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #2a2a2a;
+        }
+
+        .player-box {
+            background: #2a2a2a;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            border: 2px solid;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .player-name {
+            font-weight: 600;
+            font-size: 12px;
+        }
+
+        .player-points {
+            font-size: 14px;
+            opacity: 0.9;
+            font-weight: 700;
+        }
+
+        .team[data-color="blue"] .player-box {
+            border-color: #3b82f6;
+            color: #3b82f6;
+        }
+
+        .team[data-color="red"] .player-box {
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        .team[data-color="green"] .player-box {
+            border-color: #10b981;
+            color: #10b981;
+        }
+
+        .team[data-color="yellow"] .player-box {
+            border-color: #f59e0b;
+            color: #f59e0b;
+        }
+
+        .team[data-color="purple"] .player-box {
+            border-color: #a855f7;
+            color: #a855f7;
+        }
+
+        .team[data-color="orange"] .player-box {
+            border-color: #f97316;
+            color: #f97316;
+        }
+
+        .team.active {
+            border-width: 5px;
+        }
+
+        .team[data-color="blue"] {
+            border-color: #3b82f6;
+        }
+
+        .team[data-color="blue"].active {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+        }
+
+        .team[data-color="red"] {
+            border-color: #ef4444;
+        }
+
+        .team[data-color="red"].active {
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+        }
+
+        .team[data-color="green"] {
+            border-color: #10b981;
+        }
+
+        .team[data-color="green"].active {
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+        }
+
+        .team[data-color="yellow"] {
+            border-color: #f59e0b;
+        }
+
+        .team[data-color="yellow"].active {
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
+        }
+
+        .team[data-color="purple"] {
+            border-color: #a855f7;
+        }
+
+        .team[data-color="purple"].active {
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.5);
+        }
+
+        .team[data-color="orange"] {
+            border-color: #f97316;
+        }
+
+        .team[data-color="orange"].active {
+            box-shadow: 0 0 20px rgba(249, 115, 22, 0.5);
+        }
+
+        .team-info {
+            padding-bottom: 12px;
+            border-bottom: 2px solid #2a2a2a;
+            text-align: center;
+        }
+
+        .team-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .team[data-color="blue"] .team-name {
+            color: #3b82f6;
+        }
+
+        .team[data-color="red"] .team-name {
+            color: #ef4444;
+        }
+
+        .team[data-color="green"] .team-name {
+            color: #10b981;
+        }
+
+        .team[data-color="yellow"] .team-name {
+            color: #f59e0b;
+        }
+
+        .team[data-color="purple"] .team-name {
+            color: #a855f7;
+        }
+
+        .team[data-color="orange"] .team-name {
+            color: #f97316;
+        }
+
+        .team-score {
+            font-size: 18px;
+            color: #fff;
+            font-weight: 700;
+        }
+
+        .team-cards {
+            display: flex;
+            gap: 15px;
+        }
+
+        .card-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .card-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #777;
+            letter-spacing: 0.5px;
+        }
+
+        .cards {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .card {
+            width: 22px;
+            height: 32px;
+            background: #2a2a2a;
+            border: 2px solid;
+            border-radius: 3px;
+            position: relative;
+        }
+
+        .team[data-color="blue"] .card {
+            border-color: #3b82f6;
+        }
+
+        .team[data-color="red"] .card {
+            border-color: #ef4444;
+        }
+
+        .team[data-color="green"] .card {
+            border-color: #10b981;
+        }
+
+        .team[data-color="yellow"] .card {
+            border-color: #f59e0b;
+        }
+
+        .team[data-color="purple"] .card {
+            border-color: #a855f7;
+        }
+
+        .team[data-color="orange"] .card {
+            border-color: #f97316;
+        }
+
+        .card.deck {
+            background: #1a1a1a;
+        }
+
+        .card-count {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            margin-left: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1 class="game-title">Game Board</h1>
+            <div class="status-indicator status-green"></div>
+        </header>
+
+        <main class="main-content">
+            <aside class="events-panel">
+                <h2>Recent Events</h2>
+                <ul class="events-list">
+                    <li class="event recent">
+                        <span class="event-time">14:23:45</span>
+                        <span class="event-text">Team Blue moved 5 spaces</span>
+                    </li>
+                    <li class="event">
+                        <span class="event-time">14:23:12</span>
+                        <span class="event-text">Team Red drew 2 cards</span>
+                    </li>
+                    <li class="event">
+                        <span class="event-time">14:22:58</span>
+                        <span class="event-text">Team Green played action card</span>
+                    </li>
+                    <li class="event">
+                        <span class="event-time">14:22:34</span>
+                        <span class="event-text">Team Blue scored 10 points</span>
+                    </li>
+                    <li class="event">
+                        <span class="event-time">14:22:15</span>
+                        <span class="event-text">Team Red moved 3 spaces</span>
+                    </li>
+                    <li class="event">
+                        <span class="event-time">14:21:52</span>
+                        <span class="event-text">Team Green drew 1 card</span>
+                    </li>
+                    <li class="event">
+                        <span class="event-time">14:21:28</span>
+                        <span class="event-text">Team Blue played action card</span>
+                    </li>
+                    <li class="event">
+                        <span class="event-time">14:21:03</span>
+                        <span class="event-text">Team Red scored 5 points</span>
+                    </li>
+                    <li class="event">
+                        <span class="event-time">14:20:41</span>
+                        <span class="event-text">Team Green moved 4 spaces</span>
+                    </li>
+                    <li class="event">
+                        <span class="event-time">14:20:18</span>
+                        <span class="event-text">Team Blue drew 3 cards</span>
+                    </li>
+                </ul>
+            </aside>
+
+            <section class="board-container">
+                <div class="board-section">
+                    <div id="game-board">Game Board Module Goes Here</div>
+                </div>
+                
+                <aside class="matches-section">
+                    <h2>Matches</h2>
+                    <div class="matches-container">
+                        <div class="match-category">
+                            <h3>Current Match</h3>
+                            <div class="match-item active">
+                                <div class="match-teams">
+                                    <span class="match-team">Team Blue vs Team Red</span>
+                                    <span class="match-vs">Round 3</span>
+                                </div>
+                                <span class="match-status">Playing</span>
+                            </div>
+                        </div>
+                        
+                        <div class="match-category">
+                            <h3>Upcoming Matches</h3>
+                            <div class="match-item">
+                                <div class="match-teams">
+                                    <span class="match-team">Team Green vs Team Yellow</span>
+                                    <span class="match-vs">Round 4</span>
+                                </div>
+                                <span class="match-status">Next</span>
+                            </div>
+                            <div class="match-item">
+                                <div class="match-teams">
+                                    <span class="match-team">Team Purple vs Team Orange</span>
+                                    <span class="match-vs">Round 5</span>
+                                </div>
+                                <span class="match-status">Waiting</span>
+                            </div>
+                            <div class="match-item">
+                                <div class="match-teams">
+                                    <span class="match-team">Team Blue vs Team Green</span>
+                                    <span class="match-vs">Round 6</span>
+                                </div>
+                                <span class="match-status">Waiting</span>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+            </section>
+        </main>
+
+        <footer class="teams-footer">
+            <div class="team active" data-color="blue">
+                <div class="team-players">
+                    <div class="player-box">
+                        <span class="player-name">Player 1</span>
+                        <span class="player-points">23 pts</span>
+                    </div>
+                    <div class="player-box">
+                        <span class="player-name">Player 2</span>
+                        <span class="player-points">22 pts</span>
+                    </div>
+                </div>
+                <div class="team-info">
+                    <div class="team-score">45 pts</div>
+                </div>
+                <div class="team-cards">
+                    <div class="card-group">
+                        <span class="card-label">Hand:</span>
+                        <div class="cards">
+                            <div class="card"></div>
+                            <div class="card"></div>
+                            <div class="card"></div>
+                        </div>
+                    </div>
+                    <div class="card-group">
+                        <span class="card-label">Deck:</span>
+                        <div class="cards">
+                            <div class="card deck"></div>
+                            <span class="card-count">12</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="team" data-color="red">
+                <div class="team-players">
+                    <div class="player-box">
+                        <span class="player-name">Player 3</span>
+                        <span class="player-points">19 pts</span>
+                    </div>
+                    <div class="player-box">
+                        <span class="player-name">Player 4</span>
+                        <span class="player-points">19 pts</span>
+                    </div>
+                </div>
+                <div class="team-info">
+                    <div class="team-score">38 pts</div>
+                </div>
+                <div class="team-cards">
+                    <div class="card-group">
+                        <span class="card-label">Hand:</span>
+                        <div class="cards">
+                            <div class="card"></div>
+                            <div class="card"></div>
+                            <div class="card"></div>
+                            <div class="card"></div>
+                            <div class="card"></div>
+                        </div>
+                    </div>
+                    <div class="card-group">
+                        <span class="card-label">Deck:</span>
+                        <div class="cards">
+                            <div class="card deck"></div>
+                            <span class="card-count">8</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="team" data-color="green">
+                <div class="team-players">
+                    <div class="player-box">
+                        <span class="player-name">Player 5</span>
+                        <span class="player-points">27 pts</span>
+                    </div>
+                    <div class="player-box">
+                        <span class="player-name">Player 6</span>
+                        <span class="player-points">25 pts</span>
+                    </div>
+                </div>
+                <div class="team-info">
+                    <div class="team-score">52 pts</div>
+                </div>
+                <div class="team-cards">
+                    <div class="card-group">
+                        <span class="card-label">Hand:</span>
+                        <div class="cards">
+                            <div class="card"></div>
+                            <div class="card"></div>
+                        </div>
+                    </div>
+                    <div class="card-group">
+                        <span class="card-label">Deck:</span>
+                        <div class="cards">
+                            <div class="card deck"></div>
+                            <span class="card-count">15</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="team" data-color="yellow">
+                <div class="team-players">
+                    <div class="player-box">
+                        <span class="player-name">Player 7</span>
+                        <span class="player-points">20 pts</span>
+                    </div>
+                    <div class="player-box">
+                        <span class="player-name">Player 8</span>
+                        <span class="player-points">21 pts</span>
+                    </div>
+                </div>
+                <div class="team-info">
+                    <div class="team-score">41 pts</div>
+                </div>
+                <div class="team-cards">
+                    <div class="card-group">
+                        <span class="card-label">Hand:</span>
+                        <div class="cards">
+                            <div class="card"></div>
+                            <div class="card"></div>
+                            <div class="card"></div>
+                            <div class="card"></div>
+                        </div>
+                    </div>
+                    <div class="card-group">
+                        <span class="card-label">Deck:</span>
+                        <div class="cards">
+                            <div class="card deck"></div>
+                            <span class="card-count">10</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="team" data-color="purple">
+                <div class="team-players">
+                    <div class="player-box">
+                        <span class="player-name">Player 9</span>
+                        <span class="player-points">15 pts</span>
+                    </div>
+                    <div class="player-box">
+                        <span class="player-name">Player 10</span>
+                        <span class="player-points">14 pts</span>
+                    </div>
+                </div>
+                <div class="team-info">
+                    <div class="team-score">29 pts</div>
+                </div>
+                <div class="team-cards">
+                    <div class="card-group">
+                        <span class="card-label">Hand:</span>
+                        <div class="cards">
+                            <div class="card"></div>
+                            <div class="card"></div>
+                            <div class="card"></div>
+                        </div>
+                    </div>
+                    <div class="card-group">
+                        <span class="card-label">Deck:</span>
+                        <div class="cards">
+                            <div class="card deck"></div>
+                            <span class="card-count">14</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="team" data-color="orange">
+                <div class="team-players">
+                    <div class="player-box">
+                        <span class="player-name">Player 11</span>
+                        <span class="player-points">18 pts</span>
+                    </div>
+                    <div class="player-box">
+                        <span class="player-name">Player 12</span>
+                        <span class="player-points">17 pts</span>
+                    </div>
+                </div>
+                <div class="team-info">
+                    <div class="team-score">35 pts</div>
+                </div>
+                <div class="team-cards">
+                    <div class="card-group">
+                        <span class="card-label">Hand:</span>
+                        <div class="cards">
+                            <div class="card"></div>
+                            <div class="card"></div>
+                            <div class="card"></div>
+                            <div class="card"></div>
+                            <div class="card"></div>
+                            <div class="card"></div>
+                        </div>
+                    </div>
+                    <div class="card-group">
+                        <span class="card-label">Deck:</span>
+                        <div class="cards">
+                            <div class="card deck"></div>
+                            <span class="card-count">6</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

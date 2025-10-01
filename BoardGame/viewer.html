@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Board Test Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #2c3e50;
+            padding: 20px;
+        }
+
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-group label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .control-group input {
+            padding: 5px 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 100px;
+        }
+
+        .control-group button {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .control-group button:hover {
+            background: #5568d3;
+        }
+
+        .info {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .board-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 700px;
+        }
+
+        .hexagon {
+            width: 700px;
+            height: 700px;
+            position: relative;
+            background: #f8f9fa;
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: visible; /* Changed from hidden to see if hexes are outside */
+        }
+
+        #hexGrid {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+        }
+
+        .hex {
+            position: absolute;
+            background: white;
+            border: 2px solid #000;
+            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+            transform: translate(-50%, -50%);
+        }
+
+        .hex:hover {
+            border-color: #667eea;
+            border-width: 2px;
+            z-index: 10;
+        }
+
+        .hex.starting-location {
+            background: #ffd700;
+            border-color: #ff8c00;
+            border-width: 2px;
+        }
+
+        .hex.high-value {
+            background: #ff6b6b;
+            border-color: #ee5a52;
+            border-width: 2px;
+        }
+
+        .hex.center {
+            background: #51cf66;
+            border-color: #37b24d;
+            border-width: 2px;
+        }
+
+        .hex-inner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 9px;
+            color: #000;
+            pointer-events: none;
+        }
+
+        .debug-info {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .debug-info div {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <div class="control-group">
+            <label>Hex Size (spacing)</label>
+            <input type="number" id="hexSize" value="45" min="10" max="100">
+        </div>
+        <div class="control-group">
+            <label>Visual Width</label>
+            <input type="number" id="hexWidth" value="84" min="10" max="200">
+        </div>
+        <div class="control-group">
+            <label>Visual Height</label>
+            <input type="number" id="hexHeight" value="73" min="10" max="200">
+        </div>
+        <div class="control-group">
+            <button onclick="updateBoard()">Update Board</button>
+        </div>
+        <div class="info">
+            Adjust values and click Update. Hex Size controls spacing, Width/Height control visual size.
+        </div>
+    </div>
+
+    <div class="board-container">
+        <div class="hexagon">
+            <div id="hexGrid"></div>
+        </div>
+    </div>
+
+    <div class="debug-info" id="debugInfo">
+        <div><strong>Debug Info:</strong></div>
+        <div id="debugText">Click Update Board to see info</div>
+    </div>
+
+    <!-- Board Module -->
+    <script src="scripts/board-module.js"></script>
+    
+    <script>
+        let boardModule;
+
+        // Initialize board module
+        if (window.BoardModule) {
+            boardModule = new window.BoardModule();
+            console.log('Board module loaded');
+        }
+
+        function updateBoard() {
+            const hexGrid = document.getElementById('hexGrid');
+            const debugText = document.getElementById('debugText');
+            
+            if (!boardModule) {
+                hexGrid.innerHTML = '<div style="text-align: center; padding: 50px;">Board module not loaded</div>';
+                return;
+            }
+            
+            // Get values from inputs
+            const hexSize = parseInt(document.getElementById('hexSize').value);
+            const hexWidth = parseInt(document.getElementById('hexWidth').value);
+            const hexHeight = parseInt(document.getElementById('hexHeight').value);
+            
+            // Update board module hex size
+            boardModule.hexSize = hexSize;
+            
+            // Clear existing hexes
+            hexGrid.innerHTML = '';
+            
+            // Calculate theoretical bounds
+            const maxX = 5 * 1.5 * hexSize;
+            const maxY = 5 * Math.sqrt(3) * hexSize;
+            
+            // Generate hex coordinates
+            const coordinates = boardModule.generateHexCoordinates();
+            
+            let minX = Infinity, maxXVal = -Infinity;
+            let minY = Infinity, maxYVal = -Infinity;
+            
+            coordinates.forEach(([q, r]) => {
+                const hex = document.createElement('div');
+                const coord = `q${q}r${r}`;
+                
+                // Determine hex class
+                let hexClass = 'hex';
+                const hexType = boardModule.getHexType(q, r);
+                if (hexType !== 'normal') {
+                    hexClass += ` ${hexType}`;
+                }
+                
+                hex.className = hexClass;
+                hex.id = `hex-${q}-${r}`;
+                
+                // Position using hex-to-pixel conversion
+                const [x, y] = boardModule.hexToPixel(q, r);
+                hex.style.left = `${x}px`;
+                hex.style.top = `${y}px`;
+                hex.style.width = `${hexWidth}px`;
+                hex.style.height = `${hexHeight}px`;
+                
+                // Track bounds
+                minX = Math.min(minX, x);
+                maxXVal = Math.max(maxXVal, x);
+                minY = Math.min(minY, y);
+                maxYVal = Math.max(maxYVal, y);
+                
+                // Add coordinate label
+                const hexInner = document.createElement('div');
+                hexInner.className = 'hex-inner';
+                hexInner.textContent = `${q},${r}`;
+                
+                hex.appendChild(hexInner);
+                hexGrid.appendChild(hex);
+            });
+            
+            // Update debug info
+            debugText.innerHTML = `
+                <div><strong>Settings:</strong></div>
+                <div>Hex Size (spacing): ${hexSize}</div>
+                <div>Visual Size: ${hexWidth} × ${hexHeight}</div>
+                <div>Total Hexes: ${coordinates.length}</div>
+                <div></div>
+                <div><strong>Calculated Bounds:</strong></div>
+                <div>X Range: ${minX.toFixed(1)} to ${maxXVal.toFixed(1)} (span: ${(maxXVal - minX).toFixed(1)}px)</div>
+                <div>Y Range: ${minY.toFixed(1)} to ${maxYVal.toFixed(1)} (span: ${(maxYVal - minY).toFixed(1)}px)</div>
+                <div>Board Size: 700 × 700px</div>
+                <div></div>
+                <div><strong>Recommendations:</strong></div>
+                <div>Horizontal spacing: ${(hexSize * 1.5).toFixed(1)}px</div>
+                <div>Vertical spacing: ${(hexSize * Math.sqrt(3)).toFixed(1)}px</div>
+                <div>Suggested visual width: ${(hexSize * 1.8).toFixed(0)}px (90% of 2×size)</div>
+                <div>Suggested visual height: ${(hexSize * 1.56).toFixed(0)}px (90% of √3×size)</div>
+            `;
+        }
+
+        // Initial render
+        updateBoard();
+    </script>
+</body>
+</html>
