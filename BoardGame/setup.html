@@ -1,13 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tournament Setup</title>
-    
-    <!-- Load firebase-loader.js for authentication -->
     <script src="scripts/firebase-loader.js"></script>
-    
+    <script src="scripts/match-scheduler.js"></script>
     <style>
         * {
             margin: 0;
@@ -17,10 +15,10 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #1a1a1a;
-            color: #ffffff;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: white;
             padding: 20px;
-            line-height: 1.6;
         }
 
         .container {
@@ -28,505 +26,741 @@
             margin: 0 auto;
         }
 
-        h1 {
-            color: #00d4ff;
-            margin-bottom: 10px;
-            font-size: 32px;
-        }
-
-        .subtitle {
-            color: #888;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
-
-        .status {
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            font-weight: 500;
-        }
-
-        .status.success { background: #10b981; color: white; }
-        .status.error { background: #ef4444; color: white; }
-        .status.warning { background: #f59e0b; color: white; }
-        .status.info { background: #3b82f6; color: white; }
-
-        .step-container {
-            display: none;
-        }
-
-        .step-container.active {
-            display: block;
-        }
-
-        .section {
-            background: #2a2a2a;
-            padding: 25px;
-            border-radius: 12px;
-            border: 2px solid #333;
-            margin-bottom: 20px;
-        }
-
-        .section h2 {
-            color: #00d4ff;
-            margin-bottom: 20px;
-            font-size: 22px;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 5px;
-            color: #aaa;
-            font-size: 14px;
-        }
-
-        input, select {
-            width: 100%;
-            padding: 10px;
-            background: #1a1a1a;
-            border: 2px solid #444;
-            border-radius: 6px;
-            color: white;
-            font-size: 14px;
-        }
-
-        input:focus, select:focus {
-            outline: none;
-            border-color: #00d4ff;
-        }
-
-        button {
-            padding: 12px 24px;
-            background: #00d4ff;
-            border: none;
-            border-radius: 6px;
-            color: #1a1a1a;
-            font-weight: 600;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s;
-        }
-
-        button:hover {
-            background: #00b8e6;
-            transform: translateY(-2px);
-        }
-
-        button.secondary {
-            background: #666;
-            color: white;
-        }
-
-        button.secondary:hover {
-            background: #777;
-        }
-
-        .button-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
-
-        .game-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .game-item {
-            background: #1a1a1a;
-            padding: 15px;
-            border-radius: 8px;
-            border: 2px solid #444;
+        .header {
             text-align: center;
-            cursor: pointer;
-            transition: all 0.3s;
+            margin-bottom: 40px;
         }
 
-        .game-item:hover {
-            border-color: #00d4ff;
-        }
-
-        .game-item.selected {
-            border-color: #00d4ff;
-            background: #2d3748;
-        }
-
-        .game-item.custom {
-            border-style: dashed;
-        }
-
-        .teams-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
-        }
-
-        .team-card {
-            background: #1a1a1a;
-            padding: 15px;
-            border-radius: 8px;
-            border-left: 4px solid;
-        }
-
-        .team-card.blue { border-color: #3b82f6; }
-        .team-card.red { border-color: #ef4444; }
-        .team-card.green { border-color: #10b981; }
-        .team-card.yellow { border-color: #f59e0b; }
-        .team-card.purple { border-color: #a855f7; }
-        .team-card.orange { border-color: #f97316; }
-
-        .team-card h3 {
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             margin-bottom: 10px;
         }
 
-        .player-list {
-            list-style: none;
-            padding-left: 0;
+        .header p {
+            color: #94a3b8;
+            font-size: 1.1rem;
         }
 
-        .player-list li {
-            padding: 5px 0;
-            color: #aaa;
-        }
-
-        .color-selector {
-            display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 8px;
-            margin-top: 8px;
-        }
-
-        .color-option {
-            padding: 10px;
-            border-radius: 6px;
-            border: 2px solid transparent;
-            cursor: pointer;
-            text-align: center;
-            font-size: 12px;
-            transition: all 0.2s;
-        }
-
-        .color-option:hover {
-            border-color: white;
-        }
-
-        .color-option.selected {
-            border-color: #00d4ff;
-            box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
-        }
-
-        .player-inputs {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .match-preview {
-            background: #1a1a1a;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            border-left: 3px solid #00d4ff;
-        }
-
-        .match-preview h4 {
-            color: #00d4ff;
-            margin-bottom: 8px;
-        }
-
-        .progress-bar {
+        /* Progress Steps */
+        .progress-steps {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 30px;
+            margin-bottom: 50px;
             position: relative;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
         }
 
-        .progress-bar::before {
-            content: '';
+        .progress-line {
             position: absolute;
-            top: 20px;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: #444;
+            top: 25px;
+            left: 50px;
+            right: 50px;
+            height: 3px;
+            background: #334155;
             z-index: 0;
         }
 
-        .progress-step {
-            background: #2a2a2a;
-            padding: 10px 20px;
-            border-radius: 8px;
-            border: 2px solid #444;
-            position: relative;
+        .progress-line-fill {
+            position: absolute;
+            top: 25px;
+            left: 50px;
+            height: 3px;
+            background: linear-gradient(90deg, #06b6d4 0%, #a855f7 100%);
+            transition: width 0.5s ease;
             z-index: 1;
         }
 
-        .progress-step.active {
-            border-color: #00d4ff;
-            color: #00d4ff;
+        .progress-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 2;
         }
 
-        .progress-step.completed {
-            border-color: #10b981;
-            color: #10b981;
-        }
-
-        .match-format {
-            margin-top: 15px;
-        }
-
-        .match-format label {
+        .progress-circle {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #334155;
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 10px;
-            background: #1a1a1a;
-            border-radius: 6px;
+            justify-content: center;
+            font-size: 1.5rem;
+            transition: all 0.3s ease;
+            margin-bottom: 10px;
+        }
+
+        .progress-circle.active {
+            background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);
+            transform: scale(1.2);
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.5);
+        }
+
+        .progress-circle.completed {
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+        }
+
+        .progress-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #94a3b8;
+        }
+
+        .progress-label.active {
+            color: #06b6d4;
+        }
+
+        /* Step Content */
+        .step-content {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 40px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            min-height: 500px;
+            margin-bottom: 30px;
+        }
+
+        .step {
+            display: none;
+        }
+
+        .step.active {
+            display: block;
+            animation: fadeInUp 0.5s ease;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .step-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        /* Games Grid */
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .game-card {
+            background: rgba(51, 65, 85, 0.5);
+            border: 2px solid transparent;
+            border-radius: 15px;
+            padding: 30px;
             cursor: pointer;
-            margin-bottom: 8px;
+            transition: all 0.3s ease;
+            text-align: center;
+            position: relative;
         }
 
-        .match-format input[type="radio"] {
-            width: auto;
+        .game-card:hover {
+            border-color: #475569;
+            transform: translateY(-5px);
         }
 
-        .floating-logout {
-            position: fixed;
-            top: 20px;
-            left: 0;
-            z-index: 9999;
-            padding: 10px 15px;
-            background-color: #ef4444;
+        .game-card.selected {
+            border-color: #06b6d4;
+            background: rgba(6, 182, 212, 0.2);
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+        }
+
+        .game-card.custom {
+            border-style: dashed;
+        }
+
+        .game-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .game-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .remove-game {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #ef4444;
             color: white;
             border: none;
-            border-radius: 0 6px 6px 0;
-            font-weight: bold;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
             cursor: pointer;
-            box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
-            transform: translateX(-90%);
-            transition: transform 0.2s;
+            display: none;
+            font-size: 1rem;
+            line-height: 1;
         }
 
-        .floating-logout:hover {
-            transform: translateX(0);
+        .game-card.custom:hover .remove-game {
+            display: block;
+        }
+
+        /* Teams */
+        .teams-container {
+            display: grid;
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .team-card {
+            background: rgba(51, 65, 85, 0.5);
+            border-radius: 15px;
+            padding: 25px;
+            border-left: 5px solid;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr auto;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input {
+            padding: 12px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #06b6d4;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(6, 182, 212, 0.3);
+        }
+
+        .btn-secondary {
+            background: #475569;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+        }
+
+        /* Spell Cards */
+        .spell-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .spell-card {
+            background: rgba(51, 65, 85, 0.5);
+            border: 2px solid #a855f7;
+            border-radius: 15px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+
+        .spell-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(168, 85, 247, 0.3);
+        }
+
+        .spell-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+
+        .spell-card-title {
+            font-weight: 700;
+            color: #e9d5ff;
+            font-size: 1.1rem;
+            flex: 1;
+        }
+
+        .spell-card-description {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #cbd5e1;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #94a3b8;
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        /* Match Schedule */
+        .match-list {
+            max-height: 500px;
+            overflow-y: auto;
+            margin-top: 30px;
+        }
+
+        .match-item {
+            background: rgba(51, 65, 85, 0.5);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+
+        .match-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .match-game {
+            font-weight: bold;
+            color: #06b6d4;
+        }
+
+        .match-id {
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+
+        .split-info {
+            background: rgba(255, 215, 0, 0.1);
+            padding: 8px 12px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            border-left: 3px solid #ffd700;
+            font-size: 0.9rem;
+        }
+
+        .match-teams {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .team-side {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .team-badge {
+            padding: 6px 16px;
+            border-radius: 20px;
+            border: 2px solid;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .split-player {
+            padding: 6px 12px;
+            background: rgba(255, 215, 0, 0.2);
+            border: 2px dashed #ffd700;
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .vs {
+            font-weight: bold;
+            color: #06b6d4;
+            font-size: 1.2rem;
+        }
+
+        /* Summary */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .summary-card {
+            background: rgba(51, 65, 85, 0.5);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .summary-number {
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .summary-label {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+
+        /* Navigation */
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        .custom-game-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(51, 65, 85, 0.5);
+            border-radius: 15px;
+        }
+
+        .custom-game-section h3 {
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .custom-game-input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .custom-game-input-group input {
+            flex: 1;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(51, 65, 85, 0.5);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);
+            border-radius: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .team-card {
+                grid-template-columns: 1fr;
+            }
+            
+            .summary-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
     </style>
 </head>
 <body>
-    <!-- Content wrapper with id="content" for restrict-access.js -->
     <div id="content" class="container" style="display:none">
-        <button id="logoutBtn" class="floating-logout">Logout</button>
-
-        <h1>Tournament Setup</h1>
-        <p class="subtitle">Configure games, teams, and generate match schedule</p>
-
-        <div id="status" class="status warning">Connecting to Firebase...</div>
-
-        <div class="progress-bar">
-            <div class="progress-step active" id="step1-indicator">1. Games</div>
-            <div class="progress-step" id="step2-indicator">2. Teams</div>
-            <div class="progress-step" id="step3-indicator">3. Schedule</div>
-            <div class="progress-step" id="step4-indicator">4. Upload</div>
+        <div class="header">
+            <h1>Tournament Setup</h1>
+            <p>Create your epic gaming tournament</p>
         </div>
 
-        <!-- Step 1: Select Games -->
-        <div id="step1" class="step-container active">
-            <div class="section">
-                <h2>Step 1: Select Games</h2>
-                <p style="color: #aaa; margin-bottom: 15px;">Choose which games will be played in the tournament</p>
-                
-                <div class="game-grid" id="gameGrid">
-                    <!-- Games will be populated here -->
-                </div>
-
-                <div class="form-group" style="margin-top: 20px;">
-                    <label>Add Custom Game</label>
-                    <input type="text" id="customGameInput" placeholder="Enter game name">
-                    <button onclick="addCustomGame()" style="margin-top: 10px;" class="secondary">Add Custom Game</button>
-                </div>
-
-                <div class="button-group">
-                    <button onclick="nextStep(2)">Next: Teams</button>
-                </div>
+        <!-- Progress Steps -->
+        <div class="progress-steps">
+            <div class="progress-line"></div>
+            <div class="progress-line-fill" id="progressFill"></div>
+            
+            <div class="progress-step" data-step="1">
+                <div class="progress-circle active" id="circle1">🎮</div>
+                <span class="progress-label active">Pelit</span>
+            </div>
+            <div class="progress-step" data-step="2">
+                <div class="progress-circle" id="circle2">👥</div>
+                <span class="progress-label">Tiimit</span>
+            </div>
+            <div class="progress-step" data-step="3">
+                <div class="progress-circle" id="circle3">✨</div>
+                <span class="progress-label">Loitsut</span>
+            </div>
+            <div class="progress-step" data-step="4">
+                <div class="progress-circle" id="circle4">📅</div>
+                <span class="progress-label">Aikataulu</span>
+            </div>
+            <div class="progress-step" data-step="5">
+                <div class="progress-circle" id="circle5">🚀</div>
+                <span class="progress-label">Käynnistä</span>
             </div>
         </div>
 
-        <!-- Step 2: Teams & Players -->
-        <div id="step2" class="step-container">
-            <div class="section">
-                <h2>Step 2: Teams & Players</h2>
-                <p style="color: #aaa; margin-bottom: 15px;">Add teams and their permanent rosters (cannot be changed during tournament)</p>
-                
-                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px;">
-                    <div>
-                        <h3 style="margin-bottom: 15px;">Add Team</h3>
-                        <div class="form-group">
-                            <label>Team Name *</label>
-                            <input type="text" id="teamName" placeholder="Team Alpha">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Team Color</label>
-                            <div class="color-selector">
-                                <div class="color-option selected" data-color="blue" style="background: #3b82f6;" onclick="selectTeamColor('blue')">Blue</div>
-                                <div class="color-option" data-color="red" style="background: #ef4444;" onclick="selectTeamColor('red')">Red</div>
-                                <div class="color-option" data-color="green" style="background: #10b981;" onclick="selectTeamColor('green')">Green</div>
-                                <div class="color-option" data-color="yellow" style="background: #f59e0b;" onclick="selectTeamColor('yellow')">Yellow</div>
-                                <div class="color-option" data-color="purple" style="background: #a855f7;" onclick="selectTeamColor('purple')">Purple</div>
-                                <div class="color-option" data-color="orange" style="background: #f97316;" onclick="selectTeamColor('orange')">Orange</div>
-                            </div>
-                        </div>
+        <div class="step-content">
+            <!-- Step 1: Select Games -->
+            <div class="step active" id="step1">
+                <h2 class="step-title">
+                    <span>🎮</span>
+                    Valitse Pelit
+                </h2>
+                <p style="color: #94a3b8; margin-bottom: 20px;">
+                    Valitse mitkä pelit pelataan turnauksessa
+                </p>
 
-                        <div class="form-group">
-                            <label>Players (2 per team) *</label>
-                            <div class="player-inputs">
-                                <input type="text" id="player1" placeholder="Player 1">
-                                <input type="text" id="player2" placeholder="Player 2">
-                            </div>
-                        </div>
+                <div class="games-grid" id="gamesGrid"></div>
 
-                        <button onclick="addTeam()">Add Team</button>
-                    </div>
-
-                    <div>
-                        <h3 style="margin-bottom: 15px;">Teams (<span id="teamCount">0</span>)</h3>
-                        <div class="teams-grid" id="teamsGrid"></div>
+                <!-- Custom Game Section -->
+                <div class="custom-game-section">
+                    <h3>Lisää Oma Peli</h3>
+                    <div class="custom-game-input-group">
+                        <input type="text" id="customGameInput" placeholder="Syötä pelin nimi..." 
+                               style="padding: 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white; font-size: 1rem;">
+                        <button class="btn" onclick="addCustomGame()">
+                            Lisää Peli
+                        </button>
                     </div>
                 </div>
 
-                <div class="button-group">
-                    <button onclick="prevStep(1)" class="secondary">Back</button>
-                    <button onclick="nextStep(3)">Next: Schedule</button>
+                <div class="error-message" id="error1">
+                    Valitse vähintään yksi peli
                 </div>
             </div>
-        </div>
 
-        <!-- Step 3: Match Schedule -->
-        <div id="step3" class="step-container">
-            <div class="section">
-                <h2>Step 3: Generate Match Schedule</h2>
-                <p style="color: #aaa; margin-bottom: 15px;">Configure and preview the tournament schedule</p>
+            <!-- Step 2: Create Teams -->
+            <div class="step" id="step2">
+                <h2 class="step-title">
+                    <span>👥</span>
+                    Luo Tiimit
+                </h2>
+                <p style="color: #94a3b8; margin-bottom: 20px;">
+                    Lisää tiimejä, 2 pelaajaa per tiimi
+                </p>
+                <button class="btn" onclick="addTeam()" style="margin-bottom: 20px;">
+                    Lisää Tiimi
+                </button>
+
+                <div class="teams-container" id="teamsContainer"></div>
+
+                <div class="error-message" id="error2">
+                    Lisää vähintään 3 tiimiä, joissa kaikilla on täydet nimet
+                </div>
+            </div>
+
+            <!-- Step 3: Spell Cards -->
+            <div class="step" id="step3">
+                <h2 class="step-title">
+                    <span>✨</span>
+                    Loitsukortit
+                </h2>
+                <p style="color: #94a3b8; margin-bottom: 20px;">
+                    Tarkista turnauksen saatavilla olevat loitsukortit
+                </p>
+
+                <div class="spell-cards-grid" id="spellCardsGrid">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🔮</div>
+                        <p>Ladataan loitsukortteja...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4: Match Schedule -->
+            <div class="step" id="step4">
+                <h2 class="step-title">
+                    <span>📅</span>
+                    Peli-aikataulu
+                </h2>
+                
+                <div class="form-group" style="max-width: 400px; margin-bottom: 20px;">
+                    <label>Kokonaismäärä Pelejä</label>
+                    <input type="number" id="totalMatches" min="5" max="100" value="15" placeholder="esim. 15">
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <button class="btn" onclick="generateMatches()">
+                        Luo Aikataulu
+                    </button>
+                </div>
+
+                <div class="match-list" id="matchList">
+                    <p style="text-align:center;color:#94a3b8;">Klikkaa "Luo Aikataulu" luodaksesi ottelut</p>
+                </div>
+
+                <div class="error-message" id="error4">
+                    Luo ensin ottelut
+                </div>
+            </div>
+
+            <!-- Step 5: Summary & Upload -->
+            <div class="step" id="step5">
+                <h2 class="step-title">
+                    <span>🚀</span>
+                    Käynnistä Turnaus
+                </h2>
+
+                <div class="summary-grid">
+                    <div class="summary-card">
+                        <div class="summary-number" id="summaryGames">0</div>
+                        <div class="summary-label">Peliä</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-number" id="summaryTeams">0</div>
+                        <div class="summary-label">Tiimiä</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-number" id="summaryMatches">0</div>
+                        <div class="summary-label">Ottelua</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-number" id="summarySpells">0</div>
+                        <div class="summary-label">Loitsua</div>
+                    </div>
+                </div>
 
                 <div class="form-group">
-                    <label>Match Format</label>
-                    <div class="match-format">
-                        <label>
-                            <input type="radio" name="matchFormat" value="round-robin" checked>
-                            Round Robin (Every team plays every other team)
-                        </label>
-                        <label>
-                            <input type="radio" name="matchFormat" value="random">
-                            Random Matchups (Shuffle and pair teams)
-                        </label>
-                    </div>
+                    <label>Turnaus ID</label>
+                    <input type="text" id="gameId" placeholder="esim. lan-2025-talvi">
                 </div>
 
-                <button onclick="generateMatches()">Generate Schedule</button>
-
-                <div id="matchPreview" style="margin-top: 20px;"></div>
-
-                <div class="button-group">
-                    <button onclick="prevStep(2)" class="secondary">Back</button>
-                    <button onclick="nextStep(4)">Next: Upload</button>
+                <div class="form-group">
+                    <label>Voittoehto (Pisteet)</label>
+                    <input type="number" id="winCondition" value="50" min="10" max="200">
                 </div>
+
+                <button class="btn" style="width: 100%; margin-top: 30px; padding: 20px; font-size: 1.2rem;" onclick="uploadTournament()">
+                    Luo Turnaus
+                </button>
             </div>
         </div>
 
-        <!-- Step 4: Upload -->
-        <div id="step4" class="step-container">
-            <div class="section">
-                <h2>Step 4: Upload Tournament Data</h2>
-                <p style="color: #aaa; margin-bottom: 15px;">Review and upload to Firebase</p>
-
-                <div class="form-group">
-                    <label>Tournament ID</label>
-                    <input type="text" id="tournamentId" value="tournament_2025" placeholder="tournament_2025">
-                </div>
-
-                <div id="finalPreview" style="background: #1a1a1a; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                    <h3 style="margin-bottom: 10px;">Summary:</h3>
-                    <p id="summaryText"></p>
-                </div>
-
-                <div class="button-group">
-                    <button onclick="prevStep(3)" class="secondary">Back</button>
-                    <button onclick="uploadTournament()">Upload to Firebase</button>
-                </div>
-            </div>
+        <!-- Navigation -->
+        <div class="navigation">
+            <button class="btn btn-secondary" id="prevBtn" onclick="prevStep()" style="display:none;">
+                Edellinen
+            </button>
+            <button class="btn" id="nextBtn" onclick="nextStep()">
+                Seuraava
+            </button>
         </div>
     </div>
 
     <script>
-        let db;
+        let currentStep = 1;
         let selectedGames = [];
-        let customGames = [];
         let teams = [];
         let matches = [];
-        let selectedTeamColor = 'blue';
+        let spellCards = [];
+        let db;
 
-        const defaultGames = [
-            'Counter-Strike 2',
-            'StarCraft II',
-            'Predecessor',
-            'Dota 2',
-            'League of Legends',
-            'Valorant',
-            'Rocket League',
-            'Overwatch 2',
-            'Rainbow Six Siege',
-            'Apex Legends'
+        const games = [
+            { id: 'cs2', name: 'Counter-Strike 2', icon: '🎯' },
+            { id: 'sc2', name: 'StarCraft II', icon: '⚔️' },
+            { id: 'predecessor', name: 'Predecessor', icon: '🏆' },
+            { id: 'dota2', name: 'Dota 2', icon: '🐉' },
+            { id: 'lol', name: 'League of Legends', icon: '⚡' },
+            { id: 'valorant', name: 'Valorant', icon: '💥' },
         ];
 
-        // Wait for firebase-ready event before initializing
-        document.addEventListener('firebase-ready', function() {
-            console.log("Firebase ready, initializing setup...");
-            
+        const teamColors = [
+            { id: 'red', hex: '#ef4444' },
+            { id: 'blue', hex: '#3b82f6' },
+            { id: 'green', hex: '#10b981' },
+            { id: 'yellow', hex: '#f59e0b' },
+            { id: 'purple', hex: '#a855f7' },
+            { id: 'orange', hex: '#f97316' },
+        ];
+
+        document.addEventListener('firebase-ready', () => {
             db = firebase.firestore();
-            
-            showStatus('Firebase connected successfully!', 'success');
-            renderGames();
-            
-            // Set up logout button
-            document.getElementById('logoutBtn').addEventListener('click', () => {
-                firebase.auth().signOut().then(() => {
-                    window.location.href = 'index.html';
-                }).catch(err => console.error('Logout error:', err));
-            });
+            initializeSetup();
         });
 
-        function showStatus(message, type = 'info') {
-            const status = document.getElementById('status');
-            status.textContent = message;
-            status.className = `status ${type}`;
+        function initializeSetup() {
+            renderGames();
+            loadSpellCards();
+            updateProgress();
         }
 
         function renderGames() {
-            const grid = document.getElementById('gameGrid');
-            const allGames = [...defaultGames, ...customGames];
-            
-            grid.innerHTML = allGames.map(game => `
-                <div class="game-item ${selectedGames.includes(game) ? 'selected' : ''} ${customGames.includes(game) ? 'custom' : ''}" 
-                     onclick="toggleGame('${game}')">
-                    ${game}
+            const grid = document.getElementById('gamesGrid');
+            grid.innerHTML = games.map(game => `
+                <div class="game-card ${selectedGames.includes(game.id) ? 'selected' : ''} ${game.custom ? 'custom' : ''}" 
+                     onclick="toggleGame('${game.id}')">
+                    ${game.custom ? `<button class="remove-game" onclick="event.stopPropagation(); removeGame('${game.id}')">×</button>` : ''}
+                    <div class="game-icon">${game.icon}</div>
+                    <div class="game-name">${game.name}</div>
                 </div>
             `).join('');
         }
 
-        function toggleGame(game) {
-            const index = selectedGames.indexOf(game);
-            if (index > -1) {
-                selectedGames.splice(index, 1);
+        function toggleGame(gameId) {
+            if (selectedGames.includes(gameId)) {
+                selectedGames = selectedGames.filter(id => id !== gameId);
             } else {
-                selectedGames.push(game);
+                selectedGames.push(gameId);
             }
             renderGames();
         }
@@ -536,239 +770,375 @@
             const gameName = input.value.trim();
             
             if (!gameName) {
-                showStatus('Please enter a game name', 'error');
+                alert('Syötä pelin nimi');
                 return;
             }
             
-            if (customGames.includes(gameName) || defaultGames.includes(gameName)) {
-                showStatus('Game already exists', 'error');
+            if (games.some(g => g.name.toLowerCase() === gameName.toLowerCase())) {
+                alert('Tämä peli on jo olemassa');
                 return;
             }
             
-            customGames.push(gameName);
-            selectedGames.push(gameName);
+            const emojis = ['🎮', '🎯', '⚔️', '🏆', '🎲', '🃏', '🎪', '🎨', '🎭', '🎬'];
+            const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+            
+            const customGame = {
+                id: `custom-${Date.now()}`,
+                name: gameName,
+                icon: randomEmoji,
+                custom: true
+            };
+            
+            games.push(customGame);
+            selectedGames.push(customGame.id);
+            
             input.value = '';
             renderGames();
-            showStatus('Custom game added', 'success');
         }
 
-        function selectTeamColor(color) {
-            selectedTeamColor = color;
-            document.querySelectorAll('.color-option').forEach(opt => {
-                opt.classList.remove('selected');
-            });
-            document.querySelector(`[data-color="${color}"]`).classList.add('selected');
+        function removeGame(gameId) {
+            const gameIndex = games.findIndex(g => g.id === gameId);
+            if (gameIndex > -1) {
+                games.splice(gameIndex, 1);
+                selectedGames = selectedGames.filter(id => id !== gameId);
+                renderGames();
+            }
         }
 
         function addTeam() {
-            const name = document.getElementById('teamName').value.trim();
-            const player1 = document.getElementById('player1').value.trim();
-            const player2 = document.getElementById('player2').value.trim();
-
-            if (!name || !player1 || !player2) {
-                showStatus('Team name and both players are required', 'error');
-                return;
-            }
-
-            const team = {
-                id: `team${teams.length + 1}`,
-                name,
-                color: selectedTeamColor,
+            const teamId = teams.length + 1;
+            const color = teamColors[teams.length % teamColors.length];
+            
+            teams.push({
+                id: teamId,
+                name: `Tiimi ${teamId}`,
+                color: color.id,
                 players: [
-                    { name: player1, points: 0 },
-                    { name: player2, points: 0 }
+                    { name: '', points: 0 },
+                    { name: '', points: 0 }
                 ],
                 points: 0,
-                gamesWon: 0
-            };
-
-            teams.push(team);
+                gamesWon: 0,
+            });
+            
             renderTeams();
-            showStatus(`Team "${name}" added`, 'success');
-
-            // Clear inputs
-            document.getElementById('teamName').value = '';
-            document.getElementById('player1').value = '';
-            document.getElementById('player2').value = '';
         }
 
         function renderTeams() {
-            const grid = document.getElementById('teamsGrid');
-            document.getElementById('teamCount').textContent = teams.length;
+            const container = document.getElementById('teamsContainer');
+            container.innerHTML = teams.map((team, idx) => {
+                const colorHex = teamColors.find(c => c.id === team.color)?.hex || '#666';
+                return `
+                    <div class="team-card" style="border-left-color: ${colorHex}">
+                        <div class="form-group">
+                            <label>Tiimin Nimi</label>
+                            <input type="text" value="${team.name}" 
+                                   oninput="updateTeam(${idx}, 'name', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label>Pelaaja 1</label>
+                            <input type="text" value="${team.players[0].name}" 
+                                   oninput="updateTeam(${idx}, 'player1', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label>Pelaaja 2</label>
+                            <input type="text" value="${team.players[1].name}" 
+                                   oninput="updateTeam(${idx}, 'player2', this.value)">
+                        </div>
+                        <button class="btn btn-danger" onclick="removeTeam(${idx})">🗑️</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateTeam(idx, field, value) {
+            if (field === 'name') {
+                teams[idx].name = value;
+            } else if (field === 'player1') {
+                teams[idx].players[0].name = value;
+            } else if (field === 'player2') {
+                teams[idx].players[1].name = value;
+            }
+        }
+
+        function removeTeam(idx) {
+            teams.splice(idx, 1);
+            renderTeams();
+        }
+
+        async function loadSpellCards() {
+            const container = document.getElementById('spellCardsGrid');
             
-            grid.innerHTML = teams.map(team => `
-                <div class="team-card ${team.color}">
-                    <h3>${team.name}</h3>
-                    <ul class="player-list">
-                        ${team.players.map(p => `<li>• ${p.name}</li>`).join('')}
-                    </ul>
+            try {
+                const snapshot = await db.collection('spellCards').get();
+                
+                if (snapshot.empty) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🔮</div>
+                            <p>Firebasessa ei ole vielä loitsukortteja.</p>
+                            <p style="font-size: 0.9rem; color: #64748b; margin-top: 10px;">
+                                Loitsukortit näytetään täällä, kun admin lisää niitä.
+                            </p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                spellCards = [];
+                snapshot.forEach(doc => {
+                    spellCards.push({ id: doc.id, ...doc.data() });
+                });
+
+                renderSpellCards();
+
+            } catch (error) {
+                console.error('Virhe loitsukorttien lataamisessa:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <p style="color: #ef4444;">Virhe loitsukorttien lataamisessa</p>
+                    </div>
+                `;
+            }
+        }
+
+        function renderSpellCards() {
+            const grid = document.getElementById('spellCardsGrid');
+            grid.innerHTML = spellCards.map(card => `
+                <div class="spell-card">
+                    <div class="spell-card-header">
+                        <div class="spell-card-title">${card.name || 'Nimetön Loitsu'}</div>
+                    </div>
+                    <div class="spell-card-description">${card.description || 'Ei kuvausta saatavilla'}</div>
                 </div>
             `).join('');
         }
 
         function generateMatches() {
             if (selectedGames.length === 0) {
-                showStatus('Please select at least one game', 'error');
+                alert('Valitse vähintään yksi peli');
                 return;
             }
 
-            if (teams.length < 2) {
-                showStatus('Please add at least 2 teams', 'error');
+            if (teams.length < 3) {
+                alert('Tarvitaan vähintään 3 tiimiä kiertävälle split-tiimi systeemille');
                 return;
             }
 
-            const format = document.querySelector('input[name="matchFormat"]:checked').value;
-            matches = [];
+            const totalMatchesInput = parseInt(document.getElementById('totalMatches').value) || 15;
+            const selectedGameNames = selectedGames.map(id => games.find(g => g.id === id).name);
 
-            if (format === 'round-robin') {
-                // Generate round-robin matches
-                for (let i = 0; i < teams.length; i++) {
-                    for (let j = i + 1; j < teams.length; j++) {
-                        for (const game of selectedGames) {
-                            matches.push({
-                                game,
-                                team1: teams[i].id,
-                                team1Name: teams[i].name,
-                                team2: teams[j].id,
-                                team2Name: teams[j].name,
-                                status: 'waiting',
-                                round: matches.length + 1
-                            });
-                        }
-                    }
+            try {
+                const scheduler = new MatchScheduler(teams, selectedGameNames);
+                matches = scheduler.generateRotatingSplitTeam({
+                    maxConsecutiveGames: 3,
+                    totalMatches: totalMatchesInput
+                });
+
+                const validation = scheduler.validate();
+                if (!validation.valid) {
+                    alert('Aikataulun validointi epäonnistui: ' + validation.errors.join(', '));
+                    return;
                 }
-            } else {
-                // Random matchups
-                const shuffledTeams = [...teams].sort(() => Math.random() - 0.5);
-                for (const game of selectedGames) {
-                    for (let i = 0; i < shuffledTeams.length - 1; i += 2) {
-                        if (shuffledTeams[i + 1]) {
-                            matches.push({
-                                game,
-                                team1: shuffledTeams[i].id,
-                                team1Name: shuffledTeams[i].name,
-                                team2: shuffledTeams[i + 1].id,
-                                team2Name: shuffledTeams[i + 1].name,
-                                status: 'waiting',
-                                round: matches.length + 1
-                            });
-                        }
-                    }
-                }
+
+                renderMatches();
+                console.log(scheduler.previewSchedule());
+
+            } catch (error) {
+                alert('Virhe otteluiden luomisessa: ' + error.message);
+                console.error(error);
             }
-
-            renderMatchPreview();
-            showStatus(`Generated ${matches.length} matches`, 'success');
         }
 
-        function renderMatchPreview() {
-            const preview = document.getElementById('matchPreview');
+        function renderMatches() {
+            const list = document.getElementById('matchList');
+            if (matches.length === 0) {
+                list.innerHTML = '<p style="text-align:center;color:#94a3b8;">Klikkaa "Luo Aikataulu" luodaksesi ottelut</p>';
+                return;
+            }
             
-            preview.innerHTML = `
-                <h3 style="margin-bottom: 15px;">Match Schedule (${matches.length} matches)</h3>
-                ${matches.map((match, i) => `
-                    <div class="match-preview">
-                        <h4>Match ${i + 1}: ${match.game}</h4>
-                        <p>${match.team1Name} vs ${match.team2Name}</p>
+            const firstThreeRounds = [...new Set(matches.map(m => m.round))].slice(0, 3);
+            
+            list.innerHTML = firstThreeRounds.map(round => {
+                const roundMatches = matches.filter(m => m.round === round);
+                return `
+                    <div style="margin-bottom: 30px;">
+                        <h3 style="color: #06b6d4; margin-bottom: 15px;">Kierros ${round}</h3>
+                        ${roundMatches.map(match => {
+                            const gameSeq = match.gameSequence ? `(#${match.gameSequence})` : '';
+                            return `
+                                <div class="match-item">
+                                    <div class="match-header">
+                                        <span class="match-game">${match.game} ${gameSeq}</span>
+                                        <span class="match-id">Ottelu #${match.id}</span>
+                                    </div>
+                                    <div class="split-info">
+                                        Jaettu Tiimi: ${match.splitTeam.name}
+                                    </div>
+                                    <div class="match-teams">
+                                        <div class="team-side">
+                                            <strong>TIIMI_A:</strong>
+                                            ${match.teamA.teams.map(t => {
+                                                const colorHex = teamColors.find(c => c.id === t.color)?.hex || '#666';
+                                                return `<span class="team-badge" style="border-color: ${colorHex}; color: ${colorHex};">${t.name}</span>`;
+                                            }).join(' + ')}
+                                            <span class="split-player">+ Jaettu Pelaaja</span>
+                                        </div>
+                                        <div class="vs">VS</div>
+                                        <div class="team-side">
+                                            <strong>TIIMI_B:</strong>
+                                            ${match.teamB.teams.map(t => {
+                                                const colorHex = teamColors.find(c => c.id === t.color)?.hex || '#666';
+                                                return `<span class="team-badge" style="border-color: ${colorHex}; color: ${colorHex};">${t.name}</span>`;
+                                            }).join(' + ')}
+                                            <span class="split-player">+ Jaettu Pelaaja</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
-                `).join('')}
-            `;
-        }
+                `;
+            }).join('');
 
-        function nextStep(step) {
-            // Validation
-            if (step === 2 && selectedGames.length === 0) {
-                showStatus('Please select at least one game', 'error');
-                return;
-            }
-            if (step === 3 && teams.length < 2) {
-                showStatus('Please add at least 2 teams', 'error');
-                return;
-            }
-            if (step === 4 && matches.length === 0) {
-                showStatus('Please generate matches first', 'error');
-                return;
-            }
-
-            // Hide all steps
-            document.querySelectorAll('.step-container').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.progress-step').forEach(el => {
-                el.classList.remove('active');
-            });
-
-            // Show current step
-            document.getElementById(`step${step}`).classList.add('active');
-            document.getElementById(`step${step}-indicator`).classList.add('active');
-
-            // Mark previous steps as completed
-            for (let i = 1; i < step; i++) {
-                document.getElementById(`step${i}-indicator`).classList.add('completed');
-            }
-
-            // Update summary if on final step
-            if (step === 4) {
-                document.getElementById('summaryText').innerHTML = `
-                    <strong>Games:</strong> ${selectedGames.length}<br>
-                    <strong>Teams:</strong> ${teams.length}<br>
-                    <strong>Matches:</strong> ${matches.length}<br>
-                    <strong>Players:</strong> ${teams.length * 2}
+            const totalRounds = [...new Set(matches.map(m => m.round))].length;
+            if (totalRounds > 3) {
+                list.innerHTML += `
+                    <p style="text-align: center; color: #64748b; margin-top: 20px;">
+                        ... ja ${totalRounds - 3} kierrosta lisää (${matches.length - roundMatches.length} ottelua)
+                    </p>
                 `;
             }
         }
 
-        function prevStep(step) {
-            nextStep(step);
+        function nextStep() {
+            if (!validateStep()) return;
+            
+            if (currentStep < 5) {
+                currentStep++;
+                updateStepDisplay();
+                updateProgress();
+            }
         }
 
-        function uploadTournament() {
-            const tournamentId = document.getElementById('tournamentId').value.trim();
+        function prevStep() {
+            if (currentStep > 1) {
+                currentStep--;
+                updateStepDisplay();
+                updateProgress();
+            }
+        }
+
+        function validateStep() {
+            const errorEl = document.getElementById(`error${currentStep}`);
+            if (errorEl) errorEl.classList.remove('show');
             
-            if (!tournamentId) {
-                showStatus('Tournament ID is required', 'error');
+            switch(currentStep) {
+                case 1:
+                    if (selectedGames.length === 0) {
+                        if (errorEl) errorEl.classList.add('show');
+                        return false;
+                    }
+                    break;
+                case 2:
+                    if (teams.length < 3 || teams.some(t => !t.players[0].name || !t.players[1].name)) {
+                        if (errorEl) errorEl.classList.add('show');
+                        return false;
+                    }
+                    break;
+                case 3:
+                    return true;
+                case 4:
+                    if (matches.length === 0) {
+                        if (errorEl) errorEl.classList.add('show');
+                        return false;
+                    }
+                    break;
+                case 5:
+                    return true;
+            }
+            return true;
+        }
+
+        function updateStepDisplay() {
+            document.querySelectorAll('.step').forEach((step, idx) => {
+                step.classList.toggle('active', idx + 1 === currentStep);
+            });
+            
+            document.getElementById('prevBtn').style.display = currentStep === 1 ? 'none' : 'block';
+            document.getElementById('nextBtn').style.display = currentStep === 5 ? 'none' : 'block';
+            
+            if (currentStep === 5) {
+                updateSummary();
+            }
+        }
+
+        function updateProgress() {
+            const progressWidth = ((currentStep - 1) / 4) * 100;
+            document.getElementById('progressFill').style.width = `calc(${progressWidth}% - 100px)`;
+            
+            for (let i = 1; i <= 5; i++) {
+                const circle = document.getElementById(`circle${i}`);
+                circle.classList.toggle('active', i === currentStep);
+                circle.classList.toggle('completed', i < currentStep);
+                
+                const label = document.querySelector(`[data-step="${i}"] .progress-label`);
+                label.classList.toggle('active', i === currentStep);
+            }
+        }
+
+        function updateSummary() {
+            document.getElementById('summaryGames').textContent = selectedGames.length;
+            document.getElementById('summaryTeams').textContent = teams.length;
+            document.getElementById('summaryMatches').textContent = matches.length;
+            document.getElementById('summarySpells').textContent = spellCards.length;
+        }
+
+        async function uploadTournament() {
+            const gameId = document.getElementById('gameId').value.trim();
+            const winCondition = parseInt(document.getElementById('winCondition').value);
+            
+            if (!gameId) {
+                alert('Turnaus ID vaaditaan');
                 return;
             }
 
-            const tournamentData = {
-                tournamentId,
-                games: selectedGames,
-                teams: teams,
-                matches: matches,
-                createdAt: Date.now(),
-                status: 'setup'
-            };
+            const scheduler = new MatchScheduler(teams, selectedGames.map(id => games.find(g => g.id === id).name));
+            const scheduleData = scheduler.exportForFirebase();
 
-            db.collection('tournaments').doc(tournamentId).set(tournamentData)
-                .then(() => {
-                    showStatus('Tournament uploaded successfully!', 'success');
-                    
-                    // Also create initial game state
-                    return db.collection('games').doc(tournamentId).set({
-                        gameId: tournamentId,
-                        name: `Tournament: ${tournamentId}`,
-                        gamePhase: 'setup',
-                        board: {},
-                        teams: teams,
-                        events: [{
-                            timestamp: Date.now(),
-                            text: 'Tournament created'
-                        }],
-                        upcomingMatches: matches,
-                        createdAt: Date.now()
-                    });
-                })
-                .then(() => {
-                    showStatus('Tournament and game state created! Redirecting...', 'success');
-                    setTimeout(() => {
-                        window.location.href = `view.html?gameId=${tournamentId}`;
-                    }, 2000);
-                })
-                .catch(error => {
-                    showStatus('Error uploading: ' + error.message, 'error');
-                });
+            const tournamentData = {
+                gameId,
+                teams,
+                matches,
+                schedule: scheduleData,
+                selectedGames,
+                spellCards: spellCards.map(s => s.id),
+                winCondition,
+                createdAt: new Date().toISOString(),
+                status: 'setup',
+                board: {},
+                heartHexes: ['q2r-4', 'q4r-2', 'q2r2', 'q-2r4', 'q-4r2', 'q-2r-2'],
+                heartHexControl: {},
+                currentRound: 0,
+                gamesPlayed: 0,
+                gameHistory: [],
+                currentTurn: null,
+                gamePhase: 'playing',
+            };
+            
+            try {
+                await db.collection('games').doc(gameId).set(tournamentData);
+                await db.collection('tournaments').doc(gameId).set(tournamentData);
+                
+                alert('Turnaus luotu onnistuneesti!');
+                window.location.href = `view.html?gameId=${gameId}`;
+            } catch (error) {
+                alert('Virhe turnauksen luomisessa: ' + error.message);
+                console.error(error);
+            }
         }
     </script>
-    
-    <!-- Restrict access script - checks authentication and shows content if logged in -->
     <script src="scripts/restrict-access.js"></script>
 </body>
 </html>
