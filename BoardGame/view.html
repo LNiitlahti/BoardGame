@@ -1127,22 +1127,70 @@
             const currentMatch = matches.find(m => m.status === 'playing' || m.status === 'active');
             const upcomingMatches = matches.filter(m => m.status === 'waiting' || m.status === 'upcoming');
             
+            // Helper function to create match HTML
+            function createMatchHTML(match, isActive = false) {
+                const matchDiv = document.createElement('div');
+                matchDiv.className = isActive ? 'match-item active' : 'match-item';
+                
+                // Determine format from sides/teams structure
+                let format = '';
+                if (match.sides && Array.isArray(match.sides)) {
+                    const sideSizes = match.sides.map(side => 
+                        side.players ? side.players.length : 0
+                    );
+                    format = sideSizes.join('v');
+                } else if (match.teams && Array.isArray(match.teams)) {
+                    const teamSizes = match.teams.map(team => 
+                        team.players ? team.players.length : 0
+                    );
+                    format = teamSizes.join('v');
+                }
+                
+                // Build header
+                const headerHTML = `
+                    <div class="match-header">
+                        <span class="match-game">${match.game || 'Match'}</span>
+                        <span class="match-format">${format || 'TBD'}</span>
+                    </div>
+                `;
+                
+                // Build teams/sides display
+                let teamsHTML = '<div class="match-teams">';
+                
+                const sidesData = match.sides || match.teams || [];
+                sidesData.forEach((side, sideIndex) => {
+                    if (sideIndex > 0) {
+                        teamsHTML += '<span class="match-vs">VS</span>';
+                    }
+                    
+                    teamsHTML += '<div class="match-team">';
+                    
+                    if (side.players && Array.isArray(side.players)) {
+                        side.players.forEach((player, playerIndex) => {
+                            if (playerIndex > 0) teamsHTML += ' ';
+                            
+                            const playerColor = player.color || player.teamColor || 'blue';
+                            const playerName = player.name || `Player ${player.id || '?'}`;
+                            
+                            teamsHTML += `<span class="match-player ${playerColor}">${playerName}</span>`;
+                        });
+                    }
+                    
+                    teamsHTML += '</div>';
+                });
+                
+                teamsHTML += '</div>';
+                
+                matchDiv.innerHTML = headerHTML + teamsHTML;
+                return matchDiv;
+            }
+            
             // Current Match Section
             if (currentMatch) {
                 const currentSection = document.createElement('div');
                 currentSection.className = 'match-category';
-                currentSection.innerHTML = `
-                    <h3>Current Match</h3>
-                    <div class="match-item active">
-                        <div class="match-header">
-                            <span class="match-game">${currentMatch.game}</span>
-                            <span class="match-format">Round ${currentMatch.round || 1}</span>
-                        </div>
-                        <div class="match-teams">
-                            <span class="match-team">${currentMatch.team1Name} vs ${currentMatch.team2Name}</span>
-                        </div>
-                    </div>
-                `;
+                currentSection.innerHTML = '<h3>Current Match</h3>';
+                currentSection.appendChild(createMatchHTML(currentMatch, true));
                 matchesContainer.appendChild(currentSection);
             }
             
@@ -1154,18 +1202,7 @@
                 
                 // Show up to 5 upcoming matches
                 upcomingMatches.slice(0, 5).forEach(match => {
-                    const matchDiv = document.createElement('div');
-                    matchDiv.className = 'match-item';
-                    matchDiv.innerHTML = `
-                        <div class="match-header">
-                            <span class="match-game">${match.game}</span>
-                            <span class="match-format">Round ${match.round || 1}</span>
-                        </div>
-                        <div class="match-teams">
-                            <span class="match-team">${match.team1Name} vs ${match.team2Name}</span>
-                        </div>
-                    `;
-                    upcomingSection.appendChild(matchDiv);
+                    upcomingSection.appendChild(createMatchHTML(match, false));
                 });
                 
                 matchesContainer.appendChild(upcomingSection);

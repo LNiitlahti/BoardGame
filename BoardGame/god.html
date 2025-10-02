@@ -1,316 +1,17 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>God Mode - Board Game Admin</title>
+    <link rel="stylesheet" href="css/styles.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1e3c72, #2a5298);
-            min-height: 100vh;
-            color: white;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 1800px;
-            margin: 0 auto;
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-        }
-
-        .header h1 {
-            font-size: 2.5rem;
-            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
+        /* Additional styles specific to god mode */
         .main-grid {
             display: grid;
             grid-template-columns: 350px 1fr 350px;
             gap: 20px;
             margin-bottom: 20px;
-        }
-
-        .panel {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 20px;
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .panel h3 {
-            color: #ffd700;
-            margin-bottom: 15px;
-            font-size: 1.2rem;
-        }
-
-        .board-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .hex-board {
-            position: relative;
-            width: 700px;
-            height: 700px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .hex {
-            position: absolute;
-            width: 45px;
-            height: 40px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .hex-inner {
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 9px;
-            font-weight: bold;
-            transition: all 0.3s ease;
-        }
-
-        .hex:hover .hex-inner {
-            background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.15);
-        }
-
-        .hex.starting-location .hex-inner {
-            background: rgba(255, 215, 0, 0.4);
-            border-color: #ffd700;
-        }
-
-        .hex.heart-hex .hex-inner {
-            background: rgba(255, 20, 147, 0.4);
-            border-color: #ff1493;
-        }
-
-        .hex.center .hex-inner {
-            background: rgba(138, 43, 226, 0.5);
-            border-color: #8a2be2;
-        }
-
-        .hex.can-place .hex-inner {
-            background: rgba(0, 255, 0, 0.4) !important;
-            border-color: #00ff00 !important;
-            animation: pulse-green 1s infinite;
-        }
-
-        .hex.team1 .hex-inner { background: rgba(255, 68, 68, 0.9); border-color: #ff4444; color: white; }
-        .hex.team2 .hex-inner { background: rgba(68, 255, 68, 0.9); border-color: #44ff44; color: black; }
-        .hex.team3 .hex-inner { background: rgba(68, 68, 255, 0.9); border-color: #4444ff; color: white; }
-        .hex.team4 .hex-inner { background: rgba(255, 255, 68, 0.9); border-color: #ffff44; color: black; }
-        .hex.team5 .hex-inner { background: rgba(255, 68, 255, 0.9); border-color: #ff44ff; color: white; }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            color: #ffd700;
-            font-weight: 600;
-        }
-
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            font-size: 0.95rem;
-        }
-
-        .form-group input::placeholder,
-        .form-group textarea::placeholder {
-            color: rgba(255, 255, 255, 0.6);
-        }
-
-        .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            width: 100%;
-            margin-top: 10px;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-        }
-
-        .btn.primary {
-            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
-            color: #333;
-        }
-
-        .btn.danger {
-            background: linear-gradient(135deg, #ff4444 0%, #cc3333 100%);
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .team-card {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 15px;
-            border-radius: 10px;
-            border-left: 4px solid;
-            margin-bottom: 15px;
-        }
-
-        .team-card.team1 { border-left-color: #ff4444; }
-        .team-card.team2 { border-left-color: #44ff44; }
-        .team-card.team3 { border-left-color: #4444ff; }
-        .team-card.team4 { border-left-color: #ffff44; }
-        .team-card.team5 { border-left-color: #ff44ff; }
-
-        .team-card.active {
-            background: rgba(255, 215, 0, 0.2);
-            border: 2px solid #ffd700;
-        }
-
-        .status-message {
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            text-align: center;
-            font-weight: 600;
-            display: none;
-        }
-
-        .status-message.success {
-            background: rgba(74, 222, 128, 0.2);
-            border: 1px solid #4ade80;
-            color: #4ade80;
-        }
-
-        .status-message.error {
-            background: rgba(248, 113, 113, 0.2);
-            border: 1px solid #f87171;
-            color: #f87171;
-        }
-
-        .status-message.info {
-            background: rgba(96, 165, 250, 0.2);
-            border: 1px solid #60a5fa;
-            color: #60a5fa;
-        }
-
-        .game-log {
-            background: rgba(0, 0, 0, 0.4);
-            padding: 15px;
-            border-radius: 10px;
-            height: 300px;
-            overflow-y: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-        }
-
-        .log-entry {
-            margin-bottom: 5px;
-            padding: 5px;
-            border-left: 3px solid #ffd700;
-            padding-left: 10px;
-        }
-
-        .log-entry.error {
-            border-left-color: #f87171;
-            color: #f87171;
-        }
-
-        .log-entry.success {
-            border-left-color: #4ade80;
-            color: #4ade80;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        .stat-item {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 10px;
-            border-radius: 8px;
-            text-align: center;
-        }
-
-        .stat-number {
-            font-size: 1.5rem;
-            font-weight: 800;
-            color: #ffd700;
-        }
-
-        .stat-label {
-            font-size: 0.85rem;
-            opacity: 0.8;
-        }
-
-        @keyframes pulse-green {
-            0%, 100% { opacity: 0.7; }
-            50% { opacity: 1; }
-        }
-
-        @media (max-width: 1400px) {
-            .main-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .hex-board {
-                width: 500px;
-                height: 500px;
-            }
-            
-            .hex {
-                width: 35px;
-                height: 31px;
-            }
         }
 
         .connection-status {
@@ -335,10 +36,361 @@
             border: 1px solid #f87171;
             color: #f87171;
         }
+
+        /* Board container needs proper wrapper structure */
+        .board-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .hex-board-wrapper {
+            position: relative;
+            width: 100%;
+            height: 700px;
+            overflow: hidden;
+        }
+
+        /* Highlighting for valid placements - targets the ::before pseudo-element */
+        .board-hex.can-place-highlight::before {
+            background: rgba(74, 222, 128, 0.9) !important;
+            box-shadow: 0 0 20px rgba(74, 222, 128, 0.8);
+            animation: pulse-highlight 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse-highlight {
+            0%, 100% { 
+                opacity: 0.8;
+                transform: scale(1);
+            }
+            50% { 
+                opacity: 1;
+                transform: scale(1.05);
+            }
+        }
+
+        /* Game Queue Styles */
+        .queue-container {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .queued-game {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #ffd700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .queued-game:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateX(5px);
+        }
+
+        .queued-game.pending {
+            border-left-color: #60a5fa;
+        }
+
+        .queued-game.ready {
+            border-left-color: #4ade80;
+        }
+
+        /* Plan Game Interface */
+        .plan-game-container {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+            min-height: 250px;
+        }
+
+        .team-pool {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .team-pool h4 {
+            color: #ffd700;
+            margin-bottom: 10px;
+            font-size: 1rem;
+            sticky: top;
+            background: inherit;
+            padding-bottom: 10px;
+        }
+
+        .team-slots-container {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .team-slot {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            min-height: 80px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .team-slot.drag-over {
+            background: rgba(74, 222, 128, 0.2);
+            border-color: #4ade80;
+        }
+
+        .team-slot h5 {
+            margin-bottom: 8px;
+            color: #ffd700;
+            font-size: 0.9rem;
+        }
+
+        .team-slot.slot-0 { border-color: rgba(59, 130, 246, 0.5); }
+        .team-slot.slot-1 { border-color: rgba(239, 68, 68, 0.5); }
+        .team-slot.slot-2 { border-color: rgba(34, 197, 94, 0.5); }
+        .team-slot.slot-3 { border-color: rgba(251, 146, 60, 0.5); }
+
+        .team-box {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: move;
+            border-left: 4px solid;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .team-box:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateX(3px);
+        }
+
+        .team-box.dragging {
+            opacity: 0.5;
+        }
+
+        .team-box.team1 { border-left-color: #ff4444; }
+        .team-box.team2 { border-left-color: #44ff44; }
+        .team-box.team3 { border-left-color: #4444ff; }
+        .team-box.team4 { border-left-color: #ffff44; }
+        .team-box.team5 { border-left-color: #ff44ff; }
+
+        .team-box.in-slot {
+            cursor: default;
+        }
+
+        .remove-team {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(239, 68, 68, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            line-height: 1;
+            padding: 0;
+        }
+
+        .remove-team:hover {
+            background: rgba(239, 68, 68, 1);
+        }
+
+        .team-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.95rem;
+        }
+
+        .players-container {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .player-tag {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            cursor: move;
+            transition: all 0.2s ease;
+            display: inline-block;
+            margin: 2px;
+        }
+
+        .player-tag:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        .player-tag.dragging {
+            opacity: 0.5;
+        }
+
+        .team-box.team1 .player-tag { background: rgba(255, 68, 68, 0.4); border: 1px solid rgba(255, 68, 68, 0.6); }
+        .team-box.team2 .player-tag { background: rgba(68, 255, 68, 0.4); border: 1px solid rgba(68, 255, 68, 0.6); }
+        .team-box.team3 .player-tag { background: rgba(68, 68, 255, 0.4); border: 1px solid rgba(68, 68, 255, 0.6); }
+        .team-box.team4 .player-tag { background: rgba(255, 255, 68, 0.4); border: 1px solid rgba(255, 255, 68, 0.6); }
+        .team-box.team5 .player-tag { background: rgba(255, 68, 255, 0.4); border: 1px solid rgba(255, 68, 255, 0.6); }
+
+        /* Editable player names */
+        .editable-player-name {
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .editable-player-name:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .editable-player-name.editing {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid #ffd700;
+            outline: none;
+        }
+
+        /* Manual game setup - player-based drop zones */
+        .player-drop-zone {
+            min-height: 100px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+
+        .player-drop-zone.drag-over {
+            background: rgba(74, 222, 128, 0.2);
+            border-color: #4ade80;
+        }
+
+        .player-drop-zone.team-a {
+            border-color: rgba(59, 130, 246, 0.5);
+        }
+
+        .player-drop-zone.team-b {
+            border-color: rgba(239, 68, 68, 0.5);
+        }
+
+        .assigned-player {
+            display: inline-block;
+            padding: 6px 10px;
+            margin: 4px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            position: relative;
+            padding-right: 25px;
+        }
+
+        .assigned-player .remove-player {
+            position: absolute;
+            top: 2px;
+            right: 4px;
+            background: rgba(239, 68, 68, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            font-size: 10px;
+            line-height: 1;
+            padding: 0;
+        }
+
+        /* Confirm Result Interface */
+        .confirm-container {
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+
+        .teams-display {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .winner-checkbox {
+            margin-right: 10px;
+            transform: scale(1.2);
+            cursor: pointer;
+        }
+
+        .winner-label {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active {
+            background: rgba(255, 215, 0, 0.2);
+            border-color: #ffd700;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @media (max-width: 1400px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .plan-game-container {
+                flex-direction: column;
+            }
+        }
     </style>
 </head>
 <body>
-    <div id="connectionStatus" class="connection-status disconnected">🔴 Not Connected</div>
+    <div id="connectionStatus" class="connection-status disconnected">🔴 Connecting to Firebase...</div>
     
     <div class="container">
         <div class="header">
@@ -349,25 +401,24 @@
         <div class="status-message" id="statusMessage"></div>
 
         <div class="main-grid">
-            <!-- Left Sidebar: Game Setup & Controls -->
+            <!-- Left Sidebar: Player Management & Controls -->
             <div>
                 <div class="panel">
-                    <h3>🎮 Game Setup</h3>
+                    <h3>👥 Player & Team Management</h3>
                     <div class="form-group">
                         <label>Game ID</label>
-                        <input type="text" id="gameId" placeholder="my-game-session">
+                        <input type="text" id="gameId" placeholder="game-session-id">
+                        <button class="btn" onclick="loadGame()" style="margin-top: 5px;">📂 Load Game</button>
                     </div>
-                    <div class="form-group">
-                        <label>Players (comma separated)</label>
-                        <textarea id="playerNames" rows="3" placeholder="Alice, Bob, Charlie, Diana, Eve, Frank"></textarea>
+                    
+                    <div id="playerManagementSection" style="display: none; margin-top: 15px;">
+                        <label style="display: block; margin-bottom: 10px; color: #ffd700; font-weight: 600;">
+                            Teams & Players (click name to edit)
+                        </label>
+                        <div id="playersList" style="max-height: 300px; overflow-y: auto;">
+                            <!-- Players list will be rendered here -->
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Win Condition (Points)</label>
-                        <input type="number" id="winCondition" value="50" min="10" max="200">
-                    </div>
-                    <button class="btn primary" onclick="initializeGame()">🚀 Initialize Game</button>
-                    <button class="btn" onclick="loadGame()">📂 Load Game</button>
-                    <button class="btn danger" onclick="resetGame()">🔄 Reset Game</button>
                 </div>
 
                 <div class="panel" style="margin-top: 20px;">
@@ -393,37 +444,113 @@
                 </div>
 
                 <div class="panel" style="margin-top: 20px;">
-                    <h3>🏆 Add Game Result</h3>
-                    <div class="form-group">
-                        <label>Game Type</label>
-                        <select id="gameType">
-                            <option value="CS2">Counter-Strike 2</option>
-                            <option value="Dota2">Dota 2</option>
-                            <option value="Valorant">Valorant</option>
-                            <option value="StarCraft2">StarCraft 2</option>
-                            <option value="Predecessor">Predecessor</option>
-                        </select>
+                    <h3>🎯 Game Management</h3>
+                    
+                    <!-- Tab Buttons -->
+                    <div class="tab-buttons">
+                        <button class="tab-btn active" onclick="switchTab('plan')">📋 Plan Game</button>
+                        <button class="tab-btn" onclick="switchTab('confirm')">✅ Confirm Result</button>
                     </div>
-                    <div class="form-group">
-                        <label>Match Type</label>
-                        <select id="playType">
-                            <option value="1v1">1v1</option>
-                            <option value="2v2">2v2</option>
-                            <option value="3v3">3v3</option>
-                            <option value="5v5">5v5</option>
-                        </select>
+
+                    <!-- Plan Game Tab -->
+                    <div id="planTab" class="tab-content active">
+                        <div class="form-group">
+                            <label>Game Type</label>
+                            <select id="planGameType">
+                                <option value="CS2">Counter-Strike 2</option>
+                                <option value="Dota2">Dota 2</option>
+                                <option value="Valorant">Valorant</option>
+                                <option value="StarCraft2">StarCraft 2</option>
+                                <option value="Predecessor">Predecessor</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Match Type</label>
+                            <select id="planPlayType">
+                                <option value="1v1">1v1</option>
+                                <option value="2v2">2v2</option>
+                                <option value="3v3">3v3</option>
+                                <option value="5v5">5v5</option>
+                            </select>
+                        </div>
+
+                        <label style="color: #ffd700; font-weight: 600; display: block; margin-bottom: 10px;">
+                            Build Match (drag players or whole teams)
+                        </label>
+
+                        <!-- Player-based drag and drop -->
+                        <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                            <div style="flex: 1;">
+                                <div class="player-drop-zone team-a" 
+                                     ondrop="dropPlayer(event, 'TEAM_A')" 
+                                     ondragover="allowDrop(event)" 
+                                     ondragleave="dragLeave(event)">
+                                    <h5 style="color: #3b82f6; margin-bottom: 8px;">TEAM A</h5>
+                                    <div id="teamAPlayers" style="min-height: 60px;">
+                                        <span style="opacity: 0.6; font-size: 0.85rem;">Drop players here...</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="flex: 1;">
+                                <div class="player-drop-zone team-b" 
+                                     ondrop="dropPlayer(event, 'TEAM_B')" 
+                                     ondragover="allowDrop(event)" 
+                                     ondragleave="dragLeave(event)">
+                                    <h5 style="color: #ef4444; margin-bottom: 8px;">TEAM B</h5>
+                                    <div id="teamBPlayers" style="min-height: 60px;">
+                                        <span style="opacity: 0.6; font-size: 0.85rem;">Drop players here...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Available teams/players pool -->
+                        <div class="team-pool" style="max-height: 300px;">
+                            <h4>Available Teams & Players</h4>
+                            <div id="planTeamPool"></div>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 15px;">
+                            <label>Notes (optional)</label>
+                            <input type="text" id="planNotes" placeholder="Any special notes about this game...">
+                        </div>
+                        <button class="btn primary" onclick="addGameToQueue()">➕ Add to Queue</button>
+                        <button class="btn" onclick="clearPlanSetup()">🔄 Clear</button>
                     </div>
-                    <div class="form-group">
-                        <label>Winning Team</label>
-                        <select id="winningTeam">
-                            <option value="">Select winner...</option>
-                        </select>
+
+                    <!-- Confirm Result Tab -->
+                    <div id="confirmTab" class="tab-content">
+                        <div class="form-group">
+                            <label>Select Queued Game</label>
+                            <select id="queuedGameSelect" onchange="loadQueuedGame()">
+                                <option value="">-- Select a game to confirm --</option>
+                            </select>
+                        </div>
+
+                        <div class="confirm-container" id="confirmContainer" style="display: none;">
+                            <h4 style="color: #ffd700; margin-bottom: 10px;">Game Details</h4>
+                            <div id="confirmGameInfo"></div>
+
+                            <h4 style="color: #ffd700; margin-top: 15px; margin-bottom: 10px;">Select Winner(s)</h4>
+                            <div id="confirmTeamsDisplay"></div>
+
+                            <div class="form-group" style="margin-top: 15px;">
+                                <label>Actual Result Notes (optional)</label>
+                                <input type="text" id="confirmNotes" placeholder="Any additional notes about the result...">
+                            </div>
+
+                            <button class="btn primary" onclick="confirmGameResult()">✅ Submit Result & Start Turn</button>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Notes (optional)</label>
-                        <input type="text" id="gameNotes" placeholder="Any special notes...">
+                </div>
+
+                <!-- Game Queue Display -->
+                <div class="panel" style="margin-top: 20px;">
+                    <h3>📋 Game Queue (<span id="queueCount">0</span>)</h3>
+                    <div class="queue-container" id="gameQueue">
+                        <p style="text-align: center; opacity: 0.7; font-style: italic;">No games in queue</p>
                     </div>
-                    <button class="btn primary" onclick="addGameResult()">✅ Add Result & Start Turn</button>
                 </div>
             </div>
 
@@ -444,8 +571,8 @@
                     </div>
                 </div>
 
-                <div class="hex-board" id="hexBoard">
-                    <!-- Hex grid generated here -->
+                <div class="hex-board-wrapper">
+                    <div id="hexBoard"></div>
                 </div>
 
                 <div class="panel" style="width: 100%;">
@@ -496,140 +623,111 @@
         </div>
     </div>
 
-    <!-- Firebase SDK - Load from external file -->
-    <script src="scripts/firebase.js"></script>
-
-    <!-- Wait for Firebase to initialize -->
-    <script>
-        // Wait for Firebase to be ready
-        window.addEventListener('load', function() {
-            // Check if Firebase is initialized
-            if (window.firebaseDB && window.firebaseDoc && window.firebaseSetDoc) {
-                document.getElementById('connectionStatus').className = 'connection-status connected';
-                document.getElementById('connectionStatus').textContent = '🟢 Firebase Connected';
-                addLog('Firebase connected successfully', 'success');
-            } else {
-                // Wait a bit more if needed
-                setTimeout(() => {
-                    if (window.firebaseDB && window.firebaseDoc && window.firebaseSetDoc) {
-                        document.getElementById('connectionStatus').className = 'connection-status connected';
-                        document.getElementById('connectionStatus').textContent = '🟢 Firebase Connected';
-                        addLog('Firebase connected successfully', 'success');
-                    } else {
-                        document.getElementById('connectionStatus').className = 'connection-status disconnected';
-                        document.getElementById('connectionStatus').textContent = '🔴 Firebase Connection Failed';
-                        addLog('Firebase connection failed - check firebase.js', 'error');
-                    }
-                }, 2000);
-            }
-        });
-    </script>
+    <!-- Load board modules first -->
+    <script src="scripts/board-module.js"></script>
+    <script src="scripts/board-renderer.js"></script>
+    
+    <!-- Firebase SDK - Using the loader pattern -->
+    <script src="scripts/firebase-loader.js"></script>
 
     <script>
         // Game state
         let gameState = null;
         let activeListener = null;
+        
+        // Manual game setup - now player-based instead of team-based
+        let manualGameSetup = {
+            teamA: [], // Array of player objects
+            teamB: []  // Array of player objects
+        };
+        
+        let selectedQueuedGame = null;
+        
+        // Board rendering instances
+        let boardModule = null;
+        let boardRenderer = null;
 
-        // Hex coordinate system
-        function generateHexCoordinates() {
-            const coordinates = [];
-            for (let q = -5; q <= 5; q++) {
-                const r1 = Math.max(-5, -q - 5);
-                const r2 = Math.min(5, -q + 5);
-                for (let r = r1; r <= r2; r++) {
-                    coordinates.push([q, r]);
-                }
-            }
-            return coordinates;
-        }
-
-        function hexToPixel(q, r, size = 24, centerX = 350, centerY = 350) {
-            const x = size * 3/2 * q;
-            const y = size * Math.sqrt(3) * (r + q/2);
-            return [x + centerX, y + centerY];
-        }
-
-        function getHexType(q, r) {
-            const coord = `q${q}r${r}`;
-            const startingLocs = ['q0r-5', 'q5r-5', 'q5r0', 'q0r5', 'q-5r5', 'q-5r0'];
-            if (startingLocs.includes(coord)) return 'starting-location';
-            
-            const heartHexes = gameState?.heartHexes || ['q2r-4', 'q4r-2', 'q2r2', 'q-2r4', 'q-4r2', 'q-2r-2'];
-            if (heartHexes.includes(coord)) return 'heart-hex';
-            
-            if (coord === 'q0r0') return 'center';
-            return 'normal';
-        }
-
-        function getHexNeighbors(q, r) {
-            const directions = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
-            return directions.map(([dq, dr]) => {
-                const nq = q + dq;
-                const nr = r + dr;
-                return `q${nq}r${nr}`;
-            }).filter(coord => {
-                const [nq, nr] = coord.match(/-?\d+/g).map(Number);
-                return Math.abs(nq) <= 5 && Math.abs(nr) <= 5 && Math.abs(nq + nr) <= 5;
+        // Initialize board modules
+        function initializeBoardModules() {
+            boardModule = new BoardModule(1);
+            const hexBoardContainer = document.getElementById('hexBoard');
+            boardRenderer = new BoardRenderer(hexBoardContainer, boardModule, {
+                responsive: true
             });
+        }
+
+        // Wait for Firebase to be ready
+        document.addEventListener('firebase-ready', function() {
+            document.getElementById('connectionStatus').className = 'connection-status connected';
+            document.getElementById('connectionStatus').textContent = '🟢 Firebase Connected';
+            addLog('Firebase connected successfully', 'success');
+        });
+
+        // Also check on load in case event already fired
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                if (window.firebaseDB) {
+                    document.getElementById('connectionStatus').className = 'connection-status connected';
+                    document.getElementById('connectionStatus').textContent = '🟢 Firebase Connected';
+                    addLog('Firebase connected successfully', 'success');
+                }
+            }, 2000);
+        });
+
+        // Helper function to remove undefined values from objects
+        function cleanObject(obj) {
+            if (obj === null || obj === undefined) {
+                return null;
+            }
+            
+            if (Array.isArray(obj)) {
+                return obj.map(item => cleanObject(item)).filter(item => item !== undefined);
+            }
+            
+            if (typeof obj === 'object') {
+                const cleaned = {};
+                for (const key in obj) {
+                    const value = cleanObject(obj[key]);
+                    if (value !== undefined) {
+                        cleaned[key] = value;
+                    }
+                }
+                return cleaned;
+            }
+            
+            return obj;
+        }
+
+        // Tab switching
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            if (tab === 'plan') {
+                document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+                document.getElementById('planTab').classList.add('active');
+            } else {
+                document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+                document.getElementById('confirmTab').classList.add('active');
+                updateQueuedGameSelect();
+            }
         }
 
         function canPlaceAt(q, r, teamId) {
-            if (!gameState) return false;
-            const coord = `q${q}r${r}`;
+            if (!gameState || !boardModule) return false;
             
-            if (gameState.board[coord]) return false;
-            
-            const teamPlates = Object.entries(gameState.board)
+            const teamPlates = Object.entries(gameState.board || {})
                 .filter(([_, occupier]) => occupier === teamId)
                 .map(([coord, _]) => coord);
             
-            if (teamPlates.length === 0) {
-                const startingLocs = ['q0r-5', 'q5r-5', 'q5r0', 'q0r5', 'q-5r5', 'q-5r0'];
-                return startingLocs.includes(coord);
-            }
+            const occupiedHexes = Object.keys(gameState.board || {});
             
-            const neighbors = getHexNeighbors(q, r);
-            return neighbors.some(neighborCoord => teamPlates.includes(neighborCoord));
-        }
-
-        // Initialize hex board
-        function initializeHexBoard() {
-            const hexBoard = document.getElementById('hexBoard');
-            hexBoard.innerHTML = '';
-            
-            const coordinates = generateHexCoordinates();
-            coordinates.forEach(([q, r]) => {
-                const hex = document.createElement('div');
-                hex.className = `hex ${getHexType(q, r)}`;
-                hex.id = `hex-${q}-${r}`;
-                
-                const [x, y] = hexToPixel(q, r);
-                hex.style.left = `${x}px`;
-                hex.style.top = `${y}px`;
-                
-                const hexInner = document.createElement('div');
-                hexInner.className = 'hex-inner';
-                
-                const coord = `q${q}r${r}`;
-                const occupier = gameState?.board?.[coord];
-                
-                if (occupier) {
-                    const team = gameState.teams.find(t => t.id === occupier);
-                    hexInner.textContent = team ? team.name.slice(-1) : occupier;
-                    hex.classList.add(`team${occupier}`);
-                } else {
-                    hexInner.textContent = `${q},${r}`;
-                }
-                
-                hex.appendChild(hexInner);
-                hex.addEventListener('click', () => handleHexClick(q, r));
-                hexBoard.appendChild(hex);
-            });
+            return boardModule.canPlaceAt(q, r, teamPlates, occupiedHexes);
         }
 
         function handleHexClick(q, r) {
             if (!gameState?.currentTurn) {
-                showStatus('No active turn. Add a game result first.', 'error');
+                showStatus('No active turn. Confirm a game result first.', 'error');
                 return;
             }
             
@@ -651,8 +749,9 @@
             
             gameState.board[coord] = teamId;
             
-            // Check for heart hex capture
-            if (gameState.heartHexes?.includes(coord)) {
+            // Check for heart hex capture using board module
+            const hexType = boardModule.getHexType(q, r);
+            if (hexType === 'high-value' || hexType === 'center') {
                 gameState.heartHexControl = gameState.heartHexControl || {};
                 gameState.heartHexControl[coord] = teamId;
                 addLog(`❤️ Team ${teamId} captured heart hex ${coord}!`, 'success');
@@ -670,26 +769,25 @@
         }
 
         function calculatePoints() {
-            if (!gameState?.teams) return;
+            if (!gameState?.teams || !boardModule) return;
             
             gameState.teams.forEach(team => {
-                let points = 0;
+                const teamPlates = Object.entries(gameState.board || {})
+                    .filter(([_, occupier]) => occupier === team.id)
+                    .map(([coord, _]) => coord);
                 
-                Object.entries(gameState.board || {}).forEach(([coord, occupier]) => {
-                    if (occupier === team.id) {
-                        const [q, r] = coord.match(/-?\d+/g).map(Number);
-                        const hexType = getHexType(q, r);
-                        points += (hexType === 'center' || hexType === 'heart-hex') ? 2 : 1;
-                    }
-                });
+                team.points = boardModule.calculateTeamPoints(teamPlates);
                 
+                // Add heart hex bonus
                 Object.entries(gameState.heartHexControl || {}).forEach(([heartHex, controllingTeam]) => {
                     if (controllingTeam === team.id) {
-                        points += heartHex === 'q0r0' ? 2 : 1;
+                        const matches = heartHex.match(/-?\d+/g);
+                        if (matches) {
+                            const [q, r] = matches.map(Number);
+                            team.points += boardModule.getHexType(q, r) === 'center' ? 2 : 1;
+                        }
                     }
                 });
-                
-                team.points = points;
             });
         }
 
@@ -727,14 +825,16 @@
             }));
             
             const teams = [];
+            const teamColors = ['red', 'blue', 'green', 'yellow', 'purple'];
             for (let i = 1; i <= teamCount; i++) {
                 const teamPlayers = players.filter(p => p.team === i);
                 teams.push({
                     id: i,
-                    name: `Team ${i}`,
+                    name: `Tiimi ${i}`,
                     players: teamPlayers,
                     points: 0,
-                    gamesWon: 0
+                    gamesWon: 0,
+                    color: teamColors[i - 1]
                 });
             }
             
@@ -749,16 +849,18 @@
                 gamesPlayed: 0,
                 winCondition: winCondition,
                 gameHistory: [],
+                gameQueue: [],
                 currentTurn: null,
                 gamePhase: 'playing',
                 gameTypes: ['CS2', 'Dota2', 'Valorant', 'StarCraft2', 'Predecessor'],
-                playTypes: ['1v1', '2v2', '3v3', '5v5'],
+                playTypes: ['1v1', '2v2', '3v3', '5v5', '2v2v2v2', 'FFA'],
                 createdAt: new Date().toISOString(),
                 initialized: true
             };
             
             await saveGameState();
             updateDisplay();
+            renderPlanTeamPool();
             addLog(`🚀 Game "${gameId}" initialized with ${playerNames.length} players`, 'success');
             showStatus('Game initialized successfully!', 'success');
         }
@@ -773,13 +875,24 @@
             try {
                 const docRef = window.firebaseDoc(window.firebaseDB, 'games', gameId);
                 
-                // Set up real-time listener
                 if (activeListener) activeListener();
                 
                 activeListener = window.firebaseOnSnapshot(docRef, (docSnap) => {
-                    if (docSnap.exists()) {
+                    if (docSnap.exists) {
                         gameState = docSnap.data();
+                        
+                        // Ensure gameQueue exists
+                        if (!gameState.gameQueue) {
+                            gameState.gameQueue = [];
+                        }
+                        
+                        // Show player management section once game is loaded
+                        document.getElementById('playerManagementSection').style.display = 'block';
+                        
                         updateDisplay();
+                        renderPlanTeamPool();
+                        renderPlayerManagement();
+                        updateGameQueue();
                         addLog(`📂 Game "${gameId}" loaded`, 'success');
                         showStatus('Game loaded successfully!', 'success');
                     } else {
@@ -792,57 +905,582 @@
             }
         }
 
+        // Render player management section with editable names
+        function renderPlayerManagement() {
+            const container = document.getElementById('playersList');
+            
+            if (!gameState?.teams) {
+                container.innerHTML = '<p style="opacity: 0.7; text-align: center;">Load game to see players</p>';
+                return;
+            }
+            
+            container.innerHTML = gameState.teams.map(team => `
+                <div style="margin-bottom: 15px; padding: 12px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; border-left: 4px solid ${getTeamColor(team.id)};">
+                    <div style="font-weight: 600; color: #ffd700; margin-bottom: 8px;">
+                        ${team.name} (${team.points || 0} pts)
+                    </div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        ${team.players.map(player => `
+                            <span class="editable-player-name" 
+                                  data-player-id="${player.id}" 
+                                  data-team-id="${team.id}"
+                                  onclick="makePlayerNameEditable(this)"
+                                  title="Click to edit">
+                                ${player.name}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Make player name editable when clicked
+        function makePlayerNameEditable(element) {
+            // Prevent multiple edits at once
+            if (document.querySelector('.editing')) {
+                return;
+            }
+            
+            const playerId = parseInt(element.dataset.playerId);
+            const teamId = parseInt(element.dataset.teamId);
+            const currentName = element.textContent.trim();
+            
+            // Make element editable
+            element.contentEditable = true;
+            element.classList.add('editing');
+            element.focus();
+            
+            // Select all text for easy replacement
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            // Handle when user finishes editing
+            const finishEdit = async () => {
+                const newName = element.textContent.trim();
+                
+                // Restore to normal state
+                element.contentEditable = false;
+                element.classList.remove('editing');
+                
+                // Only update if name actually changed and is not empty
+                if (newName && newName !== currentName) {
+                    // Find and update the player in gameState
+                    const team = gameState.teams.find(t => t.id === teamId);
+                    if (team) {
+                        const player = team.players.find(p => p.id === playerId);
+                        if (player) {
+                            const oldName = player.name;
+                            player.name = newName;
+                            
+                            // Also update in the players array if it exists
+                            const globalPlayer = gameState.players?.find(p => p.id === playerId);
+                            if (globalPlayer) {
+                                globalPlayer.name = newName;
+                            }
+                            
+                            await saveGameState();
+                            addLog(`✏️ Renamed player: ${oldName} → ${newName}`, 'success');
+                            showStatus(`Player renamed to ${newName}`, 'success');
+                            
+                            // Re-render to update everywhere
+                            renderPlayerManagement();
+                            renderPlanTeamPool();
+                        }
+                    }
+                } else if (!newName) {
+                    // If empty, restore original name
+                    element.textContent = currentName;
+                }
+            };
+            
+            // Save on Enter key
+            element.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    element.blur();
+                }
+            });
+            
+            // Save when clicking away
+            element.addEventListener('blur', finishEdit, { once: true });
+        }
+
+        // Helper to get team color
+        function getTeamColor(teamId) {
+            const colors = {
+                1: '#ff4444',
+                2: '#44ff44', 
+                3: '#4444ff',
+                4: '#ffff44',
+                5: '#ff44ff'
+            };
+            return colors[teamId] || '#888888';
+        }
+
         async function saveGameState() {
             if (!gameState?.gameId) return;
             
             try {
+                // Clean the object to remove any undefined values
+                const cleanedState = cleanObject(gameState);
+                
                 const docRef = window.firebaseDoc(window.firebaseDB, 'games', gameState.gameId);
-                await window.firebaseSetDoc(docRef, gameState);
+                await window.firebaseSetDoc(docRef, cleanedState);
                 addLog('💾 Game state saved', 'success');
             } catch (error) {
                 console.error('Save error:', error);
-                showStatus('Error saving game', 'error');
+                showStatus('Error saving game: ' + error.message, 'error');
+                addLog('Save error: ' + error.message, 'error');
             }
         }
 
-        async function addGameResult() {
+        // Render team pool with draggable players and teams
+        function renderPlanTeamPool() {
+            const pool = document.getElementById('planTeamPool');
+            if (!gameState?.teams) {
+                pool.innerHTML = '<p style="opacity: 0.7; text-align: center; font-size: 0.85rem;">Load game first</p>';
+                return;
+            }
+            
+            // Get list of already assigned player IDs to grey them out or hide them
+            const assignedPlayerIds = [
+                ...manualGameSetup.teamA.map(p => p.id),
+                ...manualGameSetup.teamB.map(p => p.id)
+            ];
+            
+            pool.innerHTML = gameState.teams.map(team => {
+                // Check if all players from this team are already assigned
+                const availablePlayers = team.players.filter(p => !assignedPlayerIds.includes(p.id));
+                
+                return `
+                    <div class="team-box team${team.id}" 
+                         draggable="${availablePlayers.length > 0 ? 'true' : 'false'}" 
+                         ondragstart="dragTeam(event, ${team.id})" 
+                         ondragend="dragEnd(event)"
+                         style="${availablePlayers.length === 0 ? 'opacity: 0.4; cursor: not-allowed;' : ''}">
+                        <div class="team-name">
+                            <span>${team.name}</span>
+                            <span style="opacity: 0.7; font-size: 0.85rem;">${team.points || 0} pts</span>
+                        </div>
+                        <div class="players-container">
+                            ${team.players.map(player => {
+                                const isAssigned = assignedPlayerIds.includes(player.id);
+                                return `
+                                    <span class="player-tag ${isAssigned ? 'assigned' : ''}" 
+                                          draggable="${!isAssigned ? 'true' : 'false'}"
+                                          ondragstart="dragPlayer(event, ${player.id}, ${team.id})" 
+                                          ondragend="dragEnd(event)"
+                                          style="${isAssigned ? 'opacity: 0.3; cursor: not-allowed;' : ''}">
+                                        ${player.name}
+                                    </span>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Drag a single player
+        function dragPlayer(event, playerId, teamId) {
+            event.stopPropagation(); // Prevent team drag from firing
+            event.target.classList.add('dragging');
+            
+            // Store both player ID and team ID so we can find the full player object
+            event.dataTransfer.setData('application/json', JSON.stringify({
+                type: 'player',
+                playerId: playerId,
+                teamId: teamId
+            }));
+        }
+
+        // Drag an entire team (adds all its players at once)
+        function dragTeam(event, teamId) {
+            event.target.classList.add('dragging');
+            
+            event.dataTransfer.setData('application/json', JSON.stringify({
+                type: 'team',
+                teamId: teamId
+            }));
+        }
+
+        function dragEnd(event) {
+            event.target.classList.remove('dragging');
+        }
+
+        function allowDrop(event) {
+            event.preventDefault();
+            event.currentTarget.classList.add('drag-over');
+        }
+
+        function dragLeave(event) {
+            event.currentTarget.classList.remove('drag-over');
+        }
+
+        // Drop player(s) into TEAM_A or TEAM_B
+        function dropPlayer(event, targetTeam) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('drag-over');
+            
+            const dragData = JSON.parse(event.dataTransfer.getData('application/json'));
+            
+            if (dragData.type === 'player') {
+                // Find the player object from gameState
+                const sourceTeam = gameState.teams.find(t => t.id === dragData.teamId);
+                if (!sourceTeam) return;
+                
+                const player = sourceTeam.players.find(p => p.id === dragData.playerId);
+                if (!player) return;
+                
+                // Check if player is already assigned
+                const alreadyInA = manualGameSetup.teamA.some(p => p.id === player.id);
+                const alreadyInB = manualGameSetup.teamB.some(p => p.id === player.id);
+                
+                if (alreadyInA || alreadyInB) {
+                    showStatus('Player already assigned', 'error');
+                    return;
+                }
+                
+                // Add player to target team
+                if (targetTeam === 'TEAM_A') {
+                    manualGameSetup.teamA.push({
+                        id: player.id,
+                        name: player.name,
+                        originalTeamId: dragData.teamId,
+                        originalTeamName: sourceTeam.name
+                    });
+                } else {
+                    manualGameSetup.teamB.push({
+                        id: player.id,
+                        name: player.name,
+                        originalTeamId: dragData.teamId,
+                        originalTeamName: sourceTeam.name
+                    });
+                }
+                
+            } else if (dragData.type === 'team') {
+                // Add all players from the team
+                const sourceTeam = gameState.teams.find(t => t.id === dragData.teamId);
+                if (!sourceTeam) return;
+                
+                // Filter out already assigned players
+                const assignedPlayerIds = [
+                    ...manualGameSetup.teamA.map(p => p.id),
+                    ...manualGameSetup.teamB.map(p => p.id)
+                ];
+                
+                const playersToAdd = sourceTeam.players
+                    .filter(p => !assignedPlayerIds.includes(p.id))
+                    .map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        originalTeamId: sourceTeam.id,
+                        originalTeamName: sourceTeam.name
+                    }));
+                
+                if (playersToAdd.length === 0) {
+                    showStatus('All players from this team are already assigned', 'error');
+                    return;
+                }
+                
+                // Add all players to target team
+                if (targetTeam === 'TEAM_A') {
+                    manualGameSetup.teamA.push(...playersToAdd);
+                } else {
+                    manualGameSetup.teamB.push(...playersToAdd);
+                }
+            }
+            
+            updateManualGameDisplay();
+            renderPlanTeamPool(); // Re-render to grey out assigned players
+        }
+
+        // Update the visual display of assigned players
+        function updateManualGameDisplay() {
+            const teamADiv = document.getElementById('teamAPlayers');
+            const teamBDiv = document.getElementById('teamBPlayers');
+            
+            // Render Team A players
+            if (manualGameSetup.teamA.length === 0) {
+                teamADiv.innerHTML = '<span style="opacity: 0.6; font-size: 0.85rem;">Drop players here...</span>';
+            } else {
+                teamADiv.innerHTML = manualGameSetup.teamA.map((player, index) => `
+                    <div class="assigned-player">
+                        ${player.name}
+                        <span style="opacity: 0.6; font-size: 0.75rem; margin-left: 4px;">(${player.originalTeamName})</span>
+                        <button class="remove-player" onclick="removePlayerFromSide('teamA', ${index})" title="Remove">×</button>
+                    </div>
+                `).join('');
+            }
+            
+            // Render Team B players
+            if (manualGameSetup.teamB.length === 0) {
+                teamBDiv.innerHTML = '<span style="opacity: 0.6; font-size: 0.85rem;">Drop players here...</span>';
+            } else {
+                teamBDiv.innerHTML = manualGameSetup.teamB.map((player, index) => `
+                    <div class="assigned-player">
+                        ${player.name}
+                        <span style="opacity: 0.6; font-size: 0.75rem; margin-left: 4px;">(${player.originalTeamName})</span>
+                        <button class="remove-player" onclick="removePlayerFromSide('teamB', ${index})" title="Remove">×</button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Remove a player from TEAM_A or TEAM_B
+        function removePlayerFromSide(side, index) {
+            if (side === 'teamA') {
+                manualGameSetup.teamA.splice(index, 1);
+            } else {
+                manualGameSetup.teamB.splice(index, 1);
+            }
+            
+            updateManualGameDisplay();
+            renderPlanTeamPool(); // Re-render to make removed players available again
+        }
+
+        function clearPlanSetup() {
+            manualGameSetup.teamA = [];
+            manualGameSetup.teamB = [];
+            document.getElementById('planNotes').value = '';
+            updateManualGameDisplay();
+            renderPlanTeamPool();
+            addLog('🔄 Plan setup cleared');
+        }
+
+        async function addGameToQueue() {
             if (!gameState) {
                 showStatus('Initialize game first!', 'error');
                 return;
             }
             
-            const game = document.getElementById('gameType').value;
-            const playType = document.getElementById('playType').value;
-            const winningTeamId = parseInt(document.getElementById('winningTeam').value);
-            const notes = document.getElementById('gameNotes').value;
+            const game = document.getElementById('planGameType').value;
+            const playType = document.getElementById('planPlayType').value;
+            const notes = document.getElementById('planNotes').value || '';
             
-            if (!winningTeamId) {
-                showStatus('Please select a winning team', 'error');
+            const filledSlots = planGameSetup.slots.filter(t => t !== null);
+            if (filledSlots.length < 2) {
+                showStatus('Please assign at least 2 teams', 'error');
                 return;
             }
             
-            const result = {
-                id: (gameState.gameHistory?.length || 0) + 1,
+            const queueEntry = {
+                id: Date.now(),
                 game: game,
                 playType: playType,
-                winningTeamId: winningTeamId,
+                teams: filledSlots.map(team => ({
+                    id: team.id,
+                    name: team.name,
+                    players: team.players.map(p => ({ 
+                        id: p.id, 
+                        name: p.name 
+                    }))
+                })),
                 notes: notes,
+                status: 'pending',
+                createdAt: new Date().toISOString()
+            };
+            
+            gameState.gameQueue = gameState.gameQueue || [];
+            gameState.gameQueue.push(queueEntry);
+            
+            await saveGameState();
+            updateGameQueue();
+            clearPlanSetup();
+            
+            addLog(`📋 Added ${game} ${playType} to queue`, 'success');
+            showStatus('Game added to queue!', 'success');
+        }
+
+        // Confirm Result Functions
+        function updateQueuedGameSelect() {
+            const select = document.getElementById('queuedGameSelect');
+            
+            if (!gameState?.gameQueue || gameState.gameQueue.length === 0) {
+                select.innerHTML = '<option value="">-- No games in queue --</option>';
+                document.getElementById('confirmContainer').style.display = 'none';
+                return;
+            }
+            
+            const pendingGames = gameState.gameQueue.filter(g => g.status === 'pending');
+            
+            if (pendingGames.length === 0) {
+                select.innerHTML = '<option value="">-- No pending games --</option>';
+                document.getElementById('confirmContainer').style.display = 'none';
+                return;
+            }
+            
+            select.innerHTML = '<option value="">-- Select a game to confirm --</option>' +
+                pendingGames.map(game => {
+                    const teamNames = game.teams.map(t => t.name).join(' vs ');
+                    return `<option value="${game.id}">${game.game} ${game.playType} - ${teamNames}</option>`;
+                }).join('');
+        }
+
+        function loadQueuedGame() {
+            const select = document.getElementById('queuedGameSelect');
+            const gameId = parseInt(select.value);
+            
+            if (!gameId) {
+                document.getElementById('confirmContainer').style.display = 'none';
+                selectedQueuedGame = null;
+                return;
+            }
+            
+            selectedQueuedGame = gameState.gameQueue.find(g => g.id === gameId);
+            
+            if (!selectedQueuedGame) {
+                showStatus('Game not found', 'error');
+                return;
+            }
+            
+            const infoDiv = document.getElementById('confirmGameInfo');
+            infoDiv.innerHTML = `
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 10px; border-radius: 5px;">
+                    <strong>${selectedQueuedGame.game} - ${selectedQueuedGame.playType}</strong><br>
+                    <small style="opacity: 0.8;">${selectedQueuedGame.notes || 'No notes'}</small>
+                </div>
+            `;
+            
+            // Determine if this is a two-team match (only one winner allowed)
+            // or a multi-team match (multiple winners can be selected)
+            const isTwoTeamMatch = selectedQueuedGame.teams.length === 2;
+            const inputType = isTwoTeamMatch ? 'radio' : 'checkbox';
+            const inputName = isTwoTeamMatch ? 'winner-selection' : ''; // Radio buttons need same name to be mutually exclusive
+            
+            const teamsDiv = document.getElementById('confirmTeamsDisplay');
+            
+            // Add explanation text based on match type
+            const explanationText = isTwoTeamMatch 
+                ? '<p style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 10px;">Select the winning team:</p>'
+                : '<p style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 10px;">Check all teams that won together (they will be counted as allied winners):</p>';
+            
+            teamsDiv.innerHTML = explanationText + selectedQueuedGame.teams.map((team, index) => `
+                <div style="margin-bottom: 10px; padding: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 5px;">
+                    <label class="winner-label">
+                        <input type="${inputType}" 
+                               ${inputName ? `name="${inputName}"` : ''} 
+                               class="winner-checkbox" 
+                               id="winner-${index}" 
+                               value="${team.id}">
+                        <strong>${team.name}</strong>
+                        <span style="opacity: 0.8; font-size: 0.85rem;">
+                            (${team.players.map(p => p.name).join(', ')})
+                        </span>
+                    </label>
+                </div>
+            `).join('');
+            
+            document.getElementById('confirmContainer').style.display = 'block';
+        }
+
+        async function confirmGameResult() {
+            if (!selectedQueuedGame) {
+                showStatus('Please select a game to confirm', 'error');
+                return;
+            }
+            
+            // Get selected winners
+            const checkedInputs = Array.from(document.querySelectorAll('input[class="winner-checkbox"]:checked'));
+            
+            if (checkedInputs.length === 0) {
+                showStatus('Please select at least one winning team', 'error');
+                return;
+            }
+            
+            // For two-team matches (our manual entries are always two teams: TEAM_A vs TEAM_B)
+            const isTwoTeamMatch = selectedQueuedGame.teams.length === 2;
+            if (isTwoTeamMatch && checkedInputs.length > 1) {
+                showStatus('Error: Only one team can win in a two-team match', 'error');
+                return;
+            }
+            
+            // Get the winning side (TEAM_A or TEAM_B for manual entries)
+            const winningSides = checkedInputs.map(input => input.value);
+            const resultNotes = document.getElementById('confirmNotes').value || '';
+            
+            // For manual entries, we need to map the virtual TEAM_A/TEAM_B back to the actual teams
+            // The players on the winning side get their original teams credited with a win
+            const winningPlayers = [];
+            winningSides.forEach(side => {
+                const virtualTeam = selectedQueuedGame.teams.find(t => t.id === side);
+                if (virtualTeam) {
+                    winningPlayers.push(...virtualTeam.players);
+                }
+            });
+            
+            // Get unique original team IDs that won (for awarding wins and turns)
+            const winningTeamIds = [...new Set(winningPlayers.map(p => p.originalTeamId))];
+            
+            if (winningTeamIds.length === 0) {
+                showStatus('Error: Could not determine winning teams', 'error');
+                return;
+            }
+            
+            // The first team in the list gets the turn to place a plate
+            const firstWinningTeamId = winningTeamIds[0];
+            const winningTeam = gameState.teams.find(t => t.id === firstWinningTeamId);
+            
+            if (!winningTeam) {
+                showStatus('Error: Winning team not found!', 'error');
+                return;
+            }
+            
+            // Create the result entry
+            const result = {
+                id: (gameState.gameHistory?.length || 0) + 1,
+                game: selectedQueuedGame.game,
+                playType: selectedQueuedGame.playType,
+                matchup: {
+                    teamA: selectedQueuedGame.teams[0].players.map(p => ({
+                        name: p.name,
+                        originalTeam: p.originalTeamName
+                    })),
+                    teamB: selectedQueuedGame.teams[1].players.map(p => ({
+                        name: p.name,
+                        originalTeam: p.originalTeamName
+                    }))
+                },
+                winningSide: winningSides[0], // TEAM_A or TEAM_B
+                winningPlayers: winningPlayers.map(p => ({
+                    name: p.name,
+                    originalTeamId: p.originalTeamId
+                })),
+                winningTeamIds: winningTeamIds, // Actual team IDs that get credit
+                queuedGameId: selectedQueuedGame.id,
+                planNotes: selectedQueuedGame.notes || '',
+                resultNotes: resultNotes,
                 timestamp: new Date().toISOString()
             };
             
+            // Update game state
             gameState.gameHistory = gameState.gameHistory || [];
             gameState.gameHistory.push(result);
             gameState.gamesPlayed = (gameState.gamesPlayed || 0) + 1;
             gameState.currentRound = Math.ceil(gameState.gamesPlayed / gameState.teams.length);
             
-            const winningTeam = gameState.teams.find(t => t.id === winningTeamId);
-            if (winningTeam) {
-                winningTeam.gamesWon = (winningTeam.gamesWon || 0) + 1;
+            // Increment wins for all teams whose players won
+            winningTeamIds.forEach(teamId => {
+                const team = gameState.teams.find(t => t.id === teamId);
+                if (team) {
+                    team.gamesWon = (team.gamesWon || 0) + 1;
+                }
+            });
+            
+            // Mark queued game as completed
+            const queuedGame = gameState.gameQueue.find(g => g.id === selectedQueuedGame.id);
+            if (queuedGame) {
+                queuedGame.status = 'completed';
+                queuedGame.completedAt = new Date().toISOString();
+                queuedGame.resultId = result.id;
             }
             
-            // Start winner's turn
+            // Start the first winning team's turn
             gameState.currentTurn = {
-                teamId: winningTeamId,
+                teamId: firstWinningTeamId,
                 needsPlacement: true,
                 gameResultId: result.id,
                 startTime: new Date().toISOString()
@@ -850,37 +1488,112 @@
             
             await saveGameState();
             updateDisplay();
+            updateGameQueue();
             
-            addLog(`🏆 ${winningTeam?.name} won ${game} ${playType}`, 'success');
-            showStatus(`${winningTeam?.name}'s turn to place a plate!`, 'info');
+            // Create detailed log message
+            const teamANames = selectedQueuedGame.teams[0].players.map(p => p.name).join(' & ');
+            const teamBNames = selectedQueuedGame.teams[1].players.map(p => p.name).join(' & ');
+            const winningNames = winningPlayers.map(p => p.name).join(' & ');
+            
+            const logMessage = `🏆 ${winningNames} won ${selectedQueuedGame.game} ${selectedQueuedGame.playType}. Match was: ${teamANames} vs ${teamBNames}`;
+            
+            addLog(logMessage, 'success');
+            showStatus(`${winningTeam.name}'s turn to place a plate!`, 'info');
             
             // Clear form
-            document.getElementById('gameNotes').value = '';
+            document.getElementById('confirmContainer').style.display = 'none';
+            document.getElementById('queuedGameSelect').value = '';
+            document.getElementById('confirmNotes').value = '';
+            selectedQueuedGame = null;
         }
 
-        function resetGame() {
-            if (!confirm('Are you sure you want to reset the entire game? This cannot be undone.')) {
+        function updateGameQueue() {
+            const container = document.getElementById('gameQueue');
+            const countSpan = document.getElementById('queueCount');
+            
+            if (!gameState?.gameQueue || gameState.gameQueue.length === 0) {
+                container.innerHTML = '<p style="text-align: center; opacity: 0.7; font-style: italic; font-size: 0.85rem;">No games in queue</p>';
+                countSpan.textContent = '0';
                 return;
             }
             
-            if (activeListener) activeListener();
-            gameState = null;
+            const pendingGames = gameState.gameQueue.filter(g => g.status === 'pending');
+            countSpan.textContent = pendingGames.length.toString();
             
-            document.getElementById('gameId').value = '';
-            document.getElementById('playerNames').value = '';
-            document.getElementById('winCondition').value = '50';
+            if (pendingGames.length === 0) {
+                container.innerHTML = '<p style="text-align: center; opacity: 0.7; font-style: italic; font-size: 0.85rem;">No pending games</p>';
+                return;
+            }
             
-            updateDisplay();
-            addLog('🔄 Game reset', 'success');
-            showStatus('Game reset complete', 'success');
+            container.innerHTML = pendingGames.map(game => {
+                const teamNames = game.teams.map(t => t.name).join(' vs ');
+                return `
+                    <div class="queued-game ${game.status}" onclick="selectQueuedGameFromList(${game.id})">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <strong style="font-size: 0.9rem;">${game.game} - ${game.playType}</strong>
+                            <button onclick="event.stopPropagation(); removeFromQueue(${game.id})" 
+                                    style="background: rgba(239, 68, 68, 0.8); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px; line-height: 1; padding: 0;">×</button>
+                        </div>
+                        <div style="font-size: 0.85rem; opacity: 0.9;">${teamNames}</div>
+                        ${game.notes ? `<div style="font-size: 0.75rem; opacity: 0.7; margin-top: 3px;">${game.notes}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectQueuedGameFromList(gameId) {
+            switchTab('confirm');
+            document.getElementById('queuedGameSelect').value = gameId;
+            loadQueuedGame();
+        }
+
+        async function removeFromQueue(gameId) {
+            if (!confirm('Remove this game from queue?')) return;
+            
+            gameState.gameQueue = gameState.gameQueue.filter(g => g.id !== gameId);
+            await saveGameState();
+            updateGameQueue();
+            updateQueuedGameSelect();
+            addLog(`🗑️ Removed game from queue`, 'success');
+        }
+
+        function resetGame() {
+            if (!confirm('Are you sure you want to reset? This will clear the manual game setup but keep the loaded game data.')) {
+                return;
+            }
+            
+            // Only reset the manual game setup, not the entire gameState
+            manualGameSetup = { teamA: [], teamB: [] };
+            selectedQueuedGame = null;
+            
+            updateManualGameDisplay();
+            renderPlanTeamPool();
+            
+            addLog('🔄 Manual game setup cleared', 'success');
+            showStatus('Manual setup reset complete', 'success');
         }
 
         function updateDisplay() {
-            initializeHexBoard();
+            if (boardRenderer && gameState) {
+                boardRenderer.render(gameState);
+                
+                // Add click handlers to hexes
+                document.querySelectorAll('.board-hex').forEach(hex => {
+                    const coord = hex.dataset.coord;
+                    if (coord) {
+                        const matches = coord.match(/-?\d+/g);
+                        if (matches) {
+                            const [q, r] = matches.map(Number);
+                            hex.addEventListener('click', () => handleHexClick(q, r));
+                        }
+                    }
+                });
+            }
+            
             updateTeamsList();
             updateCurrentTurnInfo();
             updateStatistics();
-            updateWinningTeamDropdown();
+            updateGameQueue();
         }
 
         function updateTeamsList() {
@@ -891,7 +1604,7 @@
                 return;
             }
             
-            const sortedTeams = [...gameState.teams].sort((a, b) => b.points - a.points);
+            const sortedTeams = [...gameState.teams].sort((a, b) => (b.points || 0) - (a.points || 0));
             
             container.innerHTML = sortedTeams.map((team, index) => {
                 const isActive = gameState.currentTurn?.teamId === team.id;
@@ -905,7 +1618,7 @@
                                 <small>${team.players.map(p => p.name).join(' & ')}</small>
                             </div>
                             <div style="text-align: right;">
-                                <div style="font-size: 1.3rem; font-weight: bold;">${team.points}</div>
+                                <div style="font-size: 1.3rem; font-weight: bold;">${team.points || 0}</div>
                                 <div style="font-size: 0.8rem; opacity: 0.8;">${team.gamesWon || 0} wins</div>
                             </div>
                         </div>
@@ -918,7 +1631,7 @@
             const container = document.getElementById('currentTurnInfo');
             
             if (!gameState?.currentTurn) {
-                container.innerHTML = '<strong>⏳ No active turn - Add a game result to start</strong>';
+                container.innerHTML = '<strong>⏳ No active turn - Confirm a game result to start</strong>';
                 return;
             }
             
@@ -927,7 +1640,7 @@
                 <strong>🎯 ${team?.name}'s Turn</strong><br>
                 <small>${team?.players.map(p => p.name).join(' & ')}</small><br>
                 <div style="margin-top: 8px; color: #4ade80;">
-                    ${gameState.currentTurn.needsPlacement ? '📍 Click a green hex to place plate' : '✅ Placement complete'}
+                    ${gameState.currentTurn.needsPlacement ? '📍 Click a hex to place plate' : '✅ Placement complete'}
                 </div>
             `;
         }
@@ -947,20 +1660,6 @@
             document.getElementById('statHearts').textContent = Object.keys(gameState.heartHexControl || {}).length;
         }
 
-        function updateWinningTeamDropdown() {
-            const select = document.getElementById('winningTeam');
-            
-            if (!gameState?.teams) {
-                select.innerHTML = '<option value="">Initialize game first...</option>';
-                return;
-            }
-            
-            select.innerHTML = '<option value="">Select winner...</option>' +
-                gameState.teams.map(team => 
-                    `<option value="${team.id}">${team.name} (${team.players.map(p => p.name).join(' & ')})</option>`
-                ).join('');
-        }
-
         function highlightValidPlacements() {
             if (!gameState?.currentTurn) {
                 showStatus('No active turn', 'error');
@@ -970,13 +1669,16 @@
             clearHighlights();
             
             const teamId = gameState.currentTurn.teamId;
-            const coordinates = generateHexCoordinates();
+            const coordinates = boardModule.generateHexCoordinates();
             
+            // Add a CSS class that will style the ::before pseudo-element
+            // This ensures the highlight appears on TOP of the hex, not behind it
             coordinates.forEach(([q, r]) => {
                 if (canPlaceAt(q, r, teamId)) {
-                    const hexElement = document.getElementById(`hex-${q}-${r}`);
+                    const coord = `q${q}r${r}`;
+                    const hexElement = document.querySelector(`[data-coord="${coord}"]`);
                     if (hexElement) {
-                        hexElement.classList.add('can-place');
+                        hexElement.classList.add('can-place-highlight');
                     }
                 }
             });
@@ -985,8 +1687,9 @@
         }
 
         function clearHighlights() {
-            document.querySelectorAll('.hex.can-place').forEach(hex => {
-                hex.classList.remove('can-place');
+            // Remove the highlight class from all hexes
+            document.querySelectorAll('.board-hex.can-place-highlight').forEach(hex => {
+                hex.classList.remove('can-place-highlight');
             });
         }
 
@@ -1036,19 +1739,23 @@
         document.addEventListener('DOMContentLoaded', function() {
             addLog('👑 God Mode Admin Panel Ready');
             
+            // Initialize board modules
+            initializeBoardModules();
+            
             // Check for game ID in URL
             const urlParams = new URLSearchParams(window.location.search);
-            const gameId = urlParams.get('game');
+            const gameId = urlParams.get('gameId') || urlParams.get('game');
             if (gameId) {
                 document.getElementById('gameId').value = gameId;
-                loadGame();
-            }
-            
-            // Auto-generate game ID if empty
-            if (!document.getElementById('gameId').value) {
+                setTimeout(() => loadGame(), 1000);
+            } else {
+                // Auto-generate game ID if empty
                 const dateStr = new Date().toISOString().slice(0, 10);
                 document.getElementById('gameId').value = `game-${dateStr}`;
             }
+            
+            // Initialize manual game display
+            updateManualGameDisplay();
         });
 
         // Auto-save every 30 seconds
