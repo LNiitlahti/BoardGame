@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Board Game - Login</title>
+
+  <!-- Favicons -->
+  <link rel="apple-touch-icon" sizes="180x180" href="images/favicon/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="images/favicon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="images/favicon/favicon-16x16.png">
+  <link rel="manifest" href="images/favicon/site.webmanifest">
+  <link rel="shortcut icon" href="images/favicon/favicon.ico">
+
+  <script src="scripts/firebase-loader.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 450px;
+      width: 100%;
+    }
+
+    .logo-section {
+      text-align: center;
+      margin-bottom: 40px;
+      animation: fadeInDown 0.8s ease;
+    }
+
+    .logo-section h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #00d4ff 0%, #00ffc8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+      text-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
+    }
+
+    .logo-section p {
+      color: #aaa;
+      font-size: 1.1rem;
+      letter-spacing: 1px;
+    }
+
+    .auth-card {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      animation: fadeInUp 0.8s ease;
+    }
+
+    .auth-card h2 {
+      color: #00d4ff;
+      margin-bottom: 10px;
+      font-size: 1.8rem;
+      text-align: center;
+    }
+
+    .auth-card p {
+      text-align: center;
+      color: #aaa;
+      margin-bottom: 30px;
+      font-size: 0.9rem;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #00d4ff;
+      font-weight: 600;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 15px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      color: white;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #00d4ff;
+      background: rgba(255, 255, 255, 0.15);
+      box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+    }
+
+    .form-group input::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #00d4ff 0%, #00ffc8 100%);
+      border: none;
+      border-radius: 10px;
+      color: #1a1a1a;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 10px;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(0, 212, 255, 0.4);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn.secondary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn.secondary:hover {
+      box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+    }
+
+    .divider {
+      text-align: center;
+      margin: 30px 0;
+      position: relative;
+    }
+
+    .divider::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      width: 100%;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .divider span {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 0 15px;
+      position: relative;
+      color: #aaa;
+      font-size: 0.9rem;
+    }
+
+    .status-message {
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      text-align: center;
+      font-weight: 600;
+      display: none;
+      animation: slideIn 0.3s ease;
+    }
+
+    .status-message.success {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid #10b981;
+      color: #10b981;
+    }
+
+    .status-message.error {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid #ef4444;
+      color: #ef4444;
+    }
+
+    .status-message.info {
+      background: rgba(59, 130, 246, 0.2);
+      border: 1px solid #3b82f6;
+      color: #3b82f6;
+    }
+
+    .toggle-auth {
+      text-align: center;
+      margin-top: 20px;
+      color: #aaa;
+      font-size: 0.9rem;
+    }
+
+    .toggle-auth a {
+      color: #00d4ff;
+      text-decoration: none;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .toggle-auth a:hover {
+      color: #00ffc8;
+      text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+    }
+
+    /* Animations */
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* Loading spinner */
+    .spinner {
+      display: none;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #00d4ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .btn.loading {
+      position: relative;
+      color: transparent;
+    }
+
+    .btn.loading::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      top: 50%;
+      left: 50%;
+      margin-left: -10px;
+      margin-top: -10px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #1a1a1a;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .logo-section h1 {
+        font-size: 2.5rem;
+      }
+
+      .auth-card {
+        padding: 30px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo-section">
+      <h1>🎮 Board Game</h1>
+      <p>Tournament Management System</p>
+    </div>
+
+    <div id="statusMessage" class="status-message"></div>
+
+    <!-- Login Form -->
+    <div id="loginSection" class="auth-card">
+      <h2>Welcome Back</h2>
+      <p>Sign in to continue to your tournament</p>
+      
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" placeholder="your@email.com" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" placeholder="Enter your password" required>
+        </div>
+        
+        <button type="submit" class="btn" id="loginBtn">Sign In</button>
+      </form>
+
+      <div class="toggle-auth">
+        Don't have an account? <a onclick="showRegister()">Register here</a>
+      </div>
+    </div>
+
+    <!-- Registration Form -->
+    <div id="registerSection" class="auth-card" style="display: none;">
+      <h2>Create Account</h2>
+      <p>Register with a referral code to join</p>
+
+      <form id="registerForm">
+        <div class="form-group">
+          <label for="firstName">First Name</label>
+          <input type="text" id="firstName" placeholder="Your first name" required>
+        </div>
+
+        <div class="form-group">
+          <label for="lastName">Last Name</label>
+          <input type="text" id="lastName" placeholder="Your last name" required>
+        </div>
+
+        <div class="form-group">
+          <label for="registerEmail">Email</label>
+          <input type="email" id="registerEmail" placeholder="your@email.com" required>
+        </div>
+
+        <div class="form-group">
+          <label for="registerPassword">Password</label>
+          <input type="password" id="registerPassword" placeholder="Choose a strong password" required>
+        </div>
+
+        <div class="form-group">
+          <label for="referralCode">Referral Code</label>
+          <input type="text" id="referralCode" placeholder="Enter your referral code" required>
+        </div>
+
+        <button type="submit" class="btn secondary" id="registerBtn">Create Account</button>
+      </form>
+
+      <div class="toggle-auth">
+        Already have an account? <a onclick="showLogin()">Sign in here</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let auth;
+    let db;
+
+    // Wait for Firebase to be ready
+    document.addEventListener('firebase-ready', function() {
+      console.log("Firebase ready, setting up auth...");
+
+      auth = firebase.auth();
+      db = firebase.firestore();
+
+      // Monitor auth state
+      auth.onAuthStateChanged(user => {
+        if (user) {
+          console.log("User logged in:", user.uid);
+          showStatus('Login successful! Redirecting...', 'success');
+          setTimeout(() => {
+            window.location.href = 'index.html';
+          }, 1000);
+        }
+      });
+
+      // Login form submission
+      document.getElementById('loginForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        handleLogin();
+      });
+
+      // Register form submission
+      document.getElementById('registerForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        handleRegister();
+      });
+    });
+
+    function handleLogin() {
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const btn = document.getElementById('loginBtn');
+
+      if (!email || !password) {
+        showStatus('Please enter both email and password', 'error');
+        return;
+      }
+
+      // Show loading state
+      btn.classList.add('loading');
+      btn.disabled = true;
+
+      auth.signInWithEmailAndPassword(email, password)
+        .then(() => {
+          showStatus('Login successful!', 'success');
+        })
+        .catch(err => {
+          console.error('Login error:', err);
+          btn.classList.remove('loading');
+          btn.disabled = false;
+          
+          let message = 'Login failed. Please try again.';
+          if (err.code === 'auth/user-not-found') {
+            message = 'No account found with this email.';
+          } else if (err.code === 'auth/wrong-password') {
+            message = 'Incorrect password.';
+          } else if (err.code === 'auth/invalid-email') {
+            message = 'Invalid email address.';
+          }
+          
+          showStatus(message, 'error');
+        });
+    }
+
+    function handleRegister() {
+      const firstName = document.getElementById('firstName').value.trim();
+      const lastName = document.getElementById('lastName').value.trim();
+      const email = document.getElementById('registerEmail').value.trim();
+      const password = document.getElementById('registerPassword').value;
+      const code = document.getElementById('referralCode').value.trim();
+      const btn = document.getElementById('registerBtn');
+
+      if (!firstName || !lastName || !email || !password || !code) {
+        showStatus('Please fill in all fields', 'error');
+        return;
+      }
+
+      if (password.length < 6) {
+        showStatus('Password must be at least 6 characters', 'error');
+        return;
+      }
+
+      // Show loading state
+      btn.classList.add('loading');
+      btn.disabled = true;
+
+      let userId;
+
+      // Check if referral code exists and is unused
+      db.collection("referralCodes").doc(code).get().then(doc => {
+        if (!doc.exists) {
+          throw new Error('Invalid referral code');
+        }
+        if (doc.data().used) {
+          throw new Error('This referral code has already been used');
+        }
+
+        // Create the user
+        return auth.createUserWithEmailAndPassword(email, password);
+      })
+      .then(cred => {
+        userId = cred.user.uid;
+
+        // Create user document in Firestore
+        return db.collection("users").doc(userId).set({
+          uid: userId,
+          email: email,
+          firstName: firstName,
+          lastName: lastName,
+          displayName: firstName,  // Use first name as display name (player name)
+          fullName: `${firstName} ${lastName}`,
+
+          // Role flags (default: no special roles)
+          isAdmin: false,
+          isSuperAdmin: false,
+          isGod: false,
+
+          // Appointment fields (null until admin assigns)
+          assignedGameId: null,
+          assignedTeamId: null,
+          assignedTeamName: null,
+          appointedAt: null,
+          appointedBy: null,
+
+          // Metadata
+          createdAt: new Date().toISOString(),
+          lastLogin: new Date().toISOString(),
+          referralCode: code
+        });
+      })
+      .then(() => {
+        // Mark referral code as used
+        return db.collection("referralCodes").doc(code).set({
+          used: true,
+          assignedTo: userId,
+          assignedEmail: email,
+          assignedName: `${firstName} ${lastName}`,
+          usedAt: new Date().toISOString()
+        }, { merge: true });
+      })
+      .then(() => {
+        showStatus('Registration successful! Redirecting...', 'success');
+      })
+      .catch(err => {
+        console.error('Registration error:', err);
+        btn.classList.remove('loading');
+        btn.disabled = false;
+
+        let message = err.message || 'Registration failed. Please try again.';
+        if (err.code === 'auth/email-already-in-use') {
+          message = 'An account with this email already exists.';
+        } else if (err.code === 'auth/invalid-email') {
+          message = 'Invalid email address.';
+        } else if (err.code === 'auth/weak-password') {
+          message = 'Password is too weak. Use at least 6 characters.';
+        }
+
+        showStatus(message, 'error');
+      });
+    }
+
+    function showLogin() {
+      document.getElementById('loginSection').style.display = 'block';
+      document.getElementById('registerSection').style.display = 'none';
+      hideStatus();
+    }
+
+    function showRegister() {
+      document.getElementById('loginSection').style.display = 'none';
+      document.getElementById('registerSection').style.display = 'block';
+      hideStatus();
+    }
+
+    function showStatus(message, type) {
+      const statusEl = document.getElementById('statusMessage');
+      statusEl.textContent = message;
+      statusEl.className = `status-message ${type}`;
+      statusEl.style.display = 'block';
+      
+      // Auto-hide after 5 seconds for errors
+      if (type === 'error') {
+        setTimeout(() => {
+          hideStatus();
+        }, 5000);
+      }
+    }
+
+    function hideStatus() {
+      const statusEl = document.getElementById('statusMessage');
+      statusEl.style.display = 'none';
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,831 @@
+/* God Mode Specific Styles */
+
+/* Additional styles specific to god mode */
+body {
+    padding: 0;
+    margin: 0;
+}
+
+.container {
+    max-width: 100%;
+    padding: 15px;
+}
+
+.main-grid {
+    display: grid;
+    grid-template-columns: 380px 1fr 380px;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+/* Override the styles.css connection-status box style with a proper circle */
+#connectionStatus.connection-status {
+    position: fixed;
+    top: 15px;
+    right: 15px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    z-index: 1000;
+    box-shadow: 0 0 10px currentColor;
+    transition: all 0.3s ease;
+    border: 2px solid;
+    padding: 0; /* Override styles.css padding */
+    font-size: 0; /* Hide any text */
+}
+
+#connectionStatus.connection-status.connected {
+    background: #4ade80;
+    border-color: #22c55e;
+    box-shadow: 0 0 15px #4ade80;
+}
+
+#connectionStatus.connection-status.disconnected {
+    background: #f87171;
+    border-color: #ef4444;
+    box-shadow: 0 0 15px #f87171;
+}
+
+#connectionStatus.connection-status.warning {
+    background: #fbbf24;
+    border-color: #f59e0b;
+    box-shadow: 0 0 15px #fbbf24;
+}
+
+/* Board container needs proper wrapper structure */
+.board-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.hex-board-wrapper {
+    position: relative;
+    width: 100%;
+    height: 700px;
+    overflow: hidden;
+}
+
+/* Highlighting for valid placements - targets the ::before pseudo-element */
+.board-hex.can-place-highlight::before {
+    background: rgba(74, 222, 128, 0.9) !important;
+    box-shadow: 0 0 20px rgba(74, 222, 128, 0.8);
+    animation: pulse-highlight 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-highlight {
+    0%, 100% {
+        opacity: 0.8;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.05);
+    }
+}
+
+/* Game Queue Styles */
+.queue-container {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 15px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.queued-game {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    border-left: 4px solid #ffd700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.queued-game:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateX(5px);
+}
+
+.queued-game.pending {
+    border-left-color: #60a5fa;
+}
+
+.queued-game.ready {
+    border-left-color: #4ade80;
+}
+
+/* Plan Game Interface */
+.plan-game-container {
+    display: flex;
+    gap: 15px;
+    margin-top: 15px;
+    min-height: 250px;
+}
+
+.team-pool {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 15px;
+    border-radius: 10px;
+    border: 2px dashed rgba(255, 255, 255, 0.3);
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.team-pool h4 {
+    color: #ffd700;
+    margin-bottom: 10px;
+    font-size: 1rem;
+    position: sticky;
+    top: 0;
+    background: inherit;
+    padding-bottom: 10px;
+}
+
+.team-slots-container {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.team-slot {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 15px;
+    border-radius: 10px;
+    border: 2px dashed rgba(255, 255, 255, 0.3);
+    min-height: 80px;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.team-slot.drag-over {
+    background: rgba(74, 222, 128, 0.2);
+    border-color: #4ade80;
+}
+
+.team-slot h5 {
+    margin-bottom: 8px;
+    color: #ffd700;
+    font-size: 0.9rem;
+}
+
+.team-slot.slot-0 { border-color: rgba(59, 130, 246, 0.5); }
+.team-slot.slot-1 { border-color: rgba(239, 68, 68, 0.5); }
+.team-slot.slot-2 { border-color: rgba(34, 197, 94, 0.5); }
+.team-slot.slot-3 { border-color: rgba(251, 146, 60, 0.5); }
+
+.team-box {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: move;
+    border-left: 4px solid;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.team-box:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateX(3px);
+}
+
+.team-box.dragging {
+    opacity: 0.5;
+}
+
+.team-box.team1 { border-left-color: #ff4444; }
+.team-box.team2 { border-left-color: #44ff44; }
+.team-box.team3 { border-left-color: #4444ff; }
+.team-box.team4 { border-left-color: #ffff44; }
+.team-box.team5 { border-left-color: #ff44ff; }
+
+.team-box.in-slot {
+    cursor: default;
+}
+
+.remove-team {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: rgba(239, 68, 68, 0.8);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    padding: 0;
+}
+
+.remove-team:hover {
+    background: rgba(239, 68, 68, 1);
+}
+
+.team-name {
+    font-weight: 600;
+    margin-bottom: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.95rem;
+}
+
+.players-container {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.player-tag {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 0.8rem;
+    cursor: move;
+    transition: all 0.2s ease;
+    display: inline-block;
+    margin: 2px;
+}
+
+.player-tag:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+.player-tag.dragging {
+    opacity: 0.5;
+}
+
+.team-box.team1 .player-tag { background: rgba(255, 68, 68, 0.4); border: 1px solid rgba(255, 68, 68, 0.6); }
+.team-box.team2 .player-tag { background: rgba(68, 255, 68, 0.4); border: 1px solid rgba(68, 255, 68, 0.6); }
+.team-box.team3 .player-tag { background: rgba(68, 68, 255, 0.4); border: 1px solid rgba(68, 68, 255, 0.6); }
+.team-box.team4 .player-tag { background: rgba(255, 255, 68, 0.4); border: 1px solid rgba(255, 255, 68, 0.6); }
+.team-box.team5 .player-tag { background: rgba(255, 68, 255, 0.4); border: 1px solid rgba(255, 68, 255, 0.6); }
+
+/* Editable player names */
+.editable-player-name {
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.editable-player-name:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.editable-player-name.editing {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid #ffd700;
+    outline: none;
+}
+
+/* Manual game setup - player-based drop zones */
+.player-drop-zone {
+    min-height: 100px;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px dashed rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+    margin-bottom: 10px;
+}
+
+.player-drop-zone.drag-over {
+    background: rgba(74, 222, 128, 0.2);
+    border-color: #4ade80;
+}
+
+.player-drop-zone.team-a {
+    border-color: rgba(59, 130, 246, 0.5);
+}
+
+.player-drop-zone.team-b {
+    border-color: rgba(239, 68, 68, 0.5);
+}
+
+.assigned-player {
+    display: inline-block;
+    padding: 6px 10px;
+    margin: 4px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    position: relative;
+    padding-right: 25px;
+}
+
+.assigned-player .remove-player {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    background: rgba(239, 68, 68, 0.8);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    font-size: 10px;
+    line-height: 1;
+    padding: 0;
+}
+
+/* Confirm Result Interface */
+.confirm-container {
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    margin-top: 15px;
+}
+
+.teams-display {
+    display: flex;
+    gap: 10px;
+    margin: 15px 0;
+    flex-wrap: wrap;
+}
+
+.winner-checkbox {
+    margin-right: 10px;
+    transform: scale(1.2);
+    cursor: pointer;
+}
+
+.winner-label {
+    cursor: pointer;
+    user-select: none;
+}
+
+.tab-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.tab-btn.active {
+    background: rgba(255, 215, 0, 0.2);
+    border-color: #ffd700;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Tournament Card Styles */
+.tournament-card {
+    background: rgba(51, 65, 85, 0.5);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-left: 4px solid #334155;
+    transition: all 0.3s;
+}
+
+.tournament-card:hover {
+    border-left-color: #06b6d4;
+    background: rgba(51, 65, 85, 0.7);
+    transform: translateX(5px);
+}
+
+.tournament-card.active,
+.tournament-card.playing {
+    border-left-color: #10b981;
+}
+
+.tournament-card.finished {
+    border-left-color: #a855f7;
+}
+
+.tournament-card.archived {
+    opacity: 0.5;
+}
+
+.tournament-title {
+    font-weight: 600;
+    color: #06b6d4;
+    margin-bottom: 5px;
+}
+
+.tournament-meta {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    margin-bottom: 10px;
+}
+
+.tournament-actions {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.tournament-actions button {
+    padding: 5px 10px;
+    font-size: 0.8rem;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-load {
+    background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+    color: white;
+}
+
+.btn-view {
+    background: linear-gradient(135deg, #a855f7 0%, #8b5cf6 100%);
+    color: white;
+}
+
+.btn-edit {
+    background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+    color: white;
+}
+
+.btn-more {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.modal-content {
+    background: #1e293b;
+    border-radius: 15px;
+    padding: 0;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+    padding: 20px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+@media (max-width: 1400px) {
+    .main-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .plan-game-container {
+        flex-direction: column;
+    }
+}
+
+/* Main Navigation Tabs */
+.god-nav {
+    display: flex;
+    gap: 0;
+    background: rgba(15, 23, 42, 0.9);
+    border-radius: 10px;
+    padding: 5px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.god-nav-tab {
+    flex: 1;
+    padding: 12px 20px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.god-nav-tab:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.god-nav-tab.active {
+    background: linear-gradient(135deg, #ffd700 0%, #f59e0b 100%);
+    color: #0f172a;
+    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+}
+
+/* Tab Content Panels */
+.god-tab-panel {
+    display: none;
+}
+
+.god-tab-panel.active {
+    display: block;
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Matches tab specific layout */
+.matches-layout {
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    gap: 20px;
+}
+
+/* Board tab full-width layout */
+.board-layout {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Teams tab 2-column layout */
+.teams-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+/* User Management Styles - Table Layout */
+.user-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(15, 23, 42, 0.5);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.user-table th {
+    background: rgba(255, 255, 255, 0.05);
+    color: #00d4ff;
+    font-weight: 600;
+    padding: 12px;
+    text-align: left;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.user-table td {
+    padding: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: white;
+    font-size: 0.9rem;
+}
+
+.user-table tr:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.user-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Action buttons in table */
+.user-table .btn-small {
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin: 2px;
+    white-space: nowrap;
+}
+
+.user-table .btn-edit {
+    background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+    color: white;
+}
+
+.user-table .btn-edit:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+}
+
+.user-table .btn-delete {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+}
+
+.user-table .btn-delete:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
+}
+
+.user-table .btn-toggle {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.user-table .btn-toggle:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* Legacy card styles (keeping for backwards compatibility) */
+.user-card {
+    background: rgba(51, 65, 85, 0.5);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-left: 4px solid #334155;
+    transition: all 0.3s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.user-card:hover {
+    background: rgba(51, 65, 85, 0.7);
+    transform: translateX(5px);
+}
+
+.user-card.god {
+    border-left-color: #ffd700;
+}
+
+.user-card.admin {
+    border-left-color: #667eea;
+}
+
+.user-card.player {
+    border-left-color: #00d4ff;
+}
+
+.user-card.user {
+    border-left-color: #94a3b8;
+}
+
+.user-card.disabled {
+    opacity: 0.5;
+}
+
+.user-info {
+    flex: 1;
+}
+
+.user-name {
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: white;
+    margin-bottom: 5px;
+}
+
+.user-email {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    margin-bottom: 5px;
+}
+
+.user-uid {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+    font-family: monospace;
+}
+
+.user-role-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-right: 8px;
+    margin-top: 5px;
+}
+
+.user-role-badge.god {
+    background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+    color: #1a1a1a;
+}
+
+.user-role-badge.admin {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.user-role-badge.player {
+    background: linear-gradient(135deg, #00d4ff 0%, #00ffc8 100%);
+    color: #1a1a1a;
+}
+
+.user-role-badge.user {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.user-status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-top: 5px;
+}
+
+.user-status-badge.enabled {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    border: 1px solid #10b981;
+}
+
+.user-status-badge.disabled {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border: 1px solid #ef4444;
+}
+
+.user-actions {
+    display: flex;
+    gap: 5px;
+    flex-direction: column;
+}
+
+.user-actions button {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.btn-edit-user {
+    background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+    color: white;
+}
+
+.btn-delete-user {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+}
+
+.btn-toggle-user {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+/* User Appointment System Styles */
+.user-drag-item {
+    transition: all 0.3s ease;
+}
+
+.user-drag-item:hover {
+    background: rgba(51, 65, 85, 0.7) !important;
+    transform: translateX(5px);
+    box-shadow: 0 4px 8px rgba(6, 182, 212, 0.3);
+}
+
+.user-drag-item.dragging {
+    opacity: 0.5;
+    transform: rotate(2deg);
+}

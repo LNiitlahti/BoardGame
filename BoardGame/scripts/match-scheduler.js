@@ -1,471 +1,280 @@
 /**
- * MATCH SCHEDULER
- * Handles tournament match generation with Rotating Split-Team System
- * 
- * System: One team is always split between two sides (TEAM_A and TEAM_B)
- * The split team rotates each round for fair distribution
+ * MATCH SCHEDULER - Template Generator
+ * Generates match templates without specific player assignments
+ * Admin assigns players manually in god.html
  */
 
 class MatchScheduler {
     constructor(teams, games) {
         this.teams = teams || [];
-        this.games = games || [];
-        this.matches = [];
-        this.currentSplitTeamIndex = 0;
+        this.games = games || []; // Array of {name, format, icon}
+        this.templates = [];
     }
 
     /**
-     * Generate matches using Rotating Split-Team System
-     * 
-     * Pattern for 5 teams:
-     * Round 1: Team5 splits → TEAM_A: [1,2,5a] vs TEAM_B: [3,4,5b]
-     * Round 2: Team4 splits → TEAM_A: [1,2,4a] vs TEAM_B: [3,5,4b]
-     * Round 3: Team3 splits → TEAM_A: [1,2,3a] vs TEAM_B: [4,5,3b]
-     * Round 4: Team2 splits → TEAM_A: [1,4,2a] vs TEAM_B: [3,5,2b]
-     * Round 5: Team1 splits → TEAM_A: [2,4,1a] vs TEAM_B: [3,5,1b]
-     * 
-     * Game rotation: Max 3 of same game consecutively, then rotate
-     * Example: CS2, CS2, CS2, Dota2, Dota2, Dota2, Valorant...
-     * 
-     * @param {Object} options - Configuration options
-     * @returns {Array} Array of match objects
+     * Generate match templates based on game rotation
+     * No player assignment - just placeholders
      */
-    generateRotatingSplitTeam(options = {}) {
+    generateMatchTemplates(options = {}) {
         const {
-            maxConsecutiveGames = 3,  // Max same game in a row
-            startFromTeam = null,
-            totalMatches = null  // If null, generates full rotation cycle
+            totalMatches = 15,
+            maxConsecutiveGames = 3
         } = options;
-
-        if (this.teams.length < 3) {
-            throw new Error('Need at least 3 teams for Rotating Split-Team System');
-        }
 
         if (this.games.length === 0) {
             throw new Error('Need at least 1 game');
         }
 
-        this.matches = [];
+        this.templates = [];
         
-        // Calculate how many matches to generate
-        const matchCount = totalMatches || (this.teams.length * this.games.length * maxConsecutiveGames);
-        
-        // Determine starting split team
-        this.currentSplitTeamIndex = startFromTeam !== null 
-            ? startFromTeam 
-            : this.teams.length - 1; // Start with last team by default
-
-        let matchId = 1;
+        let templateId = 1;
         let currentGameIndex = 0;
-        let consecutiveGameCount = 0;
+        let gameSequenceCount = 0;
 
-        // Generate matches
-        for (let i = 0; i < matchCount; i++) {
-            // Get current game
-            const game = this.games[currentGameIndex];
+        for (let round = 1; round <= totalMatches; round++) {
+            const gameConfig = this.games[currentGameIndex];
+            const gameName = typeof gameConfig === 'string' ? gameConfig : gameConfig.name || gameConfig;
+            const format = gameConfig.format || '5v5';
+            const icon = gameConfig.icon || '🎮';
             
-            // Get current split team
-            const splitTeamIndex = this.currentSplitTeamIndex;
-            const splitTeam = this.teams[splitTeamIndex];
-            
-            // Validate split team has 2 players
-            if (!splitTeam.players || splitTeam.players.length < 2) {
-                throw new Error(`Team ${splitTeam.name} must have at least 2 players`);
+            gameSequenceCount++;
+
+            // Determine how many sub-matches this creates
+            let subMatches = 1;
+            if (format === '2v2x2') subMatches = 2;
+            if (format === '3v3+2v2') subMatches = 2;
+
+            for (let sub = 0; sub < subMatches; sub++) {
+                const template = {
+                    id: templateId++,
+                    round,
+                    subMatch: subMatches > 1 ? String.fromCharCode(65 + sub) : null, // A, B, C...
+                    game: gameName,
+                    gameIcon: icon,
+                    format: format,
+                    gameSequence: gameSequenceCount,
+                    
+                    // Player slots - to be filled by admin
+                    teamA: {
+                        name: 'TEAM_A',
+                        players: [],
+                        requiredPlayers: this.getRequiredPlayers(format, 'A')
+                    },
+                    teamB: {
+                        name: 'TEAM_B',
+                        players: [],
+                        requiredPlayers: this.getRequiredPlayers(format, 'B')
+                    },
+                    
+                    // Suggested assignment (for admin convenience)
+                    suggestedPlayers: this.suggestPlayers(format, round),
+                    
+                    status: 'template', // template → planned → playing → completed
+                    winner: null,
+                    actualPlayers: null, // Filled when admin confirms
+                    notes: ''
+                };
+
+                this.templates.push(template);
             }
 
-            const [playerA, playerB] = splitTeam.players;
-
-            // Build TEAM_A and TEAM_B
-            const teamA = this.buildTeamA(splitTeamIndex, playerA);
-            const teamB = this.buildTeamB(splitTeamIndex, playerB);
-
-            // Calculate round number (each full team rotation = 1 round)
-            const round = Math.floor(i / this.teams.length) + 1;
-            const subRound = (i % this.teams.length) + 1;
-
-            // Create match object
-            const match = {
-                id: matchId++,
-                round: round,
-                subRound: subRound,
-                game: game,
-                gameSequence: consecutiveGameCount + 1, // Which occurrence of this game (1st, 2nd, 3rd)
-                splitTeam: {
-                    id: splitTeam.id,
-                    name: splitTeam.name,
-                    color: splitTeam.color
-                },
-                teamA: teamA,
-                teamB: teamB,
-                status: 'waiting',
-                winner: null,
-                timestamp: null
-            };
-
-            this.matches.push(match);
-
-            // Rotate split team (backwards through team list)
-            this.currentSplitTeamIndex = (this.currentSplitTeamIndex - 1 + this.teams.length) % this.teams.length;
-
-            // Handle game rotation
-            consecutiveGameCount++;
-            
-            // After maxConsecutiveGames of same game, rotate to next game
-            if (consecutiveGameCount >= maxConsecutiveGames) {
+            // Rotate game after maxConsecutiveGames
+            if (gameSequenceCount >= maxConsecutiveGames) {
                 currentGameIndex = (currentGameIndex + 1) % this.games.length;
-                consecutiveGameCount = 0;
+                gameSequenceCount = 0;
             }
         }
 
-        return this.matches;
+        return this.templates;
     }
 
     /**
-     * Build TEAM_A composition
-     * Default: Team1 + Team2 + one player from split team
+     * Get required number of players per side based on format
      */
-    buildTeamA(splitTeamIndex, splitPlayer) {
-        const team = {
-            name: 'TEAM_A',
-            players: [],
-            teams: []
+    getRequiredPlayers(format, side) {
+        const formats = {
+            '5v5': { A: 5, B: 5 },
+            '3v3': { A: 3, B: 3 },
+            '2v2': { A: 2, B: 2 },
+            '2v2x2': { A: 2, B: 2 },
+            '3v3+2v2': { A: 3, B: 3 } // This would need sub-match logic
+        };
+        return formats[format]?.[side] || 5;
+    }
+
+    /**
+     * Suggest player assignments based on fairness and rotation
+     * This is just a suggestion - admin can override
+     */
+    suggestPlayers(format, round) {
+        if (!this.teams || this.teams.length === 0) {
+            return { teamA: [], teamB: [], note: 'No teams available' };
+        }
+
+        // Simple rotation: alternate which team gets split
+        const splitTeamIndex = (this.teams.length - (round % this.teams.length)) % this.teams.length;
+        
+        if (format === '5v5') {
+            return this.suggest5v5Split(splitTeamIndex);
+        } else if (format === '2v2') {
+            return this.suggest2v2();
+        }
+        
+        return { teamA: [], teamB: [], note: 'Manual assignment needed' };
+    }
+
+    /**
+     * Suggest 5v5 split-team assignment
+     */
+    suggest5v5Split(splitTeamIndex) {
+        const suggestion = {
+            teamA: [],
+            teamB: [],
+            splitTeam: this.teams[splitTeamIndex]?.name,
+            note: `Suggested split: ${this.teams[splitTeamIndex]?.name}`
         };
 
-        // Add full teams (excluding split team)
-        for (let i = 0; i < Math.ceil(this.teams.length / 2) - 1; i++) {
-            if (i !== splitTeamIndex) {
-                const fullTeam = this.teams[i];
-                team.teams.push({
-                    id: fullTeam.id,
-                    name: fullTeam.name,
-                    color: fullTeam.color
-                });
-                team.players.push(...fullTeam.players);
-            }
+        const otherTeams = this.teams.filter((_, idx) => idx !== splitTeamIndex);
+        const teamsPerSide = Math.floor(otherTeams.length / 2);
+
+        // Team A gets first half of other teams + player 1 from split team
+        for (let i = 0; i < teamsPerSide; i++) {
+            const team = otherTeams[i];
+            team.players?.forEach(p => suggestion.teamA.push({
+                name: p.name,
+                teamName: team.name,
+                teamColor: team.color
+            }));
+        }
+        
+        // Add split player 1
+        if (this.teams[splitTeamIndex]?.players?.[0]) {
+            suggestion.teamA.push({
+                name: this.teams[splitTeamIndex].players[0].name,
+                teamName: this.teams[splitTeamIndex].name,
+                teamColor: this.teams[splitTeamIndex].color,
+                split: true
+            });
         }
 
-        // Add one player from split team
-        team.players.push({
-            ...splitPlayer,
-            fromSplitTeam: true
-        });
+        // Team B gets second half + player 2 from split team
+        for (let i = teamsPerSide; i < otherTeams.length; i++) {
+            const team = otherTeams[i];
+            team.players?.forEach(p => suggestion.teamB.push({
+                name: p.name,
+                teamName: team.name,
+                teamColor: team.color
+            }));
+        }
+        
+        // Add split player 2
+        if (this.teams[splitTeamIndex]?.players?.[1]) {
+            suggestion.teamB.push({
+                name: this.teams[splitTeamIndex].players[1].name,
+                teamName: this.teams[splitTeamIndex].name,
+                teamColor: this.teams[splitTeamIndex].color,
+                split: true
+            });
+        }
 
-        return team;
+        return suggestion;
     }
 
     /**
-     * Build TEAM_B composition
-     * Default: Team3 + Team4 + one player from split team
+     * Suggest 2v2 assignment
      */
-    buildTeamB(splitTeamIndex, splitPlayer) {
-        const team = {
-            name: 'TEAM_B',
-            players: [],
-            teams: []
+    suggest2v2() {
+        const suggestion = {
+            teamA: [],
+            teamB: [],
+            note: 'Suggested 2v2 matchup'
         };
 
-        // Add full teams (excluding split team)
-        const halfPoint = Math.ceil(this.teams.length / 2) - 1;
-        for (let i = halfPoint; i < this.teams.length; i++) {
-            if (i !== splitTeamIndex) {
-                const fullTeam = this.teams[i];
-                team.teams.push({
-                    id: fullTeam.id,
-                    name: fullTeam.name,
-                    color: fullTeam.color
-                });
-                team.players.push(...fullTeam.players);
-            }
+        if (this.teams.length >= 2) {
+            // Team A = Team 1
+            this.teams[0].players?.forEach(p => suggestion.teamA.push({
+                name: p.name,
+                teamName: this.teams[0].name,
+                teamColor: this.teams[0].color
+            }));
+
+            // Team B = Team 2
+            this.teams[1].players?.forEach(p => suggestion.teamB.push({
+                name: p.name,
+                teamName: this.teams[1].name,
+                teamColor: this.teams[1].color
+            }));
         }
 
-        // Add one player from split team
-        team.players.push({
-            ...splitPlayer,
-            fromSplitTeam: true
-        });
-
-        return team;
+        return suggestion;
     }
 
     /**
-     * Generate traditional Round-Robin schedule
-     * Every team plays every other team
-     */
-    generateRoundRobin() {
-        this.matches = [];
-        let matchId = 1;
-
-        for (const game of this.games) {
-            for (let i = 0; i < this.teams.length; i++) {
-                for (let j = i + 1; j < this.teams.length; j++) {
-                    this.matches.push({
-                        id: matchId++,
-                        game: game,
-                        team1: this.teams[i],
-                        team2: this.teams[j],
-                        status: 'waiting',
-                        winner: null,
-                        timestamp: null
-                    });
-                }
-            }
-        }
-
-        return this.matches;
-    }
-
-    /**
-     * Validate the generated schedule
-     * Check for balance, fairness, and edge cases
+     * Validate templates
      */
     validate() {
-        const validation = {
-            valid: true,
-            errors: [],
+        return {
+            valid: this.templates.length > 0,
+            errors: this.templates.length === 0 ? ['No templates generated'] : [],
             warnings: [],
-            stats: {}
-        };
-
-        if (this.matches.length === 0) {
-            validation.valid = false;
-            validation.errors.push('No matches generated');
-            return validation;
-        }
-
-        // Validate game rotation (max 3 consecutive)
-        const gameRotation = this.validateGameRotation(3);
-        if (!gameRotation.valid) {
-            validation.warnings.push(gameRotation.message);
-            validation.stats.gameRotationViolations = gameRotation.violations;
-        }
-
-        // Count how many times each team is split
-        const splitCounts = {};
-        this.teams.forEach(team => {
-            splitCounts[team.id] = 0;
-        });
-
-        this.matches.forEach(match => {
-            if (match.splitTeam) {
-                splitCounts[match.splitTeam.id]++;
+            stats: {
+                totalTemplates: this.templates.length,
+                byFormat: this.getFormatDistribution()
             }
-        });
-
-        // Check if splits are balanced
-        const splitValues = Object.values(splitCounts);
-        const maxSplits = Math.max(...splitValues);
-        const minSplits = Math.min(...splitValues);
-
-        if (maxSplits - minSplits > 1) {
-            validation.warnings.push(`Uneven split distribution: ${minSplits}-${maxSplits} splits per team`);
-        }
-
-        // Check each team appears fair number of times
-        const appearances = {};
-        this.teams.forEach(team => {
-            appearances[team.id] = 0;
-        });
-
-        this.matches.forEach(match => {
-            if (match.teamA) {
-                match.teamA.teams?.forEach(t => appearances[t.id]++);
-            }
-            if (match.teamB) {
-                match.teamB.teams?.forEach(t => appearances[t.id]++);
-            }
-        });
-
-        // Check game distribution
-        const gameDistribution = {};
-        this.matches.forEach(match => {
-            if (!gameDistribution[match.game]) {
-                gameDistribution[match.game] = 0;
-            }
-            gameDistribution[match.game]++;
-        });
-
-        validation.stats = {
-            totalMatches: this.matches.length,
-            totalRounds: Math.max(...this.matches.map(m => m.round || 0)),
-            splitDistribution: splitCounts,
-            appearances: appearances,
-            gameDistribution: gameDistribution,
-            gameRotationPattern: this.getGameRotationPattern()
-        };
-
-        return validation;
-    }
-
-    /**
-     * Get matches for a specific round
-     */
-    getMatchesForRound(round) {
-        return this.matches.filter(m => m.round === round);
-    }
-
-    /**
-     * Get next unplayed match
-     */
-    getNextMatch() {
-        return this.matches.find(m => m.status === 'waiting');
-    }
-
-    /**
-     * Record match result
-     */
-    recordMatchResult(matchId, winner) {
-        const match = this.matches.find(m => m.id === matchId);
-        if (!match) {
-            throw new Error(`Match ${matchId} not found`);
-        }
-
-        match.status = 'completed';
-        match.winner = winner;
-        match.timestamp = new Date().toISOString();
-
-        return match;
-    }
-
-    /**
-     * Export schedule to Firebase format
-     */
-    exportForFirebase() {
-        return {
-            matches: this.matches,
-            teams: this.teams,
-            games: this.games,
-            schedulerType: 'rotating-split-team',
-            generatedAt: new Date().toISOString(),
-            validation: this.validate()
         };
     }
 
-    /**
-     * Get schedule statistics
-     */
-    getStats() {
-        const totalGames = this.matches.length;
-        const completedGames = this.matches.filter(m => m.status === 'completed').length;
-        const remainingGames = totalGames - completedGames;
-
-        return {
-            totalMatches: totalGames,
-            completed: completedGames,
-            remaining: remainingGames,
-            progress: totalGames > 0 ? (completedGames / totalGames * 100).toFixed(1) : 0,
-            currentRound: this.getCurrentRound()
-        };
+    getFormatDistribution() {
+        const dist = {};
+        this.templates.forEach(t => {
+            dist[t.format] = (dist[t.format] || 0) + 1;
+        });
+        return dist;
     }
 
     /**
-     * Get current round number
-     */
-    getCurrentRound() {
-        const nextMatch = this.getNextMatch();
-        return nextMatch ? nextMatch.round : this.matches.length > 0 ? Math.max(...this.matches.map(m => m.round)) : 0;
-    }
-
-    /**
-     * Preview match schedule as text
+     * Preview schedule
      */
     previewSchedule() {
-        let preview = '=== MATCH SCHEDULE ===\n\n';
-        preview += `Total Matches: ${this.matches.length}\n`;
-        preview += `Game Rotation: Max 3 consecutive games\n\n`;
+        let preview = '=== MATCH SCHEDULE (TEMPLATES) ===\n\n';
+        preview += `Total Templates: ${this.templates.length}\n`;
+        preview += 'Player assignments will be made by admin\n\n';
 
-        const rounds = [...new Set(this.matches.map(m => m.round))];
-        
-        rounds.forEach(round => {
-            preview += `ROUND ${round}\n`;
-            preview += '─'.repeat(50) + '\n';
-
-            const roundMatches = this.getMatchesForRound(round);
-            roundMatches.forEach(match => {
-                const gameSeq = match.gameSequence ? `(#${match.gameSequence})` : '';
-                preview += `Match ${match.id}: ${match.game} ${gameSeq}\n`;
-                
-                if (match.splitTeam) {
-                    preview += `  Split Team: ${match.splitTeam.name}\n`;
-                    preview += `  TEAM_A: ${match.teamA.teams.map(t => t.name).join(' + ')} + Split Player\n`;
-                    preview += `  TEAM_B: ${match.teamB.teams.map(t => t.name).join(' + ')} + Split Player\n`;
-                } else if (match.team1 && match.team2) {
-                    preview += `  ${match.team1.name} vs ${match.team2.name}\n`;
-                }
-                
-                preview += '\n';
-            });
-            preview += '\n';
+        this.templates.forEach(template => {
+            const subMatch = template.subMatch ? ` (${template.subMatch})` : '';
+            preview += `Round ${template.round}${subMatch}: ${template.game} (${template.format})\n`;
+            preview += `  Match #${template.id} - Sequence: ${template.gameSequence}\n`;
+            
+            if (template.suggestedPlayers?.splitTeam) {
+                preview += `  Suggested split: ${template.suggestedPlayers.splitTeam}\n`;
+            }
+            
+            preview += `  TEAM_A needs: ${template.teamA.requiredPlayers} players\n`;
+            preview += `  TEAM_B needs: ${template.teamB.requiredPlayers} players\n\n`;
         });
 
         return preview;
     }
 
     /**
-     * Get game rotation visualization
-     * Shows how games are distributed across matches
+     * Export for Firebase
      */
-    getGameRotationPattern() {
-        const pattern = {
-            sequence: [],
-            distribution: {}
-        };
-
-        this.matches.forEach((match, index) => {
-            pattern.sequence.push({
-                matchId: match.id,
-                game: match.game,
-                gameSequence: match.gameSequence || 1
-            });
-
-            if (!pattern.distribution[match.game]) {
-                pattern.distribution[match.game] = [];
-            }
-            pattern.distribution[match.game].push(match.id);
-        });
-
-        return pattern;
-    }
-
-    /**
-     * Validate game rotation (no more than maxConsecutive in a row)
-     */
-    validateGameRotation(maxConsecutive = 3) {
-        let currentGame = null;
-        let consecutiveCount = 0;
-        const violations = [];
-
-        this.matches.forEach((match, index) => {
-            if (match.game === currentGame) {
-                consecutiveCount++;
-                if (consecutiveCount > maxConsecutive) {
-                    violations.push({
-                        matchId: match.id,
-                        game: match.game,
-                        consecutiveCount: consecutiveCount,
-                        position: index + 1
-                    });
-                }
-            } else {
-                currentGame = match.game;
-                consecutiveCount = 1;
-            }
-        });
-
+    exportForFirebase() {
         return {
-            valid: violations.length === 0,
-            violations: violations,
-            message: violations.length === 0 
-                ? 'Game rotation is valid' 
-                : `Found ${violations.length} violations of max ${maxConsecutive} consecutive games`
+            templates: this.templates,
+            teams: this.teams,
+            games: this.games,
+            schedulerType: 'template-based',
+            generatedAt: new Date().toISOString(),
+            validation: this.validate()
         };
     }
 }
 
-// Export for use in other files
+// Export
 if (typeof window !== 'undefined') {
     window.MatchScheduler = MatchScheduler;
 }
-
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = MatchScheduler;
 }

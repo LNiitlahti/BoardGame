@@ -4,8 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tournament Setup</title>
+
+    <!-- Favicons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="images/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="images/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="images/favicon/favicon-16x16.png">
+    <link rel="manifest" href="images/favicon/site.webmanifest">
+    <link rel="shortcut icon" href="images/favicon/favicon.ico">
+
     <script src="scripts/firebase-loader.js"></script>
     <script src="scripts/match-scheduler.js"></script>
+
+    <!-- Dosis Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Dosis:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
+
     <style>
         * {
             margin: 0;
@@ -14,10 +28,10 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            font-family: 'Dosis', sans-serif;
+            background: #22241d;
             min-height: 100vh;
-            color: white;
+            color: #f7f0e3;
             padding: 20px;
         }
 
@@ -34,15 +48,15 @@
         .header h1 {
             font-size: 3rem;
             font-weight: 800;
-            background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);
-            -webkit-background-clip: text;
-            background-clip: text; /*for backwards compatibility*/
-            -webkit-text-fill-color: transparent;
+            color: #f7f0e3;
             margin-bottom: 10px;
+            text-shadow:
+                0 4px 8px rgba(0, 0, 0, 0.5),
+                0 0 40px rgba(247, 186, 50, 0.3);
         }
 
         .header p {
-            color: #94a3b8;
+            color: rgba(247, 240, 227, 0.7);
             font-size: 1.1rem;
         }
 
@@ -63,7 +77,7 @@
             left: 50px;
             right: 50px;
             height: 3px;
-            background: #334155;
+            background: rgba(247, 240, 227, 0.1);
             z-index: 0;
         }
 
@@ -72,7 +86,7 @@
             top: 25px;
             left: 50px;
             height: 3px;
-            background: linear-gradient(90deg, #06b6d4 0%, #a855f7 100%);
+            background: #f7ba32;
             transition: width 0.5s ease;
             z-index: 1;
         }
@@ -89,7 +103,8 @@
             width: 50px;
             height: 50px;
             border-radius: 50%;
-            background: #334155;
+            background: rgba(247, 240, 227, 0.1);
+            border: 2px solid rgba(247, 240, 227, 0.2);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -99,32 +114,33 @@
         }
 
         .progress-circle.active {
-            background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);
+            background: #f7ba32;
+            border-color: #f7ba32;
             transform: scale(1.2);
-            box-shadow: 0 0 20px rgba(6, 182, 212, 0.5);
+            box-shadow: 0 0 20px rgba(247, 186, 50, 0.4);
         }
 
         .progress-circle.completed {
-            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            background: #2278a3;
+            border-color: #2278a3;
         }
 
         .progress-label {
             font-size: 0.9rem;
             font-weight: 600;
-            color: #94a3b8;
+            color: rgba(247, 240, 227, 0.6);
         }
 
         .progress-label.active {
-            color: #06b6d4;
+            color: #f7ba32;
         }
 
         /* Step Content */
         .step-content {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(20px);
+            background: rgba(247, 240, 227, 0.03);
             border-radius: 20px;
             padding: 40px;
-            border: 1px solid rgba(148, 163, 184, 0.2);
+            border: 1px solid rgba(247, 240, 227, 0.1);
             min-height: 500px;
             margin-bottom: 30px;
         }
@@ -167,8 +183,8 @@
         }
 
         .game-card {
-            background: rgba(51, 65, 85, 0.5);
-            border: 2px solid transparent;
+            background: rgba(247, 240, 227, 0.03);
+            border: 2px solid rgba(247, 240, 227, 0.1);
             border-radius: 15px;
             padding: 30px;
             cursor: pointer;
@@ -178,14 +194,13 @@
         }
 
         .game-card:hover {
-            border-color: #475569;
+            border-color: rgba(247, 186, 50, 0.5);
             transform: translateY(-5px);
         }
 
         .game-card.selected {
-            border-color: #06b6d4;
-            background: rgba(6, 182, 212, 0.2);
-            box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+            border-color: #f7ba32;
+            background: rgba(247, 186, 50, 0.1);
         }
 
         .game-card.custom {
@@ -206,7 +221,7 @@
             position: absolute;
             top: 10px;
             right: 10px;
-            background: #ef4444;
+            background: #de392c;
             color: white;
             border: none;
             border-radius: 50%;
@@ -230,9 +245,10 @@
         }
 
         .team-card {
-            background: rgba(51, 65, 85, 0.5);
+            background: rgba(247, 240, 227, 0.03);
             border-radius: 15px;
             padding: 25px;
+            border: 1px solid rgba(247, 240, 227, 0.1);
             border-left: 5px solid;
             display: grid;
             grid-template-columns: 1fr 1fr 1fr auto;
@@ -248,7 +264,7 @@
 
         .form-group label {
             font-size: 0.85rem;
-            color: #94a3b8;
+            color: rgba(247, 240, 227, 0.6);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -256,25 +272,25 @@
 
         .form-group input {
             padding: 12px;
-            background: rgba(15, 23, 42, 0.8);
-            border: 1px solid #334155;
+            background: rgba(247, 240, 227, 0.05);
+            border: 1px solid rgba(247, 240, 227, 0.15);
             border-radius: 8px;
-            color: white;
+            color: #f7f0e3;
             font-size: 1rem;
             transition: border-color 0.3s;
         }
 
         .form-group input:focus {
             outline: none;
-            border-color: #06b6d4;
+            border-color: #f7ba32;
         }
 
         .btn {
             padding: 12px 24px;
-            background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);
+            background: #f7ba32;
             border: none;
             border-radius: 10px;
-            color: white;
+            color: #22241d;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
@@ -283,15 +299,17 @@
 
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(6, 182, 212, 0.3);
+            box-shadow: 0 4px 20px rgba(247, 186, 50, 0.4);
         }
 
         .btn-secondary {
-            background: #475569;
+            background: rgba(247, 240, 227, 0.1);
+            color: #f7f0e3;
+            border: 1px solid rgba(247, 240, 227, 0.2);
         }
 
         .btn-danger {
-            background: #ef4444;
+            background: #de392c;
         }
 
         /* Spell Cards */
@@ -303,8 +321,8 @@
         }
 
         .spell-card {
-            background: rgba(51, 65, 85, 0.5);
-            border: 2px solid #a855f7;
+            background: rgba(247, 240, 227, 0.03);
+            border: 1px solid rgba(247, 240, 227, 0.1);
             border-radius: 15px;
             padding: 20px;
             transition: all 0.3s;
@@ -312,7 +330,7 @@
 
         .spell-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(168, 85, 247, 0.3);
+            border-color: #f7ba32;
         }
 
         .spell-card-header {
@@ -324,7 +342,7 @@
 
         .spell-card-title {
             font-weight: 700;
-            color: #e9d5ff;
+            color: #f7ba32;
             font-size: 1.1rem;
             flex: 1;
         }
@@ -332,13 +350,13 @@
         .spell-card-description {
             font-size: 0.9rem;
             line-height: 1.6;
-            color: #cbd5e1;
+            color: rgba(247, 240, 227, 0.8);
         }
 
         .empty-state {
             text-align: center;
             padding: 60px 20px;
-            color: #94a3b8;
+            color: rgba(247, 240, 227, 0.6);
         }
 
         .empty-state-icon {
@@ -355,7 +373,8 @@
         }
 
         .match-item {
-            background: rgba(51, 65, 85, 0.5);
+            background: rgba(247, 240, 227, 0.03);
+            border: 1px solid rgba(247, 240, 227, 0.1);
             border-radius: 10px;
             padding: 15px;
             margin-bottom: 10px;
@@ -370,20 +389,20 @@
 
         .match-game {
             font-weight: bold;
-            color: #06b6d4;
+            color: #2278a3;
         }
 
         .match-id {
             font-size: 0.9rem;
-            color: #64748b;
+            color: rgba(247, 240, 227, 0.5);
         }
 
         .split-info {
-            background: rgba(255, 215, 0, 0.1);
+            background: rgba(247, 186, 50, 0.1);
             padding: 8px 12px;
             border-radius: 5px;
             margin-bottom: 10px;
-            border-left: 3px solid #ffd700;
+            border-left: 3px solid #f7ba32;
             font-size: 0.9rem;
         }
 
@@ -411,15 +430,15 @@
 
         .split-player {
             padding: 6px 12px;
-            background: rgba(255, 215, 0, 0.2);
-            border: 2px dashed #ffd700;
+            background: rgba(247, 186, 50, 0.2);
+            border: 2px dashed #f7ba32;
             border-radius: 6px;
             font-size: 0.85rem;
         }
 
         .vs {
             font-weight: bold;
-            color: #06b6d4;
+            color: #2278a3;
             font-size: 1.2rem;
         }
 
@@ -432,7 +451,8 @@
         }
 
         .summary-card {
-            background: rgba(51, 65, 85, 0.5);
+            background: rgba(247, 240, 227, 0.03);
+            border: 1px solid rgba(247, 240, 227, 0.1);
             border-radius: 15px;
             padding: 30px;
             text-align: center;
@@ -441,14 +461,11 @@
         .summary-number {
             font-size: 3rem;
             font-weight: 800;
-            background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);
-            -webkit-background-clip: text;
-            background-clip: text; /*for backwards compatibility*/
-            -webkit-text-fill-color: transparent;
+            color: #f7ba32;
         }
 
         .summary-label {
-            color: #94a3b8;
+            color: rgba(247, 240, 227, 0.6);
             font-size: 0.9rem;
             margin-top: 10px;
         }
@@ -461,8 +478,8 @@
         }
 
         .error-message {
-            background: rgba(239, 68, 68, 0.2);
-            border: 1px solid #ef4444;
+            background: rgba(222, 57, 44, 0.2);
+            border: 1px solid #de392c;
             border-radius: 10px;
             padding: 15px;
             margin-top: 20px;
@@ -483,7 +500,8 @@
         .custom-game-section {
             margin-top: 30px;
             padding: 20px;
-            background: rgba(51, 65, 85, 0.5);
+            background: rgba(247, 240, 227, 0.03);
+            border: 1px solid rgba(247, 240, 227, 0.1);
             border-radius: 15px;
         }
 
@@ -507,12 +525,12 @@
         }
 
         ::-webkit-scrollbar-track {
-            background: rgba(51, 65, 85, 0.5);
+            background: rgba(247, 240, 227, 0.05);
             border-radius: 5px;
         }
 
         ::-webkit-scrollbar-thumb {
-            background: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);
+            background: #f7ba32;
             border-radius: 5px;
         }
 
@@ -530,6 +548,7 @@
 <body>
     <div id="content" class="container" style="display:none">
         <div class="header">
+            <img src="images/favicon/android-chrome-512x512.png" alt="Brand Logo" class="brand-logo" style="margin-bottom: 20px;">
             <h1>Tournament Setup</h1>
             <p>Create your epic gaming tournament</p>
         </div>
@@ -568,7 +587,7 @@
                     <span>🎮</span>
                     Valitse Pelit
                 </h2>
-                <p style="color: #94a3b8; margin-bottom: 20px;">
+                <p style="color: rgba(247, 240, 227, 0.7); margin-bottom: 20px;">
                     Valitse mitkä pelit pelataan turnauksessa
                 </p>
 
@@ -578,8 +597,8 @@
                 <div class="custom-game-section">
                     <h3>Lisää Oma Peli</h3>
                     <div class="custom-game-input-group">
-                        <input type="text" id="customGameInput" placeholder="Syötä pelin nimi..." 
-                               style="padding: 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white; font-size: 1rem;">
+                        <input type="text" id="customGameInput" placeholder="Syötä pelin nimi..."
+                               style="padding: 12px; background: rgba(247, 240, 227, 0.05); border: 1px solid rgba(247, 240, 227, 0.15); border-radius: 8px; color: #f7f0e3; font-size: 1rem;">
                         <button class="btn" onclick="addCustomGame()">
                             Lisää Peli
                         </button>
@@ -597,7 +616,7 @@
                     <span>👥</span>
                     Luo Tiimit
                 </h2>
-                <p style="color: #94a3b8; margin-bottom: 20px;">
+                <p style="color: rgba(247, 240, 227, 0.7); margin-bottom: 20px;">
                     Lisää tiimejä, 2 pelaajaa per tiimi
                 </p>
                 <button class="btn" onclick="addTeam()" style="margin-bottom: 20px;">
@@ -617,7 +636,7 @@
                     <span>✨</span>
                     Loitsukortit
                 </h2>
-                <p style="color: #94a3b8; margin-bottom: 20px;">
+                <p style="color: rgba(247, 240, 227, 0.7); margin-bottom: 20px;">
                     Tarkista turnauksen saatavilla olevat loitsukortit
                 </p>
 
@@ -648,7 +667,7 @@
                 </div>
 
                 <div class="match-list" id="matchList">
-                    <p style="text-align:center;color:#94a3b8;">Klikkaa "Luo Aikataulu" luodaksesi ottelut</p>
+                    <p style="text-align:center;color:rgba(247, 240, 227, 0.6);">Klikkaa "Luo Aikataulu" luodaksesi ottelut</p>
                 </div>
 
                 <div class="error-message" id="error4">
@@ -810,11 +829,11 @@
         function addTeam() {
             const teamId = teams.length + 1;
             const color = teamColors[teams.length % teamColors.length];
-            
+
             teams.push({
                 id: teamId,
                 name: `Tiimi ${teamId}`,
-                color: color.id,
+                color: color.hex,  // Store hex code instead of color name
                 players: [
                     { name: '', points: 0 },
                     { name: '', points: 0 }
@@ -829,7 +848,8 @@
         function renderTeams() {
             const container = document.getElementById('teamsContainer');
             container.innerHTML = teams.map((team, idx) => {
-                const colorHex = teamColors.find(c => c.id === team.color)?.hex || '#666';
+                // team.color is now already a hex code
+                const colorHex = team.color || '#666';
                 return `
                     <div class="team-card" style="border-left-color: ${colorHex}">
                         <div class="form-group">
@@ -899,7 +919,7 @@
                 container.innerHTML = `
                     <div class="empty-state">
                         <div class="empty-state-icon">⚠️</div>
-                        <p style="color: #ef4444;">Virhe loitsukorttien lataamisessa</p>
+                        <p style="color: #de392c;">Virhe loitsukorttien lataamisessa</p>
                     </div>
                 `;
             }
@@ -918,102 +938,94 @@
         }
 
         function generateMatches() {
-            if (selectedGames.length === 0) {
-                alert('Valitse vähintään yksi peli');
-                return;
-            }
-
-            if (teams.length < 3) {
-                alert('Tarvitaan vähintään 3 tiimiä kiertävälle split-tiimi systeemille');
-                return;
-            }
-
-            const totalMatchesInput = parseInt(document.getElementById('totalMatches').value) || 15;
-            const selectedGameNames = selectedGames.map(id => games.find(g => g.id === id).name);
-
-            try {
-                const scheduler = new MatchScheduler(teams, selectedGameNames);
-                matches = scheduler.generateRotatingSplitTeam({
-                    maxConsecutiveGames: 3,
-                    totalMatches: totalMatchesInput
-                });
-
-                const validation = scheduler.validate();
-                if (!validation.valid) {
-                    alert('Aikataulun validointi epäonnistui: ' + validation.errors.join(', '));
-                    return;
-                }
-
-                renderMatches();
-                console.log(scheduler.previewSchedule());
-
-            } catch (error) {
-                alert('Virhe otteluiden luomisessa: ' + error.message);
-                console.error(error);
-            }
+        if (selectedGames.length === 0) {
+            alert('Valitse vähintään yksi peli');
+            return;
         }
+
+        if (teams.length < 3) {
+            alert('Tarvitaan vähintään 3 tiimiä');
+            return;
+        }
+
+        const totalMatchesInput = parseInt(document.getElementById('totalMatches').value) || 15;
+        
+        // Prepare games with format info
+        const gamesWithFormat = selectedGames.map(id => {
+            const game = games.find(g => g.id === id);
+            return {
+                name: game.name,
+                format: game.format || '5v5',
+                icon: game.icon
+            };
+        });
+
+        try {
+            const scheduler = new MatchScheduler(teams, gamesWithFormat);
+            matches = scheduler.generateMatchTemplates({
+                totalMatches: totalMatchesInput,
+                maxConsecutiveGames: 3
+            });
+
+            const validation = scheduler.validate();
+            if (!validation.valid) {
+                alert('Aikataulun validointi epäonnistui: ' + validation.errors.join(', '));
+                return;
+            }
+
+            renderMatches();
+            console.log(scheduler.previewSchedule());
+
+        } catch (error) {
+            alert('Virhe otteluiden luomisessa: ' + error.message);
+            console.error(error);
+        }
+    }
 
         function renderMatches() {
-            const list = document.getElementById('matchList');
-            if (matches.length === 0) {
-                list.innerHTML = '<p style="text-align:center;color:#94a3b8;">Klikkaa "Luo Aikataulu" luodaksesi ottelut</p>';
-                return;
-            }
-            
-            const firstThreeRounds = [...new Set(matches.map(m => m.round))].slice(0, 3);
-            
-            list.innerHTML = firstThreeRounds.map(round => {
-                const roundMatches = matches.filter(m => m.round === round);
-                return `
-                    <div style="margin-bottom: 30px;">
-                        <h3 style="color: #06b6d4; margin-bottom: 15px;">Kierros ${round}</h3>
-                        ${roundMatches.map(match => {
-                            const gameSeq = match.gameSequence ? `(#${match.gameSequence})` : '';
-                            return `
-                                <div class="match-item">
-                                    <div class="match-header">
-                                        <span class="match-game">${match.game} ${gameSeq}</span>
-                                        <span class="match-id">Ottelu #${match.id}</span>
-                                    </div>
-                                    <div class="split-info">
-                                        Jaettu Tiimi: ${match.splitTeam.name}
-                                    </div>
-                                    <div class="match-teams">
-                                        <div class="team-side">
-                                            <strong>TIIMI_A:</strong>
-                                            ${match.teamA.teams.map(t => {
-                                                const colorHex = teamColors.find(c => c.id === t.color)?.hex || '#666';
-                                                return `<span class="team-badge" style="border-color: ${colorHex}; color: ${colorHex};">${t.name}</span>`;
-                                            }).join(' + ')}
-                                            <span class="split-player">+ Jaettu Pelaaja</span>
-                                        </div>
-                                        <div class="vs">VS</div>
-                                        <div class="team-side">
-                                            <strong>TIIMI_B:</strong>
-                                            ${match.teamB.teams.map(t => {
-                                                const colorHex = teamColors.find(c => c.id === t.color)?.hex || '#666';
-                                                return `<span class="team-badge" style="border-color: ${colorHex}; color: ${colorHex};">${t.name}</span>`;
-                                            }).join(' + ')}
-                                            <span class="split-player">+ Jaettu Pelaaja</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                `;
-            }).join('');
+    const list = document.getElementById('matchList');
+    if (matches.length === 0) {
+        list.innerHTML = '<p style="text-align:center;color:rgba(247, 240, 227, 0.6);">Klikkaa "Luo Aikataulu" luodaksesi ottelut</p>';
+        return;
+    }
+    
+    const firstThreeRounds = [...new Set(matches.map(m => m.round))].slice(0, 3);
+    
+    list.innerHTML = firstThreeRounds.map(round => {
+        const roundMatches = matches.filter(m => m.round === round);
+        return `
+            <div style="margin-bottom: 30px;">
+                <h3 style="color: #2278a3; margin-bottom: 15px;">Kierros ${round}</h3>
+                ${roundMatches.map(match => {
+                    const subMatch = match.subMatch ? ` (${match.subMatch})` : '';
+                    return `
+                        <div class="match-item">
+                            <div class="match-header">
+                                <span class="match-game">${match.gameIcon} ${match.game} (${match.format})${subMatch}</span>
+                                <span class="match-id">Template #${match.id}</span>
+                            </div>
+                            <div style="background: rgba(255, 215, 0, 0.1); padding: 10px; border-radius: 5px; margin-top: 10px;">
+                                <strong>📋 Tämä on pohja</strong><br>
+                                Admin valitsee pelaajat god.html:ssä<br>
+                                ${match.suggestedPlayers?.note ? `💡 ${match.suggestedPlayers.note}` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }).join('');
 
-            const totalRounds = [...new Set(matches.map(m => m.round))].length;
-            if (totalRounds > 3) {
-                list.innerHTML += `
-                    <p style="text-align: center; color: #64748b; margin-top: 20px;">
-                        ... ja ${totalRounds - 3} kierrosta lisää (${matches.length - roundMatches.length} ottelua)
-                    </p>
-                `;
-            }
-        }
-
+    const totalRounds = [...new Set(matches.map(m => m.round))].length;
+    if (totalRounds > 3) {
+        const shownMatches = matches.filter(m => firstThreeRounds.includes(m.round)).length;
+        list.innerHTML += `
+            <p style="text-align: center; color: rgba(247, 240, 227, 0.5); margin-top: 20px;">
+                ... ja ${totalRounds - 3} kierrosta lisää (${matches.length - shownMatches} ottelua)
+            </p>
+        `;
+    }
+}
         function nextStep() {
             if (!validateStep()) return;
             
@@ -1130,11 +1142,11 @@
             };
             
             try {
-                await db.collection('games').doc(gameId).set(tournamentData);
+                // Only write to tournaments collection (games collection is deprecated)
                 await db.collection('tournaments').doc(gameId).set(tournamentData);
-                
+
                 alert('Turnaus luotu onnistuneesti!');
-                window.location.href = `view.html?gameId=${gameId}`;
+                window.location.href = `view.html?tournamentId=${gameId}`;
             } catch (error) {
                 alert('Virhe turnauksen luomisessa: ' + error.message);
                 console.error(error);

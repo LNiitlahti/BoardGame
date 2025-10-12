@@ -3,354 +3,519 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minimal Team View</title>
+    <title>Team Controls - Board Game</title>
+
+    <!-- Favicons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="images/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="images/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="images/favicon/favicon-16x16.png">
+    <link rel="manifest" href="images/favicon/site.webmanifest">
+    <link rel="shortcut icon" href="images/favicon/favicon.ico">
+
+    <link rel="stylesheet" href="css/styles.css">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 900px;
+        /* Team Controls Specific Styles */
+        .team-controls-container {
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #f5f5f5;
         }
-        h1 {
-            color: #333;
-        }
-        .status {
-            margin: 20px 0;
-            padding: 15px;
-            border-radius: 5px;
-        }
-        .warning {
-            background-color: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeeba;
-        }
-        .success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .panel {
-            background: white;
-            border-radius: 8px;
+
+        .team-header {
+            background: var(--cream-alpha-1);
             padding: 20px;
-            margin: 15px 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: var(--radius-lg);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 2px solid var(--accent-primary);
         }
-        .panel h2 {
-            margin-top: 0;
-            color: #444;
-            border-bottom: 2px solid #4CAF50;
-            padding-bottom: 10px;
+
+        .team-name-display {
+            display: flex;
+            align-items: center;
+            gap: 15px;
         }
-        .team-selector {
-            margin: 20px 0;
+
+        .team-name-display h1 {
+            margin: 0;
+            color: var(--accent-primary);
         }
-        .team-selector select {
-            width: 100%;
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+
+        .edit-team-name-btn {
+            background: transparent;
+            border: 2px solid var(--accent-primary);
+            color: var(--accent-primary);
+            padding: 8px 16px;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.3s;
         }
-        .player-list {
-            list-style: none;
-            padding: 0;
+
+        .edit-team-name-btn:hover {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
         }
-        .player-list li {
-            padding: 8px;
-            margin: 5px 0;
-            background-color: #f9f9f9;
-            border-left: 3px solid #4CAF50;
-            border-radius: 3px;
+
+        .team-points {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--accent-primary);
         }
-        .stat {
+
+        .team-grid {
+            display: grid;
+            grid-template-columns: 350px 1fr 350px;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .team-panel {
+            background: var(--cream-alpha-05);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            border: 1px solid var(--cream-alpha-15);
+        }
+
+        .team-panel h3 {
+            color: var(--accent-primary);
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .teammates-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .teammate-item {
+            background: var(--cream-alpha-1);
+            padding: 12px;
+            border-radius: var(--radius-md);
+            border-left: 4px solid var(--cream-alpha-2);
+        }
+
+        .teammate-item.you {
+            border-left-color: var(--accent-primary);
+            background: var(--cream-alpha-15);
+        }
+
+        .teammate-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .you-badge {
             display: inline-block;
-            margin-right: 20px;
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            margin-left: 8px;
             font-weight: bold;
         }
-        .loading {
+
+        .current-match-panel {
+            background: linear-gradient(135deg, rgba(247, 186, 50, 0.1) 0%, rgba(34, 120, 163, 0.1) 100%);
+            border: 2px solid var(--accent-primary);
+        }
+
+        .match-status {
             text-align: center;
             padding: 20px;
-            color: #666;
+            font-size: 1.1rem;
         }
-        .nav-links {
+
+        .match-status.waiting {
+            color: var(--cream-alpha-6);
+        }
+
+        .match-status.active {
+            color: var(--accent-primary);
+            font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .match-details {
+            background: var(--cream-alpha-05);
+            padding: 15px;
+            border-radius: var(--radius-md);
+            margin-top: 15px;
+        }
+
+        .match-sides {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 15px;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .match-side {
+            background: var(--cream-alpha-1);
+            padding: 10px;
+            border-radius: var(--radius-md);
+        }
+
+        .match-side.your-side {
+            border: 2px solid var(--accent-primary);
+        }
+
+        .vs-divider {
+            font-weight: bold;
+            color: var(--accent-primary);
+            font-size: 1.2rem;
+        }
+
+        .player-chip {
+            display: inline-block;
+            background: var(--cream-alpha-2);
+            padding: 4px 10px;
+            border-radius: 12px;
+            margin: 4px;
+            font-size: 0.9rem;
+        }
+
+        .spell-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .spell-card {
+            background: var(--cream-alpha-1);
+            border: 2px solid var(--cream-alpha-2);
+            border-radius: var(--radius-md);
+            padding: 15px 10px;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .spell-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent-primary);
+            box-shadow: 0 5px 15px rgba(247, 186, 50, 0.3);
+        }
+
+        .spell-card.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .spell-card.disabled:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        .spell-card-name {
+            font-weight: bold;
+            color: var(--accent-primary);
+            margin-bottom: 8px;
+        }
+
+        .spell-card-desc {
+            font-size: 0.85rem;
+            color: var(--cream-alpha-7);
+        }
+
+        .board-wrapper {
+            width: 100%;
+            height: 600px;
+            background: var(--cream-alpha-05);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .voting-section {
+            background: var(--cream-alpha-05);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            border: 1px solid var(--cream-alpha-15);
+            margin-top: 20px;
+        }
+
+        .voting-section.active {
+            border: 2px solid var(--accent-primary);
+            background: linear-gradient(135deg, rgba(247, 186, 50, 0.1) 0%, rgba(34, 120, 163, 0.05) 100%);
+        }
+
+        .vote-options {
+            display: flex;
+            gap: 15px;
             margin: 20px 0;
         }
-        .nav-links a {
-            display: inline-block;
-            padding: 10px 15px;
-            margin-right: 10px;
-            background-color: #4CAF50;
-            color: white;
-            text-decoration: none;
-            border-radius: 4px;
+
+        .vote-option {
+            flex: 1;
+            background: var(--cream-alpha-1);
+            border: 2px solid var(--cream-alpha-2);
+            border-radius: var(--radius-md);
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
         }
-        .nav-links a:hover {
-            background-color: #45a049;
+
+        .vote-option:hover {
+            border-color: var(--accent-primary);
+            background: var(--cream-alpha-15);
+        }
+
+        .vote-option.selected {
+            border-color: var(--accent-primary);
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+        }
+
+        .vote-option input[type="radio"] {
+            margin-right: 8px;
+        }
+
+        .vote-progress {
+            margin-top: 20px;
+            padding: 15px;
+            background: var(--cream-alpha-1);
+            border-radius: var(--radius-md);
+        }
+
+        .vote-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--cream-alpha-1);
+        }
+
+        .vote-item:last-child {
+            border-bottom: none;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-box {
+            background: var(--cream-alpha-1);
+            padding: 15px;
+            border-radius: var(--radius-md);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--accent-primary);
+        }
+
+        .stat-label {
+            color: var(--cream-alpha-7);
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 1200px) {
+            .team-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
-    <h1>Team Dashboard</h1>
-    
-    <div id="connectionStatus" class="status warning">
-        Connecting to Firebase...
-    </div>
-    
-    <div class="nav-links" id="navLinks" style="display: none;">
-        <a href="#" id="setupLink">Setup</a>
-        <a href="#" id="gameLink">Game Board</a>
-        <a href="#" id="adminLink">Admin</a>
-    </div>
-    
-    <div class="team-selector" id="teamSelector" style="display: none;">
-        <label for="teamSelect"><strong>Select Your Team:</strong></label>
-        <select id="teamSelect">
-            <option value="">-- Choose Team --</option>
-        </select>
-    </div>
-    
-    <div id="content" style="display: none;">
-        <div class="panel" id="teamInfo">
-            <h2>Team Information</h2>
-            <div class="loading">Select a team above</div>
+    <div class="team-controls-container">
+        <!-- Header with Team Name and Points -->
+        <div class="team-header">
+            <div class="team-name-display">
+                <h1 id="teamNameDisplay">Loading...</h1>
+                <button class="edit-team-name-btn" onclick="openEditTeamNameModal()">✏️ Edit</button>
+            </div>
+            <div>
+                <div class="team-points">
+                    <span id="teamPointsDisplay">0</span> pts
+                </div>
+            </div>
+            <button class="btn" onclick="goBackToHome()" style="width: auto; padding: 8px 16px;">
+                ⬅️ Home
+            </button>
         </div>
-        
-        <div class="panel" id="gameStatus">
-            <h2>Game Status</h2>
-            <div class="loading">Loading game status...</div>
+
+        <div class="status-message" id="statusMessage"></div>
+
+        <!-- Main Grid: Team Info | Board | Match Info -->
+        <div class="team-grid">
+            <!-- Left Sidebar: Team Info -->
+            <div>
+                <div class="team-panel">
+                    <h3>👥 Teammates</h3>
+                    <div class="teammates-list" id="teammatesList">
+                        <p style="text-align: center; opacity: 0.5;">Loading teammates...</p>
+                    </div>
+                </div>
+
+                <div class="team-panel" style="margin-top: 20px;">
+                    <h3>📊 Team Stats</h3>
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div class="stat-value" id="teamWins">0</div>
+                            <div class="stat-label">Wins</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="teamLosses">0</div>
+                            <div class="stat-label">Losses</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="teamGamesPlayed">0</div>
+                            <div class="stat-label">Games Played</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="teamHeartsControlled">0</div>
+                            <div class="stat-label">Hearts Controlled</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="team-panel" style="margin-top: 20px;">
+                    <h3>🃏 Spell Cards</h3>
+                    <div id="spellCardsCount" style="text-align: center; color: var(--accent-primary); font-size: 1.2rem; margin-bottom: 10px;">
+                        0 cards available
+                    </div>
+                    <div class="spell-cards-grid" id="spellCardsList">
+                        <p style="text-align: center; opacity: 0.5; grid-column: 1 / -1;">No spell cards available</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center: Game Board -->
+            <div>
+                <div class="team-panel">
+                    <h3 style="text-align: center;">🎲 Game Board</h3>
+                    <div class="board-wrapper">
+                        <div id="hexBoard"></div>
+                    </div>
+                    <div style="margin-top: 15px; padding: 10px; background: var(--cream-alpha-05); border-radius: var(--radius-md); font-size: 0.9rem; text-align: center; color: var(--cream-alpha-7);">
+                        Board updates in real-time during matches
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Sidebar: Current Match -->
+            <div>
+                <div class="team-panel current-match-panel">
+                    <h3>🎮 Current Match</h3>
+                    <div id="currentMatchDisplay">
+                        <div class="match-status waiting">
+                            ⏳ No active match. Waiting for next game...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="team-panel" style="margin-top: 20px;">
+                    <h3>📅 Upcoming Matches</h3>
+                    <div id="upcomingMatchesList">
+                        <p style="text-align: center; opacity: 0.5;">No upcoming matches scheduled</p>
+                    </div>
+                </div>
+
+                <div class="team-panel" style="margin-top: 20px;">
+                    <h3>📜 Recent Events</h3>
+                    <div id="recentEventsList" style="max-height: 300px; overflow-y: auto;">
+                        <p style="text-align: center; opacity: 0.5;">No recent events</p>
+                    </div>
+                </div>
+            </div>
         </div>
-        
-        <div class="panel" id="teamHistory">
-            <h2>Team History</h2>
-            <div class="loading">Loading team history...</div>
+
+        <!-- Match Result Voting Section -->
+        <div class="voting-section" id="votingSection" style="display: none;">
+            <h3>🗳️ Match Result Voting</h3>
+            <div id="votingMatchInfo" style="margin-bottom: 15px; color: var(--cream-alpha-7);">
+                <!-- Match info will be inserted here -->
+            </div>
+
+            <div class="vote-options" id="voteOptions">
+                <!-- Vote options will be inserted here -->
+            </div>
+
+            <button class="btn primary" onclick="submitVote()" id="submitVoteBtn" style="width: 100%; margin-top: 10px;">
+                Submit Vote
+            </button>
+
+            <div class="vote-progress" id="voteProgress" style="display: none;">
+                <h4 style="color: var(--accent-primary); margin-bottom: 10px;">Voting Progress</h4>
+                <div id="voteProgressList">
+                    <!-- Vote progress will be inserted here -->
+                </div>
+            </div>
         </div>
     </div>
-    
-    <!-- Load Firebase scripts directly -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    
+
+    <!-- Edit Team Name Modal -->
+    <div id="editTeamNameModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>✏️ Edit Team Name</h2>
+                <button onclick="closeEditTeamNameModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Team Name</label>
+                    <input type="text" id="newTeamNameInput" placeholder="Enter new team name..."
+                           style="width: 100%; padding: 12px; background: var(--cream-alpha-05); border: 1px solid var(--cream-alpha-2); border-radius: var(--radius-md); color: var(--text-primary); font-size: 1rem;">
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn secondary" onclick="closeEditTeamNameModal()" style="flex: 1;">Cancel</button>
+                    <button class="btn primary" onclick="saveTeamName()" style="flex: 1;">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load infrastructure first -->
+    <script type="module" src="scripts/errorHandler.js"></script>
+    <script type="module" src="scripts/stateManager.js"></script>
+    <script type="module" src="scripts/utils.js"></script>
+
+    <!-- Load board modules -->
+    <script src="scripts/board-module.js"></script>
+    <script src="scripts/board-renderer.js"></script>
+
+    <!-- Firebase SDK -->
+    <script src="scripts/firebase-loader.js"></script>
+
+    <!-- Team Controls Script -->
+    <script src="scripts/team-controls.js"></script>
+
+    <!-- Navigation -->
     <script>
-        let db = null;
-        let gameId = null;
-        let currentTeamId = null;
-        
-        // Get URL parameters
-        function getUrlParams() {
-            const urlParams = new URLSearchParams(window.location.search);
-            gameId = urlParams.get('gameId');
-            const teamId = urlParams.get('teamId');
-            
-            if (!gameId) {
-                document.getElementById('connectionStatus').textContent = 'No game ID provided in URL';
-                document.getElementById('connectionStatus').className = 'status error';
-                return false;
-            }
-            
-            return { gameId, teamId };
+        function goBackToHome() {
+            window.location.href = 'index.html';
         }
-        
-        // Update navigation links
-        function updateNavLinks() {
-            const setupLink = document.getElementById('setupLink');
-            const gameLink = document.getElementById('gameLink');
-            const adminLink = document.getElementById('adminLink');
-            
-            setupLink.href = `minimal-setup.html`;
-            gameLink.href = `game.html?gameId=${gameId}${currentTeamId ? `&teamId=${currentTeamId}` : ''}`;
-            adminLink.href = `admin.html?gameId=${gameId}`;
-            
-            document.getElementById('navLinks').style.display = 'block';
+
+        function openEditTeamNameModal() {
+            const modal = document.getElementById('editTeamNameModal');
+            const input = document.getElementById('newTeamNameInput');
+            const currentName = document.getElementById('teamNameDisplay').textContent;
+
+            input.value = currentName;
+            modal.style.display = 'flex';
         }
-        
-        // Load game data and populate team selector
-        function loadGameData() {
-            db.collection('games').doc(gameId).get()
-                .then((doc) => {
-                    if (!doc.exists) {
-                        throw new Error('Game not found');
-                    }
-                    
-                    const gameData = doc.data();
-                    
-                    // Populate team selector
-                    const teamSelect = document.getElementById('teamSelect');
-                    teamSelect.innerHTML = '<option value="">-- Choose Team --</option>';
-                    
-                    if (gameData.teams) {
-                        gameData.teams.forEach(team => {
-                            const option = document.createElement('option');
-                            option.value = team.id;
-                            option.textContent = `${team.name} (${team.points} points)`;
-                            teamSelect.appendChild(option);
-                        });
-                    }
-                    
-                    document.getElementById('teamSelector').style.display = 'block';
-                    document.getElementById('content').style.display = 'block';
-                    
-                    // If teamId in URL, auto-select it
-                    const params = getUrlParams();
-                    if (params.teamId) {
-                        teamSelect.value = params.teamId;
-                        loadTeamData(params.teamId, gameData);
-                    }
-                    
-                    // Load game status
-                    loadGameStatus(gameData);
-                })
-                .catch((error) => {
-                    console.error('Error loading game:', error);
-                    document.getElementById('connectionStatus').textContent = 'Error loading game: ' + error.message;
-                    document.getElementById('connectionStatus').className = 'status error';
-                });
+
+        function closeEditTeamNameModal() {
+            const modal = document.getElementById('editTeamNameModal');
+            modal.style.display = 'none';
         }
-        
-        // Load specific team data
-        function loadTeamData(teamId, gameData) {
-            currentTeamId = teamId;
-            updateNavLinks();
-            
-            const team = gameData.teams.find(t => t.id == teamId);
-            
-            if (!team) {
-                document.getElementById('teamInfo').innerHTML = '<h2>Team Information</h2><p>Team not found</p>';
-                return;
-            }
-            
-            // Display team info
-            let teamHtml = `
-                <h2>${team.name}</h2>
-                <div class="stat">Team Points: ${team.points}</div>
-                <div class="stat">Games Won: ${team.gamesWon || 0}</div>
-                <h3>Players:</h3>
-                <ul class="player-list">
-            `;
-            
-            team.players.forEach(player => {
-                teamHtml += `<li>${player.name} - ${player.points} points</li>`;
-            });
-            
-            teamHtml += '</ul>';
-            document.getElementById('teamInfo').innerHTML = teamHtml;
-            
-            // Load team history
-            loadTeamHistory(teamId, gameData);
-        }
-        
-        // Load game status
-        function loadGameStatus(gameData) {
-            let statusHtml = '<h2>Game Status</h2>';
-            statusHtml += `<p><strong>Game ID:</strong> ${gameData.gameId}</p>`;
-            statusHtml += `<p><strong>Current Round:</strong> ${gameData.currentRound}</p>`;
-            statusHtml += `<p><strong>Games Played:</strong> ${gameData.gamesPlayed}</p>`;
-            statusHtml += `<p><strong>Win Condition:</strong> ${gameData.winCondition} points</p>`;
-            statusHtml += `<p><strong>Game Phase:</strong> ${gameData.gamePhase}</p>`;
-            
-            if (gameData.currentTurn) {
-                statusHtml += `<p><strong>Current Turn:</strong> Team ${gameData.currentTurn}</p>`;
-            }
-            
-            document.getElementById('gameStatus').innerHTML = statusHtml;
-        }
-        
-        // Load team history
-        function loadTeamHistory(teamId, gameData) {
-            let historyHtml = '<h2>Team History</h2>';
-            
-            if (!gameData.gameHistory || gameData.gameHistory.length === 0) {
-                historyHtml += '<p>No games played yet</p>';
-            } else {
-                // Filter history for this team
-                const teamHistory = gameData.gameHistory.filter(game => 
-                    game.winner == teamId || 
-                    (game.teams && game.teams.includes(parseInt(teamId)))
-                );
-                
-                if (teamHistory.length === 0) {
-                    historyHtml += '<p>No games played by this team yet</p>';
-                } else {
-                    historyHtml += '<ul class="player-list">';
-                    teamHistory.forEach(game => {
-                        const isWinner = game.winner == teamId;
-                        historyHtml += `
-                            <li>
-                                <strong>${game.gameType || 'Unknown'}</strong> - 
-                                ${game.playType || 'Unknown'} - 
-                                ${isWinner ? '🏆 WON' : '❌ LOST'}
-                                ${game.hex ? ` (Hex: ${game.hex})` : ''}
-                            </li>
-                        `;
-                    });
-                    historyHtml += '</ul>';
-                }
-            }
-            
-            document.getElementById('teamHistory').innerHTML = historyHtml;
-        }
-        
-        // Initialize Firebase and load data
-        document.addEventListener('DOMContentLoaded', function() {
-            // Check URL params first
-            if (!getUrlParams()) {
-                return;
-            }
-            
-            const firebaseConfig = {
-                apiKey: "AIzaSyCJsd9NmSaV9QYcIC2pVH7PkRB9iKiYxf8",
-                authDomain: "boardgame-7b9f0.firebaseapp.com",
-                projectId: "boardgame-7b9f0",
-                storageBucket: "boardgame-7b9f0.firebasestorage.app",
-                messagingSenderId: "1001331148981",
-                appId: "1:1001331148981:web:5094c89e3b6cf056c696fc",
-                measurementId: "G-22Y0E9VTPV"
-            };
-            
-            try {
-                // Initialize Firebase
-                firebase.initializeApp(firebaseConfig);
-                db = firebase.firestore();
-                
-                // Update connection status
-                const connectionStatus = document.getElementById('connectionStatus');
-                connectionStatus.textContent = 'Firebase connected successfully!';
-                connectionStatus.className = 'status success';
-                
-                // Update nav links
-                updateNavLinks();
-                
-                // Load game data
-                loadGameData();
-                
-                // Set up team selector listener
-                document.getElementById('teamSelect').addEventListener('change', function(e) {
-                    const selectedTeamId = e.target.value;
-                    if (selectedTeamId) {
-                        // Reload game data to get fresh data
-                        db.collection('games').doc(gameId).get()
-                            .then((doc) => {
-                                if (doc.exists) {
-                                    loadTeamData(selectedTeamId, doc.data());
-                                }
-                            });
-                    }
-                });
-                
-            } catch (error) {
-                console.error('Error initializing Firebase:', error);
-                
-                const connectionStatus = document.getElementById('connectionStatus');
-                connectionStatus.textContent = 'Error initializing Firebase: ' + error.message;
-                connectionStatus.className = 'status error';
-            }
-        });
     </script>
 </body>
 </html>

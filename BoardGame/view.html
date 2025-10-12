@@ -1,9 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
+<!--
+    ============================================================================
+    VIEW.HTML - DIGITAL SIGNAGE DISPLAY PAGE
+    ============================================================================
+
+    PURPOSE:
+    This page is designed for PUBLIC DISPLAY on external digital signage screens,
+    TVs, or projectors at gaming events. It shows real-time game state for spectators.
+
+    CHARACTERISTICS:
+    ✓ Read-only (no user inputs or buttons)
+    ✓ Public information only (no sensitive data)
+    ✓ No authentication required (meant to be publicly viewable)
+    ✓ Real-time Firebase updates
+    ✓ Optimized for large screens
+
+    USAGE:
+    Open with tournament/match IDs: view.html?tournamentId=xxx&matchId=yyy
+    Or just tournament: view.html?tournamentId=xxx (will show first match)
+
+    SECURITY:
+    This page requires NO security features - all data displayed is public.
+    It only reads from Firebase (no writes) and shows no sensitive information.
+
+    See VIEW_PAGE_DOCUMENTATION.md for full details.
+    ============================================================================
+-->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Board Game Viewer</title>
+
+    <!-- Favicons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="images/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="images/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="images/favicon/favicon-16x16.png">
+    <link rel="manifest" href="images/favicon/site.webmanifest">
+    <link rel="shortcut icon" href="images/favicon/favicon.ico">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -895,7 +930,9 @@
     <script>
         let renderer;
         let boardModule;
-        let gameId = new URLSearchParams(window.location.search).get('gameId') || 'default-game';
+        const urlParams = new URLSearchParams(window.location.search);
+        let tournamentId = urlParams.get('tournament') || urlParams.get('tournamentId') || urlParams.get('gameId') || 'default-tournament';
+        let matchId = urlParams.get('matchId') || null;
         let firebaseReady = false;
         
         // Initialize the board when page loads
@@ -939,87 +976,121 @@
             }
         }
         
-        function setupGameListener() {
+        async function setupGameListener() {
             const db = window.firebaseDB;
-            
+
             if (!db) {
                 console.error('Firebase database not available');
                 updateFirebaseStatus('red', 'Firebase database not available');
                 return;
             }
-            
-            // Listen to the game document
-            const gameRef = window.firebaseDoc(db, 'games', gameId);
-            
-            window.firebaseOnSnapshot(gameRef, (docSnapshot) => {
+
+            // Listen to the tournament document directly (tournament = match in simplified structure)
+            console.log('[View] Setting up listener for tournament:', tournamentId);
+            const tournamentRef = db.collection('tournaments').doc(tournamentId);
+
+            window.firebaseOnSnapshot(tournamentRef, (docSnapshot) => {
                 if (docSnapshot.exists) {
                     const gameData = docSnapshot.data();
-                    console.log('Game data received:', gameData);
-                    
-                    // Update the board
+                    console.log('[View] Match data received:', gameData);
+
+                    // Update the board (will reflect undo/redo instantly)
                     if (renderer && gameData.board) {
                         renderer.render(gameData);
                     }
-                    
+
                     // Update teams display
                     if (gameData.teams) {
                         updateTeamsDisplay(gameData.teams);
                     }
-                    
+
                     // Update game title
                     if (gameData.name || gameData.gameId) {
-                        document.querySelector('.game-title').textContent = gameData.name || gameData.gameId;
+                        document.querySelector('.game-title').textContent = gameData.name || `Tournament ${tournamentId}`;
                     }
-                    
+
                     // Update status indicator based on game status
                     updateStatusIndicator(gameData.gamePhase || gameData.status || 'active');
-                    
-                    // Update events
-                    if (gameData.events) {
-                        updateEventsDisplay(gameData.events);
-                    }
-                    
-                    // Update matches
-                    if (gameData.upcomingMatches) {
-                        updateMatchesDisplay(gameData.upcomingMatches);
-                    }
+
+                    // Update events - check both events and gameHistory
+                    const eventsData = gameData.events || gameData.gameHistory || [];
+                    console.log('[View] Events data:', eventsData.length, 'events found');
+                    updateEventsDisplay(eventsData);
+
+                    // Update matches - use gameQueue (matches are planned there)
+                    const matchesData = gameData.gameQueue || gameData.upcomingMatches || gameData.matches || gameData.selectedGames || [];
+                    console.log('[View] Matches data:', matchesData.length, 'matches found');
+                    console.log('[View] Available game data fields:', Object.keys(gameData));
+                    updateMatchesDisplay(matchesData, gameData);
                 } else {
-                    console.warn('No game found with ID:', gameId);
-                    document.querySelector('.game-title').textContent = `Game Not Found: ${gameId}`;
-                    updateFirebaseStatus('red', `Game "${gameId}" not found`);
+                    console.warn('[View] Tournament not found:', tournamentId);
+                    document.querySelector('.game-title').textContent = `Tournament Not Found`;
+                    updateFirebaseStatus('red', `Tournament not found: ${tournamentId}`);
                 }
             }, (error) => {
-                console.error('Error listening to game:', error);
-                updateFirebaseStatus('red', 'Error loading game data');
+                console.error('Error listening to tournament:', error);
+                updateFirebaseStatus('red', 'Error loading tournament data');
             });
         }
         
+        /**
+         * Helper function to convert color names to hex codes
+         * Supports both hex codes and legacy color names
+         */
+        function getHexColor(color) {
+            // If already a hex code, return it
+            if (color && color.startsWith('#')) {
+                return color;
+            }
+
+            // Map legacy color names to hex codes
+            const colorMap = {
+                'blue': '#3b82f6',
+                'red': '#ef4444',
+                'green': '#10b981',
+                'yellow': '#f59e0b',
+                'amber': '#f59e0b',
+                'purple': '#a855f7',
+                'pink': '#ec4899',
+                'teal': '#14b8a6',
+                'orange': '#f97316'
+            };
+
+            return colorMap[color?.toLowerCase()] || '#3b82f6'; // Default to blue
+        }
+
         function updateTeamsDisplay(teams) {
             const teamsFooter = document.querySelector('.teams-footer');
             if (!teams) return;
-            
+
             // Clear existing teams
             teamsFooter.innerHTML = '';
-            
+
             // Handle both object and array formats
             const teamsArray = Array.isArray(teams) ? teams : Object.values(teams);
-            
+
             // Create team elements
             teamsArray.forEach((teamData) => {
                 const teamElement = document.createElement('div');
                 teamElement.className = 'team';
-                teamElement.dataset.color = teamData.color || 'blue';
-                
+
+                // Get hex color from team data
+                const teamColor = getHexColor(teamData.color);
+
+                // Set border color using inline style
+                teamElement.style.borderColor = teamColor;
+
                 if (teamData.isActive) {
                     teamElement.classList.add('active');
+                    teamElement.style.boxShadow = `0 0 20px ${teamColor}80`; // Add transparency
                 }
-                
+
                 // Players section
                 let playersHTML = '<div class="team-players">';
                 if (teamData.players && Array.isArray(teamData.players)) {
                     teamData.players.forEach(player => {
                         playersHTML += `
-                            <div class="player-box">
+                            <div class="player-box" style="border-color: ${teamColor}; color: ${teamColor};">
                                 <span class="player-name">${player.name || 'Player'}</span>
                                 <span class="player-points">${player.points || 0} pts</span>
                             </div>
@@ -1027,31 +1098,32 @@
                     });
                 }
                 playersHTML += '</div>';
-                
+
                 // Team info section
                 const teamScore = teamData.points || teamData.score || 0;
                 const teamInfoHTML = `
                     <div class="team-info">
+                        <div class="team-name" style="color: ${teamColor};">${teamData.name || 'Team'}</div>
                         <div class="team-score">${teamScore} pts</div>
                     </div>
                 `;
-                
+
                 // Cards section
                 const handCount = teamData.hand?.length || 0;
                 const deckCount = teamData.deck?.length || 0;
-                
+
                 let cardsHTML = '<div class="team-cards">';
                 cardsHTML += '<div class="card-group"><span class="card-label">Hand:</span><div class="cards">';
                 for (let i = 0; i < handCount; i++) {
-                    cardsHTML += '<div class="card"></div>';
+                    cardsHTML += `<div class="card" style="border-color: ${teamColor};"></div>`;
                 }
                 cardsHTML += '</div></div>';
-                
+
                 cardsHTML += '<div class="card-group"><span class="card-label">Deck:</span><div class="cards">';
-                cardsHTML += '<div class="card deck"></div>';
+                cardsHTML += `<div class="card deck" style="border-color: ${teamColor};"></div>`;
                 cardsHTML += `<span class="card-count">${deckCount}</span>`;
                 cardsHTML += '</div></div></div>';
-                
+
                 teamElement.innerHTML = playersHTML + teamInfoHTML + cardsHTML;
                 teamsFooter.appendChild(teamElement);
             });
@@ -1091,96 +1163,142 @@
         
         function updateEventsDisplay(events) {
             const eventsList = document.querySelector('.events-list');
-            if (!events || !Array.isArray(events)) return;
-            
+            if (!events || !Array.isArray(events) || events.length === 0) {
+                // Show placeholder if no events
+                eventsList.innerHTML = '<li class="event"><span class="event-text" style="opacity: 0.5; font-style: italic;">No events yet. Start playing to see game history here.</span></li>';
+                return;
+            }
+
             eventsList.innerHTML = '';
-            
+
             // Show last 10 events
             const recentEvents = events.slice(-10).reverse();
-            
+
             recentEvents.forEach((event, index) => {
                 const eventElement = document.createElement('li');
                 eventElement.className = 'event';
-                
+
                 if (index === 0) {
                     eventElement.classList.add('recent');
                 }
-                
-                const timestamp = event.timestamp ? new Date(event.timestamp).toLocaleTimeString() : '';
-                
+
+                // Handle different timestamp formats
+                let timestamp = '';
+                if (event.timestamp) {
+                    timestamp = new Date(event.timestamp).toLocaleTimeString();
+                } else if (event.date) {
+                    timestamp = new Date(event.date).toLocaleTimeString();
+                } else if (event.time) {
+                    timestamp = event.time;
+                }
+
+                // Handle different message formats
+                let message = event.text || event.message || event.description || event.action || 'Event occurred';
+
+                // If event is a game result from gameHistory
+                if (event.gameNumber || event.game) {
+                    const gameNum = event.gameNumber || event.game;
+                    const winner = event.winner || event.winners || 'Unknown';
+                    const loser = event.loser || event.losers || 'Unknown';
+                    message = `Game ${gameNum}: ${Array.isArray(winner) ? winner.join(', ') : winner} defeated ${Array.isArray(loser) ? loser.join(', ') : loser}`;
+                }
+
                 eventElement.innerHTML = `
                     <span class="event-time">${timestamp}</span>
-                    <span class="event-text">${event.text || event.message || 'Event occurred'}</span>
+                    <span class="event-text">${message}</span>
                 `;
-                
+
                 eventsList.appendChild(eventElement);
             });
         }
         
-        function updateMatchesDisplay(matches) {
-            if (!matches || !Array.isArray(matches) || matches.length === 0) return;
-            
+        function updateMatchesDisplay(matches, gameData) {
             const matchesContainer = document.querySelector('.matches-container');
+
+            if (!matches || !Array.isArray(matches) || matches.length === 0) {
+                // Show placeholder
+                matchesContainer.innerHTML = '<div class="match-category"><p style="opacity: 0.5; font-style: italic; text-align: center;">No matches scheduled yet. Use God Mode to plan matches.</p></div>';
+                return;
+            }
+
             matchesContainer.innerHTML = '';
-            
-            // Find current match (first with status 'playing' or 'active')
-            const currentMatch = matches.find(m => m.status === 'playing' || m.status === 'active');
-            const upcomingMatches = matches.filter(m => m.status === 'waiting' || m.status === 'upcoming');
+
+            // Categorize matches by status
+            // Current match (being played right now - if any)
+            const currentMatch = matches.find(m => m.status === 'playing' || m.status === 'active' || m.status === 'inProgress');
+
+            // Completed matches (confirmed results)
+            const completedMatches = matches.filter(m => m.status === 'completed');
+
+            // Pending matches (not played yet)
+            const upcomingMatches = matches.filter(m =>
+                m.status === 'pending' || m.status === 'waiting' || m.status === 'upcoming' || m.status === 'scheduled'
+            );
             
             // Helper function to create match HTML
             function createMatchHTML(match, isActive = false) {
                 const matchDiv = document.createElement('div');
                 matchDiv.className = isActive ? 'match-item active' : 'match-item';
-                
+
                 // Determine format from sides/teams structure
                 let format = '';
                 if (match.sides && Array.isArray(match.sides)) {
-                    const sideSizes = match.sides.map(side => 
+                    const sideSizes = match.sides.map(side =>
                         side.players ? side.players.length : 0
                     );
                     format = sideSizes.join('v');
                 } else if (match.teams && Array.isArray(match.teams)) {
-                    const teamSizes = match.teams.map(team => 
+                    const teamSizes = match.teams.map(team =>
                         team.players ? team.players.length : 0
                     );
                     format = teamSizes.join('v');
                 }
-                
-                // Build header
+
+                // Build header - use game number or match ID
+                const gameLabel = match.game || match.gameNumber || match.id || 'Match';
                 const headerHTML = `
                     <div class="match-header">
-                        <span class="match-game">${match.game || 'Match'}</span>
+                        <span class="match-game">Game ${gameLabel}</span>
                         <span class="match-format">${format || 'TBD'}</span>
                     </div>
                 `;
-                
+
                 // Build teams/sides display
                 let teamsHTML = '<div class="match-teams">';
-                
+
                 const sidesData = match.sides || match.teams || [];
-                sidesData.forEach((side, sideIndex) => {
-                    if (sideIndex > 0) {
-                        teamsHTML += '<span class="match-vs">VS</span>';
-                    }
-                    
-                    teamsHTML += '<div class="match-team">';
-                    
-                    if (side.players && Array.isArray(side.players)) {
-                        side.players.forEach((player, playerIndex) => {
-                            if (playerIndex > 0) teamsHTML += ' ';
-                            
-                            const playerColor = player.color || player.teamColor || 'blue';
-                            const playerName = player.name || `Player ${player.id || '?'}`;
-                            
-                            teamsHTML += `<span class="match-player ${playerColor}">${playerName}</span>`;
-                        });
-                    }
-                    
-                    teamsHTML += '</div>';
-                });
-                
+
+                if (sidesData.length === 0) {
+                    // No sides defined yet
+                    teamsHTML += '<span class="match-team" style="opacity: 0.5;">No teams assigned</span>';
+                } else {
+                    sidesData.forEach((side, sideIndex) => {
+                        if (sideIndex > 0) {
+                            teamsHTML += '<span class="match-vs">VS</span>';
+                        }
+
+                        teamsHTML += '<div class="match-team">';
+
+                        if (side.players && Array.isArray(side.players) && side.players.length > 0) {
+                            side.players.forEach((player, playerIndex) => {
+                                if (playerIndex > 0) teamsHTML += ' ';
+
+                                const playerColor = getHexColor(player.color || player.teamColor || player.originalTeamColor);
+                                const playerName = player.name || player.displayName || `Player ${player.id || '?'}`;
+
+                                teamsHTML += `<span class="match-player" style="border-color: ${playerColor}; color: ${playerColor};">${playerName}</span>`;
+                            });
+                        } else {
+                            // Side has no players
+                            teamsHTML += '<span style="opacity: 0.5; font-size: 11px;">Empty side</span>';
+                        }
+
+                        teamsHTML += '</div>';
+                    });
+                }
+
                 teamsHTML += '</div>';
-                
+
                 matchDiv.innerHTML = headerHTML + teamsHTML;
                 return matchDiv;
             }
@@ -1194,17 +1312,31 @@
                 matchesContainer.appendChild(currentSection);
             }
             
+            // Finished Matches Section (show first since they're completed)
+            if (completedMatches.length > 0) {
+                const finishedSection = document.createElement('div');
+                finishedSection.className = 'match-category';
+                finishedSection.innerHTML = '<h3>Finished Matches</h3>';
+
+                // Show last 3 completed matches
+                completedMatches.slice(-3).reverse().forEach(match => {
+                    finishedSection.appendChild(createMatchHTML(match, false));
+                });
+
+                matchesContainer.appendChild(finishedSection);
+            }
+
             // Upcoming Matches Section
             if (upcomingMatches.length > 0) {
                 const upcomingSection = document.createElement('div');
                 upcomingSection.className = 'match-category';
                 upcomingSection.innerHTML = '<h3>Upcoming Matches</h3>';
-                
+
                 // Show up to 5 upcoming matches
                 upcomingMatches.slice(0, 5).forEach(match => {
                     upcomingSection.appendChild(createMatchHTML(match, false));
                 });
-                
+
                 matchesContainer.appendChild(upcomingSection);
             }
         }

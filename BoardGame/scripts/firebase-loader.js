@@ -60,11 +60,39 @@ document.addEventListener('DOMContentLoaded', function() {
                     window.firebaseGetDocs = function(collectionRef) {
                         return collectionRef.get();
                     };
-                    window.firebaseOnSnapshot = function(docRef, callback) {
-                        return docRef.onSnapshot(callback);
+                    window.firebaseOnSnapshot = function(docRef, callback, errorCallback) {
+                        return docRef.onSnapshot(callback, errorCallback);
                     };
-                    window.firebaseCollection = function(db, collection) {
-                        return db.collection(collection);
+                    window.firebaseCollection = function(db, ...pathSegments) {
+                        // Support both single collection and subcollection paths
+                        // e.g., firebaseCollection(db, 'games', gameId, 'actions')
+                        let ref = db;
+                        for (let i = 0; i < pathSegments.length; i += 2) {
+                            ref = ref.collection(pathSegments[i]);
+                            if (i + 1 < pathSegments.length) {
+                                ref = ref.doc(pathSegments[i + 1]);
+                            }
+                        }
+                        return ref;
+                    };
+                    window.firebaseQuery = function(collectionRef, ...queryConstraints) {
+                        // Apply query constraints (orderBy, limit, where, etc.)
+                        let query = collectionRef;
+                        queryConstraints.forEach(constraint => {
+                            if (constraint) {
+                                query = constraint(query);
+                            }
+                        });
+                        return query;
+                    };
+                    window.firebaseOrderBy = function(field, direction = 'asc') {
+                        return (query) => query.orderBy(field, direction);
+                    };
+                    window.firebaseLimit = function(count) {
+                        return (query) => query.limit(count);
+                    };
+                    window.firebaseWhere = function(field, operator, value) {
+                        return (query) => query.where(field, operator, value);
                     };
                     
                     console.log("Firebase initialized successfully");
@@ -75,10 +103,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Update status if it exists
                     const status = document.getElementById('connectionStatus');
                     if (status) {
-                        status.textContent = 'Firebase connected successfully!';
+                        status.title = 'Firebase: Connected';
                         if (status.classList) {
-                            status.classList.remove('warning');
-                            status.classList.add('success');
+                            status.classList.remove('disconnected', 'warning');
+                            status.classList.add('connected');
                         }
                     }
                 })
@@ -86,10 +114,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.error('Error loading Firebase config:', error);
                     const status = document.getElementById('connectionStatus');
                     if (status) {
-                        status.textContent = 'Error initializing Firebase: ' + error.message;
+                        status.title = 'Firebase: Error - ' + error.message;
                         if (status.classList) {
-                            status.classList.remove('warning');
-                            status.classList.add('error');
+                            status.classList.remove('connected', 'warning');
+                            status.classList.add('disconnected');
                         }
                     }
                 });
@@ -98,10 +126,10 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error loading Firebase:', error);
             const status = document.getElementById('connectionStatus');
             if (status) {
-                status.textContent = 'Error connecting to Firebase: ' + error.message;
+                status.title = 'Firebase: Connection Error - ' + error.message;
                 if (status.classList) {
-                    status.classList.remove('warning');
-                    status.classList.add('error');
+                    status.classList.remove('connected', 'warning');
+                    status.classList.add('disconnected');
                 }
             }
         });
