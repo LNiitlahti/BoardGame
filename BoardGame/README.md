@@ -4,338 +4,327 @@ A real-time, role-based tournament management system for hex-grid board games, b
 
 ## 🚀 Quick Start
 
-1. **Login:** Open `login.html` to authenticate
-2. **Get Admin Access:** Use `make-me-admin.html` to grant yourself admin privileges
-3. **Manage Tournaments:** Open `god.html` to create and manage tournaments
-4. **View on Signage:** Use `view.html?gameId=tournament-id` for public displays
+1. **Configure Firebase:** Add your Firebase configuration to `scripts/firebase.js`
+2. **Login:** Open `login.html` to authenticate with email/password
+3. **Access Home:** Navigate to `home.html` for your role-based dashboard
+4. **Admin Access:** Admins can access `god.html` for tournament management
+5. **Public Display:** Use `view.html?tournamentId=your-id` for digital signage
 
-## 📚 Documentation
-
-### Core Documentation
-
-| Document | Purpose |
-|----------|---------|
-| [ROUTING_ARCHITECTURE.md](ROUTING_ARCHITECTURE.md) | Role-based routing and navigation system |
-| [AUTHENTICATION.md](AUTHENTICATION.md) | Authentication setup and security model |
-| [VIEW_PAGE_DOCUMENTATION.md](VIEW_PAGE_DOCUMENTATION.md) | Digital signage display documentation |
-| [MIGRATION_PLAN.md](MIGRATION_PLAN.md) | 4-week migration plan to modular architecture |
-| [CORE_GAME_ARCHITECTURE.md](CORE_GAME_ARCHITECTURE.md) | Game engine and module design specs |
-
-### Key Pages
-
-| Page | Purpose | Access Level |
-|------|---------|--------------|
-| [index.html](index.html) | Smart router - entry point | Public |
-| [login.html](login.html) | User authentication | Public |
-| [home.html](home.html) | Role-based dashboard | Authenticated |
-| [god.html](god.html) | Admin control panel | GOD/Admin only |
-| [view.html](view.html) | **Digital signage display** | Public (read-only) |
-| [setup.html](setup.html) | Tournament setup wizard | Admin |
-| [team.html](team.html) | Team management | Player/Admin |
-| [profile.html](profile.html) | User profile | User |
-
-## 🎭 User Roles
-
-### GOD (Superadmin)
-- Complete system control
-- Tournament CRUD operations
-- User management
-- Access all features
-
-**How to become GOD:**
-1. Use `make-me-admin.html` tool, OR
-2. Add UID to `GOD_UIDS` array in `index.html`, OR
-3. Set `isSuperAdmin: true` in Firestore user document
-
-### Admin
-- Manage current tournaments
-- Confirm match results
-- Assign players to teams
-
-### Player
-- View own team information
-- See match schedule
-- View available spell cards
-
-### User
-- Basic profile access
-- Wait for role assignment
-
-## 📺 Digital Signage (view.html)
-
-**SPECIAL NOTE:** `view.html` is designed for **public display only** - no user interaction required.
-
-- ✅ Read-only display for spectators
-- ✅ Real-time game updates
-- ✅ No authentication needed
-- ✅ No sensitive data shown
-- ✅ Optimized for large screens/TVs
-
-**Usage:**
-```
-view.html?gameId=your-tournament-id
-```
-
-See [VIEW_PAGE_DOCUMENTATION.md](VIEW_PAGE_DOCUMENTATION.md) for details.
-
-## 🏗️ Architecture
-
-### Current Implementation (Phase 1 Complete)
+## 📁 Project Structure
 
 ```
 BoardGame/
 ├── Core Pages
-│   ├── index.html          # Smart router
-│   ├── login.html          # Authentication
+│   ├── index.html          # Entry point with auth routing
+│   ├── login.html          # User authentication
 │   ├── home.html           # Role-based dashboard
-│   ├── god.html            # Admin panel
-│   └── view.html           # Public signage display
+│   ├── god.html            # Admin control panel
+│   ├── setup.html          # Tournament setup wizard
+│   ├── team.html           # Team management interface
+│   ├── view.html           # Public signage display
+│   └── profile.html        # User profile management
 │
-├── Scripts (Modules)
-│   ├── errorHandler.js     # Toast notifications & error handling
-│   ├── stateManager.js     # Pub/sub state management
-│   ├── utils.js            # 40+ utility functions
-│   ├── firebase-loader.js  # Firebase initialization
-│   ├── board-module.js     # Hex grid logic
-│   ├── board-renderer.js   # Canvas rendering
-│   └── god-scripts.js      # God mode functionality
+├── Scripts (Modular Architecture)
+│   ├── firebase-loader.js      # Firebase SDK initialization
+│   ├── errorHandler.js         # Toast notifications & error handling
+│   ├── stateManager.js         # Pub/sub state management
+│   ├── utils.js                # Shared utility functions
+│   ├── god-scripts.js          # God mode functionality
+│   ├── tournament-manager.js   # Tournament lifecycle management
+│   ├── user-management.js      # User authentication & profiles
+│   ├── team-controls.js        # Team interactions
+│   ├── action-history.js       # Game action tracking
+│   ├── match-scheduler.js      # Match scheduling logic
+│   ├── board-module.js         # Hex grid game logic
+│   └── board-renderer.js       # Canvas rendering engine
 │
-├── Styles
-│   └── css/styles.css      # Unified stylesheet
-│
-├── Security
-│   ├── firestore.rules     # Server-side security rules
-│   └── .gitignore          # Protect secrets
-│
-└── Documentation
-    ├── README.md                      # This file
-    ├── ROUTING_ARCHITECTURE.md        # Navigation system
-    ├── AUTHENTICATION.md              # Security & auth
-    ├── VIEW_PAGE_DOCUMENTATION.md     # Signage display docs
-    ├── MIGRATION_PLAN.md              # Architecture roadmap
-    └── CORE_GAME_ARCHITECTURE.md      # Module specs
+└── Styles
+    ├── css/styles.css          # Global styles
+    └── css/god_styles.css      # God mode specific styles
 ```
+
+## 🎭 User Roles
+
+### GOD/Admin
+- Create and manage tournaments
+- Configure teams and players
+- Schedule and confirm matches
+- Control game flow and board state
+- Access to `god.html` control panel
+
+### Player
+- View team information
+- See match schedules
+- View tournament standings
+- Access team-specific features
+
+### User (Default)
+- Basic authenticated access
+- Profile management
+- View public tournament information
+
+**Note:** Role assignment is managed through Firestore. Set `isAdmin: true` or `isSuperAdmin: true` in the user document for admin access.
+
+## 📺 Digital Signage (view.html)
+
+The view page is designed for **public display** on large screens or TVs at tournament venues.
+
+**Features:**
+- ✅ Real-time tournament updates
+- ✅ No authentication required
+- ✅ Read-only display
+- ✅ Auto-refreshing board state
+- ✅ Team standings and match history
+
+**Usage:**
+```
+view.html?tournamentId=your-tournament-id
+```
+
+Press F11 for fullscreen mode on most browsers.
+
+## 🏗️ Architecture
 
 ### Technology Stack
 
 - **Frontend:** Vanilla JavaScript (ES6+), HTML5, CSS3
-- **Backend:** Firebase (Firestore, Authentication)
-- **Real-time:** Firebase Realtime Listeners
-- **Rendering:** HTML5 Canvas (hex grid)
-- **Security:** Firestore Security Rules
-- **Architecture:** Modular ES6 modules
+- **Backend:** Firebase Firestore (NoSQL database)
+- **Authentication:** Firebase Authentication
+- **Real-time:** Firestore real-time listeners
+- **Rendering:** HTML5 Canvas for hex grid visualization
+- **Architecture:** Modular ES6 design with pub/sub patterns
 
-## 🔐 Security Model
+### Key Design Patterns
 
-### Client-Side (UX Only)
-- Role-based UI visibility
-- Auth state checks
-- Session management
-
-### Server-Side (Real Security)
-- Firestore Security Rules enforce all permissions
-- Role validation on every database operation
-- Admin verification for write operations
-
-**Important:** Client-side checks are for UX only. Real security is enforced by Firestore rules.
-
-See [AUTHENTICATION.md](AUTHENTICATION.md) for details.
+1. **Modular Scripts:** Each major feature has its own module
+2. **State Management:** Centralized state with pub/sub via `stateManager.js`
+3. **Error Handling:** Global error handler with user-friendly toast notifications
+4. **Real-time Sync:** Firebase listeners keep all clients synchronized
+5. **Role-Based Access:** Client-side routing + server-side Firestore security rules
 
 ## ✨ Key Features
 
-### Tournament Management (god.html)
-- ✅ Create, edit, duplicate, archive, delete tournaments
-- ✅ Real-time tournament list with search & filtering
-- ✅ Match queue manager with drag-and-drop
-- ✅ Turn-by-turn game management
-- ✅ Board state visualization
-- ✅ Heart hex control tracking
-- ✅ Game history logging
+### Tournament Management
+- Create, edit, and archive tournaments
+- Configure teams with custom colors
+- Define game types and match formats
+- Set win conditions and scoring rules
+- Real-time tournament status tracking
 
-### Match Scheduling
-- ✅ Manual match planning
-- ✅ Game queue system
-- ✅ Result confirmation
-- ✅ Winner selection
-- ✅ Automatic turn progression
+### Match System
+- Match scheduling with queue management
+- Multiple game types (CS2, Dota 2, Valorant, StarCraft II, etc.)
+- Flexible team formats (1v1, 2v2, 3v3, 5v5)
+- Result confirmation workflow
+- Automatic turn progression
 
-### Board Management
-- ✅ Hex grid with axial coordinates
-- ✅ Heart hex system
-- ✅ Team position tracking
-- ✅ Control point scoring
-- ✅ Visual board state rendering
+### Hex Grid Board
+- Axial coordinate system
+- Heart hex control points
+- Team territory visualization
+- Canvas-based rendering
+- Point calculation and win detection
 
 ### Player Features
-- ✅ Team assignment
-- ✅ Spell card system
-- ✅ Personal statistics
-- ✅ Match schedule viewing
+- Team assignment and management
+- Match history viewing
+- Personal statistics tracking
+- Tournament schedule access
 
 ## 🎮 Game Flow
 
 ```
-1. GOD creates tournament (god.html)
+1. Admin creates tournament (setup.html or god.html)
    ↓
-2. GOD adds teams and players
+2. Admin configures teams and players
    ↓
-3. GOD plans matches in queue
+3. Admin schedules matches
    ↓
-4. Matches are played
+4. Matches are played (external to system)
    ↓
-5. GOD confirms results
+5. Admin confirms results in god.html
    ↓
-6. System updates scores & board
+6. System updates scores and board state
    ↓
-7. Next turn begins
+7. Next match begins
    ↓
-8. Repeat until win condition met
+8. Repeat until win condition is met
 ```
 
-## 📊 Data Structure
+## 📊 Firestore Data Structure
 
-### Tournament Document (Firestore: `games/{gameId}`)
+### Collections
+
+- **`tournaments`** - Tournament configurations and state
+- **`users`** - User profiles and roles
+- **`spellCards`** - Spell card definitions (optional game mechanic)
+
+### Tournament Document Structure
 
 ```javascript
 {
-  gameId: "game-2025-10-12",
+  gameId: "tournament-2025-01",
   status: "setup" | "playing" | "finished" | "archived",
-  winCondition: 50,
-  teams: [...],
-  selectedGames: [
+  teams: [
     {
-      game: 1,
-      sides: [
-        { players: [{name: "...", color: "blue"}] },
-        { players: [{name: "...", color: "red"}] }
+      id: 1,
+      name: "Team Blue",
+      color: "#3b82f6",
+      players: [
+        { name: "Player 1", points: 0 },
+        { name: "Player 2", points: 0 }
       ],
-      status: "waiting" | "playing" | "completed"
+      points: 0,
+      gamesWon: 0
     }
   ],
-  gameHistory: [
+  matches: [
     {
-      gameNumber: 1,
-      winner: "Team Blue",
-      loser: "Team Red",
-      timestamp: "2025-10-12T..."
+      id: 1,
+      game: "Counter-Strike 2",
+      format: "5v5",
+      status: "waiting" | "playing" | "completed",
+      round: 1
     }
   ],
-  board: {
-    "q0r0": { owner: "blue", type: "normal" },
-    "q1r-1": { owner: null, type: "heart" }
-  },
-  heartHexControl: {
-    "q2r-4": "blue",
-    "q4r-2": "red"
-  },
-  currentRound: 1,
-  gamesPlayed: 5,
-  currentTurn: {
-    game: 1,
-    startedAt: "2025-10-12T..."
-  }
+  board: {},
+  heartHexes: ["q2r-4", "q4r-2", "q2r2", "q-2r4", "q-4r2", "q-2r-2"],
+  heartHexControl: {},
+  winCondition: 50,
+  currentRound: 0,
+  gamesPlayed: 0,
+  gameHistory: [],
+  createdAt: "2025-01-01T00:00:00Z"
 }
 ```
 
-## 🛠️ Development Tools
+## 🔐 Security
 
-### make-me-admin.html
-**DO NOT DEPLOY TO PRODUCTION**
+### Client-Side (UX Layer)
+- Role checks for UI visibility
+- Auth state management
+- Session handling
+- Input validation
 
-Quick tool to grant yourself admin privileges during development.
+### Server-Side (Real Security)
+- Firestore Security Rules enforce all permissions
+- Role validation on every database operation
+- Admin-only write operations
+- Public read access for `view.html`
 
-**Usage:**
-1. Log in to your account
-2. Open `make-me-admin.html`
-3. Click "Make Me Admin"
-4. Access `god.html` with full privileges
-
-**Security:** This file is in `.gitignore` and should never be deployed.
-
-## 🚧 Migration Roadmap
-
-Current status: **Phase 1 Complete** ✅
-
-- [x] Phase 1: Foundation (errorHandler, stateManager, utils, Firestore rules)
-- [ ] Phase 2: Module Extraction (GameEngine, TurnManager, MatchManager)
-- [ ] Phase 3: Orchestration Layer (GameOrchestrator, EventBus)
-- [ ] Phase 4: Testing & Polish (Unit tests, integration tests)
-
-See [MIGRATION_PLAN.md](MIGRATION_PLAN.md) for complete roadmap.
+**Important:** All client-side security is for UX only. Real security is enforced by Firestore rules.
 
 ## 📝 Common Tasks
 
-### Make Yourself Admin
-```bash
-# Option 1: Use helper tool
-Open: make-me-admin.html
+### Grant Admin Access
 
-# Option 2: Firebase Console
-1. Firestore → users/{your-uid}
-2. Add: isAdmin: true, isSuperAdmin: true
-```
+1. Open Firebase Console → Firestore
+2. Navigate to `users/{user-uid}`
+3. Add fields:
+   - `isAdmin: true`
+   - `isSuperAdmin: true` (for full access)
+4. User can now access `god.html`
 
 ### Create a Tournament
-```bash
-1. Open god.html
-2. Click "➕ Create New Tournament"
-3. Enter tournament ID (e.g., "game-2025-10-12")
-4. Click "Quick Create" or "Full Wizard"
-5. Tournament appears in list
-```
 
-### Plan Matches
-```bash
-1. Load tournament in god.html
-2. Go to "Plan Game" tab
-3. Select game type (1v1, 2v2, 3v3, etc.)
-4. Drag teams to sides
-5. Click "➕ Add to Queue"
-6. Match appears in queue
-```
+1. Navigate to `setup.html` (or use god.html)
+2. Follow the setup wizard:
+   - Select games
+   - Create teams
+   - Review spell cards
+   - Generate match schedule
+   - Set tournament ID and win condition
+3. Click "Create Tournament"
+4. Tournament is saved to Firestore
 
 ### Display on Signage
-```bash
-1. Get tournament ID from god.html
-2. Open: view.html?gameId=your-tournament-id
+
+1. Get tournament ID from god.html or setup
+2. Open: `view.html?tournamentId=your-tournament-id`
 3. Press F11 for fullscreen
-4. Display updates automatically in real-time
-```
+4. Display updates automatically
 
 ## 🐛 Troubleshooting
 
-### Can't Access god.html
-- Use `make-me-admin.html` to grant admin privileges
-- Check Firestore user document has `isAdmin: true`
-- Verify Firebase connection (check console)
+### Cannot Access Admin Pages
+- Check that your user document in Firestore has `isAdmin: true`
+- Verify you're logged in (check `home.html` redirect)
+- Clear browser cache and try again
 
 ### view.html Shows No Data
-- Verify gameId parameter is correct
-- Check Firebase connection indicator (top-right)
-- Open browser console for debug logs
-- Ensure tournament exists in Firestore
+- Verify the `tournamentId` parameter in the URL is correct
+- Check that the tournament exists in Firestore `tournaments` collection
+- Open browser console for error messages
+- Verify Firebase connection (check console logs)
 
-### Authentication Errors
-- Clear browser cache and session storage
-- Check `scripts/firebase.js` configuration
-- Verify Firestore rules are deployed
-- Try logging out and back in
+### Authentication Issues
+- Ensure `scripts/firebase.js` has correct Firebase config
+- Check Firebase Console → Authentication is enabled
+- Verify email/password provider is enabled
+- Try clearing browser storage and logging in again
+
+### Board Not Rendering
+- Check browser console for canvas errors
+- Verify `board-module.js` and `board-renderer.js` are loaded
+- Ensure tournament has board data in Firestore
+- Try refreshing the page
+
+## 🛠️ Development Setup
+
+1. **Clone the repository**
+   ```bash
+   git clone <your-repo-url>
+   cd BoardGame
+   ```
+
+2. **Configure Firebase**
+   - Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com)
+   - Enable Authentication (Email/Password)
+   - Create Firestore database
+   - Copy your Firebase config to `scripts/firebase.js`
+
+3. **Set up Firestore Security Rules**
+   - Deploy security rules from Firebase Console
+   - Ensure proper role-based access control
+
+4. **Serve locally**
+   - Use a local web server (e.g., Live Server, Python's http.server)
+   - Open `index.html` in your browser
+
+5. **Create admin user**
+   - Register via `login.html`
+   - Manually add `isAdmin: true` to your user document in Firestore
+
+## 📦 Deployment
+
+The project is a static web application that can be deployed to:
+- Firebase Hosting
+- GitHub Pages
+- Netlify
+- Vercel
+- Any static hosting service
+
+**Important:** Never commit `scripts/firebase.js` with your real API keys. Use environment variables or Firebase's built-in security.
+
+## 🔄 Recent Changes
+
+- Migrated from legacy MVC architecture to modular design
+- Removed unused controller files and pages
+- Added new modular scripts (tournament-manager, user-management, etc.)
+- Improved god.html with better UI and functionality
+- Added comprehensive .gitignore for better security
+- Simplified authentication flow
+- Enhanced real-time synchronization
 
 ## 📄 License
 
 [Add your license here]
 
-## 👥 Contributors
+## 👥 Contributing
 
-[Add contributors here]
-
-## 🔗 Related Links
-
-- [Firebase Console](https://console.firebase.google.com)
-- [Firestore Security Rules](https://firebase.google.com/docs/firestore/security/get-started)
-- [Firebase Authentication](https://firebase.google.com/docs/auth)
+[Add contribution guidelines here]
 
 ---
 
-**Last Updated:** 2025-10-12
-**Version:** 1.0.0 (Phase 1 Complete)
+**Last Updated:** 2025-10-13
+**Status:** Production Ready
