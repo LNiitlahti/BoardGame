@@ -4,48 +4,67 @@
    ================================= */
 
 /* =================================
+   FONT IMPORTS
+   ================================= */
+@import url('https://fonts.googleapis.com/css2?family=Dosis:wght@200;300;400;500;600;700;800&display=swap');
+
+/* =================================
    CSS CUSTOM PROPERTIES (VARIABLES)
    ================================= */
 :root {
-    /* Colors */
-    --primary-gradient: linear-gradient(135deg, #1e3c72, #2a5298);
-    --gold-gradient: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
-    --purple-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    --danger-gradient: linear-gradient(135deg, #ff4444 0%, #cc3333 100%);
-    --god-header-gradient: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
-    
-    /* Team Colors */
-    --team1-color: #ff4444;
-    --team2-color: #44ff44;
-    --team3-color: #4444ff;
-    --team4-color: #ffff44;
+    /* Typography */
+    --font-primary: 'Dosis', sans-serif;
+
+    /* Brand Colors - Minimalist Black & White */
+    --brand-dark: #22241d;
+    --brand-cream: #f7f0e3;
+    --brand-yellow: #f7ba32;
+    --brand-blue: #2278a3;
+    --brand-green: #2e9158;
+    --brand-red: #de392c;
+    --brand-purple: #7A4BA0;
+
+    /* Primary Colors */
+    --bg-primary: #22241d;
+    --text-primary: #f7f0e3;
+    --accent-primary: #f7ba32;
+    --accent-secondary: #2278a3;
+
+    /* Alpha Colors */
+    --cream-alpha-03: rgba(247, 240, 227, 0.03);
+    --cream-alpha-05: rgba(247, 240, 227, 0.05);
+    --cream-alpha-1: rgba(247, 240, 227, 0.1);
+    --cream-alpha-15: rgba(247, 240, 227, 0.15);
+    --cream-alpha-2: rgba(247, 240, 227, 0.2);
+    --cream-alpha-6: rgba(247, 240, 227, 0.6);
+    --cream-alpha-7: rgba(247, 240, 227, 0.7);
+
+    /* Team Colors (keep for compatibility) */
+    --team1-color: #de392c;
+    --team2-color: #2e9158;
+    --team3-color: #2278a3;
+    --team4-color: #f7ba32;
     --team5-color: #ff44ff;
-    
-    /* Accent Colors */
-    --gold: #ffd700;
-    --gold-light: #ffed4e;
-    --white-alpha-1: rgba(255, 255, 255, 0.1);
-    --white-alpha-2: rgba(255, 255, 255, 0.2);
-    --white-alpha-3: rgba(255, 255, 255, 0.3);
-    
+
     /* Spacing */
     --spacing-xs: 5px;
     --spacing-sm: 10px;
     --spacing-md: 15px;
     --spacing-lg: 20px;
     --spacing-xl: 30px;
-    
+
     /* Border Radius */
     --radius-sm: 5px;
     --radius-md: 10px;
     --radius-lg: 15px;
     --radius-xl: 20px;
-    
+
     /* Shadows */
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
     --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.2);
     --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.3);
-    --shadow-gold: 0 0 20px rgba(255, 215, 0, 0.3);
+    --shadow-yellow: 0 0 20px rgba(247, 186, 50, 0.3);
+    --shadow-yellow-hover: 0 4px 20px rgba(247, 186, 50, 0.4);
 }
 
 /* =================================
@@ -58,10 +77,10 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: var(--primary-gradient);
+    font-family: var(--font-primary);
+    background: var(--bg-primary);
     min-height: 100vh;
-    color: white;
+    color: var(--text-primary);
     line-height: 1.6;
 }
 
@@ -71,16 +90,48 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--cream-alpha-05);
+    border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(255, 215, 0, 0.5);
+    background: var(--accent-primary);
     border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 215, 0, 0.7);
+    background: var(--brand-yellow);
+}
+
+/* =================================
+   LOGO COMPONENT
+   ================================= */
+.brand-logo {
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
+    transition: transform 0.3s ease;
+    background: var(--brand-cream);
+    border-radius: 12px;
+    padding: 4px;
+}
+
+.brand-logo:hover {
+    transform: scale(1.05);
+}
+
+.brand-logo.small {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    padding: 3px;
+}
+
+.brand-logo.large {
+    width: 100px;
+    height: 100px;
+    border-radius: 16px;
+    padding: 6px;
 }
 
 /* =================================
@@ -741,11 +792,10 @@ body {
    PANEL & CARD COMPONENTS
    ================================= */
 .panel, .control-panel {
-    background: var(--white-alpha-1);
+    background: var(--cream-alpha-03);
     padding: var(--spacing-lg);
     border-radius: var(--radius-lg);
-    backdrop-filter: blur(10px);
-    border: 1px solid var(--white-alpha-2);
+    border: 1px solid var(--cream-alpha-1);
 }
 
 .control-panel {
@@ -755,7 +805,7 @@ body {
 }
 
 .panel h3, .control-panel h3 {
-    color: var(--gold);
+    color: var(--accent-primary);
     margin-bottom: var(--spacing-md);
     font-size: 1.2rem;
     display: flex;
@@ -921,10 +971,10 @@ body {
 input, select, textarea {
     width: 100%;
     padding: var(--spacing-md);
-    border: 2px solid var(--white-alpha-3);
+    border: 1px solid var(--cream-alpha-15);
     border-radius: var(--radius-md);
-    background: var(--white-alpha-1);
-    color: white;
+    background: var(--cream-alpha-05);
+    color: var(--text-primary);
     font-size: 1rem;
     transition: all 0.3s ease;
 }
@@ -933,7 +983,7 @@ input, select, textarea {
 .control-panel select,
 .control-panel textarea {
     padding: 8px;
-    border: 1px solid var(--white-alpha-3);
+    border: 1px solid var(--cream-alpha-15);
     border-radius: var(--radius-sm);
     margin: var(--spacing-xs) 0;
 }
@@ -942,8 +992,7 @@ input, select, textarea {
 .form-group textarea:focus,
 .form-group select:focus {
     outline: none;
-    border-color: var(--gold);
-    box-shadow: var(--shadow-gold);
+    border-color: var(--accent-primary);
 }
 
 .form-group input::placeholder,
@@ -962,8 +1011,8 @@ input::placeholder {
    BUTTON COMPONENTS
    ================================= */
 .btn, .action-button {
-    background: var(--purple-gradient);
-    color: white;
+    background: var(--accent-primary);
+    color: var(--brand-dark);
     border: none;
     padding: var(--spacing-md) var(--spacing-xl);
     border-radius: var(--radius-md);
@@ -989,11 +1038,7 @@ input::placeholder {
 
 .btn:hover, .action-button:hover {
     transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-}
-
-.action-button:hover {
-    box-shadow: var(--shadow-gold);
+    box-shadow: var(--shadow-yellow-hover);
 }
 
 .btn:disabled, .action-button:disabled {
@@ -1003,8 +1048,8 @@ input::placeholder {
 }
 
 .btn.primary, .action-button {
-    background: var(--gold-gradient);
-    color: #333;
+    background: var(--accent-primary);
+    color: var(--brand-dark);
     font-weight: 700;
 }
 
@@ -1014,17 +1059,19 @@ input::placeholder {
 }
 
 .btn.secondary {
-    background: rgba(255, 255, 255, 0.1);
-    border: 2px solid var(--white-alpha-3);
+    background: var(--cream-alpha-1);
+    color: var(--text-primary);
+    border: 1px solid var(--cream-alpha-2);
 }
 
 .btn.secondary:hover {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: var(--gold);
+    background: var(--cream-alpha-15);
+    border-color: var(--accent-primary);
 }
 
 .btn.danger {
-    background: var(--danger-gradient);
+    background: var(--brand-red);
+    color: white;
 }
 
 /* =================================
@@ -1533,6 +1580,106 @@ input::placeholder {
 }
 
 /* =================================
+   TOAST NOTIFICATIONS
+   ================================= */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 15px 25px;
+    background: rgba(15, 23, 42, 0.95);
+    color: white;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    z-index: 10000;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    border: 2px solid #334155;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    max-width: 400px;
+    word-wrap: break-word;
+}
+
+.toast.show {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.toast.toast-error {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.95);
+    box-shadow: 0 10px 40px rgba(239, 68, 68, 0.4);
+}
+
+.toast.toast-success {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.95);
+    box-shadow: 0 10px 40px rgba(16, 185, 129, 0.4);
+}
+
+.toast.toast-warning {
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.95);
+    box-shadow: 0 10px 40px rgba(245, 158, 11, 0.4);
+}
+
+.toast.toast-info {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.95);
+    box-shadow: 0 10px 40px rgba(59, 130, 246, 0.4);
+}
+
+/* Toast animation on mobile */
+@media (max-width: 768px) {
+    .toast {
+        bottom: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+        text-align: center;
+    }
+}
+
+/* =================================
+   CONNECTION STATUS DOT
+   ================================= */
+.connection-dot {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    z-index: 9999;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+.connection-dot.connected {
+    background: #10b981;
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.6);
+}
+
+.connection-dot.disconnected {
+    background: #ef4444;
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
+    animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.7;
+        transform: scale(1.2);
+    }
+}
+
+/* =================================
    UTILITY CLASSES
    ================================= */
 .text-center { text-align: center; }
@@ -1541,7 +1688,7 @@ input::placeholder {
 .hidden { display: none; }
 .full-width { width: 100%; }
 .pointer { cursor: pointer; }
-.no-select { 
-    user-select: none; 
+.no-select {
+    user-select: none;
     -webkit-user-select: none;
 }

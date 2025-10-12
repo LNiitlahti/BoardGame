@@ -1,0 +1,217 @@
+# ===========================
+# BoardGame Project .gitignore
+# ===========================
+
+# ===========================
+# SECRETS & CREDENTIALS
+# ===========================
+# Firebase config (contains API keys)
+scripts/firebase.js
+
+# Any backup of firebase config
+scripts/firebase.*.js
+!scripts/firebase.example.js
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Credentials
+credentials.json
+serviceAccountKey.json
+*.pem
+*.key
+
+# ===========================
+# PLANNING & NOTES
+# ===========================
+# Planning documents (ChatGPT conversations, brainstorming, etc.)
+.plan/
+*.plan.txt
+notes.txt
+TODO.txt
+NOTES.md
+
+# Personal notes
+.notes/
+scratch/
+
+# ===========================
+# IDE & EDITOR
+# ===========================
+# VS Code
+.vscode/
+*.code-workspace
+
+# Claude Code
+.claude/
+
+# JetBrains IDEs (WebStorm, etc.)
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ===========================
+# OPERATING SYSTEM
+# ===========================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ===========================
+# BACKUPS & TEMPORARY
+# ===========================
+# Backup files
+*.backup
+*.bak
+*.old
+*.orig
+*.tmp
+
+# Temporary files
+temp/
+tmp/
+*.temp
+
+# Log files
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===========================
+# BUILD & DEPENDENCIES
+# ===========================
+# Node modules (if you add npm/yarn later)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Build output
+dist/
+build/
+out/
+
+# Cache
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+
+# ===========================
+# TESTING
+# ===========================
+# Test coverage
+coverage/
+*.coverage
+.nyc_output/
+
+# Test artifacts
+test-results/
+screenshots/
+test-screenshots/
+
+# ===========================
+# DOCUMENTATION DRAFTS
+# ===========================
+# Keep final .md files, ignore drafts
+*.draft.md
+*.wip.md
+
+# ===========================
+# FIREBASE SPECIFIC
+# ===========================
+# Firebase cache
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Firebase hosting
+.firebaserc
+
+# Firestore security rules (contains security logic)
+firestore.rules
+storage.rules
+database.rules.json
+
+# ===========================
+# MIGRATION ARTIFACTS
+# ===========================
+# Backup files during migration
+scripts/*.backup.js
+*.before-migration.js
+migration-logs/
+
+# ===========================
+# SENSITIVE DATA
+# ===========================
+# User data exports
+exports/
+user-data/
+*.csv
+*.xlsx
+
+# Database dumps
+*.sql
+*.db
+*.sqlite
+
+# ===========================
+# DEVELOPMENT TOOLS
+# ===========================
+# Admin helper tools (DO NOT deploy to production)
+make-me-admin.html
+dev-create-users.html
+dev-tools/
+setup-helpers/
+
+# ===========================
+# MISC
+# ===========================
+# Compressed files (unless needed for project)
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# Archives
+archive/
+old/
+deprecated/
+
+# Old test files
+old_test_files/
