@@ -12,6 +12,15 @@
     --brand-cream: #f7f0e3;
     --brand-dark: #22241d;
 
+    /* Cream Alpha Variants (for backgrounds) */
+    --cream-alpha-05: rgba(247, 240, 227, 0.05);
+    --cream-alpha-1: rgba(247, 240, 227, 0.1);
+    --cream-alpha-15: rgba(247, 240, 227, 0.15);
+    --cream-alpha-2: rgba(247, 240, 227, 0.2);
+    --cream-alpha-3: rgba(247, 240, 227, 0.3);
+    --cream-alpha-6: rgba(247, 240, 227, 0.6);
+    --cream-alpha-7: rgba(247, 240, 227, 0.7);
+
     /* Night-Friendly Dark Palette */
     --bg-primary: #2a2d28;         /* Slightly warm dark, not pure black */
     --bg-secondary: #363933;       /* Lighter panels */
@@ -375,3 +384,77 @@ tr:hover {
 .text-success { color: var(--accent-success); }
 .text-warning { color: var(--accent-warning); }
 .text-danger { color: var(--accent-danger); }
+
+/* Enhanced Interactive Elements */
+.btn.primary {
+    background: var(--accent-primary);
+    box-shadow: 0 0 10px rgba(34, 120, 163, 0.2);
+}
+
+.btn.primary:hover:not(:disabled) {
+    box-shadow: 0 0 20px rgba(34, 120, 163, 0.4);
+}
+
+/* Spell Card Enhancements */
+.spell-card {
+    transition: all var(--transition-base);
+    border: 2px solid var(--border-color);
+}
+
+.spell-card:hover:not(.disabled) {
+    border-color: var(--accent-warning);
+    box-shadow: 0 0 15px rgba(247, 186, 50, 0.3);
+    transform: translateY(-3px);
+}
+
+.spell-card.active {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 20px rgba(34, 120, 163, 0.4);
+}
+
+/* Pulse Animation for Important Elements */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Glow Effect for Active States */
+.glow {
+    box-shadow: 0 0 15px currentColor;
+}
+
+.glow-primary {
+    box-shadow: 0 0 15px var(--accent-primary);
+}
+
+.glow-success {
+    box-shadow: 0 0 15px var(--accent-success);
+}
+
+.glow-warning {
+    box-shadow: 0 0 15px var(--accent-warning);
+}
+
+/* Focus Visible Enhancement */
+*:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+
+/* Smooth Hover Transitions */
+a, button, .clickable {
+    transition: all var(--transition-base);
+}
+
+/* Grid Utilities */
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--spacing-md); }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--spacing-md); }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--spacing-md); }
