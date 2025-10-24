@@ -649,7 +649,6 @@
 
                     if (!userDoc.exists()) {
                         console.log('[God Mode] No user profile found');
-                        // User might still be admin via GOD_UIDS in index.html
                         // Let them try - if they're not admin, Firestore rules will block operations
                         console.log('[God Mode] Allowing access - Firestore rules will enforce permissions');
                         return;
