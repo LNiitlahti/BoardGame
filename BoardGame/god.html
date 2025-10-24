@@ -1207,6 +1207,61 @@
         // ===========================
 
         /**
+         * Get team name at a specific timestamp (handles name changes)
+         * @param {number} teamId - Team ID
+         * @param {string} timestamp - ISO timestamp
+         * @returns {string} Team name at that time
+         */
+        function getTeamNameAtTime(teamId, timestamp) {
+            const team = window.gameState?.teams?.find(t => t.id === teamId);
+            if (!team) return 'Unknown Team';
+
+            // If no name history, return current name
+            if (!team.nameHistory || team.nameHistory.length === 0) {
+                return team.name;
+            }
+
+            // Find the name that was active at the given timestamp
+            const matchTime = new Date(timestamp).getTime();
+            let nameAtTime = team.name;  // Start with current name
+
+            // Sort name history by timestamp (oldest first)
+            const sortedHistory = [...team.nameHistory].sort((a, b) =>
+                new Date(a.changedAt).getTime() - new Date(b.changedAt).getTime()
+            );
+
+            // Walk backwards through history to find the name at match time
+            for (let i = sortedHistory.length - 1; i >= 0; i--) {
+                const change = sortedHistory[i];
+                const changeTime = new Date(change.changedAt).getTime();
+
+                if (changeTime > matchTime) {
+                    // This change happened AFTER the match, use the old name
+                    nameAtTime = change.oldName;
+                } else {
+                    // This change happened BEFORE the match, we've found our answer
+                    break;
+                }
+            }
+
+            return nameAtTime;
+        }
+
+        /**
+         * Get player name from UID
+         * @param {string} uid - Player UID
+         * @param {number} teamId - Team ID
+         * @returns {string} Player name
+         */
+        function getPlayerName(uid, teamId) {
+            const team = window.gameState?.teams?.find(t => t.id === teamId);
+            if (!team) return 'Unknown';
+
+            const player = team.players?.find(p => p.uid === uid || p.email === uid);
+            return player?.name || 'Unknown';
+        }
+
+        /**
          * Refresh all history displays
          */
         function refreshHistoryDisplay() {
@@ -1244,6 +1299,29 @@
                     hour: '2-digit', minute: '2-digit'
                 });
 
+                // Get team names at match time using ID lookup
+                const winnerNames = (match.winningTeamIds || []).map(id =>
+                    getTeamNameAtTime(id, match.timestamp)
+                ).join(' & ');
+
+                const loserNames = (match.losingTeamIds || []).map(id =>
+                    getTeamNameAtTime(id, match.timestamp)
+                ).join(' & ');
+
+                // Check if any teams have been renamed since this match
+                let nameChangeNote = '';
+                const changedTeams = [];
+                [...(match.winningTeamIds || []), ...(match.losingTeamIds || [])].forEach(teamId => {
+                    const team = window.gameState.teams?.find(t => t.id === teamId);
+                    const matchTimeName = getTeamNameAtTime(teamId, match.timestamp);
+                    if (team && team.name !== matchTimeName) {
+                        changedTeams.push(`"${matchTimeName}" is now "${team.name}"`);
+                    }
+                });
+                if (changedTeams.length > 0) {
+                    nameChangeNote = `<div style="font-size: 0.75rem; color: #f7ba32; margin-top: 8px; padding: 6px; background: rgba(247, 186, 50, 0.1); border-radius: 4px;">ℹ️ Name changes: ${changedTeams.join(', ')}</div>`;
+                }
+
                 html += `
                     <div class="match-history-item" style="background: rgba(247, 240, 227, 0.05); padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #2278a3;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -1254,12 +1332,13 @@
                             <span style="color: #94a3b8; font-size: 0.75rem;">${timestamp}</span>
                         </div>
                         <div style="margin-bottom: 8px;">
-                            <span style="color: #10b981;">🏆 Winner: ${match.winner || 'Unknown'}</span>
+                            <span style="color: #10b981;">🏆 Winner: ${winnerNames || 'Unknown'}</span>
                         </div>
                         <div style="margin-bottom: 8px;">
-                            <span style="color: #f43f5e;">Loser: ${match.loser || 'Unknown'}</span>
+                            <span style="color: #f43f5e;">Loser: ${loserNames || 'Unknown'}</span>
                         </div>
                         ${match.resultNotes ? `<div style="font-size: 0.85rem; color: #94a3b8; font-style: italic; margin-top: 8px;">📝 ${match.resultNotes}</div>` : ''}
+                        ${nameChangeNote}
                     </div>
                 `;
             });
@@ -1279,9 +1358,17 @@
             if (!display) return;
 
             const filtered = gameHistory.filter(match => {
+                // Search in team names (both historical and current)
+                const winnerNames = (match.winningTeamIds || []).map(id =>
+                    getTeamNameAtTime(id, match.timestamp)
+                ).join(' ');
+                const loserNames = (match.losingTeamIds || []).map(id =>
+                    getTeamNameAtTime(id, match.timestamp)
+                ).join(' ');
+
                 const matchesSearch = searchTerm === '' ||
-                    match.winner?.toLowerCase().includes(searchTerm) ||
-                    match.loser?.toLowerCase().includes(searchTerm) ||
+                    winnerNames?.toLowerCase().includes(searchTerm) ||
+                    loserNames?.toLowerCase().includes(searchTerm) ||
                     match.game?.toLowerCase().includes(searchTerm);
 
                 const matchesGame = gameFilter === 'all' || match.game === gameFilter;
@@ -1302,6 +1389,29 @@
                     hour: '2-digit', minute: '2-digit'
                 });
 
+                // Get team names at match time using ID lookup
+                const winnerNames = (match.winningTeamIds || []).map(id =>
+                    getTeamNameAtTime(id, match.timestamp)
+                ).join(' & ');
+
+                const loserNames = (match.losingTeamIds || []).map(id =>
+                    getTeamNameAtTime(id, match.timestamp)
+                ).join(' & ');
+
+                // Check if any teams have been renamed since this match
+                let nameChangeNote = '';
+                const changedTeams = [];
+                [...(match.winningTeamIds || []), ...(match.losingTeamIds || [])].forEach(teamId => {
+                    const team = window.gameState.teams?.find(t => t.id === teamId);
+                    const matchTimeName = getTeamNameAtTime(teamId, match.timestamp);
+                    if (team && team.name !== matchTimeName) {
+                        changedTeams.push(`"${matchTimeName}" is now "${team.name}"`);
+                    }
+                });
+                if (changedTeams.length > 0) {
+                    nameChangeNote = `<div style="font-size: 0.75rem; color: #f7ba32; margin-top: 8px; padding: 6px; background: rgba(247, 186, 50, 0.1); border-radius: 4px;">ℹ️ Name changes: ${changedTeams.join(', ')}</div>`;
+                }
+
                 html += `
                     <div class="match-history-item" style="background: rgba(247, 240, 227, 0.05); padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #2278a3;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -1312,12 +1422,13 @@
                             <span style="color: #94a3b8; font-size: 0.75rem;">${timestamp}</span>
                         </div>
                         <div style="margin-bottom: 8px;">
-                            <span style="color: #10b981;">🏆 Winner: ${match.winner || 'Unknown'}</span>
+                            <span style="color: #10b981;">🏆 Winner: ${winnerNames || 'Unknown'}</span>
                         </div>
                         <div style="margin-bottom: 8px;">
-                            <span style="color: #f43f5e;">Loser: ${match.loser || 'Unknown'}</span>
+                            <span style="color: #f43f5e;">Loser: ${loserNames || 'Unknown'}</span>
                         </div>
                         ${match.resultNotes ? `<div style="font-size: 0.85rem; color: #94a3b8; font-style: italic; margin-top: 8px;">📝 ${match.resultNotes}</div>` : ''}
+                        ${nameChangeNote}
                     </div>
                 `;
             });
@@ -1551,9 +1662,12 @@
                 exportedAt: new Date().toISOString(),
                 matchHistory: window.gameState.gameHistory || [],
                 spellHistory: window.gameState.spellHistory || [],
-                teams: window.gameState.teams,
+                teams: window.gameState.teams,  // Includes nameHistory in each team
                 totalMatches: window.gameState.gamesPlayed || 0,
-                currentRound: window.gameState.currentRound || 0
+                currentRound: window.gameState.currentRound || 0,
+                // Add metadata about the export format
+                exportVersion: '2.0',  // ID-based references with name history
+                exportNotes: 'This export uses ID-based references. Team and player names should be looked up by ID. Team nameHistory tracks all renames.'
             };
 
             if (format === 'json') {
