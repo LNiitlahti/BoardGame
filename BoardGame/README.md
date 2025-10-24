@@ -1,14 +1,53 @@
-# BoardGame Tournament Management System
+# 🎮 BoardGame Tournament Management System
 
-A real-time, role-based tournament management system for hex-grid board games, built with Firebase and vanilla JavaScript.
+A complete, real-time tournament management system for LAN events with spell card mechanics, hex-grid board visualization, and multi-game support. Built with Firebase and vanilla JavaScript.
 
-## 🚀 Quick Start
+**Perfect for: 5 teams × 2 players (10 total) LAN tournaments**
 
-1. **Configure Firebase:** Add your Firebase configuration to `scripts/firebase.js`
-2. **Login:** Open `login.html` to authenticate with email/password
-3. **Access Home:** Navigate to `home.html` for your role-based dashboard
-4. **Admin Access:** Admins can access `god.html` for tournament management
-5. **Public Display:** Use `view.html?tournamentId=your-id` for digital signage
+## ⚡ Quick Start (10 Minutes)
+
+1. **Configure Firebase:** Edit `scripts/firebase.js` with your Firebase credentials
+2. **Upload Spells:** Open `upload-spells.html` → Upload 15 spell cards to Firebase
+3. **Create Tournament:** Open `god.html` → Create tournament → Add 5 teams
+4. **Distribute Spells:** God Mode → Spells tab → Distribute 2-3 spells per team
+5. **Start Playing:** Players open `team.html`, spectators watch on `view.html`
+
+📚 **Full Guide:** See [QUICK_START.md](QUICK_START.md) for detailed walkthrough
+
+## ✨ Key Features
+
+### 🔮 Complete Spell Card System
+- **15 Unique Spells** with varied effects (offensive, defensive, utility)
+- **Strategic Depth:** Pre-game buffs, instant counters, permanent effects
+- **Full Integration:** Undo/redo support, spell history tracking
+- **Easy Management:** God mode distribution, team casting interface
+- **Reference Guide:** Complete documentation with combos and strategies
+
+### 🎯 Tournament Management
+- **God Mode Dashboard:** Comprehensive admin control panel
+- **Match Queue System:** Plan, edit, and execute matches
+- **Real-time Sync:** All devices update simultaneously via Firebase
+- **Undo/Redo:** Full action history with reversal support
+- **Multi-Game Support:** CS2, Dota 2, Valorant, StarCraft II, and more
+
+### 👥 Team System
+- **5 Teams × 2 Players:** Designed for 10-player LAN events
+- **Custom Colors:** Brand colors (red, yellow, green, blue, cream)
+- **Player Tracking:** Individual stats, contributions, match history
+- **Team Interface:** Clean UI for players to view info and cast spells
+
+### 🎮 Hex Grid Board
+- **91-Hex Game Board:** Strategic territory control
+- **Heart Hexes:** 6 special control points (1 center + 5 side hearts)
+- **Visual Display:** Real-time canvas rendering
+- **Tile Placement:** Admin-controlled or automated
+- **Point Calculation:** Auto-tracking of territorial control
+
+### 📊 Public Display (view.html)
+- **Digital Signage:** Big-screen tournament display for spectators
+- **No Authentication:** Public access for viewing
+- **Real-time Updates:** Match results, scores, board state
+- **Clean Design:** Night-friendly dark theme
 
 ## 📁 Project Structure
 
@@ -30,17 +69,26 @@ BoardGame/
 │   ├── stateManager.js         # Pub/sub state management
 │   ├── utils.js                # Shared utility functions
 │   ├── god-scripts.js          # God mode functionality
+│   ├── spells-god.js           # Spell management for admins
+│   ├── spell-manager.js        # Core spell system logic
 │   ├── tournament-manager.js   # Tournament lifecycle management
 │   ├── user-management.js      # User authentication & profiles
-│   ├── team-controls.js        # Team interactions
-│   ├── action-history.js       # Game action tracking
+│   ├── team-controls.js        # Team interactions & spell casting
+│   ├── action-history.js       # Game action tracking & undo/redo
 │   ├── match-scheduler.js      # Match scheduling logic
 │   ├── board-module.js         # Hex grid game logic
 │   └── board-renderer.js       # Canvas rendering engine
 │
+├── Data
+│   └── spells.json             # 15 spell card definitions
+│
+├── Utilities
+│   └── upload-spells.html      # Admin tool to upload spells to Firebase
+│
 └── Styles
     ├── css/styles.css          # Global styles
-    └── css/god_styles.css      # God mode specific styles
+    ├── css/god_styles.css      # God mode specific styles
+    └── css/brand-theme.css     # Brand colors & night-friendly theme
 ```
 
 ## 🎭 User Roles
@@ -48,15 +96,17 @@ BoardGame/
 ### GOD/Admin
 - Create and manage tournaments
 - Configure teams and players
+- Distribute and manage spell cards
 - Schedule and confirm matches
 - Control game flow and board state
-- Access to `god.html` control panel
+- Access to `god.html` control panel with spell management
 
 ### Player
-- View team information
-- See match schedules
+- View team information and spell inventory
+- Cast spell cards during matches
+- See match schedules and results
 - View tournament standings
-- Access team-specific features
+- Access team-specific features via `team.html`
 
 ### User (Default)
 - Basic authenticated access
@@ -102,35 +152,6 @@ Press F11 for fullscreen mode on most browsers.
 4. **Real-time Sync:** Firebase listeners keep all clients synchronized
 5. **Role-Based Access:** Client-side routing + server-side Firestore security rules
 
-## ✨ Key Features
-
-### Tournament Management
-- Create, edit, and archive tournaments
-- Configure teams with custom colors
-- Define game types and match formats
-- Set win conditions and scoring rules
-- Real-time tournament status tracking
-
-### Match System
-- Match scheduling with queue management
-- Multiple game types (CS2, Dota 2, Valorant, StarCraft II, etc.)
-- Flexible team formats (1v1, 2v2, 3v3, 5v5)
-- Result confirmation workflow
-- Automatic turn progression
-
-### Hex Grid Board
-- Axial coordinate system
-- Heart hex control points
-- Team territory visualization
-- Canvas-based rendering
-- Point calculation and win detection
-
-### Player Features
-- Team assignment and management
-- Match history viewing
-- Personal statistics tracking
-- Tournament schedule access
-
 ## 🎮 Game Flow
 
 ```
@@ -138,17 +159,23 @@ Press F11 for fullscreen mode on most browsers.
    ↓
 2. Admin configures teams and players
    ↓
-3. Admin schedules matches
+3. Admin distributes spell cards to teams
    ↓
-4. Matches are played (external to system)
+4. Admin schedules matches
    ↓
-5. Admin confirms results in god.html
+5. Players cast pre-game spells (optional)
    ↓
-6. System updates scores and board state
+6. Matches are played (external to system)
    ↓
-7. Next match begins
+7. Admin confirms results in god.html
    ↓
-8. Repeat until win condition is met
+8. System applies spell effects and updates scores
+   ↓
+9. Players place tiles and cast post-game spells
+   ↓
+10. Next match begins
+   ↓
+11. Repeat until win condition is met
 ```
 
 ## 📊 Firestore Data Structure
@@ -308,6 +335,16 @@ The project is a static web application that can be deployed to:
 
 ## 🔄 Recent Changes
 
+### v1.0-spell-system (October 2025)
+- **Complete Spell Card System:** Implemented all 15 unique spell cards with full effects
+- **Spell Manager:** Core spell logic with validation, casting, and effect application
+- **God Mode Spells Tab:** Admin interface for spell distribution and management
+- **Team Spell Interface:** Players can view and cast spells via team.html
+- **Undo/Redo Integration:** Full spell reversal support in action history
+- **Brand Theme:** Night-friendly dark theme with brand colors applied to all pages
+- **Comprehensive Documentation:** Setup guide, testing guide, spell reference, quick start
+
+### Previous Updates
 - Migrated from legacy MVC architecture to modular design
 - Removed unused controller files and pages
 - Added new modular scripts (tournament-manager, user-management, etc.)
@@ -315,6 +352,7 @@ The project is a static web application that can be deployed to:
 - Added comprehensive .gitignore for better security
 - Simplified authentication flow
 - Enhanced real-time synchronization
+- Fixed team color display bug in match queue
 
 ## 📄 License
 
@@ -326,5 +364,5 @@ The project is a static web application that can be deployed to:
 
 ---
 
-**Last Updated:** 2025-10-13
-**Status:** Active Development
+**Last Updated:** 2025-10-24
+**Status:** Active Development - Spell System Complete
