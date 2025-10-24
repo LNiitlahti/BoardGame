@@ -64,6 +64,9 @@
             <button class="god-nav-tab" data-tab="stats" onclick="switchGodTab('stats')">
                 📊 Stats
             </button>
+            <button class="god-nav-tab" data-tab="history" onclick="switchGodTab('history')">
+                📜 History
+            </button>
         </nav>
 
         <!-- Tab 1: Tournaments Panel -->
@@ -523,7 +526,141 @@
         </div>
     </div>
 
-    <!-- Tab 7: Users Panel -->
+    <!-- Tab 7: History Panel -->
+    <div id="historyPanel" class="god-tab-panel">
+        <div class="panel">
+            <h3>📜 Tournament History & Logs</h3>
+            <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 15px;">
+                Complete log of all matches, spell casts, and actions for this tournament
+            </p>
+
+            <!-- Export Buttons -->
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button class="btn primary" onclick="exportTournamentHistory('json')" data-tooltip="Download complete tournament data as JSON">
+                    📥 Export as JSON
+                </button>
+                <button class="btn primary" onclick="exportTournamentHistory('csv')" data-tooltip="Download match history as CSV spreadsheet">
+                    📊 Export as CSV
+                </button>
+                <button class="btn secondary" onclick="refreshHistoryDisplay()" data-tooltip="Reload history from Firebase">
+                    🔄 Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- Match History Section -->
+        <div class="panel" style="margin-top: 20px;">
+            <h3>🏆 Match History</h3>
+            <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 10px;">
+                All completed matches with full details
+            </p>
+
+            <!-- Filters -->
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <input type="text" id="matchHistorySearch" placeholder="🔍 Search matches..."
+                       oninput="filterMatchHistory()"
+                       style="flex: 1; padding: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
+                <select id="matchHistoryGameFilter" onchange="filterMatchHistory()"
+                        style="padding: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
+                    <option value="all">All Games</option>
+                    <option value="CS2">CS2</option>
+                    <option value="Dota2">Dota 2</option>
+                    <option value="Valorant">Valorant</option>
+                    <option value="StarCraft2">StarCraft 2</option>
+                    <option value="Predecessor">Predecessor</option>
+                </select>
+            </div>
+
+            <div id="matchHistoryDisplay" style="max-height: 500px; overflow-y: auto; background: rgba(15, 23, 42, 0.5); padding: 15px; border-radius: 10px;">
+                <p style="text-align: center; opacity: 0.7;">No matches played yet. Confirm match results to see history.</p>
+            </div>
+        </div>
+
+        <!-- Spell Cast History Section -->
+        <div class="panel" style="margin-top: 20px;">
+            <h3>🔮 Spell Cast History</h3>
+            <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 10px;">
+                All spell cards cast during this tournament
+            </p>
+
+            <!-- Filters -->
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <select id="spellHistoryTeamFilter" onchange="filterSpellHistory()"
+                        style="flex: 1; padding: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
+                    <option value="all">All Teams</option>
+                </select>
+                <select id="spellHistoryTypeFilter" onchange="filterSpellHistory()"
+                        style="flex: 1; padding: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
+                    <option value="all">All Types</option>
+                    <option value="pre-game">Pre-Game</option>
+                    <option value="instant">Instant</option>
+                    <option value="tactical">Tactical</option>
+                    <option value="defensive">Defensive</option>
+                </select>
+            </div>
+
+            <div id="spellHistoryDisplay" style="max-height: 500px; overflow-y: auto; background: rgba(15, 23, 42, 0.5); padding: 15px; border-radius: 10px;">
+                <p style="text-align: center; opacity: 0.7;">No spells cast yet.</p>
+            </div>
+        </div>
+
+        <!-- Action Timeline Section -->
+        <div class="panel" style="margin-top: 20px;">
+            <h3>⏱️ Action Timeline</h3>
+            <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 10px;">
+                Chronological timeline of all actions (tiles, spells, match results)
+            </p>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center;">
+                <label style="color: #94a3b8; font-size: 0.85rem;">Show:</label>
+                <label style="color: #94a3b8; font-size: 0.85rem; display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="showTilePlacements" checked onchange="filterActionTimeline()" style="cursor: pointer;">
+                    🎯 Tiles
+                </label>
+                <label style="color: #94a3b8; font-size: 0.85rem; display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="showSpellCasts" checked onchange="filterActionTimeline()" style="cursor: pointer;">
+                    🔮 Spells
+                </label>
+                <label style="color: #94a3b8; font-size: 0.85rem; display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="showMatchResults" checked onchange="filterActionTimeline()" style="cursor: pointer;">
+                    🏆 Matches
+                </label>
+                <label style="color: #94a3b8; font-size: 0.85rem; display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="showHeartCaptures" checked onchange="filterActionTimeline()" style="cursor: pointer;">
+                    💖 Hearts
+                </label>
+            </div>
+
+            <div id="actionTimelineDisplay" style="max-height: 500px; overflow-y: auto; background: rgba(15, 23, 42, 0.5); padding: 15px; border-radius: 10px;">
+                <p style="text-align: center; opacity: 0.7;">No actions recorded yet.</p>
+            </div>
+        </div>
+
+        <!-- Statistics Summary -->
+        <div class="panel" style="margin-top: 20px;">
+            <h3>📊 Tournament Statistics</h3>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
+                <div style="background: rgba(6, 182, 212, 0.1); padding: 20px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #06b6d4;" id="histStatTotalMatches">0</div>
+                    <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 5px;">Total Matches</div>
+                </div>
+                <div style="background: rgba(168, 85, 247, 0.1); padding: 20px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #a855f7;" id="histStatTotalSpells">0</div>
+                    <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 5px;">Spells Cast</div>
+                </div>
+                <div style="background: rgba(16, 185, 129, 0.1); padding: 20px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #10b981;" id="histStatTotalActions">0</div>
+                    <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 5px;">Total Actions</div>
+                </div>
+                <div style="background: rgba(244, 63, 94, 0.1); padding: 20px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #f43f5e;" id="histStatDuration">0h 0m</div>
+                    <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 5px;">Duration</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab 8: Users Panel -->
     <div id="usersPanel" class="god-tab-panel">
         <div class="panel">
             <h3>👤 User Management</h3>
@@ -975,6 +1112,15 @@
             // Sync data for the target tab
             syncTabData(tabName);
 
+            // If switching to History tab, load history data
+            if (tabName === 'history') {
+                setTimeout(() => {
+                    if (typeof refreshHistoryDisplay === 'function') {
+                        refreshHistoryDisplay();
+                    }
+                }, 100);
+            }
+
             // If switching to Matches tab and gameId is already filled, auto-load
             if (tabName === 'matches') {
                 const gameIdInput = document.getElementById('gameId');
@@ -1054,6 +1200,397 @@
             setTimeout(() => {
                 switchGodTab(tabName || lastTab || 'tournaments');
             }, 500);
+        }
+
+        // ===========================
+        // HISTORY TAB FUNCTIONS
+        // ===========================
+
+        /**
+         * Refresh all history displays
+         */
+        function refreshHistoryDisplay() {
+            if (!window.gameState) {
+                console.warn('[History] No game state loaded');
+                return;
+            }
+
+            console.log('[History] Refreshing history display');
+            displayMatchHistory();
+            displaySpellHistory();
+            displayActionTimeline();
+            updateHistoryStatistics();
+        }
+
+        /**
+         * Display match history with filtering
+         */
+        function displayMatchHistory() {
+            const gameHistory = window.gameState?.gameHistory || [];
+            const display = document.getElementById('matchHistoryDisplay');
+
+            if (!display) return;
+
+            if (gameHistory.length === 0) {
+                display.innerHTML = '<p style="text-align: center; opacity: 0.7;">No matches played yet. Confirm match results to see history.</p>';
+                return;
+            }
+
+            let html = '';
+            gameHistory.slice().reverse().forEach((match, index) => {
+                const matchNum = gameHistory.length - index;
+                const timestamp = new Date(match.timestamp).toLocaleString('en-GB', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+
+                html += `
+                    <div class="match-history-item" style="background: rgba(247, 240, 227, 0.05); padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #2278a3;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <div>
+                                <strong style="color: #00d4ff;">Match #${matchNum}</strong>
+                                <span style="margin-left: 10px; color: #94a3b8; font-size: 0.85rem;">${match.game || 'Unknown'} ${match.playType || ''}</span>
+                            </div>
+                            <span style="color: #94a3b8; font-size: 0.75rem;">${timestamp}</span>
+                        </div>
+                        <div style="margin-bottom: 8px;">
+                            <span style="color: #10b981;">🏆 Winner: ${match.winner || 'Unknown'}</span>
+                        </div>
+                        <div style="margin-bottom: 8px;">
+                            <span style="color: #f43f5e;">Loser: ${match.loser || 'Unknown'}</span>
+                        </div>
+                        ${match.resultNotes ? `<div style="font-size: 0.85rem; color: #94a3b8; font-style: italic; margin-top: 8px;">📝 ${match.resultNotes}</div>` : ''}
+                    </div>
+                `;
+            });
+
+            display.innerHTML = html;
+        }
+
+        /**
+         * Filter match history
+         */
+        function filterMatchHistory() {
+            const searchTerm = document.getElementById('matchHistorySearch')?.value.toLowerCase() || '';
+            const gameFilter = document.getElementById('matchHistoryGameFilter')?.value || 'all';
+            const gameHistory = window.gameState?.gameHistory || [];
+
+            const display = document.getElementById('matchHistoryDisplay');
+            if (!display) return;
+
+            const filtered = gameHistory.filter(match => {
+                const matchesSearch = searchTerm === '' ||
+                    match.winner?.toLowerCase().includes(searchTerm) ||
+                    match.loser?.toLowerCase().includes(searchTerm) ||
+                    match.game?.toLowerCase().includes(searchTerm);
+
+                const matchesGame = gameFilter === 'all' || match.game === gameFilter;
+
+                return matchesSearch && matchesGame;
+            });
+
+            if (filtered.length === 0) {
+                display.innerHTML = '<p style="text-align: center; opacity: 0.7;">No matches found.</p>';
+                return;
+            }
+
+            let html = '';
+            filtered.slice().reverse().forEach((match, index) => {
+                const matchNum = gameHistory.indexOf(match) + 1;
+                const timestamp = new Date(match.timestamp).toLocaleString('en-GB', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+
+                html += `
+                    <div class="match-history-item" style="background: rgba(247, 240, 227, 0.05); padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #2278a3;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <div>
+                                <strong style="color: #00d4ff;">Match #${matchNum}</strong>
+                                <span style="margin-left: 10px; color: #94a3b8; font-size: 0.85rem;">${match.game || 'Unknown'} ${match.playType || ''}</span>
+                            </div>
+                            <span style="color: #94a3b8; font-size: 0.75rem;">${timestamp}</span>
+                        </div>
+                        <div style="margin-bottom: 8px;">
+                            <span style="color: #10b981;">🏆 Winner: ${match.winner || 'Unknown'}</span>
+                        </div>
+                        <div style="margin-bottom: 8px;">
+                            <span style="color: #f43f5e;">Loser: ${match.loser || 'Unknown'}</span>
+                        </div>
+                        ${match.resultNotes ? `<div style="font-size: 0.85rem; color: #94a3b8; font-style: italic; margin-top: 8px;">📝 ${match.resultNotes}</div>` : ''}
+                    </div>
+                `;
+            });
+
+            display.innerHTML = html;
+        }
+
+        /**
+         * Display spell cast history
+         */
+        function displaySpellHistory() {
+            const spellHistory = window.gameState?.spellHistory || [];
+            const display = document.getElementById('spellHistoryDisplay');
+
+            if (!display) return;
+
+            // Populate team filter
+            const teamFilter = document.getElementById('spellHistoryTeamFilter');
+            if (teamFilter && window.gameState?.teams) {
+                const currentValue = teamFilter.value;
+                teamFilter.innerHTML = '<option value="all">All Teams</option>';
+                window.gameState.teams.forEach(team => {
+                    teamFilter.innerHTML += `<option value="${team.id}">${team.name}</option>`;
+                });
+                teamFilter.value = currentValue;
+            }
+
+            if (spellHistory.length === 0) {
+                display.innerHTML = '<p style="text-align: center; opacity: 0.7;">No spells cast yet.</p>';
+                return;
+            }
+
+            let html = '';
+            spellHistory.slice().reverse().forEach((spell, index) => {
+                const team = window.gameState.teams?.find(t => t.id === spell.teamId);
+                const teamName = team?.name || 'Unknown Team';
+                const teamColor = team?.color || '#888';
+                const timestamp = new Date(spell.timestamp).toLocaleString('en-GB', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+
+                html += `
+                    <div class="spell-history-item" style="background: rgba(247, 240, 227, 0.05); padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid ${teamColor};">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <strong style="color: ${teamColor};">${spell.spellName || spell.spellId}</strong>
+                            <span style="color: #94a3b8; font-size: 0.75rem;">${timestamp}</span>
+                        </div>
+                        <div style="font-size: 0.85rem; color: #94a3b8;">
+                            Cast by: <span style="color: ${teamColor};">${teamName}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            display.innerHTML = html;
+        }
+
+        /**
+         * Filter spell history
+         */
+        function filterSpellHistory() {
+            const teamFilter = document.getElementById('spellHistoryTeamFilter')?.value || 'all';
+            const typeFilter = document.getElementById('spellHistoryTypeFilter')?.value || 'all';
+            const spellHistory = window.gameState?.spellHistory || [];
+
+            const display = document.getElementById('spellHistoryDisplay');
+            if (!display) return;
+
+            const filtered = spellHistory.filter(spell => {
+                const matchesTeam = teamFilter === 'all' || spell.teamId == teamFilter;
+                const matchesType = typeFilter === 'all' || spell.timing === typeFilter;
+
+                return matchesTeam && matchesType;
+            });
+
+            if (filtered.length === 0) {
+                display.innerHTML = '<p style="text-align: center; opacity: 0.7;">No spells found.</p>';
+                return;
+            }
+
+            let html = '';
+            filtered.slice().reverse().forEach((spell) => {
+                const team = window.gameState.teams?.find(t => t.id === spell.teamId);
+                const teamName = team?.name || 'Unknown Team';
+                const teamColor = team?.color || '#888';
+                const timestamp = new Date(spell.timestamp).toLocaleString('en-GB', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+
+                html += `
+                    <div class="spell-history-item" style="background: rgba(247, 240, 227, 0.05); padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid ${teamColor};">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <strong style="color: ${teamColor};">${spell.spellName || spell.spellId}</strong>
+                            <span style="color: #94a3b8; font-size: 0.75rem;">${timestamp}</span>
+                        </div>
+                        <div style="font-size: 0.85rem; color: #94a3b8;">
+                            Cast by: <span style="color: ${teamColor};">${teamName}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            display.innerHTML = html;
+        }
+
+        /**
+         * Display action timeline
+         */
+        function displayActionTimeline() {
+            const actionHistory = window.gameState?.actionHistory || [];
+            const display = document.getElementById('actionTimelineDisplay');
+
+            if (!display) return;
+
+            if (actionHistory.length === 0) {
+                display.innerHTML = '<p style="text-align: center; opacity: 0.7;">No actions recorded yet.</p>';
+                return;
+            }
+
+            let html = '';
+            actionHistory.slice().reverse().forEach((action) => {
+                const timestamp = new Date(action.timestamp).toLocaleString('en-GB', {
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                });
+
+                let icon = '📋';
+                let actionText = action.type;
+                let color = '#94a3b8';
+
+                switch (action.type) {
+                    case 'PLACE_PLATE':
+                        icon = '🎯';
+                        actionText = `Tile placed at ${action.data?.coord || 'unknown'}`;
+                        color = '#2278a3';
+                        break;
+                    case 'USE_SPELL':
+                        icon = '🔮';
+                        actionText = `Spell cast: ${action.data?.spellCard || 'unknown'}`;
+                        color = '#a855f7';
+                        break;
+                    case 'MATCH_RESULT':
+                        icon = '🏆';
+                        actionText = `Match completed`;
+                        color = '#10b981';
+                        break;
+                    case 'CAPTURE_HEART':
+                        icon = '💖';
+                        actionText = `Heart hex captured`;
+                        color = '#f43f5e';
+                        break;
+                }
+
+                html += `
+                    <div class="action-timeline-item" data-type="${action.type}" style="padding: 10px; border-left: 3px solid ${color}; margin-bottom: 8px; background: rgba(247, 240, 227, 0.03); border-radius: 4px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: ${color};">${icon} ${actionText}</span>
+                            <span style="color: #94a3b8; font-size: 0.75rem;">${timestamp}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            display.innerHTML = html;
+        }
+
+        /**
+         * Filter action timeline
+         */
+        function filterActionTimeline() {
+            const showTiles = document.getElementById('showTilePlacements')?.checked;
+            const showSpells = document.getElementById('showSpellCasts')?.checked;
+            const showMatches = document.getElementById('showMatchResults')?.checked;
+            const showHearts = document.getElementById('showHeartCaptures')?.checked;
+
+            const items = document.querySelectorAll('.action-timeline-item');
+            items.forEach(item => {
+                const type = item.getAttribute('data-type');
+                let show = false;
+
+                if (type === 'PLACE_PLATE' && showTiles) show = true;
+                if (type === 'USE_SPELL' && showSpells) show = true;
+                if (type === 'MATCH_RESULT' && showMatches) show = true;
+                if (type === 'CAPTURE_HEART' && showHearts) show = true;
+
+                item.style.display = show ? 'block' : 'none';
+            });
+        }
+
+        /**
+         * Update history statistics
+         */
+        function updateHistoryStatistics() {
+            const gameHistory = window.gameState?.gameHistory || [];
+            const spellHistory = window.gameState?.spellHistory || [];
+            const actionHistory = window.gameState?.actionHistory || [];
+
+            // Total matches
+            document.getElementById('histStatTotalMatches').textContent = gameHistory.length;
+
+            // Total spells
+            document.getElementById('histStatTotalSpells').textContent = spellHistory.length;
+
+            // Total actions
+            document.getElementById('histStatTotalActions').textContent = actionHistory.length;
+
+            // Calculate duration
+            if (gameHistory.length > 0) {
+                const firstMatch = new Date(gameHistory[0].timestamp);
+                const lastMatch = new Date(gameHistory[gameHistory.length - 1].timestamp);
+                const duration = lastMatch - firstMatch;
+                const hours = Math.floor(duration / (1000 * 60 * 60));
+                const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
+                document.getElementById('histStatDuration').textContent = `${hours}h ${minutes}m`;
+            }
+        }
+
+        /**
+         * Export tournament history as JSON or CSV
+         */
+        function exportTournamentHistory(format) {
+            if (!window.gameState) {
+                alert('No tournament data loaded');
+                return;
+            }
+
+            const tournamentData = {
+                tournamentId: window.gameState.gameId,
+                tournamentName: window.gameState.name,
+                exportedAt: new Date().toISOString(),
+                matchHistory: window.gameState.gameHistory || [],
+                spellHistory: window.gameState.spellHistory || [],
+                teams: window.gameState.teams,
+                totalMatches: window.gameState.gamesPlayed || 0,
+                currentRound: window.gameState.currentRound || 0
+            };
+
+            if (format === 'json') {
+                // Export as JSON
+                const blob = new Blob([JSON.stringify(tournamentData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `tournament-${window.gameState.gameId}-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                window.errorHandler?.showSuccess('Tournament data exported as JSON');
+            } else if (format === 'csv') {
+                // Export match history as CSV
+                const matches = window.gameState.gameHistory || [];
+                if (matches.length === 0) {
+                    alert('No matches to export');
+                    return;
+                }
+
+                let csv = 'Match #,Game,Format,Winner,Loser,Timestamp,Notes\n';
+                matches.forEach((match, index) => {
+                    const timestamp = new Date(match.timestamp).toISOString();
+                    csv += `${index + 1},"${match.game}","${match.playType}","${match.winner}","${match.loser}","${timestamp}","${match.resultNotes || ''}"\n`;
+                });
+
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `tournament-matches-${window.gameState.gameId}-${new Date().toISOString().split('T')[0]}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                window.errorHandler?.showSuccess('Match history exported as CSV');
+            }
         }
 
         // Initialize on Firebase ready
