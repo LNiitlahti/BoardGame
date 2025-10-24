@@ -535,7 +535,18 @@ async function applyReverseAction(action) {
                 team.spellCards = team.spellCards || [];
                 team.spellCards.push(action.data.spellCard);
             }
-            // TODO: Implement spell effect reversal when spell system is complete
+
+            // Reverse spell effects
+            if (action.data?.spellEffects) {
+                reverseSpellEffects(action.data.spellEffects, gameState);
+            }
+
+            // Remove from spell history
+            if (gameState.spellHistory) {
+                gameState.spellHistory = gameState.spellHistory.filter(
+                    entry => entry.timestamp !== action.data?.timestamp
+                );
+            }
             break;
 
         case ACTION_TYPES.MATCH_RESULT:
@@ -619,14 +630,24 @@ async function applyAction(action) {
             break;
 
         case ACTION_TYPES.USE_SPELL:
-            const team = gameState.teams?.find(t => t.id === action.teamId);
-            if (team && action.data?.spellCard) {
-                const spellIndex = team.spellCards?.findIndex(s => s.id === action.data.spellCard.id);
+            const redoTeam = gameState.teams?.find(t => t.id === action.teamId);
+            if (redoTeam && action.data?.spellCard) {
+                const spellIndex = redoTeam.spellCards?.findIndex(s => s.id === action.data.spellCard.id);
                 if (spellIndex >= 0) {
-                    team.spellCards.splice(spellIndex, 1);
+                    redoTeam.spellCards.splice(spellIndex, 1);
                 }
             }
-            // TODO: Apply spell effect when spell system is complete
+
+            // Reapply spell effects
+            if (action.data?.spellEffects) {
+                applySpellEffects(action.data.spellEffects, gameState);
+            }
+
+            // Re-add to spell history
+            if (action.data?.historyEntry) {
+                gameState.spellHistory = gameState.spellHistory || [];
+                gameState.spellHistory.push(action.data.historyEntry);
+            }
             break;
 
         case ACTION_TYPES.MATCH_RESULT:
@@ -805,6 +826,81 @@ function toggleActionHistory() {
         panel.style.display = isVisible ? 'none' : 'block';
         toggle.textContent = isVisible ? '▼' : '▲';
     }
+}
+
+/**
+ * Reverse spell effects when undoing
+ */
+function reverseSpellEffects(effects, gameState) {
+    if (!effects || !effects.changes) return;
+
+    const changes = effects.changes;
+
+    // Reverse point changes
+    if (changes.pointsGained !== undefined && effects.teamId) {
+        const team = gameState.teams?.find(t => t.id === effects.teamId);
+        if (team) {
+            team.points = (team.points || 0) - changes.pointsGained;
+        }
+    }
+
+    // Restore destroyed tiles
+    if (changes.destroyedTiles && Array.isArray(changes.destroyedTiles)) {
+        for (const tile of changes.destroyedTiles) {
+            if (tile.coord && tile.teamId) {
+                gameState.board[tile.coord] = { teamId: tile.teamId };
+            }
+        }
+    }
+
+    // Remove active effects
+    if (effects.teamId) {
+        const team = gameState.teams?.find(t => t.id === effects.teamId);
+        if (team && team.activeEffects) {
+            team.activeEffects = team.activeEffects.filter(
+                effect => effect.spellId !== effects.spellId
+            );
+        }
+    }
+
+    console.log('[ActionHistory] Reversed spell effects:', effects.spellId);
+}
+
+/**
+ * Apply spell effects when redoing
+ */
+function applySpellEffects(effects, gameState) {
+    if (!effects || !effects.changes) return;
+
+    const changes = effects.changes;
+
+    // Reapply point changes
+    if (changes.pointsGained !== undefined && effects.teamId) {
+        const team = gameState.teams?.find(t => t.id === effects.teamId);
+        if (team) {
+            team.points = (team.points || 0) + changes.pointsGained;
+        }
+    }
+
+    // Destroy tiles again
+    if (changes.destroyedTiles && Array.isArray(changes.destroyedTiles)) {
+        for (const tile of changes.destroyedTiles) {
+            if (tile.coord && gameState.board) {
+                delete gameState.board[tile.coord];
+            }
+        }
+    }
+
+    // Restore active effects
+    if (effects.activeEffect) {
+        const team = gameState.teams?.find(t => t.id === effects.teamId);
+        if (team) {
+            team.activeEffects = team.activeEffects || [];
+            team.activeEffects.push(effects.activeEffect);
+        }
+    }
+
+    console.log('[ActionHistory] Reapplied spell effects:', effects.spellId);
 }
 
 // Export functions for global use

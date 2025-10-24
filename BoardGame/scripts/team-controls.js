@@ -276,12 +276,137 @@ function checkIfOurTurn() {
 }
 
 /**
- * Use a spell card (placeholder - will be enhanced later)
+ * Use a spell card
  */
-function useSpellCard(cardIndex) {
-    showStatus('Spell card usage will be implemented in a future update', 'info');
-    console.log('[Team Controls] Use spell card:', cardIndex);
-    // TODO: Implement spell card usage
+async function useSpellCard(cardIndex) {
+    if (!teamData || !gameData) {
+        showStatus('Game data not loaded', 'error');
+        return;
+    }
+
+    const spellCards = teamData.spellCards || teamData.hand || [];
+    const spell = spellCards[cardIndex];
+
+    if (!spell) {
+        showStatus('Spell card not found', 'error');
+        return;
+    }
+
+    const spellId = typeof spell === 'string' ? spell : spell.id;
+
+    try {
+        // Initialize spell manager if needed
+        if (!window.spellManager) {
+            window.spellManager = new SpellManager();
+            await window.spellManager.loadSpellDefinitions();
+        }
+
+        const spellDef = window.spellManager.getSpell(spellId);
+        if (!spellDef) {
+            showStatus('Spell definition not found', 'error');
+            return;
+        }
+
+        // Show confirmation modal
+        const confirmed = await showSpellConfirmation(spellDef);
+        if (!confirmed) return;
+
+        // Get target data if needed
+        let targetData = {};
+        if (requiresTarget(spellDef)) {
+            targetData = await getSpellTarget(spellDef, gameData);
+            if (!targetData) return; // User cancelled
+        }
+
+        // Cast the spell
+        const result = await window.spellManager.castSpell(
+            spellId,
+            teamData.id,
+            gameData,
+            targetData
+        );
+
+        // Save to Firebase
+        const tournamentRef = window.firebaseDB.collection('tournaments').doc(currentGameId);
+        await window.firebaseSetDoc(tournamentRef, gameData);
+
+        // Update UI
+        renderSpellCards();
+
+        showStatus(`✨ ${spellDef.name} cast successfully!`, 'success');
+        console.log('[Team Controls] Spell cast result:', result);
+
+    } catch (error) {
+        console.error('[Team Controls] Error casting spell:', error);
+        showStatus('Error casting spell: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Check if spell requires target selection
+ */
+function requiresTarget(spell) {
+    const targetTypes = ['opponent-card', 'opponent-team', 'opponent-player', 'board', 'adjacent-enemies'];
+    return targetTypes.includes(spell.targetType);
+}
+
+/**
+ * Show spell confirmation dialog
+ */
+function showSpellConfirmation(spell) {
+    return new Promise((resolve) => {
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        `;
+
+        modal.innerHTML = `
+            <div style="background: #2a2a2a; padding: 30px; border-radius: 12px; max-width: 500px; color: white;">
+                <h2 style="color: #00d4ff; margin-top: 0;">🔮 Cast Spell</h2>
+                <h3 style="color: #fff;">${spell.name}</h3>
+                <p style="color: #aaa; font-size: 14px;">${spell.type} • ${spell.rarity}</p>
+                <p style="margin: 20px 0;">${spell.description}</p>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button id="confirmSpell" style="flex: 1; background: #00d4ff; color: #1a1a1a; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                        Cast Spell
+                    </button>
+                    <button id="cancelSpell" style="flex: 1; background: #555; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer;">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        document.getElementById('confirmSpell').onclick = () => {
+            document.body.removeChild(modal);
+            resolve(true);
+        };
+
+        document.getElementById('cancelSpell').onclick = () => {
+            document.body.removeChild(modal);
+            resolve(false);
+        };
+    });
+}
+
+/**
+ * Get spell target selection
+ */
+async function getSpellTarget(spell, gameData) {
+    // This will be expanded based on spell type
+    // For now, return empty object
+    return {};
 }
 
 /**

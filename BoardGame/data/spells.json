@@ -1,0 +1,258 @@
+{
+  "spells": [
+    {
+      "id": "double-glow",
+      "name": "Kaksinkertainen loisto / Ylivallan aura",
+      "nameEn": "Double-sided Glow / Aura of Supremacy",
+      "type": "pre-game",
+      "rarity": "common",
+      "description": "Pelatkaa ennen pelin alkua. Jos ylihaltijat ovat pelin lopputuloksissa voittavassa rodussa paras tai toiseksi paras, saatte 2× voittopisteet ja 2× laatat pelin jälkeen.",
+      "descriptionEn": "Play before game starts. If High Elves are the best or second best in the winning race's final results, you get 2× victory points and 2× tiles after the game.",
+      "timing": "pre-game",
+      "targetType": "self",
+      "effect": {
+        "type": "multiplier",
+        "condition": "placement_1_or_2",
+        "multiplier": 2,
+        "applies_to": ["points", "tiles"]
+      }
+    },
+    {
+      "id": "get-away",
+      "name": "Irti minusta!",
+      "nameEn": "Get Away From Me!",
+      "type": "pre-game",
+      "rarity": "common",
+      "description": "Pelatkaa ennen pelin alkua. Jos rotu, jossa ylihaltijat ovat, voittaa pelin, kaikki vastustajarodujen laatat, jotka koskettavat ylihaltijoidien laattoja, tuhotaan pelin jälkeen.",
+      "descriptionEn": "Play before game starts. If the race with High Elves wins the game, all opponent race tiles touching High Elves' tiles are destroyed after the game.",
+      "timing": "pre-game",
+      "targetType": "opponents",
+      "effect": {
+        "type": "destroy_adjacent",
+        "condition": "team_wins",
+        "target": "adjacent_opponent_tiles"
+      }
+    },
+    {
+      "id": "domination-triple",
+      "name": "Domination! Domination! Domination!",
+      "nameEn": "Domination! Domination! Domination!",
+      "type": "rare-treasure",
+      "rarity": "rare",
+      "description": "Pelatkaa ennen seuraavan pelin alkua. Jos ylihaltijat ovat voittavassa rodussa kolme peliä putkeen tämän kortin jälkeen, saatte 2 ylimääräistä laattaa ja 2 ylimääräistä voittopistettä.",
+      "descriptionEn": "Play before next game starts. If High Elves are in the winning race for three games in a row after this card, you get 2 extra tiles and 2 extra victory points.",
+      "timing": "pre-game",
+      "targetType": "self",
+      "effect": {
+        "type": "streak_bonus",
+        "condition": "win_streak_3",
+        "bonus": {
+          "tiles": 2,
+          "points": 2
+        }
+      }
+    },
+    {
+      "id": "elf-protection",
+      "name": "Haltiasuoja",
+      "nameEn": "Elf Protection",
+      "type": "defensive",
+      "rarity": "uncommon",
+      "description": "Pelatkaa minkä tahansa hävityn ottelun jälkeen. Kaikki omat laatat ovat suojassa seuraavan pelin loppuun asti, eikä niitä voi poistaa millään efektillä. Ylihaltijoihin ei voi kohdistaa negatiivisia korttiefektejä ennen seuraavan kierroksen loppua.",
+      "descriptionEn": "Play after any lost match. All your tiles are protected until the end of the next game and cannot be removed by any effect. High Elves cannot be targeted by negative card effects until the end of the next round.",
+      "timing": "post-game",
+      "targetType": "self",
+      "effect": {
+        "type": "shield",
+        "duration": "next_game",
+        "protects": ["tiles", "negative_effects"]
+      }
+    },
+    {
+      "id": "all-according-plan",
+      "name": "Kaikki on minun suunnitelmaani",
+      "nameEn": "All According to My Plan",
+      "type": "tactical",
+      "rarity": "rare",
+      "description": "Pelaa milloin tahansa omalla vuorollasi. Valitse yksi muiden rotujen käytetyistä korteista ja pelaa se välittömästi omana korttinasi (kortin on oltava mahdollista pelata heti).",
+      "descriptionEn": "Play anytime on your turn. Choose one used card from other races and play it immediately as your own card (the card must be playable immediately).",
+      "timing": "anytime",
+      "targetType": "opponent-card",
+      "effect": {
+        "type": "copy_spell",
+        "target": "used_opponent_card"
+      }
+    },
+    {
+      "id": "complete-contract",
+      "name": "Täytä sopimus",
+      "nameEn": "Complete the Contract",
+      "type": "challenge",
+      "rarity": "uncommon",
+      "description": "Pelatkaa ennen peliä. Saatte haastaa Vuoren Sydämen (valtaistuinsali) hallinnan. Jos voitatte haasteen, saatte 2 voittopistettä ja voitte asettaa yhden laatan heti keskustan viereen (poisteen tarvittaessa siinä olevan toisen rodun laatan).",
+      "descriptionEn": "Play before game. You may challenge for control of Mountain's Heart (throne room). If you win the challenge, you get 2 victory points and may place one tile immediately next to the center (removing another race's tile if necessary).",
+      "timing": "pre-game",
+      "targetType": "center",
+      "effect": {
+        "type": "challenge",
+        "reward": {
+          "points": 2,
+          "placement": "center_adjacent",
+          "can_replace": true
+        }
+      }
+    },
+    {
+      "id": "mountain-purification",
+      "name": "Vuoren puhdistus",
+      "nameEn": "Mountain Purification",
+      "type": "instant",
+      "rarity": "common",
+      "description": "Voitte pelata tämän heti, kun olette asettaneet laatan laudalle. Saatte yhden voittopisteen jokaisesta vuoren sydämestä (myös sivusydämet), jotka ovat hallussanne sillä hetkellä.",
+      "descriptionEn": "You may play this immediately after placing a tile on the board. You get one victory point for each mountain heart (including side hearts) you control at that moment.",
+      "timing": "after-placement",
+      "targetType": "self",
+      "effect": {
+        "type": "bonus_points",
+        "calculation": "controlled_hearts"
+      }
+    },
+    {
+      "id": "calculated-aggression",
+      "name": "Harkittu aggressio",
+      "nameEn": "Calculated Aggression",
+      "type": "aggressive",
+      "rarity": "uncommon",
+      "description": "Pelatkaa tämä kortti ja asettakaa yksi laatta laudalle. Jos tämä laatta koskettaa (on vieressä) minkä tahansa vastustajarodun laattaa, saatte poistaa nämä vastustajan laatat laudalta.",
+      "descriptionEn": "Play this card and place one tile on the board. If this tile touches (is adjacent to) any opponent race's tile, you may remove those opponent tiles from the board.",
+      "timing": "placement",
+      "targetType": "adjacent-enemies",
+      "effect": {
+        "type": "destroy_adjacent",
+        "trigger": "on_placement",
+        "target": "adjacent_opponent_tiles"
+      }
+    },
+    {
+      "id": "sabotage",
+      "name": "Sabotaasia",
+      "nameEn": "Sabotage",
+      "type": "debuff",
+      "rarity": "uncommon",
+      "description": "Pelatkaa ennen peliä. Valitkaa yksi vastustajärotu. Päättäkää yksi pelattava asia (ase, hahmolouokka, taito, esine, jne.), jota tämä rotu ei saa käyttää seuraavassa pelissä.",
+      "descriptionEn": "Play before game. Choose one opponent race. Decide one playable thing (weapon, character class, skill, item, etc.) that this race cannot use in the next game.",
+      "timing": "pre-game",
+      "targetType": "opponent-team",
+      "effect": {
+        "type": "ban",
+        "duration": "next_game",
+        "target": "game_element"
+      }
+    },
+    {
+      "id": "double-bid",
+      "name": "Kaksoisnosto",
+      "nameEn": "Double Bid",
+      "type": "event-modifier",
+      "rarity": "uncommon",
+      "description": "Seuraavalla kerralla, kun Kalliotonttu & Bugbear asettavat laatan nostohexaan, he saavat nostaa kaksi tapahtumakorttia yhden sijaan.",
+      "descriptionEn": "Next time when Rock Gnome & Bugbear place a tile on a draw hex, they get to draw two event cards instead of one.",
+      "timing": "persistent",
+      "targetType": "self",
+      "effect": {
+        "type": "modifier",
+        "trigger": "draw_hex_placement",
+        "modifier": "double_draw",
+        "uses": 1
+      }
+    },
+    {
+      "id": "victory-strike",
+      "name": "Voitonlyönti",
+      "nameEn": "Victory Strike",
+      "type": "permanent-buff",
+      "rarity": "rare",
+      "description": "Pelatkaa tämä kortti. Tämän jälkeen jokainen uusi sydämen (Vuoren Sydän tai sivusydän) valtaus antaa välittömästi yhden voittopisteen. Efekti pysyy voimassa koko pelin ajan.",
+      "descriptionEn": "Play this card. After this, each new heart (Mountain's Heart or side heart) capture immediately gives one victory point. Effect remains active for the entire game.",
+      "timing": "anytime",
+      "targetType": "self",
+      "effect": {
+        "type": "permanent_buff",
+        "trigger": "heart_capture",
+        "bonus": {
+          "points": 1
+        }
+      }
+    },
+    {
+      "id": "knowledge-deep",
+      "name": "Knowledge from the Deep",
+      "nameEn": "Knowledge from the Deep",
+      "type": "placement",
+      "rarity": "uncommon",
+      "description": "Kun pelaatte tämän kortin, saatte asettaa kaksi laattaa mihin tahansa ruutuun laudalla, kunhan laatat eivät ole Vuoren Sydämen tai Sivusydämien viereen eivätkä muiden rotujen laattojen viereen.",
+      "descriptionEn": "When you play this card, you may place two tiles on any squares on the board, as long as the tiles are not next to Mountain's Heart or Side Hearts and not next to other races' tiles.",
+      "timing": "placement",
+      "targetType": "board",
+      "effect": {
+        "type": "extra_placement",
+        "amount": 2,
+        "restrictions": ["no_hearts_adjacent", "no_opponent_adjacent"]
+      }
+    },
+    {
+      "id": "echo-silence",
+      "name": "Hiljaisuuden kaiku",
+      "nameEn": "Echo of Silence",
+      "type": "debuff",
+      "rarity": "uncommon",
+      "description": "Pelatkaa ennen pelin alkua. Valitkaa yksi pelaaja mistä tahansa rodusta, joka ei saa käyttää mikrofonia eikä puhua lainkaan pelin aikana.",
+      "descriptionEn": "Play before game starts. Choose one player from any race who cannot use microphone or speak at all during the game.",
+      "timing": "pre-game",
+      "targetType": "opponent-player",
+      "effect": {
+        "type": "silence",
+        "duration": "one_game",
+        "target": "single_player"
+      }
+    },
+    {
+      "id": "betting-depths",
+      "name": "Vedonlyöntiä syyvyksistä",
+      "nameEn": "Betting from the Depths",
+      "type": "bet",
+      "rarity": "uncommon",
+      "description": "Ennen peliä Kääpiömestari & Drow täyttävät vedonlyöntilapun:\n- Kumpi rotu voittaa pelin\n- Kuka tekee eniten damagea/tappoja\n- Kuka kuolee eniten\nJokaisesta oikein menneestä saa 1 voittopisteen ja laatan. Jos kaikki väärin, tuhotkaa 2 omaa laattaa laudalta.",
+      "descriptionEn": "Before game, Dwarf Master & Drow fill a betting slip:\n- Which race wins the game\n- Who does most damage/kills\n- Who dies most\nFor each correct bet, get 1 victory point and tile. If all wrong, destroy 2 of your tiles from the board.",
+      "timing": "pre-game",
+      "targetType": "self",
+      "effect": {
+        "type": "bet",
+        "predictions": 3,
+        "reward_per_correct": {
+          "points": 1,
+          "tiles": 1
+        },
+        "penalty_all_wrong": {
+          "destroy_tiles": 2
+        }
+      }
+    },
+    {
+      "id": "rift-knowledge",
+      "name": "Syvän tiedon rako",
+      "nameEn": "Rift of Deep Knowledge",
+      "type": "counter",
+      "rarity": "rare",
+      "description": "Tämä kortti pysyy hallussanne, kunnes käytätte sen. Kun joku muu rotu nostaa tapahtumakortin, saatte lukea sen ja halutessanne estää noston – kortti siirtyy suoraan käytettyjen pinoon eikä sitä pelata.",
+      "descriptionEn": "This card stays in your possession until you use it. When another race draws an event card, you may read it and optionally prevent the draw – the card moves directly to the used pile and is not played.",
+      "timing": "reactive",
+      "targetType": "opponent-draw",
+      "effect": {
+        "type": "counter",
+        "trigger": "opponent_event_draw",
+        "action": "cancel_and_discard"
+      }
+    }
+  ]
+}

@@ -1434,7 +1434,8 @@ async function addGameToQueue() {
                     id: p.id,
                     name: p.name,
                     originalTeamId: p.originalTeamId,
-                    originalTeamName: p.originalTeamName
+                    originalTeamName: p.originalTeamName,
+                    originalTeamColor: p.originalTeamColor
                 }))
             },
             {
@@ -1444,7 +1445,8 @@ async function addGameToQueue() {
                     id: p.id,
                     name: p.name,
                     originalTeamId: p.originalTeamId,
-                    originalTeamName: p.originalTeamName
+                    originalTeamName: p.originalTeamName,
+                    originalTeamColor: p.originalTeamColor
                 }))
             }
         ],
