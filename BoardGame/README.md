@@ -39,7 +39,7 @@ A complete, real-time tournament management system for LAN events with spell car
 
 **Phase 4: Match Management & Automation (In Progress)**
 - 🔄 Automated match queue progression
-- 🔄 Player voting system for match results (90% consensus)
+- 🔄 Player voting system for match results (6+ players majority)
 - 🔄 Enhanced match scheduling with time slots
 - ⏳ Match statistics and analytics
 
@@ -267,7 +267,7 @@ Press F11 for fullscreen mode on most browsers.
 
 9. Result confirmation (god.html → Matches tab)
    ├─ CURRENT: Admin manually confirms winner
-   └─ PLANNED: 90% consensus voting system for players
+   └─ PLANNED: Majority voting (6+ out of 10 players agree)
 
 10. System updates tournament state
     ├─ Award points to winning team
@@ -401,7 +401,7 @@ Press F11 for fullscreen mode on most browsers.
       voteConsensus: {
         result: "side_0_won",
         percentage: 100,
-        passedThreshold: true,
+        passedThreshold: true,               // True when 6+ players agree (60%+)
         submittedToAdmin: true,
         submittedAt: "2025-01-01T12:05:00Z"
       },
