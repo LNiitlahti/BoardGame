@@ -57,6 +57,9 @@
             <button class="god-nav-tab" data-tab="users" onclick="switchGodTab('users')">
                 👤 Users
             </button>
+            <button class="god-nav-tab" data-tab="spells" onclick="switchGodTab('spells')">
+                🔮 Spells
+            </button>
             <button class="god-nav-tab" data-tab="stats" onclick="switchGodTab('stats')">
                 📊 Stats
             </button>
@@ -401,7 +404,121 @@
         </div>
     </div>
 
-    <!-- Tab 6: Users Panel -->
+    <!-- Tab 6: Spells Panel -->
+    <div id="spellsPanel" class="god-tab-panel">
+        <div class="panel">
+            <h3>🔮 Spell Card Management</h3>
+
+            <div class="stats-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
+                <div style="background: rgba(168, 85, 247, 0.1); padding: 20px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 2.5rem; font-weight: bold; color: #a855f7;" id="totalSpellsDef">0</div>
+                    <div style="font-size: 0.9rem; color: #94a3b8; margin-top: 5px;">Spell Definitions</div>
+                </div>
+                <div style="background: rgba(16, 185, 129, 0.1); padding: 20px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 2.5rem; font-weight: bold; color: #10b981;" id="totalSpellsHeld">0</div>
+                    <div style="font-size: 0.9rem; color: #94a3b8; margin-top: 5px;">In Team Hands</div>
+                </div>
+                <div style="background: rgba(244, 63, 94, 0.1); padding: 20px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 2.5rem; font-weight: bold; color: #f43f5e;" id="totalSpellsCast">0</div>
+                    <div style="font-size: 0.9rem; color: #94a3b8; margin-top: 5px;">Spells Cast</div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button class="btn" onclick="loadAllSpells()" style="flex: 1;">
+                    📥 Load Spell Definitions
+                </button>
+                <button class="btn secondary" onclick="window.open('upload-spells.html', '_blank')" style="flex: 1;">
+                    ⬆️ Upload Spells
+                </button>
+            </div>
+        </div>
+
+        <!-- Team Spell Distribution -->
+        <div class="panel" style="margin-top: 20px;">
+            <h3>📦 Distribute Spells to Teams</h3>
+            <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 15px;">
+                Select a team and spell cards to add to their hand
+            </p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <!-- Team Selection -->
+                <div>
+                    <label style="display: block; margin-bottom: 8px; color: #94a3b8; font-size: 0.9rem;">Select Team:</label>
+                    <select id="spellDistTeam" onchange="updateTeamSpellInventory()"
+                            style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
+                        <option value="">-- Choose Team --</option>
+                    </select>
+
+                    <div id="teamCurrentSpells" style="margin-top: 15px; padding: 15px; background: rgba(15, 23, 42, 0.5); border-radius: 8px; min-height: 200px;">
+                        <h4 style="margin: 0 0 10px 0; color: #00d4ff; font-size: 0.9rem;">Current Spells:</h4>
+                        <div id="teamSpellsList">
+                            <p style="opacity: 0.5; font-size: 0.85rem;">Select a team to view</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Spell Selection -->
+                <div>
+                    <label style="display: block; margin-bottom: 8px; color: #94a3b8; font-size: 0.9rem;">Select Spell to Add:</label>
+                    <select id="spellToDistribute"
+                            style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white; margin-bottom: 10px;">
+                        <option value="">-- Choose Spell --</option>
+                    </select>
+
+                    <div id="spellPreview" style="margin-bottom: 15px; padding: 15px; background: rgba(168, 85, 247, 0.1); border-radius: 8px; min-height: 150px; display: none;">
+                        <!-- Spell preview will be shown here -->
+                    </div>
+
+                    <button class="btn" onclick="distributeSpellToTeam()" id="distributeBtn" disabled
+                            style="width: 100%; background: #a855f7; margin-bottom: 10px;">
+                        ➕ Add Spell to Team
+                    </button>
+
+                    <button class="btn secondary" onclick="distributeRandomSpells()"
+                            style="width: 100%;">
+                        🎲 Distribute Random Spells
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Available Spells Library -->
+        <div class="panel" style="margin-top: 20px;">
+            <h3>📚 Available Spell Cards</h3>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <input type="text" id="spellSearchInput" placeholder="🔍 Search spells..."
+                       oninput="filterSpells()"
+                       style="flex: 1; padding: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
+                <select id="spellTypeFilter" onchange="filterSpells()"
+                        style="padding: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
+                    <option value="all">All Types</option>
+                    <option value="pre-game">Pre-Game</option>
+                    <option value="instant">Instant</option>
+                    <option value="tactical">Tactical</option>
+                    <option value="defensive">Defensive</option>
+                    <option value="aggressive">Aggressive</option>
+                    <option value="rare">Rare</option>
+                </select>
+            </div>
+
+            <div id="spellsLibrary" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; max-height: 600px; overflow-y: auto;">
+                <p style="text-align: center; opacity: 0.7; padding: 40px; grid-column: 1/-1;">
+                    Click "Load Spell Definitions" to view available spells
+                </p>
+            </div>
+        </div>
+
+        <!-- Spell Usage History -->
+        <div class="panel" style="margin-top: 20px;">
+            <h3>📜 Spell Cast History</h3>
+            <div id="spellHistory" style="max-height: 400px; overflow-y: auto; background: rgba(15, 23, 42, 0.5); padding: 15px; border-radius: 10px;">
+                <p style="text-align: center; opacity: 0.7;">No spells cast yet</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab 7: Users Panel -->
     <div id="usersPanel" class="god-tab-panel">
         <div class="panel">
             <h3>👤 User Management</h3>
@@ -582,7 +699,9 @@
     <script src="scripts/tournament-manager.js"></script>
 
     <!-- Load all god mode functionality -->
+    <script src="scripts/spell-manager.js"></script>
     <script src="scripts/god-scripts.js"></script>
+    <script src="scripts/spells-god.js"></script>
 
     <!-- Load user management -->
     <script src="scripts/user-management.js"></script>
