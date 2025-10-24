@@ -104,7 +104,7 @@
                         <option value="finished">Finished</option>
                         <option value="archived">Archived</option>
                     </select>
-                    <button class="btn primary" onclick="createNewTournament()" style="white-space: nowrap;">
+                    <button class="btn primary" onclick="createNewTournament()" style="white-space: nowrap;" data-tooltip="Create a new tournament with custom settings">
                         ➕ Create New
                     </button>
                 </div>
@@ -127,7 +127,7 @@
                     <div class="form-group">
                         <label>Game ID</label>
                         <input type="text" id="gameId" placeholder="tournament-id">
-                        <button class="btn" onclick="loadGame()" style="margin-top: 5px;">📂 Load Game</button>
+                        <button class="btn" onclick="loadGame()" style="margin-top: 5px;" data-tooltip="Load tournament data to manage matches">📂 Load Game</button>
                     </div>
 
                     <!-- Template Display -->
@@ -208,8 +208,8 @@
                             <label>Notes (optional)</label>
                             <input type="text" id="planNotes" placeholder="Any special notes about this game...">
                         </div>
-                        <button class="btn primary" onclick="addGameToQueue()">➕ Add to Queue</button>
-                        <button class="btn" onclick="clearManualGameSetup()">🔄 Clear</button>
+                        <button class="btn primary" onclick="addGameToQueue()" data-tooltip="Add this match to the queue for play">➕ Add to Queue</button>
+                        <button class="btn" onclick="clearManualGameSetup()" data-tooltip="Clear all players from both teams">🔄 Clear</button>
                     </div>
 
                     <!-- Confirm Result Tab -->
@@ -233,7 +233,7 @@
                                 <input type="text" id="confirmNotes" placeholder="Any additional notes about the result...">
                             </div>
 
-                            <button class="btn primary" onclick="confirmGameResult()">✅ Submit Result & Start Turn</button>
+                            <button class="btn primary" onclick="confirmGameResult()" data-tooltip="Confirm match outcome and begin tile placement phase">✅ Submit Result & Start Turn</button>
                         </div>
                     </div>
                 </div>
@@ -258,19 +258,19 @@
                     <strong>⏳ No active turn</strong>
                 </div>
                 <div style="text-align: center; margin-bottom: 15px;">
-                    <button class="btn" id="undoBtn" onclick="undoAction()" disabled style="width: auto; display: inline-block; margin: 5px;">
+                    <button class="btn" id="undoBtn" onclick="undoAction()" disabled style="width: auto; display: inline-block; margin: 5px;" data-tooltip="Undo the last action (tile placement, spell cast, etc.)">
                         ⬅️ Undo
                     </button>
-                    <button class="btn" id="redoBtn" onclick="redoAction()" disabled style="width: auto; display: inline-block; margin: 5px;">
+                    <button class="btn" id="redoBtn" onclick="redoAction()" disabled style="width: auto; display: inline-block; margin: 5px;" data-tooltip="Redo the previously undone action">
                         ➡️ Redo
                     </button>
                     <span id="actionHistoryStatus" style="margin-left: 10px; opacity: 0.7; font-size: 0.9rem;">No actions yet</span>
                 </div>
                 <div style="text-align: center; margin-bottom: 15px;">
-                    <button class="btn" onclick="highlightValidPlacements()" style="width: auto; display: inline-block; margin: 5px;">
+                    <button class="btn" onclick="highlightValidPlacements()" style="width: auto; display: inline-block; margin: 5px;" data-tooltip="Highlight all hexes where the current team can place tiles">
                         🔍 Show Valid Placements
                     </button>
-                    <button class="btn" onclick="clearHighlights()" style="width: auto; display: inline-block; margin: 5px;">
+                    <button class="btn" onclick="clearHighlights()" style="width: auto; display: inline-block; margin: 5px;" data-tooltip="Remove all highlights from the board">
                         🧹 Clear Highlights
                     </button>
                 </div>
@@ -328,7 +328,7 @@
                     <div id="unassignedUsersList" style="max-height: 500px; overflow-y: auto; background: rgba(15, 23, 42, 0.3); padding: 10px; border-radius: 8px;">
                         <p style="text-align: center; opacity: 0.5;">Load a tournament first</p>
                     </div>
-                    <button class="btn" onclick="loadUnassignedUsers()" style="width: 100%; margin-top: 10px;">
+                    <button class="btn" onclick="loadUnassignedUsers()" style="width: 100%; margin-top: 10px;" data-tooltip="Reload the list of registered users who aren't assigned to teams">
                         🔄 Refresh Users List
                     </button>
                 </div>
@@ -339,7 +339,7 @@
                     <div id="teamAssignmentSlots" style="max-height: 500px; overflow-y: auto;">
                         <p style="text-align: center; opacity: 0.5;">Load a tournament to see teams</p>
                     </div>
-                    <button class="btn primary" onclick="saveUserAppointments()" style="width: 100%; margin-top: 10px;">
+                    <button class="btn primary" onclick="saveUserAppointments()" style="width: 100%; margin-top: 10px;" data-tooltip="Save all user-to-team assignments to the tournament">
                         💾 Save All Appointments
                     </button>
                 </div>
