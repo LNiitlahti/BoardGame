@@ -475,11 +475,15 @@ The project is a static web application that can be deployed to:
 
 ## 📄 License
 
-[Add your license here]
+This project is currently unlicensed but is free to use for **non-profit purposes only**.
+
+For commercial use, please contact the project maintainer.
 
 ## 👥 Contributing
 
-[Add contribution guidelines here]
+This is currently a **solo project** (as of October 2025). Contributions may be accepted in the future.
+
+For bug reports or feature requests, please open an issue on the repository.
 
 ---
 
