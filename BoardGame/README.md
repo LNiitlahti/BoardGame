@@ -42,7 +42,6 @@ A complete, real-time tournament management system for LAN events with spell car
 - 🔄 Player voting system for match results (90% consensus)
 - 🔄 Enhanced match scheduling with time slots
 - ⏳ Match statistics and analytics
-- ⏳ Tournament bracket visualization
 
 **Phase 5: Polish & Advanced Features (Planned)**
 - ⏳ Mobile-optimized views for all pages
