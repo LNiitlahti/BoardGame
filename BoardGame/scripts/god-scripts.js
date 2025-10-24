@@ -784,6 +784,17 @@ function makeTeamNameEditableRoster(element) {
                     const oldName = team.name;
                     team.name = newName;
 
+                    // Track name change history
+                    if (!team.nameHistory) {
+                        team.nameHistory = [];
+                    }
+                    team.nameHistory.push({
+                        oldName: oldName,
+                        newName: newName,
+                        changedAt: new Date().toISOString(),
+                        changedBy: window.currentUser?.email || 'admin'
+                    });
+
                     // Save to Firebase
                     await saveGameState();
 
@@ -1631,41 +1642,30 @@ async function confirmGameResult() {
     const allTeamIds = [...new Set([...selectedQueuedGame.teams[0].players, ...selectedQueuedGame.teams[1].players].map(p => p.originalTeamId))];
     const losingTeamIds = allTeamIds.filter(id => !winningTeamIds.includes(id));
 
-    // Get team names for display
-    const winnerNames = winningTeamIds.map(id => {
-        const team = gameState.teams.find(t => t.id === id);
-        return team ? team.name : 'Unknown';
-    }).join(' & ');
+    // Get player data with UIDs for stable identification
+    const getPlayerWithUID = (playerFromQueue) => {
+        const team = gameState.teams.find(t => t.id === playerFromQueue.originalTeamId);
+        const playerInTeam = team?.players?.find(p => p.name === playerFromQueue.name);
 
-    const loserNames = losingTeamIds.map(id => {
-        const team = gameState.teams.find(t => t.id === id);
-        return team ? team.name : 'Unknown';
-    }).join(' & ');
+        return {
+            uid: playerInTeam?.uid || playerInTeam?.email || null,  // Stable identifier
+            teamId: playerFromQueue.originalTeamId  // Store team ID, not name
+        };
+    };
 
-    // Create the game result record
+    // Create the game result record (ID-based, no redundant names)
     const result = {
         id: (gameState.gameHistory?.length || 0) + 1,
         game: selectedQueuedGame.game,
         playType: selectedQueuedGame.playType,
         matchup: {
-            teamA: selectedQueuedGame.teams[0].players.map(p => ({
-                name: p.name,
-                originalTeam: p.originalTeamName
-            })),
-            teamB: selectedQueuedGame.teams[1].players.map(p => ({
-                name: p.name,
-                originalTeam: p.originalTeamName
-            }))
+            teamASide: selectedQueuedGame.teams[0].players.map(p => getPlayerWithUID(p)),
+            teamBSide: selectedQueuedGame.teams[1].players.map(p => getPlayerWithUID(p))
         },
         winningSide: winningSides[0],
-        winningPlayers: winningPlayers.map(p => ({
-            name: p.name,
-            originalTeamId: p.originalTeamId
-        })),
-        winningTeamIds: winningTeamIds,
-        losingTeamIds: losingTeamIds,
-        winner: winnerNames,  // Add for view.html display
-        loser: loserNames,    // Add for view.html display
+        winningPlayers: winningPlayers.map(p => getPlayerWithUID(p)),
+        winningTeamIds: winningTeamIds,  // Store IDs only
+        losingTeamIds: losingTeamIds,    // Store IDs only
         queuedGameId: selectedQueuedGame.id,
         planNotes: selectedQueuedGame.notes || '',
         resultNotes: resultNotes,
