@@ -12,6 +12,7 @@
     <link rel="manifest" href="images/favicon/site.webmanifest">
     <link rel="shortcut icon" href="images/favicon/favicon.ico">
 
+    <link rel="stylesheet" href="css/brand-theme.css">
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/god_styles.css">
 </head>
@@ -425,10 +426,12 @@
             </div>
 
             <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                <button class="btn" onclick="loadAllSpells()" style="flex: 1;">
+                <button class="btn" onclick="loadAllSpells()" style="flex: 1;"
+                        data-tooltip="Load all 15 spell cards from Firebase">
                     📥 Load Spell Definitions
                 </button>
-                <button class="btn secondary" onclick="window.open('upload-spells.html', '_blank')" style="flex: 1;">
+                <button class="btn secondary" onclick="window.open('upload-spells.html', '_blank')" style="flex: 1;"
+                        data-tooltip="Open spell upload utility in new tab">
                     ⬆️ Upload Spells
                 </button>
             </div>
@@ -471,12 +474,14 @@
                     </div>
 
                     <button class="btn" onclick="distributeSpellToTeam()" id="distributeBtn" disabled
-                            style="width: 100%; background: #a855f7; margin-bottom: 10px;">
+                            style="width: 100%; background: #a855f7; margin-bottom: 10px;"
+                            data-tooltip="Add selected spell to selected team's hand">
                         ➕ Add Spell to Team
                     </button>
 
                     <button class="btn secondary" onclick="distributeRandomSpells()"
-                            style="width: 100%;">
+                            style="width: 100%;"
+                            data-tooltip="Give random spells to all teams (you choose how many)">
                         🎲 Distribute Random Spells
                     </button>
                 </div>
