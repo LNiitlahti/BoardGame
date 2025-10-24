@@ -829,3 +829,13 @@ body {
     opacity: 0.5;
     transform: rotate(2deg);
 }
+
+/* Team slot drag-over styling for user appointment */
+.team-slot.drag-over {
+    background: rgba(16, 185, 129, 0.2) !important;
+    border-color: #10b981 !important;
+    border-style: solid !important;
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+    transform: scale(1.02);
+    transition: all 0.2s ease;
+}

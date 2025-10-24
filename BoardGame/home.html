@@ -920,8 +920,8 @@
     };
 
     window.goToTeamControls = function(tournamentId, teamId) {
-      // Team controls removed - stay on home page
-      errorHandler.showInfo('Team controls feature coming soon');
+      // Navigate to team controls page
+      window.location.href = `team.html?gameId=${tournamentId}&teamId=${teamId}`;
     };
 
     window.deleteTournamentConfirm = deleteTournamentConfirm;

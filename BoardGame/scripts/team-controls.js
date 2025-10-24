@@ -146,8 +146,50 @@ async function loadTournamentData() {
  * Render team header (name and points)
  */
 function renderTeamHeader() {
-    document.getElementById('teamNameDisplay').textContent = teamData.name || `Team ${currentTeamId}`;
-    document.getElementById('teamPointsDisplay').textContent = teamData.points || 0;
+    const teamColor = getHexColor(teamData.color);
+    const teamNameElement = document.getElementById('teamNameDisplay');
+    const teamPointsElement = document.getElementById('teamPointsDisplay');
+
+    teamNameElement.textContent = teamData.name || `Team ${currentTeamId}`;
+    teamPointsElement.textContent = teamData.points || 0;
+
+    // Add team color indicator to the header
+    teamNameElement.style.borderLeft = `6px solid ${teamColor}`;
+    teamNameElement.style.paddingLeft = '15px';
+    teamNameElement.style.color = teamColor;
+
+    // Also add a color badge
+    const existingBadge = document.querySelector('.team-color-badge');
+    if (existingBadge) {
+        existingBadge.remove();
+    }
+
+    const colorBadge = document.createElement('span');
+    colorBadge.className = 'team-color-badge';
+    colorBadge.style.cssText = `
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: ${teamColor};
+        border: 2px solid ${teamColor};
+        box-shadow: 0 0 10px ${teamColor}80;
+        margin-left: 10px;
+        vertical-align: middle;
+    `;
+    teamNameElement.appendChild(colorBadge);
+
+    // Apply team color border to all team panels
+    document.querySelectorAll('.team-panel').forEach(panel => {
+        panel.style.borderTop = `4px solid ${teamColor}`;
+        panel.style.boxShadow = `0 0 15px ${teamColor}20`;
+    });
+
+    // Apply team color to the main header
+    const teamHeader = document.querySelector('.team-header');
+    if (teamHeader) {
+        teamHeader.style.borderBottom = `3px solid ${teamColor}`;
+    }
 }
 
 /**
@@ -431,62 +473,185 @@ function renderBoard() {
 function renderCurrentMatch() {
     const container = document.getElementById('currentMatchDisplay');
 
-    if (!gameData.currentTurn || !gameData.selectedGames) {
-        container.innerHTML = '<div class="match-status waiting">⏳ No active match. Waiting for next game...</div>';
+    console.log('[Team Controls] Rendering current match:', {
+        currentTurn: gameData.currentTurn,
+        selectedGames: gameData.selectedGames?.length || 0,
+        gameQueue: gameData.gameQueue?.length || 0
+    });
+
+    // Check for matches in multiple sources
+    const matchesSource = gameData.gameQueue || gameData.selectedGames || [];
+
+    if (matchesSource.length === 0) {
+        container.innerHTML = '<div class="match-status waiting">⏳ No matches scheduled</div>';
         return;
     }
 
-    const currentMatch = gameData.selectedGames.find(
-        g => g.game === gameData.currentTurn.game || g.gameNumber === gameData.currentTurn.game
-    );
+    let currentMatch = null;
+
+    // Strategy 1: If there's a currentTurn, find that match
+    if (gameData.currentTurn) {
+        currentMatch = matchesSource.find(
+            g => g.game === gameData.currentTurn.game || g.gameNumber === gameData.currentTurn.game
+        );
+    }
+
+    // Strategy 2: If no currentTurn or match not found, use the first pending/waiting match as "current"
+    if (!currentMatch) {
+        currentMatch = matchesSource.find(m =>
+            m.status === 'pending' || m.status === 'waiting' || m.status === 'upcoming' || m.status === 'scheduled' || !m.status
+        );
+        console.log('[Team Controls] No active match, using first pending match as current:', currentMatch);
+    }
+
+    console.log('[Team Controls] Found current match:', currentMatch);
 
     if (!currentMatch) {
         container.innerHTML = '<div class="match-status waiting">⏳ No active match. Waiting for next game...</div>';
         return;
     }
 
-    // Check if this team is playing in current match
-    const isPlaying = currentMatch.sides?.some(side =>
-        side.players?.some(p => teamData.players?.some(tp => tp.uid === p.uid || tp.name === p.name))
-    );
+    // Check if this team is playing in current match - try multiple methods
+    let isPlaying = false;
+
+    if (currentMatch.sides && Array.isArray(currentMatch.sides)) {
+        isPlaying = currentMatch.sides.some(side =>
+            side.players?.some(p =>
+                teamData.players?.some(tp =>
+                    tp.uid === p.uid ||
+                    tp.name === p.name ||
+                    tp.email === p.email
+                )
+            )
+        );
+    }
+
+    // Fallback: Check if team name is in the match
+    if (!isPlaying && teamData.name) {
+        const matchStr = JSON.stringify(currentMatch).toLowerCase();
+        isPlaying = matchStr.includes(teamData.name.toLowerCase());
+    }
+
+    console.log('[Team Controls] Is team playing in current match:', isPlaying);
+
+    // Determine match status text
+    const isActiveMatch = gameData.currentTurn && (currentMatch.game === gameData.currentTurn.game || currentMatch.gameNumber === gameData.currentTurn.game);
+    const statusText = isActiveMatch && isPlaying ? '🎮 IT\'S YOUR TURN!' : isActiveMatch ? '⏳ Match in progress...' : '📋 NEXT MATCH';
+    const statusClass = isActiveMatch && isPlaying ? 'active' : isActiveMatch ? 'waiting' : 'upcoming';
 
     if (!isPlaying) {
-        container.innerHTML = '<div class="match-status waiting">⏳ Another match is in progress...</div>';
+        // Show the match info anyway but indicate team involvement
+        const sidesData = currentMatch.sides || currentMatch.teams || [];
+        console.log('[Team Controls] Rendering sides (not playing):', sidesData);
+
+        let sidesHTML = '';
+        if (sidesData.length === 0) {
+            sidesHTML = '<div style="opacity: 0.5;">No sides configured</div>';
+        } else {
+            const sideElements = sidesData.map((side, index) => {
+                const playersHTML = (side.players || []).map(p => {
+                    const playerColor = getHexColor(p.color || p.teamColor || p.originalTeamColor);
+                    return `<div class="player-chip" style="border-color: ${playerColor}; color: ${playerColor};">${p.name || 'Player'}</div>`;
+                }).join('');
+
+                return `
+                    <div class="match-side">
+                        <div style="font-weight: 600; font-size: 0.75rem; color: var(--accent-primary); margin-bottom: 2px;">
+                            Side ${String.fromCharCode(65 + index)}
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 1px;">
+                            ${playersHTML || '<div style="opacity: 0.5; font-size: 0.75rem;">No players</div>'}
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Add VS dividers between all sides
+            sidesHTML = sideElements.reduce((acc, side, index) => {
+                acc.push(side);
+                if (index < sideElements.length - 1) {
+                    acc.push('<div class="vs-divider">VS</div>');
+                }
+                return acc;
+            }, []).join('');
+        }
+
+        container.innerHTML = `
+            <div class="match-status ${statusClass}">${statusText}</div>
+            <div style="text-align: center; font-weight: bold; font-size: 0.9rem; margin: 8px 0 6px 0; color: var(--accent-primary);">
+                Game ${currentMatch.game || currentMatch.gameNumber} - ${currentMatch.gameType || 'Match'}
+            </div>
+            <div class="match-details">
+                <div class="match-sides">
+                    ${sidesHTML}
+                </div>
+                ${currentMatch.notes ? `<div style="margin-top: 8px; font-size: 0.85rem; opacity: 0.7; font-style: italic; text-align: center;">${currentMatch.notes}</div>` : ''}
+            </div>
+        `;
         return;
     }
 
     // Find which side we're on
+    const sidesData = currentMatch.sides || currentMatch.teams || [];
+    console.log('[Team Controls] Rendering sides (playing):', sidesData);
+
     let ourSideIndex = -1;
-    currentMatch.sides?.forEach((side, index) => {
-        if (side.players?.some(p => teamData.players?.some(tp => tp.uid === p.uid || tp.name === p.name))) {
+    sidesData.forEach((side, index) => {
+        if ((side.players || []).some(p => teamData.players?.some(tp => tp.uid === p.uid || tp.name === p.name || tp.email === p.email))) {
             ourSideIndex = index;
         }
     });
 
-    const matchHTML = `
-        <div class="match-status active">🎮 IT'S YOUR TURN!</div>
-        <div class="match-details">
-            <div style="text-align: center; font-weight: bold; margin-bottom: 10px;">
-                Game ${currentMatch.game || currentMatch.gameNumber} - ${currentMatch.gameType || 'Match'}
-            </div>
-            <div class="match-sides">
-                ${currentMatch.sides?.map((side, index) => `
-                    <div class="match-side ${index === ourSideIndex ? 'your-side' : ''}">
-                        <div style="font-weight: bold; margin-bottom: 8px; color: var(--accent-primary);">
-                            ${index === ourSideIndex ? '⭐ Your Side' : 'Opponents'}
-                        </div>
-                        ${side.players?.map(p => `
-                            <div class="player-chip">${p.name || 'Player'}</div>
-                        `).join('') || '<div style="opacity: 0.5;">No players</div>'}
+    let sidesHTML = '';
+    if (sidesData.length === 0) {
+        sidesHTML = '<div style="opacity: 0.5;">No sides configured</div>';
+    } else {
+        const sideElements = sidesData.map((side, index) => {
+            const isOurSide = index === ourSideIndex;
+            const playersHTML = (side.players || []).map(p => {
+                const playerColor = getHexColor(p.color || p.teamColor || p.originalTeamColor);
+                return `<div class="player-chip" style="border-color: ${playerColor}; color: ${playerColor};">${p.name || 'Player'}</div>`;
+            }).join('');
+
+            return `
+                <div class="match-side ${isOurSide ? 'your-side' : ''}">
+                    <div style="font-weight: 600; font-size: 0.75rem; color: var(--accent-primary); margin-bottom: 2px;">
+                        ${isOurSide ? '⭐ Your Side' : `Side ${String.fromCharCode(65 + index)}`}
                     </div>
-                    ${index === 0 ? '<div class="vs-divider">VS</div>' : ''}
-                `).join('') || '<div style="opacity: 0.5;">No sides configured</div>'}
+                    <div style="display: flex; flex-wrap: wrap; gap: 1px;">
+                        ${playersHTML || '<div style="opacity: 0.5; font-size: 0.75rem;">No players</div>'}
+                    </div>
+                </div>
+            `;
+        });
+
+        // Add VS dividers between all sides
+        sidesHTML = sideElements.reduce((acc, side, index) => {
+            acc.push(side);
+            if (index < sideElements.length - 1) {
+                acc.push('<div class="vs-divider">VS</div>');
+            }
+            return acc;
+        }, []).join('');
+    }
+
+    const matchHTML = `
+        <div class="match-status ${statusClass}">${statusText}</div>
+        <div style="text-align: center; font-weight: bold; font-size: 0.9rem; margin: 8px 0 6px 0; color: var(--accent-primary);">
+            Game ${currentMatch.game || currentMatch.gameNumber} - ${currentMatch.gameType || 'Match'}
+        </div>
+        <div class="match-details">
+            <div class="match-sides">
+                ${sidesHTML}
             </div>
-            ${currentMatch.notes ? `<div style="margin-top: 10px; font-size: 0.9rem; opacity: 0.7; font-style: italic;">${currentMatch.notes}</div>` : ''}
+            ${currentMatch.notes ? `<div style="margin-top: 8px; font-size: 0.85rem; opacity: 0.7; font-style: italic; text-align: center;">${currentMatch.notes}</div>` : ''}
         </div>
     `;
 
     container.innerHTML = matchHTML;
+
+    // Store the current match so upcoming matches can skip it
+    window.currentDisplayedMatchId = currentMatch.game || currentMatch.gameNumber;
 }
 
 /**
@@ -495,40 +660,149 @@ function renderCurrentMatch() {
 function renderUpcomingMatches() {
     const container = document.getElementById('upcomingMatchesList');
 
-    if (!gameData.selectedGames || gameData.selectedGames.length === 0) {
+    // Check multiple possible sources for matches (same as view.html)
+    const matchesData = gameData.gameQueue || gameData.selectedGames || gameData.upcomingMatches || gameData.matches || [];
+
+    console.log('[Team Controls] Checking upcoming matches:', {
+        gameQueue: gameData.gameQueue?.length || 0,
+        selectedGames: gameData.selectedGames?.length || 0,
+        upcomingMatches: gameData.upcomingMatches?.length || 0,
+        matches: gameData.matches?.length || 0,
+        totalMatchesData: matchesData.length,
+        teamData: teamData,
+        gameData: gameData
+    });
+
+    if (matchesData.length === 0) {
         container.innerHTML = '<p style="text-align: center; opacity: 0.5;">No upcoming matches scheduled</p>';
         return;
     }
 
     // Filter upcoming matches that involve this team
-    const upcomingMatches = gameData.selectedGames.filter(match => {
+    const upcomingMatches = matchesData.filter(match => {
         // Skip completed matches
         if (match.status === 'completed') return false;
 
-        // Skip current match
+        // Skip the match being shown as current
+        const matchId = match.game || match.gameNumber;
+        if (window.currentDisplayedMatchId && matchId === window.currentDisplayedMatchId) {
+            console.log('[Team Controls] Skipping match shown as current:', matchId);
+            return false;
+        }
+
+        // Also skip if there's a currentTurn and this is that match
         if (gameData.currentTurn && (match.game === gameData.currentTurn.game || match.gameNumber === gameData.currentTurn.game)) {
             return false;
         }
 
-        // Check if this team is involved
-        return match.sides?.some(side =>
-            side.players?.some(p => teamData.players?.some(tp => tp.uid === p.uid || tp.name === p.name))
-        );
+        // Check if this team is involved - try multiple methods
+        let isInvolved = false;
+
+        // Method 1: Check sides with player matching
+        if (match.sides && Array.isArray(match.sides)) {
+            isInvolved = match.sides.some(side =>
+                side.players?.some(p =>
+                    teamData.players?.some(tp =>
+                        tp.uid === p.uid ||
+                        tp.name === p.name ||
+                        tp.email === p.email
+                    )
+                )
+            );
+        }
+
+        // Method 2: Check if team name is mentioned
+        if (!isInvolved && teamData.name) {
+            const matchStr = JSON.stringify(match).toLowerCase();
+            isInvolved = matchStr.includes(teamData.name.toLowerCase());
+        }
+
+        // Method 3: For pending/waiting matches, show all (like view.html does)
+        if (!isInvolved && (match.status === 'pending' || match.status === 'waiting' || match.status === 'upcoming' || match.status === 'scheduled')) {
+            console.log('[Team Controls] Including match due to pending status:', match);
+            isInvolved = true;
+        }
+
+        console.log('[Team Controls] Match check:', {
+            game: match.game || match.gameNumber,
+            status: match.status,
+            isInvolved: isInvolved,
+            sides: match.sides,
+            teamPlayers: teamData.players
+        });
+
+        return isInvolved;
     });
 
-    if (upcomingMatches.length === 0) {
-        container.innerHTML = '<p style="text-align: center; opacity: 0.5;">No upcoming matches for your team</p>';
+    console.log('[Team Controls] Filtered upcoming matches:', upcomingMatches.length);
+
+    // If no team-specific matches, show all upcoming matches
+    const displayMatches = upcomingMatches.length > 0 ? upcomingMatches : matchesData.filter(m =>
+        m.status === 'pending' || m.status === 'waiting' || m.status === 'upcoming' || m.status === 'scheduled' || !m.status
+    );
+
+    console.log('[Team Controls] Display matches:', displayMatches.length);
+
+    if (displayMatches.length === 0) {
+        container.innerHTML = '<p style="text-align: center; opacity: 0.5;">No upcoming matches scheduled</p>';
         return;
     }
 
-    container.innerHTML = upcomingMatches.slice(0, 5).map(match => `
-        <div style="background: var(--cream-alpha-1); padding: 10px; border-radius: var(--radius-md); margin-bottom: 10px;">
-            <div style="font-weight: bold; color: var(--accent-primary);">Game ${match.game || match.gameNumber}</div>
-            <div style="font-size: 0.85rem; opacity: 0.7; margin-top: 4px;">
-                ${match.gameType || 'Match'} - ${match.playType || 'Unknown format'}
+    container.innerHTML = displayMatches.slice(0, 5).map(match => {
+        // Get opponent info
+        let opponentInfo = '';
+        if (match.sides && match.sides.length >= 2) {
+            const opponentSide = match.sides.find(side =>
+                !side.players?.some(p => teamData.players?.some(tp => tp.uid === p.uid || tp.name === p.name))
+            );
+            if (opponentSide && opponentSide.players) {
+                const opponentNames = opponentSide.players.map(p => {
+                    const playerColor = getHexColor(p.color || p.teamColor || p.originalTeamColor);
+                    return `<span style="color: ${playerColor};">${p.name || 'Player'}</span>`;
+                }).join(', ');
+                opponentInfo = `<div style="font-size: 0.85rem; opacity: 0.7; margin-top: 4px;">vs ${opponentNames}</div>`;
+            }
+        }
+
+        return `
+            <div style="background: var(--cream-alpha-1); padding: 10px; border-radius: var(--radius-md); margin-bottom: 10px;">
+                <div style="font-weight: bold; color: var(--accent-primary);">Game ${match.game || match.gameNumber}</div>
+                <div style="font-size: 0.85rem; opacity: 0.7; margin-top: 4px;">
+                    ${match.gameType || 'Match'} - ${match.playType || 'Unknown format'}
+                </div>
+                ${opponentInfo}
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
+}
+
+/**
+ * Get hex color from team color property
+ * Converts legacy color names to hex codes
+ */
+function getHexColor(color) {
+    // If already a hex code, return it
+    if (color && color.startsWith('#')) {
+        return color;
+    }
+
+    // Map legacy color names to hex codes
+    const colorMap = {
+        'blue': '#3b82f6',
+        'red': '#ef4444',
+        'green': '#10b981',
+        'yellow': '#f59e0b',
+        'amber': '#f59e0b',
+        'purple': '#a855f7',
+        'pink': '#ec4899',
+        'teal': '#14b8a6',
+        'orange': '#f97316',
+        'cyan': '#06b6d4',
+        'lime': '#84cc16',
+        'indigo': '#6366f1'
+    };
+
+    return colorMap[color?.toLowerCase()] || '#3b82f6'; // Default to blue
 }
 
 /**
