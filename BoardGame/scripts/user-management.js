@@ -374,6 +374,7 @@ async function deleteUser(uid, displayName) {
  * Global state for user appointments
  */
 let unassignedUsers = [];
+let unassignedUsersSearchTerm = ''; // Search filter for unassigned users
 let pendingAppointments = {}; // { teamId: { playerIndex: userData } }
 
 /**
@@ -428,6 +429,10 @@ async function loadUnassignedUsers() {
         });
 
         console.log('[User Appointment] Unassigned users:', unassignedUsers);
+
+        // Update window reference for global access
+        window.unassignedUsers = unassignedUsers;
+
         renderUnassignedUsers();
 
         if (typeof showStatus === 'function') {
@@ -443,6 +448,17 @@ async function loadUnassignedUsers() {
             showStatus('Error loading users', 'error');
         }
     }
+}
+
+/**
+ * Filter unassigned users based on search term
+ */
+function filterUnassignedUsers() {
+    const searchInput = document.getElementById('unassignedUsersSearch');
+    if (searchInput) {
+        unassignedUsersSearchTerm = searchInput.value.toLowerCase();
+    }
+    renderUnassignedUsers();
 }
 
 /**
@@ -462,10 +478,21 @@ function renderUnassignedUsers() {
     }
 
     // Filter out users who are already assigned
-    const availableUsers = unassignedUsers.filter(user => !assignedUIDs.has(user.uid));
+    let availableUsers = unassignedUsers.filter(user => !assignedUIDs.has(user.uid));
+
+    // Apply search filter
+    if (unassignedUsersSearchTerm) {
+        availableUsers = availableUsers.filter(user => {
+            return user.displayName.toLowerCase().includes(unassignedUsersSearchTerm) ||
+                   user.email.toLowerCase().includes(unassignedUsersSearchTerm);
+        });
+    }
 
     if (availableUsers.length === 0) {
-        container.innerHTML = '<p style="text-align: center; opacity: 0.5;">No unassigned users available</p>';
+        const message = unassignedUsersSearchTerm
+            ? `<p style="text-align: center; opacity: 0.5;">No users found matching "${unassignedUsersSearchTerm}"</p>`
+            : '<p style="text-align: center; opacity: 0.5;">No unassigned users available</p>';
+        container.innerHTML = message;
         return;
     }
 
@@ -500,6 +527,32 @@ function handleUserDragStart(event, uid) {
         uid: uid,
         userData: user
     }));
+}
+
+/**
+ * Allow drop on valid drop zones
+ */
+function allowDrop(event) {
+    event.preventDefault();
+    event.currentTarget.classList.add('drag-over');
+}
+
+/**
+ * Remove drag over styling when leaving drop zone
+ */
+function dragLeave(event) {
+    event.currentTarget.classList.remove('drag-over');
+}
+
+/**
+ * Clean up after drag ends
+ */
+function dragEnd(event) {
+    event.target.classList.remove('dragging');
+    // Remove all drag-over classes
+    document.querySelectorAll('.drag-over').forEach(el => {
+        el.classList.remove('drag-over');
+    });
 }
 
 /**
@@ -736,6 +789,104 @@ async function saveUserAppointments() {
             showStatus('Error saving appointments: ' + error.message, 'error');
         }
     }
+}
+
+/**
+ * Load tournament data for user appointment system
+ * Called when Teams tab is activated
+ */
+async function loadTournamentForAppointment(tournamentId) {
+    console.log('[User Appointment] Loading tournament:', tournamentId);
+
+    // Load unassigned users
+    await loadUnassignedUsers();
+
+    // Render team slots
+    renderTeamAssignmentSlots();
+
+    // Render full roster
+    renderTournamentRoster();
+}
+
+/**
+ * Render the complete tournament roster
+ * Shows all teams and their assigned players
+ */
+function renderTournamentRoster() {
+    const container = document.getElementById('tournamentRosterDisplay');
+    if (!container) return;
+
+    if (!window.gameState || !window.gameState.teams) {
+        container.innerHTML = '<p style="text-align: center; opacity: 0.5; grid-column: 1 / -1;">Load a tournament to see roster</p>';
+        return;
+    }
+
+    // Use getTeamColor from god-scripts.js if available
+    const getColor = (teamId) => {
+        if (typeof getTeamColor === 'function') {
+            return getTeamColor(teamId);
+        }
+        return '#666';
+    };
+
+    container.innerHTML = window.gameState.teams.map(team => {
+        const assignedPlayers = team.players.filter(p => p.name && p.uid);
+        const emptySlots = team.players.filter(p => !p.name || !p.uid).length;
+
+        return `
+            <div style="background: rgba(51, 65, 85, 0.3); padding: 15px; border-radius: 8px; border-left: 4px solid ${getColor(team.id)};">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <div>
+                        <div style="font-weight: 600; color: #ffd700; font-size: 1.1rem;">${team.name}</div>
+                        <div style="font-size: 0.85rem; opacity: 0.7;">${team.points || 0} points</div>
+                    </div>
+                    <div style="text-align: right; font-size: 0.85rem;">
+                        <div style="color: #10b981;">✓ ${assignedPlayers.length} assigned</div>
+                        ${emptySlots > 0 ? `<div style="color: #f59e0b;">⚠ ${emptySlots} empty</div>` : ''}
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    ${team.players.map((player, index) => {
+                        if (player.name && player.uid) {
+                            return `
+                                <div style="background: rgba(16, 185, 129, 0.1); padding: 10px; border-radius: 5px; border-left: 3px solid #10b981; display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <div style="font-weight: 600;">${player.name}</div>
+                                        <div style="font-size: 0.8rem; opacity: 0.8;">${player.email || ''}</div>
+                                        ${player.pointsContributed ? `<div style="font-size: 0.75rem; color: #10b981; margin-top: 4px;">📊 ${player.pointsContributed} points contributed</div>` : ''}
+                                    </div>
+                                    <button onclick="unassignUserFromTeam(${team.id}, ${index})"
+                                            style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 0.85rem;">
+                                        Remove
+                                    </button>
+                                </div>
+                            `;
+                        } else {
+                            return `
+                                <div style="background: rgba(71, 85, 105, 0.3); padding: 10px; border-radius: 5px; border: 2px dashed #475569;">
+                                    <div style="font-style: italic; opacity: 0.5;">Slot ${index + 1}: Empty</div>
+                                </div>
+                            `;
+                        }
+                    }).join('')}
+                </div>
+
+                ${team.formerPlayers && team.formerPlayers.length > 0 ? `
+                    <details style="margin-top: 12px;">
+                        <summary style="cursor: pointer; opacity: 0.7; font-size: 0.85rem;">📜 Former Players (${team.formerPlayers.length})</summary>
+                        <div style="margin-top: 8px; padding-left: 10px;">
+                            ${team.formerPlayers.map(fp => `
+                                <div style="font-size: 0.8rem; opacity: 0.6; margin: 4px 0;">
+                                    ${fp.name} - ${fp.pointsContributed || 0} pts contributed
+                                </div>
+                            `).join('')}
+                        </div>
+                    </details>
+                ` : ''}
+            </div>
+        `;
+    }).join('');
 }
 
 /**

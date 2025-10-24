@@ -446,6 +446,19 @@ async function loadGame() {
                 renderPlanTeamPool();
                 renderPlayerManagement();
                 updateGameQueue();
+
+                // Initialize Teams tab components
+                if (typeof loadUnassignedUsers === 'function') {
+                    loadUnassignedUsers().then(() => {
+                        if (typeof renderTeamAssignmentSlots === 'function') {
+                            renderTeamAssignmentSlots();
+                        }
+                        if (typeof renderTournamentRoster === 'function') {
+                            renderTournamentRoster();
+                        }
+                    });
+                }
+
                 addLog(`📂 Match "${tournamentId}/${matchId}" loaded`, 'success');
                 showStatus('Match loaded successfully!', 'success');
             } else {
@@ -503,6 +516,19 @@ async function loadTournamentDirectly(tournamentId) {
                 renderPlanTeamPool();
                 renderPlayerManagement();
                 updateGameQueue();
+
+                // Initialize Teams tab components
+                if (typeof loadUnassignedUsers === 'function') {
+                    loadUnassignedUsers().then(() => {
+                        if (typeof renderTeamAssignmentSlots === 'function') {
+                            renderTeamAssignmentSlots();
+                        }
+                        if (typeof renderTournamentRoster === 'function') {
+                            renderTournamentRoster();
+                        }
+                    });
+                }
+
                 addLog(`📂 Tournament "${tournamentId}" loaded successfully`, 'success');
                 addLog(`Found ${gameState.matches?.length || 0} match templates`, 'info');
                 showStatus('Tournament loaded successfully!', 'success');

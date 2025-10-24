@@ -328,7 +328,10 @@
                 <!-- Unassigned Users -->
                 <div>
                     <h4 style="color: #06b6d4; margin-bottom: 10px;">📋 Unassigned Users</h4>
-                    <div id="unassignedUsersList" style="max-height: 500px; overflow-y: auto; background: rgba(15, 23, 42, 0.3); padding: 10px; border-radius: 8px;">
+                    <input type="text" id="unassignedUsersSearch" placeholder="🔍 Search users by name or email..."
+                           oninput="filterUnassignedUsers()"
+                           style="width: 100%; padding: 10px; margin-bottom: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white; font-size: 0.95rem;">
+                    <div id="unassignedUsersList" style="max-height: 450px; overflow-y: auto; background: rgba(15, 23, 42, 0.3); padding: 10px; border-radius: 8px;">
                         <p style="text-align: center; opacity: 0.5;">Load a tournament first</p>
                     </div>
                     <button class="btn" onclick="loadUnassignedUsers()" style="width: 100%; margin-top: 10px;" data-tooltip="Reload the list of registered users who aren't assigned to teams">
@@ -1057,11 +1060,18 @@
             }
 
             if (tabName === 'teams') {
-                // Sync team data from Matches tab to Teams tab
-                const playersList = document.getElementById('playersList');
-                const teamsListPanel = document.getElementById('teamsListPanel');
-                if (playersList && teamsListPanel) {
-                    teamsListPanel.innerHTML = playersList.innerHTML;
+                // Initialize Teams tab components if gameState is loaded
+                if (window.gameState && window.gameState.gameId) {
+                    if (typeof renderTeamAssignmentSlots === 'function') {
+                        renderTeamAssignmentSlots();
+                    }
+                    if (typeof renderTournamentRoster === 'function') {
+                        renderTournamentRoster();
+                    }
+                    // Refresh unassigned users list
+                    if (typeof renderUnassignedUsers === 'function') {
+                        renderUnassignedUsers();
+                    }
                 }
             }
         }
@@ -1171,14 +1181,8 @@
                     gameIdInput.value = tournamentId;
                 }
 
-                // Load tournament for user appointment system
-                setTimeout(() => {
-                    if (typeof loadTournamentForAppointment === 'function') {
-                        loadTournamentForAppointment(tournamentId);
-                    }
-                }, 1000);
-
                 // Auto-load game state for ALL tabs (not just Matches)
+                // Note: Team appointment components are initialized after loadGame() completes
                 if (typeof loadGame === 'function') {
                     setTimeout(() => {
                         console.log('[God Mode] Auto-loading game state for tournament:', tournamentId);

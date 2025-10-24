@@ -140,6 +140,13 @@
             animation: pulse 2s infinite;
         }
 
+        .match-status.upcoming {
+            color: #10b981;
+            font-weight: bold;
+            background: rgba(16, 185, 129, 0.1);
+            border-radius: var(--radius-md);
+        }
+
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.7; }
@@ -147,42 +154,92 @@
 
         .match-details {
             background: var(--cream-alpha-05);
-            padding: 15px;
+            padding: 8px;
             border-radius: var(--radius-md);
-            margin-top: 15px;
         }
 
         .match-sides {
-            display: grid;
-            grid-template-columns: 1fr auto 1fr;
-            gap: 15px;
-            align-items: center;
-            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: start;
+            justify-content: center;
         }
 
         .match-side {
             background: var(--cream-alpha-1);
-            padding: 10px;
+            padding: 6px;
             border-radius: var(--radius-md);
+            max-height: 250px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1 1 120px;
+            min-width: 100px;
+            max-width: 200px;
         }
 
         .match-side.your-side {
             border: 2px solid var(--accent-primary);
         }
 
+        .match-side > div:first-child {
+            position: sticky;
+            top: 0;
+            background: var(--cream-alpha-1);
+            z-index: 1;
+            padding-bottom: 4px;
+            margin-bottom: 2px;
+        }
+
         .vs-divider {
             font-weight: bold;
             color: var(--accent-primary);
-            font-size: 1.2rem;
+            font-size: 0.85rem;
+            align-self: center;
         }
 
         .player-chip {
             display: inline-block;
             background: var(--cream-alpha-2);
-            padding: 4px 10px;
-            border-radius: 12px;
-            margin: 4px;
-            font-size: 0.9rem;
+            padding: 2px 6px;
+            border-radius: 8px;
+            margin: 1px;
+            font-size: 0.7rem;
+            border: 1px solid transparent;
+            white-space: nowrap;
+            transition: all 0.2s;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .player-chip:hover {
+            transform: scale(1.05);
+            filter: brightness(1.2);
+            z-index: 10;
+            max-width: none;
+            position: relative;
+        }
+
+        /* Responsive adjustments for match sides */
+        @media (max-width: 768px) {
+            .match-sides {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .vs-divider {
+                text-align: center;
+                align-self: stretch;
+            }
+
+            .match-side {
+                max-height: 150px;
+                max-width: 100%;
+                min-width: auto;
+            }
         }
 
         .spell-cards-grid {
