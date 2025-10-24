@@ -190,15 +190,7 @@
      */
     function determineUserRole(userData, uid) {
       // Check for GOD (highest privilege)
-      // Option 1: Check specific UID (hardcoded - safety backup)
-      const GOD_UIDS = [
-        'CFEHgbwBxgUh1YW60AsVVQzPlrg1' // Inffi (GOD) - lniitlahti@gmail.com
-      ];
-      if (GOD_UIDS.includes(uid)) {
-        return 'god';
-      }
-
-      // Option 2: Check profile flag
+      // Role determined by Firestore user profile only
       if (userData.isGod === true) {
         return 'god';
       }
