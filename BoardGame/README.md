@@ -4,6 +4,76 @@ A complete, real-time tournament management system for LAN events with spell car
 
 **Perfect for: 5 teams × 2 players (10 total) LAN tournaments**
 
+## 📅 Project Timeline & Status
+
+### **Current Status: Active Development**
+**Phase:** Enhanced Team Management & User Interface
+**Last Updated:** October 24, 2025
+
+### Timeline
+
+**Phase 1: Foundation (Completed)**
+- ✅ Core tournament structure and database design
+- ✅ Firebase authentication and real-time sync
+- ✅ Basic team and player management
+- ✅ Initial game board (91-hex grid) implementation
+- ✅ Role-based access control (God/Admin/Player/User)
+
+**Phase 2: Spell System (Completed)**
+- ✅ Complete spell card system with 15 unique spells
+- ✅ Spell manager with validation and effect application
+- ✅ God mode spell distribution interface
+- ✅ Team spell casting interface
+- ✅ Undo/redo integration for spell effects
+- ✅ Comprehensive spell documentation and testing guide
+
+**Phase 3: Enhanced Team Management (Current - October 2025)**
+- ✅ Drag-and-drop user assignment to teams
+- ✅ User search and filtering in team management
+- ✅ Team color indicators throughout interface
+- ✅ Improved team.html with better match displays
+- ✅ Multi-team match support (2v2v2, 2v2v2v2)
+- ✅ Responsive scaling for player lists and long names
+- ✅ Dynamic match status tracking (current/next/upcoming)
+- 🔄 Comprehensive logging and debugging tools
+
+**Phase 4: Match Management & Automation (In Progress)**
+- 🔄 Automated match queue progression
+- 🔄 Player voting system for match results (90% consensus)
+- 🔄 Enhanced match scheduling with time slots
+- ⏳ Match statistics and analytics
+- ⏳ Tournament bracket visualization
+
+**Phase 5: Polish & Advanced Features (Planned)**
+- ⏳ Mobile-optimized views for all pages
+- ⏳ Advanced spell combo suggestions
+- ⏳ Tournament templates and presets
+- ⏳ Export tournament data and statistics
+- ⏳ Spectator mode with live commentary overlay
+- ⏳ Integration with external game APIs (Steam, Riot, etc.)
+- ⏳ Tournament replay system
+
+### Recent Milestones (October 2025)
+
+**Week 4 (Current)**
+- Enhanced team management with drag-and-drop user assignment
+- Improved team.html match display scaling for multi-team formats
+- Added team color indicators and visual feedback
+- Fixed navigation between home.html and team controls
+- Implemented flexible layout for 2v2, 2v2v2, 2v2v2v2 matches
+
+**Week 3**
+- Completed spell card system implementation
+- Added comprehensive spell documentation
+- Integrated undo/redo for spell effects
+- Brand theme applied to all pages
+
+**Week 2**
+- Migrated to modular architecture
+- Enhanced god mode control panel
+- Improved real-time synchronization
+- Added match queue system
+
 ## ⚡ Quick Start (10 Minutes)
 
 1. **Configure Firebase:** Edit `scripts/firebase.js` with your Firebase credentials
@@ -24,17 +94,20 @@ A complete, real-time tournament management system for LAN events with spell car
 - **Reference Guide:** Complete documentation with combos and strategies
 
 ### 🎯 Tournament Management
-- **God Mode Dashboard:** Comprehensive admin control panel
+- **God Mode Dashboard:** Comprehensive admin control panel with tabbed interface
 - **Match Queue System:** Plan, edit, and execute matches
 - **Real-time Sync:** All devices update simultaneously via Firebase
 - **Undo/Redo:** Full action history with reversal support
 - **Multi-Game Support:** CS2, Dota 2, Valorant, StarCraft II, and more
+- **User Assignment:** Drag-and-drop registered users to tournament teams
 
 ### 👥 Team System
 - **5 Teams × 2 Players:** Designed for 10-player LAN events
 - **Custom Colors:** Brand colors (red, yellow, green, blue, cream)
 - **Player Tracking:** Individual stats, contributions, match history
 - **Team Interface:** Clean UI for players to view info and cast spells
+- **Dynamic Match Display:** Supports 2v2, 2v2v2, 2v2v2v2 formats
+- **Color Indicators:** Team colors shown throughout interface for clarity
 
 ### 🎮 Hex Grid Board
 - **91-Hex Game Board:** Strategic territory control
@@ -57,7 +130,7 @@ BoardGame/
 │   ├── index.html          # Entry point with auth routing
 │   ├── login.html          # User authentication
 │   ├── home.html           # Role-based dashboard
-│   ├── god.html            # Admin control panel
+│   ├── god.html            # Admin control panel (tabbed interface)
 │   ├── setup.html          # Tournament setup wizard
 │   ├── team.html           # Team management interface
 │   ├── view.html           # Public signage display
@@ -72,7 +145,7 @@ BoardGame/
 │   ├── spells-god.js           # Spell management for admins
 │   ├── spell-manager.js        # Core spell system logic
 │   ├── tournament-manager.js   # Tournament lifecycle management
-│   ├── user-management.js      # User authentication & profiles
+│   ├── user-management.js      # User authentication & team assignment
 │   ├── team-controls.js        # Team interactions & spell casting
 │   ├── action-history.js       # Game action tracking & undo/redo
 │   ├── match-scheduler.js      # Match scheduling logic
@@ -96,22 +169,25 @@ BoardGame/
 ### GOD/Admin
 - Create and manage tournaments
 - Configure teams and players
+- Assign registered users to teams via drag-and-drop
 - Distribute and manage spell cards
 - Schedule and confirm matches
 - Control game flow and board state
-- Access to `god.html` control panel with spell management
+- Access to `god.html` control panel with Teams, Matches, Spells, Users, and History tabs
 
 ### Player
 - View team information and spell inventory
 - Cast spell cards during matches
-- See match schedules and results
+- See match schedules and results (current/next/upcoming)
 - View tournament standings
 - Access team-specific features via `team.html`
+- See team colors and side assignments clearly
 
 ### User (Default)
 - Basic authenticated access
 - Profile management
 - View public tournament information
+- Can be assigned to teams by admins
 
 **Note:** Role assignment is managed through Firestore. Set `isAdmin: true` or `isSuperAdmin: true` in the user document for admin access.
 
@@ -125,6 +201,7 @@ The view page is designed for **public display** on large screens or TVs at tour
 - ✅ Read-only display
 - ✅ Auto-refreshing board state
 - ✅ Team standings and match history
+- ✅ Color-coded team displays
 
 **Usage:**
 ```
@@ -157,25 +234,27 @@ Press F11 for fullscreen mode on most browsers.
 ```
 1. Admin creates tournament (setup.html or god.html)
    ↓
-2. Admin configures teams and players
+2. Admin configures teams and assigns registered users
    ↓
 3. Admin distributes spell cards to teams
    ↓
-4. Admin schedules matches
+4. Admin schedules matches in queue
    ↓
-5. Players cast pre-game spells (optional)
+5. Players view upcoming matches in team.html
    ↓
-6. Matches are played (external to system)
+6. Players cast pre-game spells (optional)
    ↓
-7. Admin confirms results in god.html
+7. Matches are played (external to system)
    ↓
-8. System applies spell effects and updates scores
+8. Admin or players confirm results (90% consensus voting)
    ↓
-9. Players place tiles and cast post-game spells
+9. System applies spell effects and updates scores
    ↓
-10. Next match begins
+10. Players place tiles and cast post-game spells
    ↓
-11. Repeat until win condition is met
+11. Next match begins
+   ↓
+12. Repeat until win condition is met
 ```
 
 ## 📊 Firestore Data Structure
@@ -183,6 +262,7 @@ Press F11 for fullscreen mode on most browsers.
 ### Collections
 
 - **`tournaments`** - Tournament configurations and state
+  - **`/matches`** (subcollection) - Individual match documents
 - **`users`** - User profiles and roles
 - **`spellCards`** - Spell card definitions (optional game mechanic)
 
@@ -191,6 +271,7 @@ Press F11 for fullscreen mode on most browsers.
 ```javascript
 {
   gameId: "tournament-2025-01",
+  name: "LAN Party 2025",
   status: "setup" | "playing" | "finished" | "archived",
   teams: [
     {
@@ -198,20 +279,33 @@ Press F11 for fullscreen mode on most browsers.
       name: "Team Blue",
       color: "#3b82f6",
       players: [
-        { name: "Player 1", points: 0 },
-        { name: "Player 2", points: 0 }
+        {
+          name: "Player 1",
+          uid: "firebase-uid",
+          email: "player@example.com",
+          points: 0,
+          pointsContributed: 0
+        }
       ],
       points: 0,
-      gamesWon: 0
+      gamesWon: 0,
+      spellCards: ["spell-id-1", "spell-id-2"],
+      formerPlayers: []
     }
   ],
-  matches: [
+  gameQueue: [
     {
-      id: 1,
-      game: "Counter-Strike 2",
-      format: "5v5",
-      status: "waiting" | "playing" | "completed",
-      round: 1
+      game: 1,
+      gameType: "Counter-Strike 2",
+      playType: "2v2",
+      status: "pending" | "active" | "completed",
+      sides: [
+        {
+          players: [
+            { name: "Alice", uid: "uid-1", color: "#3b82f6" }
+          ]
+        }
+      ]
     }
   ],
   board: {},
@@ -252,6 +346,14 @@ Press F11 for fullscreen mode on most browsers.
    - `isSuperAdmin: true` (for full access)
 4. User can now access `god.html`
 
+### Assign Users to Teams
+
+1. Navigate to `god.html` → Teams tab
+2. Load your tournament
+3. Search for users in the "Unassigned Users" panel
+4. Drag users to team slots
+5. Click "Save All Appointments"
+
 ### Create a Tournament
 
 1. Navigate to `setup.html` (or use god.html)
@@ -277,6 +379,15 @@ Press F11 for fullscreen mode on most browsers.
 - Check that your user document in Firestore has `isAdmin: true`
 - Verify you're logged in (check `home.html` redirect)
 - Clear browser cache and try again
+
+### Team Controls Button Shows "Coming Soon"
+- Fixed in latest version - should redirect to team.html
+- Clear cache if issue persists
+
+### Match Sides Show "No Sides Configured"
+- Check console logs for data structure issues
+- Verify match has `sides` or `teams` array in Firestore
+- Ensure players have required fields (name, uid, color)
 
 ### view.html Shows No Data
 - Verify the `tournamentId` parameter in the URL is correct
@@ -335,7 +446,15 @@ The project is a static web application that can be deployed to:
 
 ## 🔄 Recent Changes
 
-### v1.0-spell-system (October 2025)
+### October 24, 2025
+- **Enhanced Team Management:** Drag-and-drop user assignment with search filtering
+- **Improved Match Display:** Better scaling for multi-team formats (2v2v2, 2v2v2v2)
+- **Team Color Indicators:** Visual team colors throughout team.html interface
+- **Dynamic Layout:** Flexible match display that adapts to number of teams
+- **Better UX:** Text truncation for long names, scrollable player lists
+- **Bug Fixes:** Team controls navigation, match sides rendering
+
+### October 2025 (Spell System Release)
 - **Complete Spell Card System:** Implemented all 15 unique spell cards with full effects
 - **Spell Manager:** Core spell logic with validation, casting, and effect application
 - **God Mode Spells Tab:** Admin interface for spell distribution and management
@@ -348,7 +467,7 @@ The project is a static web application that can be deployed to:
 - Migrated from legacy MVC architecture to modular design
 - Removed unused controller files and pages
 - Added new modular scripts (tournament-manager, user-management, etc.)
-- Improved god.html with better UI and functionality
+- Improved god.html with tabbed interface
 - Added comprehensive .gitignore for better security
 - Simplified authentication flow
 - Enhanced real-time synchronization
@@ -364,5 +483,6 @@ The project is a static web application that can be deployed to:
 
 ---
 
-**Last Updated:** 2025-10-24
-**Status:** Active Development - Spell System Complete
+**Status:** Active Development
+**Current Phase:** Enhanced Team Management & User Interface
+**Last Updated:** October 24, 2025
