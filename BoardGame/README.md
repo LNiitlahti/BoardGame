@@ -106,7 +106,7 @@ A complete, real-time tournament management system for LAN events with spell car
 - **Custom Colors:** Brand colors (red, yellow, green, blue, cream)
 - **Player Tracking:** Individual stats, contributions, match history
 - **Team Interface:** Clean UI for players to view info and cast spells
-- **Dynamic Match Display:** Supports 2v2, 2v2v2, 2v2v2v2 formats
+- **Dynamic Match Display:** Supports any format (1v1, 2v2, 3v3, 4v4, 5v5, 2v2v2, 2v2v2v2, etc.)
 - **Color Indicators:** Team colors shown throughout interface for clarity
 
 ### 🎮 Hex Grid Board
@@ -231,92 +231,307 @@ Press F11 for fullscreen mode on most browsers.
 
 ## 🎮 Game Flow
 
+### Tournament Setup Phase
+
 ```
-1. Admin creates tournament (setup.html or god.html)
-   ↓
-2. Admin configures teams and assigns registered users
-   ↓
-3. Admin distributes spell cards to teams
-   ↓
-4. Admin schedules matches in queue
-   ↓
-5. Players view upcoming matches in team.html
-   ↓
-6. Players cast pre-game spells (optional)
-   ↓
-7. Matches are played (external to system)
-   ↓
-8. Admin or players confirm results (90% consensus voting)
-   ↓
-9. System applies spell effects and updates scores
-   ↓
-10. Players place tiles and cast post-game spells
-   ↓
-11. Next match begins
-   ↓
-12. Repeat until win condition is met
+1. Admin creates tournament (setup.html or god.html → Plan tab)
+   └─ Set tournament ID, team count, win condition
+
+2. Admin creates teams (god.html → Plan tab)
+   └─ Assign names and colors to 5 teams
+
+3. Admin assigns users to teams (god.html → Teams tab)
+   ├─ Load registered users
+   ├─ Drag-and-drop users to team slots
+   └─ Save assignments to Firestore
+
+4. Admin distributes spell cards (god.html → Spells tab)
+   └─ Give 2-3 spell cards per team
+
+5. Admin creates match queue (god.html → Matches tab)
+   └─ Schedule matches with game types and player assignments
 ```
+
+### Active Tournament Phase
+
+```
+6. Players access their team page (team.html)
+   ├─ View current/next match
+   ├─ See team info, colors, and spell cards
+   └─ Real-time updates via Firebase
+
+7. [OPTIONAL] Players cast pre-game spells
+   └─ Strategic spells that affect upcoming match
+
+8. Match is played (external to system - physical/online game)
+   └─ Players compete in CS2, Dota, Valorant, etc.
+
+9. Result confirmation (god.html → Matches tab)
+   ├─ CURRENT: Admin manually confirms winner
+   └─ PLANNED: 90% consensus voting system for players
+
+10. System updates tournament state
+    ├─ Award points to winning team
+    ├─ Update team standings
+    ├─ Apply spell effects
+    └─ Log to game history
+
+11. [OPTIONAL] Winner places tile on board (god.html → Board tab)
+    └─ Place tile at hex coordinate → capture territory
+
+12. [OPTIONAL] Players cast post-game spells
+    └─ Tactical spells that affect board state
+
+13. Next match begins
+    └─ Admin selects next match from queue
+```
+
+### Tournament End Phase
+
+```
+14. Tournament ends when:
+    ├─ A team reaches win condition (default: 50 points)
+    ├─ All matches completed
+    └─ Admin manually ends tournament
+
+15. Final standings displayed
+    └─ view.html shows final results and statistics
+```
+
+### Key Points
+
+- **Parallel Operations**: Multiple matches can be scheduled; admin controls active match
+- **Real-time Updates**: All connected clients see changes instantly via Firestore
+- **Undo/Redo**: Admin can reverse actions using History tab
+- **Flexible Flow**: Steps 7, 11, 12 are optional based on tournament rules
 
 ## 📊 Firestore Data Structure
 
 ### Collections
 
 - **`tournaments`** - Tournament configurations and state
-  - **`/matches`** (subcollection) - Individual match documents
-- **`users`** - User profiles and roles
-- **`spellCards`** - Spell card definitions (optional game mechanic)
+- **`users`** - User profiles, roles, and team assignments
+- **`spellCards`** - Spell card definitions (15 unique cards)
 
 ### Tournament Document Structure
 
 ```javascript
 {
-  gameId: "tournament-2025-01",
-  name: "LAN Party 2025",
+  // Basic Info
+  gameId: "tournament-2025-01",               // Unique tournament identifier
+  name: "LAN Party 2025",                     // Display name (optional)
   status: "setup" | "playing" | "finished" | "archived",
+  createdAt: "2025-01-01T00:00:00Z",
+  winCondition: 50,                           // Points needed to win
+
+  // Teams Configuration
   teams: [
     {
-      id: 1,
-      name: "Team Blue",
-      color: "#3b82f6",
+      id: 1,                                   // Team ID (1-5)
+      name: "Team Blue",                       // Team name
+      color: "#3b82f6",                        // Hex color code
+      points: 0,                               // Total team points
+      gamesWon: 0,                            // Number of games won
+
+      // Active Players
       players: [
         {
-          name: "Player 1",
-          uid: "firebase-uid",
-          email: "player@example.com",
-          points: 0,
-          pointsContributed: 0
+          name: "Player 1",                    // Display name
+          uid: "firebase-uid",                 // Firebase user ID
+          email: "player@example.com",         // User email
+          points: 0,                           // Individual points
+          pointsContributed: 0                 // Points while on team
         }
       ],
-      points: 0,
-      gamesWon: 0,
-      spellCards: ["spell-id-1", "spell-id-2"],
-      formerPlayers: []
-    }
-  ],
-  gameQueue: [
-    {
-      game: 1,
-      gameType: "Counter-Strike 2",
-      playType: "2v2",
-      status: "pending" | "active" | "completed",
-      sides: [
+
+      // Spell Cards (two possible formats)
+      spellCards: ["spell-id-1", "spell-id-2"], // Array of spell IDs
+      hand: ["spell-id-1"],                     // Alternative format
+
+      // Former Players (tracking)
+      formerPlayers: [
         {
-          players: [
-            { name: "Alice", uid: "uid-1", color: "#3b82f6" }
-          ]
+          name: "Former Player",
+          pointsContributed: 10,
+          leftAt: "2025-01-15T10:00:00Z"
         }
       ]
     }
   ],
-  board: {},
+
+  // Match Queue (multiple formats supported)
+  gameQueue: [                                 // Primary format (god-scripts.js)
+    {
+      id: 1,                                   // Unique match ID
+      game: 1,                                 // Game number
+      gameNumber: 1,                           // Alternative field
+      gameType: "Counter-Strike 2",            // Game name
+      playType: "2v2",                         // Format (1v1, 2v2, 2v2v2, etc.)
+      status: "pending" | "active" | "completed",
+
+      // Match Sides
+      sides: [
+        {
+          name: "Side A",                      // Optional side name
+          players: [
+            {
+              name: "Alice",
+              uid: "uid-1",
+              email: "player@example.com",
+              color: "#3b82f6",                // Original team color
+              teamColor: "#3b82f6",            // Alternative field
+              originalTeamColor: "#3b82f6"     // Alternative field
+            }
+          ]
+        }
+      ],
+
+      // Optional Fields
+      notes: "Best of 3",                      // Match notes
+      round: 1,                                // Round number
+
+      // Voting System (in development)
+      votes: [
+        {
+          uid: "voter-uid",
+          playerName: "Voter Name",
+          result: "side_0_won" | "side_1_won" | "draw",
+          votedAt: "2025-01-01T12:00:00Z"
+        }
+      ],
+      voteConsensus: {
+        result: "side_0_won",
+        percentage: 100,
+        passedThreshold: true,
+        submittedToAdmin: true,
+        submittedAt: "2025-01-01T12:05:00Z"
+      },
+      adminConfirmed: false
+    }
+  ],
+
+  // Alternative Match Formats (legacy/setup)
+  selectedGames: [],                           // Used by setup wizard
+  matches: [],                                 // Match templates
+
+  // Current Turn System
+  currentTurn: {
+    teamId: 1,                                 // Active team ID
+    game: 5,                                   // Associated match number
+    needsPlacement: true,                      // Tile placement required
+    startedAt: "2025-01-01T12:00:00Z"
+  } | null,
+
+  // Board State (Hex Grid)
+  board: {
+    "q0r0": { teamId: 1, type: "normal" },    // Hex coordinates
+    "q1r-1": { teamId: 2, type: "normal" }
+  },
   heartHexes: ["q2r-4", "q4r-2", "q2r2", "q-2r4", "q-4r2", "q-2r-2"],
-  heartHexControl: {},
-  winCondition: 50,
-  currentRound: 0,
-  gamesPlayed: 0,
-  gameHistory: [],
+  heartHexControl: {
+    "q2r-4": 1,                                // teamId controlling heart
+    "q0r0": 2
+  },
+
+  // Game Progress Tracking
+  currentRound: 0,                             // Current round number
+  gamesPlayed: 0,                              // Total games completed
+  gameHistory: [
+    {
+      gameNumber: 1,
+      game: 1,
+      winner: ["Team Blue"] | "Team Blue",     // Can be array or string
+      loser: ["Team Red"] | "Team Red",
+      timestamp: "2025-01-01T10:00:00Z",
+      pointsAwarded: 3
+    }
+  ],
+
+  // Action History (for undo/redo)
+  actionHistory: [
+    {
+      type: "spell_cast" | "match_result" | "tile_placed",
+      timestamp: "2025-01-01T10:00:00Z",
+      data: {},                                // Action-specific data
+      undoData: {}                             // Data needed to undo
+    }
+  ]
+}
+```
+
+### User Document Structure
+
+```javascript
+{
+  uid: "firebase-auth-uid",                    // Firebase Auth UID (document ID)
+  email: "user@example.com",                   // User email
+  displayName: "John Doe",                     // Display name
+
+  // Role & Permissions
+  role: "user" | "player" | "admin" | "god",
+  isAdmin: true | false,                       // Admin access flag
+  isSuperAdmin: true | false,                  // Super admin flag
+
+  // Tournament Assignment
+  assignedGameId: "tournament-2025-01",        // Current tournament
+  assignedTeamId: 1,                           // Current team ID (1-5)
+  assignedTeamName: "Team Blue",               // Team name (synced)
+
+  // Metadata
+  createdAt: "2025-01-01T00:00:00Z",
+  lastLogin: "2025-01-15T10:00:00Z",
+
+  // Optional Fields
+  photoURL: "https://...",                     // Profile photo
+  disabled: false                              // Account status
+}
+```
+
+### Spell Card Document Structure
+
+```javascript
+{
+  id: "spell-id-1",                            // Unique spell ID
+  name: "Lightning Strike",                    // Spell name
+  description: "Deal damage to opponent",      // Description
+  type: "offensive" | "defensive" | "utility" | "instant",
+  rarity: "common" | "rare" | "epic",
+
+  // Spell Effects
+  effect: {
+    type: "damage" | "heal" | "buff" | "debuff",
+    value: 5,                                  // Effect magnitude
+    target: "opponent" | "self" | "all",
+    duration: "instant" | "permanent"
+  },
+
+  // Targeting
+  targetType: "opponent-team" | "opponent-player" | "self" | "board",
+
+  // Usage
+  timing: "pre-game" | "post-game" | "anytime",
+  usesRemaining: 1,                            // Uses per tournament
+
+  // Metadata
+  imageUrl: "https://...",                     // Card image (optional)
   createdAt: "2025-01-01T00:00:00Z"
 }
+```
+
+### Data Relationships
+
+```
+Tournament (1)
+  ├── Teams (1-5)
+  │   ├── Players (2 each)
+  │   │   └── User Document (references uid)
+  │   └── Spell Cards (2-3 per team)
+  │       └── Spell Card Document (references spell ID)
+  ├── Game Queue (matches)
+  │   └── Sides
+  │       └── Players (references from teams)
+  └── Board State (hex tiles)
+      └── Heart Hex Control (team ownership)
 ```
 
 ## 🔐 Security
