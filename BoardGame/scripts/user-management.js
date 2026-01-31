@@ -836,8 +836,30 @@ function renderTournamentRoster() {
         return `
             <div style="background: rgba(51, 65, 85, 0.3); padding: 15px; border-radius: 8px; border-left: 4px solid ${getColor(team.id)};">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <div>
-                        <div style="font-weight: 600; color: #ffd700; font-size: 1.1rem;">${team.name}</div>
+                    <div style="flex: 1;">
+                        <div id="teamName-display-${team.id}" style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-weight: 600; color: #ffd700; font-size: 1.1rem;">${team.name}</span>
+                            <button onclick="startEditTeamName(${team.id})"
+                                    style="background: rgba(255, 255, 255, 0.1); border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; color: #94a3b8; font-size: 0.75rem;"
+                                    title="Edit team name">
+                                ✏️
+                            </button>
+                        </div>
+                        <div id="teamName-edit-${team.id}" style="display: none; margin-bottom: 8px;">
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                                <input type="text" id="teamName-input-${team.id}" value="${team.name}"
+                                       style="flex: 1; padding: 6px 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #10b981; border-radius: 5px; color: white; font-size: 1rem;"
+                                       onkeydown="handleTeamNameKeydown(event, ${team.id})">
+                                <button onclick="saveTeamName(${team.id})"
+                                        style="background: #10b981; color: white; border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 0.85rem;">
+                                    Save
+                                </button>
+                                <button onclick="cancelEditTeamName(${team.id})"
+                                        style="background: #475569; color: white; border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 0.85rem;">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
                         <div style="font-size: 0.85rem; opacity: 0.7;">${team.points || 0} points</div>
                     </div>
                     <div style="text-align: right; font-size: 0.85rem;">
@@ -1012,6 +1034,159 @@ async function unassignUserFromTeam(teamId, playerIndex) {
 }
 
 // =============================================================================
+// TEAM NAME EDITING
+// =============================================================================
+
+/**
+ * Start editing a team name
+ * @param {number} teamId - Team ID
+ */
+function startEditTeamName(teamId) {
+    // Hide display, show edit
+    const displayEl = document.getElementById(`teamName-display-${teamId}`);
+    const editEl = document.getElementById(`teamName-edit-${teamId}`);
+    const inputEl = document.getElementById(`teamName-input-${teamId}`);
+
+    if (displayEl) displayEl.style.display = 'none';
+    if (editEl) editEl.style.display = 'block';
+    if (inputEl) {
+        inputEl.focus();
+        inputEl.select();
+    }
+}
+
+/**
+ * Cancel editing a team name
+ * @param {number} teamId - Team ID
+ */
+function cancelEditTeamName(teamId) {
+    const team = window.gameState?.teams?.find(t => t.id === teamId);
+    if (!team) return;
+
+    // Reset input to original value
+    const inputEl = document.getElementById(`teamName-input-${teamId}`);
+    if (inputEl) inputEl.value = team.name;
+
+    // Hide edit, show display
+    const displayEl = document.getElementById(`teamName-display-${teamId}`);
+    const editEl = document.getElementById(`teamName-edit-${teamId}`);
+
+    if (displayEl) displayEl.style.display = 'flex';
+    if (editEl) editEl.style.display = 'none';
+}
+
+/**
+ * Handle keydown in team name input
+ * @param {KeyboardEvent} event
+ * @param {number} teamId - Team ID
+ */
+function handleTeamNameKeydown(event, teamId) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        saveTeamName(teamId);
+    } else if (event.key === 'Escape') {
+        event.preventDefault();
+        cancelEditTeamName(teamId);
+    }
+}
+
+/**
+ * Save a team name change
+ * Records the old name in nameHistory for historical accuracy
+ * @param {number} teamId - Team ID
+ */
+async function saveTeamName(teamId) {
+    if (!window.gameState || !window.gameState.gameId) {
+        if (typeof showStatus === 'function') {
+            showStatus('No tournament loaded', 'error');
+        }
+        return;
+    }
+
+    const team = window.gameState.teams?.find(t => t.id === teamId);
+    if (!team) {
+        if (typeof showStatus === 'function') {
+            showStatus('Team not found', 'error');
+        }
+        return;
+    }
+
+    const inputEl = document.getElementById(`teamName-input-${teamId}`);
+    if (!inputEl) return;
+
+    const newName = inputEl.value.trim();
+
+    if (!newName) {
+        if (typeof showStatus === 'function') {
+            showStatus('Team name cannot be empty', 'error');
+        }
+        return;
+    }
+
+    if (newName === team.name) {
+        // No change, just close the edit
+        cancelEditTeamName(teamId);
+        return;
+    }
+
+    try {
+        const oldName = team.name;
+
+        // Record name change in history
+        if (!team.nameHistory) {
+            team.nameHistory = [];
+        }
+        team.nameHistory.push({
+            oldName: oldName,
+            newName: newName,
+            changedAt: new Date().toISOString(),
+            changedBy: firebase.auth().currentUser?.uid || 'unknown'
+        });
+
+        // Update the team name
+        team.name = newName;
+
+        // Save to Firebase
+        const tournamentRef = window.firebaseDB.collection('tournaments').doc(window.gameState.gameId);
+        await tournamentRef.update({
+            teams: window.gameState.teams,
+            lastModified: new Date().toISOString()
+        });
+
+        if (typeof showStatus === 'function') {
+            showStatus(`Team renamed: "${oldName}" → "${newName}"`, 'success');
+        }
+        if (typeof addLog === 'function') {
+            addLog(`📝 Team renamed: "${oldName}" → "${newName}"`, 'info');
+        }
+
+        console.log(`[User Management] Team ${teamId} renamed from "${oldName}" to "${newName}"`);
+
+        // Re-render the roster to show updated name
+        renderTournamentRoster();
+
+        // Also update team assignment slots if visible
+        if (typeof renderTeamAssignmentSlots === 'function') {
+            renderTeamAssignmentSlots();
+        }
+
+        // Update other displays that might show team names
+        if (typeof updateTeamsList === 'function') {
+            updateTeamsList();
+        }
+        if (typeof updateTeamPool === 'function') {
+            updateTeamPool();
+        }
+
+    } catch (error) {
+        console.error('[User Management] Error saving team name:', error);
+        if (typeof showStatus === 'function') {
+            showStatus('Error saving team name: ' + error.message, 'error');
+        }
+    }
+}
+
+// =============================================================================
 // INITIALIZATION
 // =============================================================================
 
@@ -1031,3 +1206,16 @@ document.addEventListener('firebase-ready', function() {
         }
     };
 });
+
+// Expose functions to window for module access
+window.loadUsers = loadAllUsers;
+window.loadAllUsers = loadAllUsers;
+window.loadUnassignedUsers = loadUnassignedUsers;
+window.renderTeamAssignmentSlots = renderTeamAssignmentSlots;
+window.renderTournamentRoster = renderTournamentRoster;
+
+// Team name editing functions
+window.startEditTeamName = startEditTeamName;
+window.cancelEditTeamName = cancelEditTeamName;
+window.saveTeamName = saveTeamName;
+window.handleTeamNameKeydown = handleTeamNameKeydown;

@@ -183,21 +183,27 @@ class TournamentManager {
         const searchInput = document.getElementById('tournamentSearch');
         const statusFilter = document.getElementById('statusFilter');
 
-        const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
-        const statusValue = statusFilter ? statusFilter.value : 'all';
+        const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
+        // Default to 'all' if statusFilter doesn't exist OR its value is empty
+        const statusValue = (statusFilter && statusFilter.value) || 'all';
+
+        console.log('[TournamentManager] Filtering - search:', searchTerm, 'status:', statusValue, 'total:', this.allTournaments.length);
 
         this.filteredTournaments = this.allTournaments.filter(tournament => {
-            // Search filter
+            // Search filter - also search in tournament name
             const matchesSearch = !searchTerm ||
                 tournament.gameId?.toLowerCase().includes(searchTerm) ||
-                tournament.id?.toLowerCase().includes(searchTerm);
+                tournament.id?.toLowerCase().includes(searchTerm) ||
+                tournament.name?.toLowerCase().includes(searchTerm);
 
-            // Status filter
-            const matchesStatus = statusValue === 'all' || tournament.status === statusValue;
+            // Status filter - treat empty/undefined status as matching 'all' or 'setup'
+            const tournamentStatus = tournament.status || 'setup';
+            const matchesStatus = statusValue === 'all' || tournamentStatus === statusValue;
 
             return matchesSearch && matchesStatus;
         });
 
+        console.log('[TournamentManager] Filtered results:', this.filteredTournaments.length);
         this.renderTournamentList();
     }
 

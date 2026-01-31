@@ -1,0 +1,144 @@
+            <div style="max-width: 900px; margin: 0 auto;">
+            <!-- Match Controls -->
+            <div>
+                <!-- Match Queue Manager -->
+                <div class="panel">
+                    <h3>📋 Match Queue Manager</h3>
+                    <div class="form-group">
+                        <label>Game ID</label>
+                        <input type="text" id="gameId" placeholder="tournament-id">
+                        <button class="btn" onclick="loadGame()" style="margin-top: 5px;" data-tooltip="Load tournament data to manage matches">📂 Load Game</button>
+                    </div>
+
+                    <!-- Template Display -->
+                    <div id="templateDisplay" style="margin-top: 15px;">
+                        <p style="text-align: center; opacity: 0.7;">Load a game to see templates</p>
+                    </div>
+                </div>
+
+                <!-- Smart Match Suggestions -->
+                <div class="panel" id="smartSuggestionPanel" style="margin-top: 20px; display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3>🧠 Smart Match Suggestion</h3>
+                        <button class="btn" onclick="generateMatchSuggestion()" style="background: #10b981;">
+                            🔄 Get Suggestion
+                        </button>
+                    </div>
+
+                    <div id="suggestionDisplay" style="background: rgba(16, 185, 129, 0.1); padding: 15px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.3);">
+                        <p style="text-align: center; opacity: 0.7;">Click "Get Suggestion" to generate an optimal match recommendation</p>
+                    </div>
+                </div>
+
+                <div class="panel" style="margin-top: 20px;">
+                    <h3>🎯 Game Management</h3>
+                    
+                    <!-- Tab Buttons -->
+                    <div class="tab-buttons">
+                        <button class="tab-btn active" onclick="switchTab('plan')">📋 Plan Game</button>
+                        <button class="tab-btn" onclick="switchTab('confirm')">✅ Confirm Result</button>
+                    </div>
+
+                    <!-- Plan Game Tab -->
+                    <div id="planTab" class="tab-content active">
+                        <div class="form-group">
+                            <label>Game Type</label>
+                            <select id="planGameType">
+                                <option value="CS2">Counter-Strike 2</option>
+                                <option value="Dota2">Dota 2</option>
+                                <option value="Valorant">Valorant</option>
+                                <option value="StarCraft2">StarCraft 2</option>
+                                <option value="Predecessor">Predecessor</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Match Type</label>
+                            <select id="planPlayType">
+                                <option value="1v1">1v1</option>
+                                <option value="2v2">2v2</option>
+                                <option value="3v3">3v3</option>
+                                <option value="5v5">5v5</option>
+                            </select>
+                        </div>
+
+                        <label style="color: #ffd700; font-weight: 600; display: block; margin-bottom: 10px;">
+                            Build Match (drag players or whole teams)
+                        </label>
+
+                        <!-- Player-based drag and drop -->
+                        <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                            <div style="flex: 1;">
+                                <div class="player-drop-zone team-a" 
+                                     ondrop="dropPlayer(event, 'teamA')" 
+                                     ondragover="allowDrop(event)" 
+                                     ondragleave="dragLeave(event)">
+                                    <h5 style="color: #3b82f6; margin-bottom: 8px;">TEAM A</h5>
+                                    <div id="teamAPlayers" style="min-height: 60px;">
+                                        <span style="opacity: 0.6; font-size: 0.85rem;">Drop players here...</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="flex: 1;">
+                                <div class="player-drop-zone team-b" 
+                                     ondrop="dropPlayer(event, 'teamB')" 
+                                     ondragover="allowDrop(event)" 
+                                     ondragleave="dragLeave(event)">
+                                    <h5 style="color: #ef4444; margin-bottom: 8px;">TEAM B</h5>
+                                    <div id="teamBPlayers" style="min-height: 60px;">
+                                        <span style="opacity: 0.6; font-size: 0.85rem;">Drop players here...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Available teams/players pool -->
+                        <div class="team-pool" style="max-height: 300px;">
+                            <h4>Available Teams & Players</h4>
+                            <div id="planTeamPool"></div>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 15px;">
+                            <label>Notes (optional)</label>
+                            <input type="text" id="planNotes" placeholder="Any special notes about this game...">
+                        </div>
+                        <button class="btn primary" onclick="addGameToQueue()" data-tooltip="Add this match to the queue for play">➕ Add to Queue</button>
+                        <button class="btn" onclick="clearManualGameSetup()" data-tooltip="Clear all players from both teams">🔄 Clear</button>
+                    </div>
+
+                    <!-- Confirm Result Tab -->
+                    <div id="confirmTab" class="tab-content">
+                        <div class="form-group">
+                            <label>Select Queued Game</label>
+                            <select id="queuedGameSelect" onchange="loadQueuedGame(parseInt(this.value))">
+                                <option value="">-- Select a game to confirm --</option>
+                            </select>
+                        </div>
+
+                        <div class="confirm-container" id="confirmContainer" style="display: none;">
+                            <h4 style="color: #ffd700; margin-bottom: 10px;">Game Details</h4>
+                            <div id="confirmGameInfo"></div>
+
+                            <h4 style="color: #ffd700; margin-top: 15px; margin-bottom: 10px;">Select Winner(s)</h4>
+                            <div id="confirmTeamsDisplay"></div>
+
+                            <div class="form-group" style="margin-top: 15px;">
+                                <label>Actual Result Notes (optional)</label>
+                                <input type="text" id="confirmNotes" placeholder="Any additional notes about the result...">
+                            </div>
+
+                            <button class="btn primary" onclick="confirmGameResult()" data-tooltip="Confirm match outcome and begin tile placement phase">✅ Submit Result & Start Turn</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Game Queue Display -->
+                <div class="panel" style="margin-top: 20px;">
+                    <h3>📋 Game Queue (<span id="queueCount">0</span>)</h3>
+                    <div class="queue-container" id="gameQueue">
+                        <p style="text-align: center; opacity: 0.7; font-style: italic;">No games in queue</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>

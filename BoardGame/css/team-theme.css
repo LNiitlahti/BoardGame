@@ -1,0 +1,583 @@
+/**
+ * TEAM CONTROLS THEME
+ * Clean, sharp design with team color theming
+ * Based on team-controls-final.html design
+ */
+
+/* Override body styles for team pages */
+body.team-page {
+    background: #f7f0e3;
+    color: #22241d;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Improve text contrast on cream background */
+body.team-page .team-quick-stat-label,
+body.team-page .teammate-id,
+body.team-page .spell-description,
+body.team-page .upcoming-details,
+body.team-page .team-board-note {
+    color: #666; /* Darker for better readability */
+}
+
+body.team-page .empty-state {
+    color: #666;
+}
+
+/* Team color theme classes - applied to body */
+body.team-1-theme {
+    --team-color: var(--team-1-color);
+    --team-color-dark: #b82e23;
+}
+
+body.team-2-theme {
+    --team-color: var(--team-2-color);
+    --team-color-dark: #1a5c7d;
+}
+
+body.team-3-theme {
+    --team-color: var(--team-3-color);
+    --team-color-dark: #247344;
+}
+
+body.team-4-theme {
+    --team-color: var(--team-4-color);
+    --team-color-dark: #d89d1a;
+}
+
+body.team-5-theme {
+    --team-color: var(--team-5-color);
+    --team-color-dark: #5d3a7a;
+}
+
+/* Container */
+.team-container {
+    max-width: 1800px;
+    margin: 0 auto;
+    padding: 20px 24px;
+}
+
+/* Header with stats */
+.team-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #22241d;
+    margin-bottom: 20px;
+}
+
+.team-header-left {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+}
+
+.team-name-display {
+    font-size: 48px;
+    font-weight: 700;
+    color: var(--team-color);
+    letter-spacing: -1px;
+}
+
+.team-quick-stats {
+    display: flex;
+    gap: 24px;
+    font-size: 14px;
+}
+
+.team-quick-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.team-quick-stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--team-color);
+    line-height: 1;
+}
+
+.team-quick-stat-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #666;
+    margin-top: 4px;
+}
+
+.team-points {
+    font-size: 32px;
+    font-weight: 700;
+    color: #22241d;
+}
+
+/* Main Layout */
+.team-main-layout {
+    display: grid;
+    grid-template-columns: 260px 1fr 300px;
+    gap: 20px;
+    align-items: start;
+}
+
+/* Sections - NO ROUNDED CORNERS */
+.team-section {
+    background: white;
+    border: 2px solid #22241d;
+    padding: 16px 20px;
+}
+
+.team-section-header {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 16px;
+    color: #22241d;
+}
+
+/* Section spacing utility classes */
+.team-section + .team-section {
+    margin-top: 16px;
+}
+
+/* Teammates */
+.teammate-item {
+    padding: 12px 16px;
+    border: 1px solid #22241d;
+    margin-bottom: 10px;
+    background: white;
+    position: relative;
+}
+
+.teammate-item.you {
+    background: var(--team-color);
+    border-width: 2px;
+}
+
+.teammate-name {
+    font-weight: 600;
+    font-size: 16px;
+    margin-bottom: 4px;
+}
+
+.teammate-id {
+    font-size: 13px;
+    color: #666;
+}
+
+.you-label {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #22241d;
+}
+
+/* Board Section - single container like reference */
+.team-board-section {
+    background: white;
+    border: 2px solid #22241d;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.team-board-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.team-board-title {
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.turn-indicator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: var(--team-color);
+    border: 2px solid #22241d;
+}
+
+.turn-indicator-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+/* Board Controls */
+.team-board-controls {
+    margin-top: 24px;
+    display: flex;
+    gap: 16px;
+}
+
+.team-board-btn {
+    padding: 12px 24px;
+    background: white;
+    border: 2px solid #22241d;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 14px;
+}
+
+.team-board-btn:hover {
+    background: #f7f0e3;
+}
+
+.team-board-btn.active {
+    background: var(--team-color);
+}
+
+.team-board-note {
+    margin-top: 16px;
+    font-size: 13px;
+    color: #666;
+    text-align: center;
+}
+
+/* Spell Cards */
+.spell-cards-grid {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+}
+
+.spell-card {
+    border: 2px solid #22241d;
+    background: white;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.spell-card:hover {
+    background: #f7f0e3;
+    transform: translateY(-2px);
+}
+
+.spell-card.selected {
+    border-color: var(--team-color);
+    background: var(--team-color);
+}
+
+.spell-card-header {
+    padding: 12px;
+    background: #7A4BA0;
+    color: white;
+    font-weight: 700;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.spell-cost {
+    font-size: 11px;
+    opacity: 0.9;
+}
+
+.spell-card-body {
+    padding: 12px;
+}
+
+.spell-description {
+    font-size: 12px;
+    color: #666;
+    line-height: 1.4;
+}
+
+.spell-card.locked {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.spell-card.locked:hover {
+    transform: none;
+    background: white;
+}
+
+.cast-btn {
+    margin-top: 8px;
+    width: 100%;
+    padding: 8px;
+    background: var(--team-color);
+    border: 1px solid #22241d;
+    font-weight: 600;
+    font-size: 12px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.cast-btn:hover {
+    background: var(--team-color-dark);
+}
+
+.cast-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Match Info */
+.match-status {
+    display: inline-block;
+    padding: 6px 12px;
+    background: #2e9158;
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+}
+
+.match-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 20px;
+}
+
+.teams-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.team-box {
+    border: 2px solid #22241d;
+    padding: 16px;
+    background: white;
+}
+
+.team-box.yours {
+    background: var(--team-color);
+}
+
+/* Match sides - use same styling as team-box */
+.match-sides {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.match-side {
+    border: 2px solid #22241d;
+    padding: 16px;
+    background: white;
+}
+
+.match-side.your-side {
+    background: var(--team-color);
+}
+
+.team-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+}
+
+.player-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.player-badge {
+    padding: 6px 12px;
+    background: white;
+    border: 1px solid #22241d;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.vs-divider {
+    text-align: center;
+    font-weight: 700;
+    color: #de392c;
+    margin: 4px 0;
+}
+
+/* Upcoming Matches */
+.upcoming-item {
+    padding: 12px;
+    border: 1px solid #22241d;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background: white;
+}
+
+.upcoming-item:hover {
+    background: #f7f0e3;
+}
+
+.upcoming-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.upcoming-details {
+    font-size: 13px;
+    color: #666;
+}
+
+/* Empty State */
+.empty-state {
+    padding: 24px;
+    text-align: center;
+    color: #999;
+    font-size: 13px;
+    border: 1px dashed #ccc;
+}
+
+.empty-state-inline {
+    text-align: center;
+    opacity: 0.5;
+    padding: 16px;
+    font-size: 13px;
+}
+
+.scrollable-list {
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .team-main-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Remove all rounded corners globally for team pages */
+body.team-page * {
+    border-radius: 0 !important;
+}
+
+/* ==================== HEX BOARD SIZING ==================== */
+/* Scale hex board to fit container dynamically */
+body.team-page .hex {
+    width: 40px;
+    height: 35px;
+}
+
+body.team-page #hexBoard {
+    width: 100%;
+    max-width: 700px;
+    margin: 0 auto;
+    transform: scale(1.5);
+    transform-origin: center center;
+    padding: 60px 0;
+}
+
+/* Make hex numbers/text larger */
+body.team-page .hex-inner {
+    font-size: 11px;
+    font-weight: 700;
+}
+
+/* Responsive scaling for 1920x1080 */
+@media (min-width: 1800px) {
+    body.team-page #hexBoard {
+        transform: scale(1.8);
+        padding: 70px 0;
+    }
+    body.team-page .team-board-section {
+        min-height: 550px;
+    }
+}
+
+@media (max-width: 1400px) {
+    body.team-page #hexBoard {
+        transform: scale(1.3);
+        padding: 50px 0;
+    }
+    body.team-page .team-board-section {
+        min-height: 450px;
+    }
+}
+
+/* Use CSS variable team colors for hexes */
+body.team-page .hex.team1 .hex-inner {
+    background: var(--team-1-color);
+    color: white;
+}
+
+body.team-page .hex.team2 .hex-inner {
+    background: var(--team-2-color);
+    color: white;
+}
+
+body.team-page .hex.team3 .hex-inner {
+    background: var(--team-3-color);
+    color: white;
+}
+
+body.team-page .hex.team4 .hex-inner {
+    background: var(--team-4-color);
+    color: #22241d;
+}
+
+body.team-page .hex.team5 .hex-inner {
+    background: var(--team-5-color);
+    color: white;
+}
+
+/* Improve hex border visibility on cream background */
+body.team-page .hex-inner {
+    border: 2px solid #22241d;
+    background: white;
+}
+
+body.team-page .hex.heart-hex .hex-inner {
+    background: rgba(255, 20, 147, 0.6);
+    border-color: #ff1493;
+    border-width: 3px;
+}
+
+/* Status Messages for team pages */
+.team-status-message {
+    padding: 12px 16px;
+    border: 2px solid #22241d;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.team-status-message.success {
+    background: #2e9158;
+    color: white;
+}
+
+.team-status-message.error {
+    background: #de392c;
+    color: white;
+}
+
+.team-status-message.warning {
+    background: #f7ba32;
+    color: #22241d;
+}
+
+.team-status-message.info {
+    background: #2278a3;
+    color: white;
+}

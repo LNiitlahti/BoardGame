@@ -1,0 +1,49 @@
+/**
+ * THEME TOGGLE BUTTON
+ * Navbar button for dark/light mode toggle
+ */
+
+/* Navbar theme toggle button */
+.navbar-theme-toggle {
+    width: 36px;
+    height: 36px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    margin-right: 0.75rem;
+}
+
+.navbar-theme-toggle:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.navbar-theme-toggle:active {
+    transform: scale(0.95);
+}
+
+/* Dark mode navbar button styles */
+body.dark-mode .navbar-theme-toggle {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+body.dark-mode .navbar-theme-toggle:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .navbar-theme-toggle {
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
+        margin-right: 0.5rem;
+    }
+}

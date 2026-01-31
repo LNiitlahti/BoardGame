@@ -13,7 +13,12 @@
   <link rel="shortcut icon" href="images/favicon/favicon.ico">
 
   <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/navbar.css">
+  <link rel="stylesheet" href="css/theme-toggle-button.css">
+  <link rel="stylesheet" href="css/dark-theme.css">
+  <script src="scripts/theme-toggle.js"></script>
   <script src="scripts/firebase-loader.js"></script>
+  <script src="scripts/navbar.js"></script>
   <script type="module" src="scripts/errorHandler.js"></script>
   <script type="module" src="scripts/stateManager.js"></script>
   <script type="module" src="scripts/utils.js"></script>
@@ -195,13 +200,6 @@
 
     .role-section.active {
       display: block;
-    }
-
-    /* Connection status indicator */
-    #connectionStatus {
-      position: fixed;
-      top: 20px;
-      right: 20px;
     }
 
     /* Tournament cards */
@@ -447,8 +445,8 @@
   </style>
 </head>
 <body>
-  <!-- Connection Status -->
-  <div id="connectionStatus" class="connection-dot"></div>
+  <!-- Navbar container - populated by navbar.js (includes connection status) -->
+  <div id="navbar-container"></div>
 
   <!-- Referral Codes Modal -->
   <div id="referralCodesModal" class="custom-modal-overlay" onclick="closeReferralCodesModal(event)">

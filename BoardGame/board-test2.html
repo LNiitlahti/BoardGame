@@ -81,6 +81,195 @@
             position: relative;
         }
 
+        /* ===========================================
+           EFFECT STYLES - Toggled via body classes
+           =========================================== */
+
+        /* Effect: Heart Glow */
+        body.effect-heart-glow .board-hex.side-heart::before,
+        body.effect-heart-glow .board-hex.mountain-heart::before {
+            box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.6);
+        }
+
+        /* Effect: Pulse Animation on Hearts (amplified) */
+        body.effect-pulse-hearts .board-hex.side-heart,
+        body.effect-pulse-hearts .board-hex.mountain-heart {
+            animation: pulse-heart 7.2s ease-in-out infinite;
+            z-index: 20; /* Render above other hexes */
+        }
+
+        @keyframes pulse-heart {
+            0%, 100% {
+                filter: brightness(1) drop-shadow(0 0 0px transparent);
+                transform: translate(-50%, -50%) scale(1);
+            }
+            50% {
+                filter: brightness(1.5) drop-shadow(0 0 8px rgba(255, 100, 150, 0.8));
+                transform: translate(-50%, -50%) scale(1.08);
+            }
+        }
+
+        /* Pulse animation for heart overlay images (includes -30deg rotation) */
+        body.effect-pulse-hearts .heart-overlay-image {
+            animation: pulse-heart-image 7.2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-heart-image {
+            0%, 100% {
+                filter: brightness(1) drop-shadow(0 0 0px transparent);
+                transform: translate(-50%, -50%) rotate(-30deg) scale(1);
+            }
+            50% {
+                filter: brightness(1.5) drop-shadow(0 0 8px rgba(255, 100, 150, 0.8));
+                transform: translate(-50%, -50%) rotate(-30deg) scale(1.08);
+            }
+        }
+
+        /* Effect: Team Colors (6 teams, 50% transparent overlay) */
+        /* Colors from setup-lightweight.html teamColors */
+        /* Use ::after for color overlay so it doesn't replace background-image */
+        body.effect-team-colors .board-hex.occupied::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            right: 2px;
+            bottom: 2px;
+            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+            pointer-events: none;
+            z-index: 6;
+        }
+        /* Team 1: Red #ef4444 */
+        body.effect-team-colors .board-hex.occupied[data-team="team1"]::after {
+            background: rgba(239, 68, 68, 0.5);
+        }
+        /* Team 2: Blue #3b82f6 */
+        body.effect-team-colors .board-hex.occupied[data-team="team2"]::after {
+            background: rgba(59, 130, 246, 0.5);
+        }
+        /* Team 3: Green #10b981 */
+        body.effect-team-colors .board-hex.occupied[data-team="team3"]::after {
+            background: rgba(16, 185, 129, 0.5);
+        }
+        /* Team 4: Purple #a855f7 */
+        body.effect-team-colors .board-hex.occupied[data-team="team4"]::after {
+            background: rgba(168, 85, 247, 0.5);
+        }
+        /* Team 5: Yellow #f59e0b */
+        body.effect-team-colors .board-hex.occupied[data-team="team5"]::after {
+            background: rgba(245, 158, 11, 0.5);
+        }
+        /* Team 6: Pink #ec4899 (additional color) */
+        body.effect-team-colors .board-hex.occupied[data-team="team6"]::after {
+            background: rgba(236, 72, 153, 0.5);
+        }
+
+        /* Hide labels when team colors active (they're fallback only) */
+        body.effect-team-colors .hex-label {
+            display: none;
+        }
+
+        /* Effect: Rooms - uses fill-rule="evenodd" to cut out center */
+        /* Hex element is 66x58 (not square!), so viewBox must match aspect ratio */
+        body.effect-rooms .board-hex.room .room-border {
+            display: block;
+        }
+        .room-border {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 100%;
+            height: 100%;
+            transform: translate(-50%, -50%);
+            z-index: 8;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.55);
+            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath fill-rule='evenodd' d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z M19,4.4 L47,4.4 L61,29 L47,53.6 L19,53.6 L5,29 Z' fill='white'/%3E%3C/svg%3E");
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath fill-rule='evenodd' d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z M19,4.4 L47,4.4 L61,29 L47,53.6 L19,53.6 L5,29 Z' fill='white'/%3E%3C/svg%3E");
+            -webkit-mask-size: 100% 100%;
+            mask-size: 100% 100%;
+        }
+
+        /* Effect: Hex Images - base styles (images applied via JS) */
+        body.effect-hex-images .board-hex::before {
+            background-size: cover;
+            background-position: center;
+            z-index: 5; /* Above the label when images are shown */
+        }
+
+        /* Type-based images (fallback, can be overridden by coordinate-specific) */
+        body.effect-hex-images .board-hex::before {
+            background-image: url('images/hexes/normal.png');
+        }
+        body.effect-hex-images .board-hex.mountain-heart::before {
+            background-image: url('images/hexes/mountain-heart.png');
+        }
+        body.effect-hex-images .board-hex.side-heart::before {
+            background-image: url('images/hexes/side-heart.png');
+        }
+        body.effect-hex-images .board-hex.starting-location::before {
+            background-image: url('images/hexes/starting-location.png');
+        }
+
+        /* Labels go behind images (fallback only) */
+        body.effect-hex-images .hex-label {
+            z-index: 1; /* Behind the ::before layer */
+        }
+
+        /* Controls Panel Styling */
+        .effects-panel {
+            max-width: 1200px;
+            margin: 0 auto 30px;
+            padding: 20px;
+            background: #34495e;
+            border-radius: 8px;
+            font-family: system-ui, sans-serif;
+        }
+
+        .effects-panel h2 {
+            color: #fff;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .effects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+        }
+
+        .effect-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 15px;
+            background: #2c3e50;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .effect-toggle:hover {
+            background: #3d566e;
+        }
+
+        .effect-toggle input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .effect-toggle label {
+            color: #fff;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .effect-toggle.active {
+            background: #27ae60;
+        }
+
         /* Responsive adjustments */
         @media (max-width: 1400px) {
             .boards-container {
@@ -109,8 +298,94 @@
     </style>
 </head>
 <body>
-    <h1>Board Scaling Test - Multiple Sizes</h1>
-    
+    <h1>Board Visualization - Heart Hexes & Special Locations</h1>
+
+    <div style="max-width: 1200px; margin: 0 auto 30px; padding: 20px; background: #2c3e50; border-radius: 8px;">
+        <h2 style="color: #fff; margin-bottom: 15px; font-family: system-ui, sans-serif; font-size: 1.2rem;">Legend</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; color: #fff; font-family: system-ui, sans-serif; font-size: 0.9rem;">
+            <div>
+                <div style="display: inline-block; width: 20px; height: 20px; background: #ff1744; margin-right: 8px; vertical-align: middle;"></div>
+                <strong>❤️❤️ Mountain Heart</strong> (Center q0r0)<br>
+                <span style="color: #ddd; font-size: 0.85rem;">Passive income: +2 VP/game</span>
+            </div>
+            <div>
+                <div style="display: inline-block; width: 20px; height: 20px; background: #ff6b9d; margin-right: 8px; vertical-align: middle;"></div>
+                <strong>❤️ Side Heart</strong> (6 hexes)<br>
+                <span style="color: #ddd; font-size: 0.85rem;">Passive income: +1 VP/game</span>
+            </div>
+            <div>
+                <div style="display: inline-block; width: 20px; height: 20px; background: #aaa; margin-right: 8px; vertical-align: middle;"></div>
+                <strong>⭐ Starting Square</strong> (6 hexes)<br>
+                <span style="color: #ddd; font-size: 0.85rem;">First tile placement only</span>
+            </div>
+            <div>
+                <div style="display: inline-block; width: 20px; height: 20px; background: #ddd; margin-right: 8px; vertical-align: middle;"></div>
+                <strong>Normal Hex</strong> (78 hexes)<br>
+                <span style="color: #ddd; font-size: 0.85rem;">No special properties</span>
+            </div>
+            <div>
+                <div style="display: inline-block; width: 20px; height: 20px; background: #ddd; border: 3px solid #000; margin-right: 8px; vertical-align: middle; box-sizing: border-box;"></div>
+                <strong>🚪 Room</strong> (10 hexes)<br>
+                <span style="color: #ddd; font-size: 0.85rem;">Special tile placement</span>
+            </div>
+            <div>
+                <div style="display: inline-block; width: 20px; height: 20px; background: rgba(239, 68, 68, 0.7); margin-right: 8px; vertical-align: middle;"></div>
+                <strong>Team 1</strong> (Red)
+            </div>
+            <div>
+                <div style="display: inline-block; width: 20px; height: 20px; background: rgba(59, 130, 246, 0.7); margin-right: 8px; vertical-align: middle;"></div>
+                <strong>Team 2</strong> (Blue)
+            </div>
+            <div>
+                <div style="display: inline-block; width: 20px; height: 20px; background: rgba(16, 185, 129, 0.7); margin-right: 8px; vertical-align: middle;"></div>
+                <strong>Team 3</strong> (Green)
+            </div>
+            <div>
+                <div style="display: inline-block; width: 20px; height: 20px; background: rgba(168, 85, 247, 0.7); margin-right: 8px; vertical-align: middle;"></div>
+                <strong>Team 4</strong> (Purple)
+            </div>
+            <div>
+                <div style="display: inline-block; width: 20px; height: 20px; background: rgba(245, 158, 11, 0.7); margin-right: 8px; vertical-align: middle;"></div>
+                <strong>Team 5</strong> (Yellow)
+            </div>
+            <div>
+                <div style="display: inline-block; width: 20px; height: 20px; background: rgba(236, 72, 153, 0.7); margin-right: 8px; vertical-align: middle;"></div>
+                <strong>Team 6</strong> (Pink)
+            </div>
+        </div>
+    </div>
+
+    <!-- Effects Control Panel -->
+    <div class="effects-panel">
+        <h2>Visual Effects Toggle</h2>
+        <div class="effects-grid">
+            <div class="effect-toggle" data-effect="team-colors">
+                <input type="checkbox" id="effect-team-colors">
+                <label for="effect-team-colors">Team Colors</label>
+            </div>
+            <div class="effect-toggle" data-effect="hex-images">
+                <input type="checkbox" id="effect-hex-images">
+                <label for="effect-hex-images">Hex Images</label>
+            </div>
+            <div class="effect-toggle" data-effect="heart-glow">
+                <input type="checkbox" id="effect-heart-glow">
+                <label for="effect-heart-glow">Heart Glow</label>
+            </div>
+            <div class="effect-toggle" data-effect="pulse-hearts">
+                <input type="checkbox" id="effect-pulse-hearts">
+                <label for="effect-pulse-hearts">Pulse Hearts</label>
+            </div>
+            <div class="effect-toggle" data-effect="rooms">
+                <input type="checkbox" id="effect-rooms">
+                <label for="effect-rooms">Rooms</label>
+            </div>
+            <div class="effect-toggle" data-effect="heart-images">
+                <input type="checkbox" id="effect-heart-images">
+                <label for="effect-heart-images">Heart Images</label>
+            </div>
+        </div>
+    </div>
+
     <div class="boards-container">
         <!-- Small Board -->
         <div class="board-wrapper small">
@@ -138,16 +413,39 @@
         // Initialize board module (shared)
         const boardModule = new BoardModule(1);
 
-        // Sample game data with some occupied hexes
+        // Sample game data: ~40% occupied (36 of 91 hexes), 6 hexes per team
+        // Teams radiate from their starting locations, some occupy hearts
         const sampleGameData = {
             board: {
-                'q0r0': 'team1',
-                'q1r0': 'team1',
-                'q0r1': 'team2',
-                'q-1r0': 'team2',
-                'q2r-2': 'team1',
-                'q-2r2': 'team2'
-            }
+                // Team 1 (Red) - from q0r-5 (top), reaches side-heart q-2r-2
+                'q0r-5': 'team1', 'q-1r-4': 'team1', 'q0r-4': 'team1',
+                'q1r-5': 'team1', 'q-1r-3': 'team1', 'q-2r-2': 'team1', // side-heart!
+
+                // Team 2 (Blue) - from q5r-5 (top-right), reaches side-heart q2r-4
+                'q5r-5': 'team2', 'q4r-4': 'team2', 'q5r-4': 'team2',
+                'q4r-5': 'team2', 'q3r-4': 'team2', 'q2r-4': 'team2', // side-heart!
+
+                // Team 3 (Green) - from q5r0 (bottom-right), reaches side-heart q4r-2
+                'q5r0': 'team3', 'q4r0': 'team3', 'q5r-1': 'team3',
+                'q4r1': 'team3', 'q3r0': 'team3', 'q4r-2': 'team3', // side-heart!
+
+                // Team 4 (Purple) - from q0r5 (bottom), reaches side-heart q2r2 AND mountain-heart q0r0!
+                'q0r5': 'team4', 'q-1r5': 'team4', 'q1r4': 'team4',
+                'q0r4': 'team4', 'q2r2': 'team4', 'q0r0': 'team4', // side-heart + mountain-heart!
+
+                // Team 5 (Orange) - from q-5r5 (bottom-left), reaches side-heart q-4r2
+                'q-5r5': 'team5', 'q-4r4': 'team5', 'q-5r4': 'team5',
+                'q-4r5': 'team5', 'q-3r4': 'team5', 'q-4r2': 'team5', // side-heart!
+
+                // Team 6 (Cyan) - from q-5r0 (top-left), reaches side-heart q-2r4
+                'q-5r0': 'team6', 'q-4r0': 'team6', 'q-5r1': 'team6',
+                'q-4r-1': 'team6', 'q-3r1': 'team6', 'q-2r4': 'team6' // side-heart!
+            },
+            // 10 random rooms (not on hearts or starting locations)
+            rooms: [
+                'q1r1', 'q-1r-1', 'q2r0', 'q-2r0', 'q3r-1',
+                'q-3r1', 'q1r2', 'q-1r2', 'q2r-1', 'q-2r-1'
+            ]
         };
 
         // Small board
@@ -175,6 +473,77 @@
         console.log('Small:', containerSmall.clientWidth, 'x', containerSmall.clientHeight);
         console.log('Medium:', containerMedium.clientWidth, 'x', containerMedium.clientHeight);
         console.log('Large:', containerLarge.clientWidth, 'x', containerLarge.clientHeight);
+
+        // Hex Images: Generate dynamic CSS for coordinate-based images
+        function applyHexImages(enabled) {
+            let styleEl = document.getElementById('hex-images-dynamic-css');
+
+            if (!enabled) {
+                // Remove dynamic CSS when disabled
+                if (styleEl) styleEl.remove();
+                return;
+            }
+
+            // Create style element if needed
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = 'hex-images-dynamic-css';
+                document.head.appendChild(styleEl);
+            }
+
+            // Generate CSS rules for each hex coordinate
+            const hexCoords = boardModule.generateHexCoordinates();
+            let css = '';
+
+            hexCoords.forEach(([q, r]) => {
+                const coord = `q${q}r${r}`;
+                css += `body.effect-hex-images .board-hex[data-coord="${coord}"]::before {
+                    background-image: url('images/hexes/coords/${coord}.png');
+                }\n`;
+            });
+
+            styleEl.textContent = css;
+            console.log(`Generated CSS for ${hexCoords.length} hex images`);
+        }
+
+        // Effects Toggle Handler
+        document.querySelectorAll('.effect-toggle').forEach(toggle => {
+            const effectName = toggle.dataset.effect;
+            const checkbox = toggle.querySelector('input[type="checkbox"]');
+
+            // Handle checkbox change (works for both direct click and label click)
+            checkbox.addEventListener('change', () => {
+                // Toggle the body class
+                document.body.classList.toggle(`effect-${effectName}`, checkbox.checked);
+
+                // Visual feedback on the toggle button
+                toggle.classList.toggle('active', checkbox.checked);
+
+                // Special handling for hex-images effect
+                if (effectName === 'hex-images') {
+                    applyHexImages(checkbox.checked);
+                }
+
+                // Special handling for heart-images toggle (uses renderer method)
+                if (effectName === 'heart-images') {
+                    rendererSmall.toggleHeartImages(checkbox.checked);
+                    rendererMedium.toggleHeartImages(checkbox.checked);
+                    rendererLarge.toggleHeartImages(checkbox.checked);
+                }
+
+                console.log(`Effect "${effectName}": ${checkbox.checked ? 'ON' : 'OFF'}`);
+            });
+
+            // Click on wrapper (but not checkbox/label) also toggles
+            toggle.addEventListener('click', (e) => {
+                if (e.target === toggle) {
+                    checkbox.checked = !checkbox.checked;
+                    checkbox.dispatchEvent(new Event('change'));
+                }
+            });
+        });
+
+        console.log('Effects panel ready');
     </script>
 </body>
 </html>

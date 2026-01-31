@@ -1,6 +1,9 @@
 # Sensitive Firebase configuration
 BoardGame/scripts/firebase.js
 
+# Dev tools (local only)
+BoardGame/dev-tools.html
+
 # Dependencies
 node_modules/
 npm-debug.log*
@@ -23,6 +26,17 @@ desktop.ini
 
 # Claude Code
 .claude/
+tmpclaude-*
+**/tmpclaude-*
+
+# Windows NUL artifacts
+nul
+NUL
+**/nul
+**/NUL
+
+# Planning documents
+.plan/
 
 # Build outputs
 dist/

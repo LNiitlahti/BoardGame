@@ -20,6 +20,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Dosis:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
 
+    <!-- Navbar -->
+    <link rel="stylesheet" href="css/navbar.css">
+    <link rel="stylesheet" href="css/theme-toggle-button.css">
+    <link rel="stylesheet" href="css/dark-theme.css">
+
     <style>
         * {
             margin: 0;
@@ -538,17 +543,134 @@
             .team-card {
                 grid-template-columns: 1fr;
             }
-            
+
             .summary-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
         }
+
+        /* Light Mode Overrides */
+        body:not(.dark-mode) {
+            background: #f8fafc;
+            color: #1e293b;
+        }
+
+        body:not(.dark-mode) .header h1 {
+            color: #1e293b;
+            text-shadow: none;
+        }
+
+        body:not(.dark-mode) .header p {
+            color: #64748b;
+        }
+
+        body:not(.dark-mode) .progress-circle {
+            background: #e2e8f0;
+            border-color: #cbd5e1;
+        }
+
+        body:not(.dark-mode) .progress-label {
+            color: #64748b;
+        }
+
+        body:not(.dark-mode) .progress-line {
+            background: #e2e8f0;
+        }
+
+        body:not(.dark-mode) .step-content {
+            background: #ffffff;
+            border-color: #e2e8f0;
+        }
+
+        body:not(.dark-mode) .step-title {
+            color: #1e293b;
+        }
+
+        body:not(.dark-mode) .game-card {
+            background: #ffffff;
+            border-color: #e2e8f0;
+        }
+
+        body:not(.dark-mode) .game-card:hover {
+            border-color: #f7ba32;
+        }
+
+        body:not(.dark-mode) .game-card.selected {
+            background: rgba(247, 186, 50, 0.1);
+        }
+
+        body:not(.dark-mode) .game-name {
+            color: #1e293b;
+        }
+
+        body:not(.dark-mode) .team-card {
+            background: #ffffff;
+            border-color: #e2e8f0;
+        }
+
+        body:not(.dark-mode) .form-group label {
+            color: #64748b;
+        }
+
+        body:not(.dark-mode) .form-group input {
+            background: #f8fafc;
+            border-color: #e2e8f0;
+            color: #1e293b;
+        }
+
+        body:not(.dark-mode) .spell-card {
+            background: #ffffff;
+            border-color: #e2e8f0;
+        }
+
+        body:not(.dark-mode) .spell-card-description {
+            color: #475569;
+        }
+
+        body:not(.dark-mode) .match-item {
+            background: #ffffff;
+            border-color: #e2e8f0;
+        }
+
+        body:not(.dark-mode) .summary-card {
+            background: #ffffff;
+            border-color: #e2e8f0;
+        }
+
+        body:not(.dark-mode) .summary-label {
+            color: #64748b;
+        }
+
+        body:not(.dark-mode) .custom-game-section {
+            background: #ffffff;
+            border-color: #e2e8f0;
+        }
+
+        body:not(.dark-mode) .custom-game-section h3 {
+            color: #1e293b;
+        }
+
+        body:not(.dark-mode) .custom-game-input-group input {
+            background: #f8fafc;
+            border-color: #e2e8f0;
+            color: #1e293b;
+        }
+
+        body:not(.dark-mode) .error-message {
+            background: rgba(222, 57, 44, 0.1);
+        }
+
+        body:not(.dark-mode) p {
+            color: #64748b;
+        }
     </style>
 </head>
 <body>
+    <!-- Navbar container - populated by navbar.js -->
+    <div id="navbar-container"></div>
+
     <div id="content" class="container" style="display:none">
         <div class="header">
-            <img src="images/favicon/android-chrome-512x512.png" alt="Brand Logo" class="brand-logo" style="margin-bottom: 20px;">
             <h1>Tournament Setup</h1>
             <p>Create your epic gaming tournament</p>
         </div>
@@ -1121,12 +1243,27 @@
             const scheduler = new MatchScheduler(teams, selectedGames.map(id => games.find(g => g.id === id).name));
             const scheduleData = scheduler.exportForFirebase();
 
+            // Build game definitions object with ID -> name/icon mapping
+            const gameDefinitions = {};
+            selectedGames.forEach(id => {
+                const game = games.find(g => g.id === id);
+                if (game) {
+                    gameDefinitions[id] = {
+                        name: game.name,
+                        icon: game.icon || '🎮',
+                        custom: game.custom || false
+                    };
+                }
+            });
+
             const tournamentData = {
                 gameId,
+                name: gameId, // Use gameId as the tournament name
                 teams,
                 matches,
                 schedule: scheduleData,
                 selectedGames,
+                gameDefinitions, // Store full game info for custom games
                 spellCards: spellCards.map(s => s.id),
                 winCondition,
                 createdAt: new Date().toISOString(),
@@ -1153,6 +1290,8 @@
             }
         }
     </script>
+    <script src="scripts/theme-toggle.js"></script>
+    <script src="scripts/navbar.js"></script>
     <script src="scripts/restrict-access.js"></script>
 </body>
 </html>

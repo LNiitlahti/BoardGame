@@ -1,0 +1,331 @@
+/**
+ * ====================================
+ * UNIFIED NAVBAR STYLES
+ * ====================================
+ * Responsive navigation bar using Falcon design system
+ */
+
+/* ==================== NAVBAR BASE ==================== */
+.unified-navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: var(--slate-900, #0f172a);
+    border-bottom: 1px solid var(--slate-700, #334155);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.navbar-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 0 20px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+/* ==================== BRAND SECTION ==================== */
+.navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    flex-shrink: 0;
+}
+
+.navbar-logo {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+}
+
+.navbar-brand-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.navbar-brand-name {
+    font-family: var(--font-display, 'Poppins', sans-serif);
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #ffffff;
+    line-height: 1.2;
+}
+
+.navbar-tournament-name {
+    font-size: 0.7rem;
+    color: var(--yellow-400, #fbbf24);
+    font-weight: 500;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ==================== TOURNAMENT SELECTOR ==================== */
+.navbar-tournament-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    background: var(--slate-800, #1e293b);
+    border: 1px solid var(--slate-600, #475569);
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.navbar-tournament-label {
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.navbar-tournament-select {
+    background: transparent;
+    border: none;
+    color: var(--yellow-400, #fbbf24);
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 4px 8px;
+    min-width: 140px;
+    max-width: 200px;
+}
+
+.navbar-tournament-select:focus {
+    outline: none;
+}
+
+.navbar-tournament-select option {
+    background: var(--slate-800, #1e293b);
+    color: var(--slate-100, #f1f5f9);
+    padding: 8px;
+}
+
+.navbar-no-tournament {
+    font-size: 0.8rem;
+    color: var(--slate-400, #94a3b8);
+    font-style: italic;
+}
+
+/* ==================== NAVIGATION LINKS ==================== */
+.navbar-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    justify-content: center;
+}
+
+.navbar-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--slate-400, #94a3b8);
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.navbar-link:hover {
+    color: #ffffff;
+    background: var(--slate-800, #1e293b);
+}
+
+.navbar-link.active {
+    color: #ffffff;
+    background: var(--slate-700, #334155);
+}
+
+.navbar-link-icon {
+    font-size: 1rem;
+}
+
+.navbar-link-label {
+    font-size: 0.85rem;
+}
+
+/* ==================== USER SECTION ==================== */
+.navbar-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+/* Connection Status Indicator */
+.navbar-connection-status {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #fbbf24;
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+    transition: all 0.3s ease;
+    cursor: help;
+}
+
+.navbar-connection-status.connected {
+    background: #22c55e;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+}
+
+.navbar-connection-status.disconnected {
+    background: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+}
+
+.navbar-connection-status.warning {
+    background: #fbbf24;
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+}
+
+.navbar-role-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.navbar-role-badge.god {
+    background: linear-gradient(135deg, #ffd700, #ff8c00);
+    color: #1a1a1a;
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
+}
+
+.navbar-role-badge.admin {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+}
+
+.navbar-role-badge.player {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
+.navbar-role-badge.user {
+    background: var(--slate-600, #475569);
+    color: white;
+}
+
+.navbar-user-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.navbar-user-name {
+    font-size: 0.85rem;
+    color: var(--slate-300, #cbd5e1);
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.navbar-logout-btn {
+    background: transparent;
+    border: 1px solid var(--slate-600, #475569);
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    color: var(--slate-400, #94a3b8);
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.navbar-logout-btn:hover {
+    background: var(--red-500, #ef4444);
+    border-color: var(--red-500, #ef4444);
+    color: white;
+}
+
+/* ==================== MOBILE TOGGLE ==================== */
+.navbar-mobile-toggle {
+    display: none;
+    flex-direction: column;
+    gap: 5px;
+    padding: 8px;
+    background: transparent;
+    border: 1px solid var(--slate-600, #475569);
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.navbar-mobile-toggle span {
+    display: block;
+    width: 20px;
+    height: 2px;
+    background: var(--slate-400, #94a3b8);
+    border-radius: 2px;
+    transition: all 0.2s ease;
+}
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 900px) {
+    .navbar-nav {
+        position: absolute;
+        top: 60px;
+        left: 0;
+        right: 0;
+        background: var(--slate-900, #0f172a);
+        border-bottom: 1px solid var(--slate-700, #334155);
+        padding: 12px;
+        flex-direction: column;
+        gap: 4px;
+        display: none;
+    }
+
+    .unified-navbar.mobile-open .navbar-nav {
+        display: flex;
+    }
+
+    .navbar-mobile-toggle {
+        display: flex;
+    }
+
+    .navbar-link {
+        width: 100%;
+        padding: 12px 16px;
+    }
+
+    .navbar-user-name {
+        display: none;
+    }
+
+    .navbar-tournament-name {
+        display: none;
+    }
+}
+
+@media (max-width: 600px) {
+    .navbar-container {
+        padding: 0 12px;
+    }
+
+    .navbar-brand-name {
+        font-size: 1rem;
+    }
+
+    .navbar-role-badge {
+        font-size: 0.65rem;
+        padding: 3px 8px;
+    }
+}
+
+/* ==================== BODY ADJUSTMENT ==================== */
+body.has-navbar {
+    padding-top: 60px;
+}

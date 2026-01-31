@@ -99,8 +99,8 @@ async function loadTournamentData() {
             gameData = doc.data();
             console.log('[Team Controls] Tournament data loaded:', gameData);
 
-            // Find team
-            teamData = gameData.teams?.find(t => t.id === currentTeamId);
+            // Find team (use string comparison to handle type mismatches)
+            teamData = gameData.teams?.find(t => String(t.id) === String(currentTeamId));
 
             if (!teamData) {
                 console.error('[Team Controls] Team not found in tournament');
@@ -120,6 +120,11 @@ async function loadTournamentData() {
             }
 
             console.log('[Team Controls] Team membership verified');
+
+            // Dispatch teamLoaded event for theme application
+            window.dispatchEvent(new CustomEvent('teamLoaded', {
+                detail: { teamId: currentTeamId }
+            }));
 
             // Render all sections
             renderTeamHeader();
@@ -207,11 +212,9 @@ function renderTeammates() {
         const isYou = player.uid === currentUser.uid;
         return `
             <div class="teammate-item ${isYou ? 'you' : ''}">
-                <div class="teammate-name">
-                    ${player.name || player.email || 'Unknown Player'}
-                    ${isYou ? '<span class="you-badge">YOU</span>' : ''}
-                </div>
-                ${player.email && !isYou ? `<div style="font-size: 0.85rem; opacity: 0.7;">${player.email}</div>` : ''}
+                ${isYou ? '<span class="you-label">YOU</span>' : ''}
+                <div class="teammate-name">${player.name || player.email || 'Unknown Player'}</div>
+                ${player.email && !isYou ? `<div class="teammate-id">${player.email}</div>` : ''}
             </div>
         `;
     }).join('');
@@ -550,17 +553,16 @@ function renderCurrentMatch() {
         } else {
             const sideElements = sidesData.map((side, index) => {
                 const playersHTML = (side.players || []).map(p => {
-                    const playerColor = getHexColor(p.color || p.teamColor || p.originalTeamColor);
-                    return `<div class="player-chip" style="border-color: ${playerColor}; color: ${playerColor};">${p.name || 'Player'}</div>`;
+                    return `<div class="player-badge">${p.name || 'Player'}</div>`;
                 }).join('');
 
                 return `
                     <div class="match-side">
-                        <div style="font-weight: 600; font-size: 0.75rem; color: var(--accent-primary); margin-bottom: 2px;">
+                        <div class="team-label">
                             Side ${String.fromCharCode(65 + index)}
                         </div>
-                        <div style="display: flex; flex-wrap: wrap; gap: 1px;">
-                            ${playersHTML || '<div style="opacity: 0.5; font-size: 0.75rem;">No players</div>'}
+                        <div class="player-list">
+                            ${playersHTML || '<div class="empty-state-inline">No players</div>'}
                         </div>
                     </div>
                 `;
@@ -609,17 +611,16 @@ function renderCurrentMatch() {
         const sideElements = sidesData.map((side, index) => {
             const isOurSide = index === ourSideIndex;
             const playersHTML = (side.players || []).map(p => {
-                const playerColor = getHexColor(p.color || p.teamColor || p.originalTeamColor);
-                return `<div class="player-chip" style="border-color: ${playerColor}; color: ${playerColor};">${p.name || 'Player'}</div>`;
+                return `<div class="player-badge">${p.name || 'Player'}</div>`;
             }).join('');
 
             return `
                 <div class="match-side ${isOurSide ? 'your-side' : ''}">
-                    <div style="font-weight: 600; font-size: 0.75rem; color: var(--accent-primary); margin-bottom: 2px;">
+                    <div class="team-label">
                         ${isOurSide ? '⭐ Your Side' : `Side ${String.fromCharCode(65 + index)}`}
                     </div>
-                    <div style="display: flex; flex-wrap: wrap; gap: 1px;">
-                        ${playersHTML || '<div style="opacity: 0.5; font-size: 0.75rem;">No players</div>'}
+                    <div class="player-list">
+                        ${playersHTML || '<div class="empty-state-inline">No players</div>'}
                     </div>
                 </div>
             `;
@@ -778,7 +779,7 @@ function renderUpcomingMatches() {
 
 /**
  * Get hex color from team color property
- * Converts legacy color names to hex codes
+ * Converts legacy color names to hex codes matching brand-theme.css
  */
 function getHexColor(color) {
     // If already a hex code, return it
@@ -786,23 +787,23 @@ function getHexColor(color) {
         return color;
     }
 
-    // Map legacy color names to hex codes
+    // Map legacy color names to brand theme hex codes
     const colorMap = {
-        'blue': '#3b82f6',
-        'red': '#ef4444',
-        'green': '#10b981',
-        'yellow': '#f59e0b',
-        'amber': '#f59e0b',
-        'purple': '#a855f7',
-        'pink': '#ec4899',
-        'teal': '#14b8a6',
-        'orange': '#f97316',
-        'cyan': '#06b6d4',
-        'lime': '#84cc16',
-        'indigo': '#6366f1'
+        'red': '#de392c',      // Team 1 - Red
+        'blue': '#2278a3',     // Team 2 - Blue
+        'green': '#2e9158',    // Team 3 - Green
+        'orange': '#f7ba32',   // Team 4 - Orange
+        'yellow': '#f7ba32',   // Alias for orange
+        'amber': '#f7ba32',    // Alias for orange
+        'purple': '#a855f7',   // Team 5 - Purple
+        'pink': '#ec4899',     // Legacy support
+        'teal': '#14b8a6',     // Legacy support
+        'cyan': '#06b6d4',     // Legacy support
+        'lime': '#84cc16',     // Legacy support
+        'indigo': '#6366f1'    // Legacy support
     };
 
-    return colorMap[color?.toLowerCase()] || '#3b82f6'; // Default to blue
+    return colorMap[color?.toLowerCase()] || '#2278a3'; // Default to team blue
 }
 
 /**
@@ -1132,8 +1133,8 @@ async function saveTeamName() {
         const db = firebase.firestore();
         const tournamentRef = db.collection('tournaments').doc(currentGameId);
 
-        // Find team index
-        const teamIndex = gameData.teams.findIndex(t => t.id === currentTeamId);
+        // Find team index (use string comparison to handle type mismatches)
+        const teamIndex = gameData.teams.findIndex(t => String(t.id) === String(currentTeamId));
 
         if (teamIndex === -1) {
             showStatus('Team not found', 'error');

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+    ============================================================================
+    ADMIN-LIGHTWEIGHT.HTML - SIMPLIFIED TOURNAMENT MANAGEMENT
+    ============================================================================
+
+    PURPOSE:
+    Streamlined admin tool for tournament management - no spells, no complex rules.
+    Focus on: matches, results, board control, and scoring.
+
+    FEATURES:
+    - Match creation with drag-drop
+    - Match queue management
+    - Result confirmation
+    - Click-to-assign hex control
+    - Manual points adjustment
+    - Round management
+
+    USAGE:
+    - URL parameter: admin-lightweight.html?tournamentId=xxx
+    - Or select tournament from dropdown
+
+    ACCESS:
+    Requires God or Admin role.
+    ============================================================================
+-->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lightweight Admin - Tournament Manager</title>
+
+    <!-- Favicons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="images/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="images/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="images/favicon/favicon-16x16.png">
+    <link rel="shortcut icon" href="images/favicon/favicon.ico">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="css/brand-theme.css">
+    <link rel="stylesheet" href="css/navbar.css">
+    <link rel="stylesheet" href="css/admin-lightweight.css">
+    <link rel="stylesheet" href="css/fantasy-mountain-theme.css">
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <div>Loading tournament data...</div>
+        </div>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="unified-navbar">
+        <div class="navbar-container">
+            <a href="home.html" class="navbar-brand">
+                <img src="images/favicon/android-chrome-192x192.png" alt="Logo" class="navbar-logo">
+                <div class="navbar-brand-text">
+                    <span class="navbar-brand-name">Lightweight Admin</span>
+                    <span class="navbar-tournament-name" id="navTournamentName">No Tournament</span>
+                </div>
+            </a>
+
+            <div class="navbar-user">
+                <div class="navbar-connection-status" id="connectionStatus" title="Connecting..."></div>
+                <span class="navbar-role-badge admin" id="roleBadge">ADMIN</span>
+                <span class="navbar-user-name" id="userName">Loading...</span>
+                <button class="navbar-logout-btn" onclick="logout()" title="Logout">Exit</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="admin-container">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="tournament-selector">
+                <label for="tournamentSelect">Tournament:</label>
+                <select id="tournamentSelect" onchange="onTournamentSelect(this.value)">
+                    <option value="">Select a tournament...</option>
+                </select>
+                <button class="btn secondary" onclick="refreshTournaments()">Refresh</button>
+            </div>
+
+            <div class="top-bar-center">
+                <span>Hearts: <strong id="heartsControlled">0</strong></span>
+                <button class="btn primary" onclick="advanceRound()">Next Round</button>
+                <div class="status-message" id="statusMessage"></div>
+            </div>
+
+            <div class="round-info">
+                <span>Round: <strong id="currentRound">0</strong></span>
+                <span>Games: <strong id="gamesPlayed">0</strong></span>
+                <span>Hexes: <strong id="hexCount">0</strong></span>
+                <button class="btn secondary" onclick="openViewWindow()" title="Open digital signage view in new window">Open View</button>
+                <button class="btn secondary" onclick="openStatsWindow()" title="Open tournament statistics">Stats</button>
+            </div>
+        </div>
+
+        <!-- Main Content: Board + Queue -->
+        <div class="main-content">
+            <!-- Board Section -->
+            <section class="board-section">
+                <!-- Effects Panel -->
+                <div class="effects-panel" id="effectsPanel">
+                    <button class="effect-btn active" data-effect="hex-images" title="Hex Terrain Images">Map</button>
+                    <button class="effect-btn active" data-effect="heart-glow" title="Heart Glow">Glow</button>
+                    <button class="effect-btn active" data-effect="pulse-hearts" title="Pulse Hearts">Pulse</button>
+                    <button class="effect-btn active" data-effect="rooms" title="Show Rooms">Rooms</button>
+                    <button class="effect-btn active" data-effect="heart-images" title="Heart Images">Hearts</button>
+                </div>
+                <div id="hexBoard"></div>
+            </section>
+
+            <!-- Queue Panel (right side) -->
+            <aside class="queue-panel">
+                <h3>Match Queue <span class="count" id="queueCount">0</span></h3>
+
+                <!-- Ongoing Matches -->
+                <div id="ongoingMatchesList"></div>
+
+                <!-- Queued Matches -->
+                <div class="queue-list" id="matchQueue">
+                    <p class="queue-empty">No matches in queue</p>
+                </div>
+            </aside>
+        </div>
+
+        <!-- Bottom Panels: Teams + Create Match -->
+        <div class="bottom-panels">
+            <!-- Teams Panel -->
+            <div class="panel teams-panel">
+                <h4>Teams <button class="btn-icon" onclick="openPlayerManager()" title="Manage Players">&#9998;</button></h4>
+                <div class="teams-grid" id="teamsList">
+                    <p class="queue-empty">Load a tournament to see teams</p>
+                </div>
+            </div>
+
+            <!-- Match Creation -->
+            <div class="panel create-match-panel">
+                <h4>Create Match
+                    <button class="btn-small secondary" onclick="generateSuggestedMatches()" title="Auto-generate matches based on rotation">Auto</button>
+                    <button class="btn-small challenge" onclick="addChallengeToQueue()" title="Create a challenge match (hex dispute)">Challenge</button>
+                </h4>
+
+                <div class="game-selects">
+                    <select id="gameType">
+                        <option value="">Load tournament first...</option>
+                    </select>
+                    <span class="auto-format" id="autoFormat">--</span>
+                </div>
+
+                <div class="sides-container" id="sidesContainer">
+                    <!-- Dynamic sides rendered by JS -->
+                </div>
+                <div class="sides-actions">
+                    <button class="btn-small secondary" onclick="addMatchSide()" title="Add another team side">+ Side</button>
+                    <button class="btn-small secondary" onclick="removeMatchSide()" title="Remove last side">- Side</button>
+                </div>
+
+                <div class="match-buttons">
+                    <button class="btn primary" onclick="addMatchToQueue()">Add to Queue</button>
+                    <button class="btn secondary" onclick="clearMatchSetup()">Clear</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Team Picker Modal -->
+    <div class="modal-overlay" id="teamPickerModal">
+        <div class="modal-content">
+            <h4>Assign Hex: <span id="pickerHexCoord"></span></h4>
+            <div class="team-picker-options" id="teamPickerOptions"></div>
+            <button class="btn secondary modal-cancel" onclick="closeTeamPicker()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Result Confirmation Modal -->
+    <div class="modal-overlay" id="resultConfirmModal">
+        <div class="modal-content result-confirm-modal">
+            <div id="resultConfirmContent"></div>
+        </div>
+    </div>
+
+    <!-- Player Manager Modal -->
+    <div class="modal-overlay" id="playerManagerModal">
+        <div class="modal-content player-manager-modal">
+            <h4>Manage Players</h4>
+            <p class="modal-hint">Players are managed locally - no login required for them.</p>
+
+            <div class="player-manager-teams" id="playerManagerTeams">
+                <!-- Teams and players rendered here -->
+            </div>
+
+            <div class="player-manager-actions">
+                <button class="btn secondary" onclick="closePlayerManager()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Next Round Confirmation Modal -->
+    <div class="modal-overlay" id="nextRoundModal">
+        <div class="modal-content next-round-modal">
+            <h4>⚠️ Advance to Next Round?</h4>
+            <p class="modal-warning">This will add hex control points to corresponding teams.</p>
+            <p class="modal-danger">YOU CANNOT GO BACK IN ROUNDS!</p>
+
+            <div class="next-round-preview" id="nextRoundPreview">
+                <!-- Points preview rendered here -->
+            </div>
+
+            <div class="next-round-actions">
+                <button class="btn primary" onclick="confirmAdvanceRound()">Yes, Advance Round</button>
+                <button class="btn secondary" onclick="closeNextRoundModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auto Match Confirmation Modal -->
+    <div class="modal-overlay" id="autoMatchModal">
+        <div class="modal-content auto-match-modal">
+            <div id="autoMatchContent">
+                <!-- Auto match preview rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="scripts/firebase-loader.js"></script>
+    <script src="scripts/config.js"></script>
+    <script src="scripts/board-module.js"></script>
+    <script src="scripts/board-renderer.js"></script>
+    <script src="scripts/match-suggester.js"></script>
+    <script src="scripts/player-utils.js"></script>
+    <script src="scripts/admin-lightweight.js"></script>
+</body>
+</html>

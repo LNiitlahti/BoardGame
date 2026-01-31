@@ -15,6 +15,9 @@
  * Used as defaults when creating new teams.
  * Once a team is created, its color is stored in Firebase and loaded from there.
  *
+ * IMPORTANT: These colors MUST match the physical board game pieces!
+ * Only 5 colors available - corresponding to the 5 physical team colors.
+ *
  * Flow:
  * 1. New team created → gets color from this array
  * 2. Team saved to Firebase with that color
@@ -22,14 +25,11 @@
  * 4. If team.color is missing → fallback to this array
  */
 const TEAM_COLORS = [
-    '#ff4444', // Red - Team 1 default
-    '#44ff44', // Green - Team 2 default
-    '#4444ff', // Blue - Team 3 default
-    '#ffff44', // Yellow - Team 4 default
-    '#ff44ff', // Magenta - Team 5 default
-    '#44ffff', // Cyan - Team 6 default
-    '#ff8844', // Orange - Team 7 default
-    '#8844ff'  // Purple - Team 8 default
+    '#de392c', // Red - Team 1 (Brand Red)
+    '#2278a3', // Blue - Team 2 (Brand Blue)
+    '#2e9158', // Green - Team 3 (Brand Green)
+    '#f7ba32', // Yellow - Team 4 (Brand Yellow)
+    '#22241d'  // Black - Team 5 (Brand Dark)
 ];
 
 /**
@@ -48,9 +48,12 @@ const DEFAULT_COLOR = '#888888'; // Gray
  * @returns {string} - Hex color code
  */
 function getTeamColor(teamId, gameState = null) {
+    if (teamId == null) return DEFAULT_COLOR;
+
     // Try to get color from loaded team data (Firebase)
+    // Use string comparison to handle type mismatches (string vs number IDs)
     if (gameState && gameState.teams) {
-        const team = gameState.teams.find(t => t.id === teamId);
+        const team = gameState.teams.find(t => String(t.id) === String(teamId));
         if (team && team.color) {
             return team.color;
         }
@@ -58,7 +61,7 @@ function getTeamColor(teamId, gameState = null) {
 
     // Try to get from global gameState if not passed
     if (typeof window !== 'undefined' && window.gameState && window.gameState.teams) {
-        const team = window.gameState.teams.find(t => t.id === teamId);
+        const team = window.gameState.teams.find(t => String(t.id) === String(teamId));
         if (team && team.color) {
             return team.color;
         }

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Under Development - Board Game</title>
+
+    <!-- Favicons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="images/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="images/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="images/favicon/favicon-16x16.png">
+    <link rel="shortcut icon" href="images/favicon/favicon.ico">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="css/brand-theme.css">
+    <link rel="stylesheet" href="css/navbar.css">
+    <link rel="stylesheet" href="css/fantasy-mountain-theme.css">
+
+    <style>
+        body {
+            min-height: 100vh;
+            padding-top: 60px;
+        }
+
+        .development-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: calc(100vh - 60px);
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .development-card {
+            background: linear-gradient(180deg, rgba(30, 32, 42, 0.9), rgba(14, 16, 22, 0.95));
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
+            border-radius: 16px;
+            padding: 3rem 4rem;
+            max-width: 600px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.65),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .development-icon {
+            font-size: 4rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .development-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.8rem;
+            color: var(--accent-gold, #c8b37e);
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .development-message {
+            font-size: 1.1rem;
+            color: var(--text-primary, #d6d9df);
+            line-height: 1.8;
+            margin-bottom: 2rem;
+        }
+
+        .github-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(180deg, #3a3a3a, #1a1a1a);
+            border: 1px solid var(--border-accent, rgba(200, 179, 126, 0.45));
+            border-radius: 8px;
+            color: #e6dec8;
+            text-decoration: none;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: all 0.3s ease;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+
+        .github-link:hover {
+            box-shadow: 0 0 18px rgba(200, 179, 126, 0.35),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+            transform: translateY(-2px);
+        }
+
+        .github-link svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: rgba(247, 186, 50, 0.2);
+            border: 1px solid rgba(247, 186, 50, 0.5);
+            border-radius: 20px;
+            color: #f7ba32;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Navigation links for admin/god */
+        .nav-links {
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
+        }
+
+        .nav-links-title {
+            font-size: 0.75rem;
+            color: var(--text-muted, #9aa1ad);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 1rem;
+        }
+
+        .nav-links-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            justify-content: center;
+        }
+
+        .nav-link-btn {
+            padding: 0.5rem 1rem;
+            background: var(--bg-secondary, #363933);
+            border: 1px solid var(--border-color, rgba(247, 240, 227, 0.1));
+            border-radius: 6px;
+            color: var(--text-secondary, #d4cfc4);
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .nav-link-btn:hover {
+            background: var(--bg-tertiary, #454842);
+            border-color: var(--border-color-hover, rgba(247, 240, 227, 0.2));
+            color: var(--text-primary, #f7f0e3);
+        }
+
+        .nav-links {
+            display: none;
+        }
+
+        body.is-admin .nav-links,
+        body.is-god .nav-links {
+            display: block;
+        }
+
+        .nav-link-btn.god-only {
+            display: none;
+        }
+
+        body.is-god .nav-link-btn.god-only {
+            display: inline-block;
+        }
+
+        @media (max-width: 600px) {
+            .development-card {
+                padding: 2rem 1.5rem;
+                margin: 1rem;
+            }
+
+            .development-title {
+                font-size: 1.4rem;
+            }
+
+            .development-message {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body class="has-navbar">
+    <!-- Navbar -->
+    <nav class="unified-navbar">
+        <div class="navbar-container">
+            <a href="development-landing-page.html" class="navbar-brand">
+                <img src="images/favicon/android-chrome-192x192.png" alt="Logo" class="navbar-logo">
+                <div class="navbar-brand-text">
+                    <span class="navbar-brand-name">Board Game</span>
+                    <span class="navbar-tournament-name" id="navTournamentName">Development</span>
+                </div>
+            </a>
+
+            <div class="navbar-user">
+                <div class="navbar-connection-status connected" id="connectionStatus" title="Connected"></div>
+                <span class="navbar-role-badge user" id="roleBadge">USER</span>
+                <span class="navbar-user-name" id="userName">Loading...</span>
+                <button class="navbar-logout-btn" onclick="logout()" title="Logout">Exit</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="development-container">
+        <div class="development-card">
+            <div class="status-badge">Active Development</div>
+            <div class="development-icon">&#128736;</div>
+            <h1 class="development-title">Under Construction</h1>
+            <p class="development-message">
+                Please be patient, this software is under development.<br>
+                New features and improvements are being added regularly.
+            </p>
+
+            <a href="https://github.com/LNiitlahti/BoardGame" target="_blank" rel="noopener noreferrer" class="github-link">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+                </svg>
+                View on GitHub
+            </a>
+
+            <div class="nav-links" id="navLinks">
+                <div class="nav-links-title">Dev Tools</div>
+                <div class="nav-links-grid">
+                    <a href="home.html" class="nav-link-btn">Home</a>
+                    <a href="god.html" class="nav-link-btn">God Mode</a>
+                    <a href="admin-lightweight.html" class="nav-link-btn">Lightweight Admin</a>
+                    <a href="view-lightweight.html" class="nav-link-btn">Lightweight View</a>
+                    <a href="setup-lightweight.html" class="nav-link-btn god-only">Lightweight Setup</a>
+                    <a href="dev-tools.html" class="nav-link-btn god-only">Dev Tools</a>
+                    <a href="upload-spells.html" class="nav-link-btn god-only">Upload Spells</a>
+                    <a href="board-test2.html" class="nav-link-btn god-only">Board Test</a>
+                    <a href="hex-tile-slicer.html" class="nav-link-btn god-only">Hex Tile Slicer</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="scripts/firebase-loader.js"></script>
+    <script>
+        let auth;
+        let db;
+
+        document.addEventListener('firebase-ready', function() {
+            auth = firebase.auth();
+            db = firebase.firestore();
+
+            auth.onAuthStateChanged(async (user) => {
+                if (!user) {
+                    // Not logged in, redirect to login
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                try {
+                    const userDoc = await db.collection('users').doc(user.uid).get();
+
+                    if (userDoc.exists) {
+                        const userData = userDoc.data();
+
+                        // Update navbar
+                        document.getElementById('userName').textContent = userData.displayName || user.email;
+
+                        // Determine role and update badge
+                        let role = 'user';
+                        let roleClass = 'user';
+
+                        if (userData.isGod === true || userData.isSuperAdmin === true) {
+                            role = 'GOD';
+                            roleClass = 'god';
+                            document.body.classList.add('is-god');
+                        } else if (userData.isAdmin === true) {
+                            role = 'ADMIN';
+                            roleClass = 'admin';
+                            document.body.classList.add('is-admin');
+                        } else if (userData.isPlayer === true || userData.teamId) {
+                            role = 'PLAYER';
+                            roleClass = 'player';
+                        }
+
+                        const badge = document.getElementById('roleBadge');
+                        badge.textContent = role;
+                        badge.className = 'navbar-role-badge ' + roleClass;
+                    } else {
+                        document.getElementById('userName').textContent = user.email;
+                    }
+                } catch (error) {
+                    console.error('Error loading user profile:', error);
+                    document.getElementById('userName').textContent = user.email || 'User';
+                }
+            });
+        });
+
+        function logout() {
+            if (auth) {
+                auth.signOut().then(() => {
+                    window.location.href = 'login.html';
+                }).catch((error) => {
+                    console.error('Logout error:', error);
+                    alert('Error logging out. Please try again.');
+                });
+            }
+        }
+    </script>
+</body>
+</html>

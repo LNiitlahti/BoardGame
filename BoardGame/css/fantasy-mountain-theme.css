@@ -1,0 +1,196 @@
+/* ============================================
+   WAR OF THE MOUNTAIN – CINEMATIC THEME
+   Drop-in override stylesheet
+   ============================================ */
+
+/* ---------- Root Palette ---------- */
+:root {
+    --bg-deep: #0b0d10;
+    --bg-mid: #141821;
+    --bg-panel: rgba(20, 22, 30, 0.85);
+
+    --text-primary: #d6d9df;
+    --text-muted: #9aa1ad;
+
+    --accent-gold: #c8b37e;
+    --accent-steel: #8f98a6;
+
+    --border-soft: rgba(255, 255, 255, 0.08);
+    --border-accent: rgba(200, 179, 126, 0.45);
+}
+
+/* ---------- Global Background ---------- */
+body {
+    background:
+        radial-gradient(
+            ellipse at top center,
+            rgba(255, 255, 255, 0.06),
+            rgba(0, 0, 0, 0.9) 65%
+        ),
+        linear-gradient(
+            to bottom,
+            rgba(10, 12, 18, 0.92),
+            rgba(5, 6, 10, 0.98)
+        ),
+        url("../images/backgrounds/bg.png") center / cover no-repeat fixed;
+
+    color: var(--text-primary);
+}
+
+/* ---------- Global Atmospheric Layer ---------- */
+.container::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+        linear-gradient(
+            to bottom,
+            rgba(255, 255, 255, 0.05),
+            rgba(0, 0, 0, 0.35)
+        );
+    opacity: 0.4;
+    z-index: 1;
+}
+
+/* ---------- Headers & Titles ---------- */
+h1, h2, h3, .tournament-name, .panel-title {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-primary);
+}
+
+/* ---------- Stone / Frosted Panels ---------- */
+.header,
+.queue-panel,
+.team-card,
+.match-card {
+    background:
+        linear-gradient(
+            180deg,
+            rgba(30, 32, 42, 0.8),
+            rgba(14, 16, 22, 0.9)
+        );
+
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+
+    border: 1px solid var(--border-soft);
+
+    box-shadow:
+        0 25px 50px rgba(0, 0, 0, 0.65),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+
+    position: relative;
+    z-index: 2;
+}
+
+/* Board section - transparent to show background */
+.board-section {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    position: relative;
+    z-index: 2;
+}
+
+/* ---------- Board Section: Monumental Framing ---------- */
+.board-section::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(
+            circle at center,
+            rgba(255, 255, 255, 0.04),
+            transparent 60%
+        );
+}
+
+/* ---------- Match Cards ---------- */
+.match-card {
+    border-left: 4px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Ongoing / Active Match */
+.match-card.ongoing {
+    border-left-color: var(--accent-gold);
+    box-shadow:
+        0 0 0 1px rgba(200, 179, 126, 0.25),
+        0 0 45px rgba(200, 179, 126, 0.18);
+}
+
+/* ---------- Team Cards ---------- */
+.team-card {
+    filter: saturate(0.85) brightness(0.95);
+}
+
+/* ---------- Accent Text ---------- */
+.accent,
+.stat-value,
+.team-stat-value {
+    color: var(--accent-gold);
+}
+
+/* ---------- Buttons ---------- */
+button,
+.btn {
+    background:
+        linear-gradient(
+            180deg,
+            #3a3a3a,
+            #1a1a1a
+        );
+
+    border: 1px solid var(--border-accent);
+    color: #e6dec8;
+
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+
+    box-shadow:
+        0 6px 18px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+button:hover,
+.btn:hover {
+    box-shadow:
+        0 0 18px rgba(200, 179, 126, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* ---------- Tables / Lists ---------- */
+table,
+.list,
+.queue-list {
+    border-color: var(--border-soft);
+}
+
+th {
+    color: var(--accent-steel);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+/* ---------- Scrollbars ---------- */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(
+        to bottom,
+        var(--accent-gold),
+        #6e5a2e
+    );
+}
+
+/* ---------- Reduced Motion Respect ---------- */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation: none !important;
+        transition: none !important;
+    }
+}

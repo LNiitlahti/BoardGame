@@ -9,10 +9,19 @@ class BoardModule {
         this.hexSize = 32 * scale; // Increased from 30 to reduce gaps
         this.centerOffset = { x: 375 * scale, y: 375 * scale };
         
-        // Define special locations
+        // Define special locations (fixed)
         this.startingLocations = ['q0r-5', 'q5r-5', 'q5r0', 'q0r5', 'q-5r5', 'q-5r0'];
-        this.highValueLocations = ['q2r-4', 'q4r-2', 'q2r2', 'q-2r4', 'q-4r2', 'q-2r-2'];
         this.centerLocation = 'q0r0';
+
+        // Define heart hexes (matching physical board)
+        // Side hearts give +1 VP per game when controlled
+        this.sideHeartLocations = ['q-4r2', 'q-2r-2', 'q2r-4', 'q4r-2', 'q2r2', 'q-2r4'];
+        // Mountain heart (center) gives +2 VP per game when controlled
+        this.mountainHeartLocation = 'q0r0';
+
+        // Room hexes (admin-defined during tournament setup)
+        // When a team places a tile on a room, they draw a spell card
+        this.roomHexes = []; // Loaded from tournament data
     }
 
     /**
@@ -119,25 +128,29 @@ class BoardModule {
     }
 
     /**
-     * Get hex type (normal, starting-location, high-value, center)
+     * Get hex type (normal, starting-location, side-heart, mountain-heart, room)
      */
     getHexType(q, r) {
         const coord = `q${q}r${r}`;
-        
+
+        // Priority order (hearts and starting squares cannot be rooms)
+        if (coord === this.mountainHeartLocation) return 'mountain-heart';
         if (this.startingLocations.includes(coord)) return 'starting-location';
-        if (this.highValueLocations.includes(coord)) return 'high-value';
-        if (coord === this.centerLocation) return 'center';
-        
+        if (this.sideHeartLocations.includes(coord)) return 'side-heart';
+        if (this.roomHexes.includes(coord)) return 'room';
+
         return 'normal';
     }
 
     /**
-     * Get point value for a hex
+     * Get passive income value for a hex
+     * Returns VP per game when this hex is controlled
      */
     getHexValue(q, r) {
         const type = this.getHexType(q, r);
-        if (type === 'high-value' || type === 'center') return 2;
-        return 1;
+        if (type === 'mountain-heart') return 2; // Mountain heart: +2 VP per game
+        if (type === 'side-heart') return 1;     // Side heart: +1 VP per game
+        return 0; // Normal hex: no passive income
     }
 
     /**
@@ -196,6 +209,29 @@ class BoardModule {
             }
         });
         return points;
+    }
+
+    /**
+     * Set room hexes (admin-defined during setup)
+     * @param {Array<string>} roomCoords - Array of coordinate strings like "q1r2"
+     */
+    setRoomHexes(roomCoords) {
+        // Validate that rooms don't overlap with fixed special hexes
+        const invalidRooms = roomCoords.filter(coord =>
+            this.startingLocations.includes(coord) ||
+            this.sideHeartLocations.includes(coord) ||
+            coord === this.mountainHeartLocation
+        );
+
+        if (invalidRooms.length > 0) {
+            console.warn('[BoardModule] Rooms cannot overlap with starting squares or heart hexes:', invalidRooms);
+            // Filter out invalid rooms
+            this.roomHexes = roomCoords.filter(coord => !invalidRooms.includes(coord));
+        } else {
+            this.roomHexes = [...roomCoords];
+        }
+
+        console.log('[BoardModule] Room hexes configured:', this.roomHexes);
     }
 
     /**

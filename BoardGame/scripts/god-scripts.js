@@ -197,8 +197,12 @@ function parseHexKey(hexKey) {
  * Updates the connection status indicator when Firebase successfully connects
  */
 document.addEventListener('firebase-ready', function() {
-    document.getElementById('connectionStatus').className = 'connection-status connected';
-    document.getElementById('connectionStatus').textContent = '🟢 Firebase Connected';
+    const status = document.getElementById('connectionStatus');
+    if (status) {
+        status.classList.remove('disconnected', 'warning');
+        status.classList.add('connected');
+        status.title = 'Firebase: Connected';
+    }
     addLog('Firebase connected successfully', 'success');
 });
 
@@ -209,8 +213,12 @@ document.addEventListener('firebase-ready', function() {
 window.addEventListener('load', function() {
     setTimeout(() => {
         if (window.firebaseDB) {
-            document.getElementById('connectionStatus').className = 'connection-status connected';
-            document.getElementById('connectionStatus').textContent = '🟢 Firebase Connected';
+            const status = document.getElementById('connectionStatus');
+            if (status) {
+                status.classList.remove('disconnected', 'warning');
+                status.classList.add('connected');
+                status.title = 'Firebase: Connected';
+            }
             addLog('Firebase connected successfully', 'success');
         }
     }, 2000);
@@ -252,22 +260,7 @@ function cleanObject(obj) {
     return obj;
 }
 
-/**
- * Gets the display color for a team based on their ID
- * 
- * @param {number} teamId - The team's ID (1-5)
- * @returns {string} - Hex color code for the team
- */
-function getTeamColor(teamId) {
-    const colors = {
-        1: '#ff4444', // Red
-        2: '#44ff44', // Green
-        3: '#4444ff', // Blue
-        4: '#ffff44', // Yellow
-        5: '#ff44ff'  // Magenta
-    };
-    return colors[teamId] || '#888888';
-}
+// Removed duplicate getTeamColor function - see correct version at end of file
 
 /**
  * Shows a status message to the user
@@ -309,10 +302,72 @@ function addLog(message, type = 'info') {
 }
 
 /**
+ * Gets players from a match team, supporting both old and new data formats
+ * Old format: team.players = [{ name, id, originalTeamId, originalTeamColor }]
+ * New format: team.playerIds = ["p_xxx", "p_yyy"] (references to players registry)
+ *
+ * @param {Object} matchTeam - A team object from a match in the queue
+ * @returns {Array} Array of player objects with name, id, originalTeamId, and color
+ */
+function getMatchTeamPlayers(matchTeam) {
+    if (!matchTeam) return [];
+
+    // New format: playerIds array referencing the central registry
+    if (matchTeam.playerIds && Array.isArray(matchTeam.playerIds)) {
+        return matchTeam.playerIds.map(playerId => {
+            // Use PlayerUtils if available
+            if (window.PlayerUtils) {
+                const info = window.PlayerUtils.getPlayerDisplayInfo(gameState, playerId);
+                return {
+                    id: playerId,
+                    name: info.name,
+                    originalTeamId: info.teamId,
+                    originalTeamColor: info.teamId ? getTeamColor(info.teamId) : '#666666'
+                };
+            }
+
+            // Fallback: look up in players registry directly
+            if (gameState?.players && gameState.players[playerId]) {
+                const p = gameState.players[playerId];
+                return {
+                    id: playerId,
+                    name: p.name || 'Unknown',
+                    originalTeamId: p.teamId,
+                    originalTeamColor: p.teamId ? getTeamColor(p.teamId) : '#666666'
+                };
+            }
+
+            // Last resort: return placeholder
+            return {
+                id: playerId,
+                name: playerId.substring(0, 6) + '...',
+                originalTeamId: null,
+                originalTeamColor: '#666666'
+            };
+        });
+    }
+
+    // Old format: players array with full player objects
+    if (matchTeam.players && Array.isArray(matchTeam.players)) {
+        return matchTeam.players.map(p => ({
+            id: p.id || null,
+            name: p.name || 'Unknown',
+            originalTeamId: p.originalTeamId,
+            originalTeamColor: p.originalTeamColor || getTeamColor(p.originalTeamId) || '#666666'
+        }));
+    }
+
+    return [];
+}
+
+/**
  * Clears all entries from the game log
  */
 function clearLog() {
-    document.getElementById('gameLog').innerHTML = '<div class="log-entry">Log cleared...</div>';
+    const log = document.getElementById('gameLog');
+    if (log) {
+        log.innerHTML = '<div class="log-entry">Log cleared...</div>';
+    }
 }
 
 /**
@@ -446,6 +501,7 @@ async function loadGame() {
                 renderPlanTeamPool();
                 renderPlayerManagement();
                 updateGameQueue();
+                updateTemplateDisplay();
 
                 // Initialize Teams tab components
                 if (typeof loadUnassignedUsers === 'function') {
@@ -516,6 +572,7 @@ async function loadTournamentDirectly(tournamentId) {
                 renderPlanTeamPool();
                 renderPlayerManagement();
                 updateGameQueue();
+                updateTemplateDisplay();
 
                 // Initialize Teams tab components
                 if (typeof loadUnassignedUsers === 'function') {
@@ -1458,7 +1515,7 @@ async function addGameToQueue() {
         return;
     }
     
-    // Create the queue entry
+    // Create the queue entry with normalized playerIds
     const queueEntry = {
         id: Date.now(),
         game: game,
@@ -1467,6 +1524,9 @@ async function addGameToQueue() {
             {
                 id: 'TEAM_A',
                 name: 'TEAM A',
+                // Store player IDs for normalized data structure
+                playerIds: manualGameSetup.teamA.map(p => p.id),
+                // Also store full players for backward compatibility during transition
                 players: manualGameSetup.teamA.map(p => ({
                     id: p.id,
                     name: p.name,
@@ -1478,6 +1538,9 @@ async function addGameToQueue() {
             {
                 id: 'TEAM_B',
                 name: 'TEAM B',
+                // Store player IDs for normalized data structure
+                playerIds: manualGameSetup.teamB.map(p => p.id),
+                // Also store full players for backward compatibility during transition
                 players: manualGameSetup.teamB.map(p => ({
                     id: p.id,
                     name: p.name,
@@ -1638,15 +1701,16 @@ async function confirmGameResult() {
     const winningSides = checkedInputs.map(input => input.value);
     const resultNotes = document.getElementById('confirmNotes').value || '';
     
-    // Collect all winning players
+    // Collect all winning players (using helper that supports both old and new formats)
     const winningPlayers = [];
     winningSides.forEach(side => {
         const virtualTeam = selectedQueuedGame.teams.find(t => t.id === side);
         if (virtualTeam) {
-            winningPlayers.push(...virtualTeam.players);
+            const players = getMatchTeamPlayers(virtualTeam);
+            winningPlayers.push(...players);
         }
     });
-    
+
     // Get the real team IDs (from the original teams, not the virtual TEAM_A/TEAM_B)
     const winningTeamIds = [...new Set(winningPlayers.map(p => p.originalTeamId))];
     
@@ -1664,8 +1728,10 @@ async function confirmGameResult() {
         return;
     }
 
-    // Get losing teams
-    const allTeamIds = [...new Set([...selectedQueuedGame.teams[0].players, ...selectedQueuedGame.teams[1].players].map(p => p.originalTeamId))];
+    // Get losing teams (using helper that supports both old and new formats)
+    const teamAPlayers = getMatchTeamPlayers(selectedQueuedGame.teams[0]);
+    const teamBPlayers = getMatchTeamPlayers(selectedQueuedGame.teams[1]);
+    const allTeamIds = [...new Set([...teamAPlayers, ...teamBPlayers].map(p => p.originalTeamId))];
     const losingTeamIds = allTeamIds.filter(id => !winningTeamIds.includes(id));
 
     // Get player data with UIDs for stable identification
@@ -1679,23 +1745,66 @@ async function confirmGameResult() {
         };
     };
 
-    // Create the game result record (ID-based, no redundant names)
+    // Calculate match duration if match had an "ongoing" start time
+    const now = new Date();
+    const startedAt = selectedQueuedGame.startedAt || selectedQueuedGame.ongoingAt;
+    let matchDuration = null;
+    if (startedAt) {
+        const startTime = new Date(startedAt);
+        const durationMs = now - startTime;
+        matchDuration = {
+            startedAt: startedAt,
+            endedAt: now.toISOString(),
+            durationMinutes: Math.round(durationMs / 60000)
+        };
+    }
+
+    // Create team stats snapshot for historical tracking
+    const teamStatsSnapshot = {};
+    gameState.teams.forEach(team => {
+        const hexCount = Object.values(gameState.board || {}).filter(t => t === team.id).length;
+        teamStatsSnapshot[team.id] = {
+            points: team.points || 0,
+            gamesWon: team.gamesWon || 0,
+            hexCount: hexCount
+        };
+    });
+
+    // Create the game result record (ID-based, normalized format)
     const result = {
         id: (gameState.gameHistory?.length || 0) + 1,
         game: selectedQueuedGame.game,
         playType: selectedQueuedGame.playType,
+        // Normalized matchup: store player IDs
         matchup: {
-            teamASide: selectedQueuedGame.teams[0].players.map(p => getPlayerWithUID(p)),
-            teamBSide: selectedQueuedGame.teams[1].players.map(p => getPlayerWithUID(p))
+            teamASidePlayerIds: teamAPlayers.map(p => p.id),
+            teamBSidePlayerIds: teamBPlayers.map(p => p.id),
+            // Keep old format for backward compatibility during transition
+            teamASide: teamAPlayers.map(p => getPlayerWithUID(p)),
+            teamBSide: teamBPlayers.map(p => getPlayerWithUID(p))
         },
         winningSide: winningSides[0],
+        // Normalized: store winning/losing player IDs
+        winningPlayerIds: winningPlayers.map(p => p.id),
+        losingPlayerIds: [...teamAPlayers, ...teamBPlayers]
+            .filter(p => !winningPlayers.some(wp => wp.id === p.id))
+            .map(p => p.id),
+        // Keep old format for backward compatibility
         winningPlayers: winningPlayers.map(p => getPlayerWithUID(p)),
         winningTeamIds: winningTeamIds,  // Store IDs only
         losingTeamIds: losingTeamIds,    // Store IDs only
         queuedGameId: selectedQueuedGame.id,
         planNotes: selectedQueuedGame.notes || '',
         resultNotes: resultNotes,
-        timestamp: new Date().toISOString()
+        timestamp: now.toISOString(),
+
+        // Enhanced statistics fields
+        matchDuration: matchDuration,
+        tournamentRound: gameState.currentRound || 1,
+        matchNumberInRound: ((gameState.gameHistory?.length || 0) % (gameState.teams?.length || 5)) + 1,
+        teamStatsSnapshot: teamStatsSnapshot,
+        isChallenge: selectedQueuedGame.isChallenge || false,
+        challengeHexCoord: selectedQueuedGame.challengeHexCoord || null
     };
     
     // Add to game history
@@ -1709,6 +1818,16 @@ async function confirmGameResult() {
         const team = gameState.teams.find(t => t.id === teamId);
         if (team) {
             team.gamesWon = (team.gamesWon || 0) + 1;
+            team.gamesPlayed = (team.gamesPlayed || 0) + 1;
+        }
+    });
+
+    // Update loss counts for all losing teams
+    losingTeamIds.forEach(teamId => {
+        const team = gameState.teams.find(t => t.id === teamId);
+        if (team) {
+            team.gamesLost = (team.gamesLost || 0) + 1;
+            team.gamesPlayed = (team.gamesPlayed || 0) + 1;
         }
     });
     
@@ -1733,9 +1852,9 @@ async function confirmGameResult() {
     updateDisplay();
     updateGameQueue();
     
-    // Create log message
-    const teamANames = selectedQueuedGame.teams[0].players.map(p => p.name).join(' & ');
-    const teamBNames = selectedQueuedGame.teams[1].players.map(p => p.name).join(' & ');
+    // Create log message (using already resolved player arrays)
+    const teamANames = teamAPlayers.map(p => p.name).join(' & ');
+    const teamBNames = teamBPlayers.map(p => p.name).join(' & ');
     const winningNames = winningPlayers.map(p => p.name).join(' & ');
     
     const logMessage = `🏆 ${winningNames} won ${selectedQueuedGame.game} ${selectedQueuedGame.playType}. Match was: ${teamANames} vs ${teamBNames}`;
@@ -1758,42 +1877,141 @@ async function confirmGameResult() {
 
 /**
  * Updates the visual display of the game queue
- * Shows all pending games with options to select or delete them
+ * Shows all pending games with drag-and-drop reordering
  */
 function updateGameQueue() {
     const container = document.getElementById('gameQueue');
     const countSpan = document.getElementById('queueCount');
-    
+
     if (!gameState?.gameQueue || gameState.gameQueue.length === 0) {
         container.innerHTML = '<p style="text-align: center; opacity: 0.7; font-style: italic; font-size: 0.85rem;">No games in queue</p>';
         countSpan.textContent = '0';
         return;
     }
-    
+
     // Filter to only pending games
     const pendingGames = gameState.gameQueue.filter(g => g.status === 'pending');
     countSpan.textContent = pendingGames.length.toString();
-    
+
     if (pendingGames.length === 0) {
         container.innerHTML = '<p style="text-align: center; opacity: 0.7; font-style: italic; font-size: 0.85rem;">No pending games</p>';
         return;
     }
-    
-    // Render each queued game
-    container.innerHTML = pendingGames.map(game => {
+
+    // Render each queued game with drag-and-drop support
+    container.innerHTML = pendingGames.map((game, index) => {
         const teamNames = game.teams.map(t => t.name).join(' vs ');
         return `
-            <div class="queued-game ${game.status}" onclick="selectQueuedGameFromList(${game.id})">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                    <strong style="font-size: 0.9rem;">${game.game} - ${game.playType}</strong>
-                    <button onclick="event.stopPropagation(); removeFromQueue(${game.id})" 
-                            style="background: rgba(239, 68, 68, 0.8); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px; line-height: 1; padding: 0;">×</button>
+            <div class="queued-game ${game.status}"
+                 draggable="true"
+                 data-queue-id="${game.id}"
+                 ondragstart="dragQueueItem(event, ${game.id})"
+                 ondragover="allowQueueDrop(event)"
+                 ondrop="dropQueueItem(event, ${game.id})"
+                 ondragend="dragQueueEnd(event)"
+                 onclick="selectQueuedGameFromList(${game.id})">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="cursor: grab; opacity: 0.4; font-size: 1.1rem; user-select: none;" class="drag-handle" title="Drag to reorder">⋮⋮</div>
+                    <div style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <strong style="font-size: 0.9rem;">#${index + 1} - ${game.game} - ${game.playType}</strong>
+                            <button onclick="event.stopPropagation(); removeFromQueue(${game.id})"
+                                    style="background: rgba(239, 68, 68, 0.8); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px; line-height: 1; padding: 0;">×</button>
+                        </div>
+                        <div style="font-size: 0.85rem; opacity: 0.9;">${teamNames}</div>
+                        ${game.notes ? `<div style="font-size: 0.75rem; opacity: 0.7; margin-top: 3px;">${game.notes}</div>` : ''}
+                    </div>
                 </div>
-                <div style="font-size: 0.85rem; opacity: 0.9;">${teamNames}</div>
-                ${game.notes ? `<div style="font-size: 0.75rem; opacity: 0.7; margin-top: 3px;">${game.notes}</div>` : ''}
             </div>
         `;
     }).join('');
+}
+
+// =============================================================================
+// DRAG AND DROP QUEUE REORDERING
+// =============================================================================
+
+let draggedQueueId = null;
+
+/**
+ * Start dragging a queue item
+ */
+function dragQueueItem(event, gameId) {
+    draggedQueueId = gameId;
+    event.currentTarget.style.opacity = '0.4';
+    event.dataTransfer.effectAllowed = 'move';
+}
+
+/**
+ * Allow drop on queue items
+ */
+function allowQueueDrop(event) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+
+    // Highlight drop zone
+    const item = event.currentTarget;
+    if (item.dataset.queueId != draggedQueueId) {
+        item.style.borderTop = '3px solid #ffd700';
+    }
+}
+
+/**
+ * Handle dropping a queue item
+ */
+async function dropQueueItem(event, targetGameId) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    // Remove highlight
+    event.currentTarget.style.borderTop = '';
+
+    if (!draggedQueueId || draggedQueueId === targetGameId) {
+        return;
+    }
+
+    try {
+        // Find indices in the pending games array
+        const pendingGames = gameState.gameQueue.filter(g => g.status === 'pending');
+        const draggedIndex = pendingGames.findIndex(g => g.id === draggedQueueId);
+        const targetIndex = pendingGames.findIndex(g => g.id === targetGameId);
+
+        if (draggedIndex === -1 || targetIndex === -1) return;
+
+        // Reorder the pending games
+        const draggedGame = pendingGames[draggedIndex];
+        pendingGames.splice(draggedIndex, 1);
+        pendingGames.splice(targetIndex, 0, draggedGame);
+
+        // Rebuild the full queue with reordered pending games
+        const completedGames = gameState.gameQueue.filter(g => g.status === 'completed');
+        gameState.gameQueue = [...pendingGames, ...completedGames];
+
+        // Save and update
+        await saveGameState();
+        updateGameQueue();
+        updateQueuedGameSelect();
+
+        addLog(`🔄 Reordered queue: moved game #${draggedIndex + 1} to position #${targetIndex + 1}`, 'info');
+
+    } catch (error) {
+        console.error('Error reordering queue:', error);
+        showStatus('Error reordering queue: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Clean up after drag ends
+ */
+function dragQueueEnd(event) {
+    event.currentTarget.style.opacity = '1';
+
+    // Remove all highlights
+    document.querySelectorAll('.queued-game').forEach(item => {
+        item.style.borderTop = '';
+    });
+
+    draggedQueueId = null;
 }
 
 /**
@@ -1820,6 +2038,146 @@ async function removeFromQueue(gameId) {
     updateGameQueue();
     updateQueuedGameSelect();
     addLog(`🗑️ Removed game from queue`, 'success');
+}
+
+/**
+ * Imports match templates from setup wizard into the game queue
+ * Converts match templates to playable queue entries
+ */
+async function importMatchTemplates() {
+    if (!gameState || !gameState.matches || gameState.matches.length === 0) {
+        showStatus('No match templates found to import', 'error');
+        return;
+    }
+
+    if (!confirm(`Import ${gameState.matches.length} match templates into the game queue?\n\nNote: Templates don't have assigned players yet. You'll need to assign players manually for each match.`)) {
+        return;
+    }
+
+    try {
+        let importedCount = 0;
+        const startId = (gameState.gameQueue?.length || 0) + 1;
+
+        // Convert each template to a queue entry
+        gameState.matches.forEach((template, index) => {
+            // Create a queue entry based on the template
+            const queueEntry = {
+                id: startId + index,
+                game: template.game || template.gameType || 'Unknown Game',
+                gameNumber: template.gameSequence || (startId + index),
+                playType: template.format || '2v2',
+                status: 'pending',
+
+                // Create empty sides that need to be filled
+                sides: [
+                    {
+                        name: template.teamA?.name || 'Side A',
+                        players: [] // Will be filled manually by admin
+                    },
+                    {
+                        name: template.teamB?.name || 'Side B',
+                        players: [] // Will be filled manually by admin
+                    }
+                ],
+
+                notes: template.suggestedPlayers?.note || `Template #${template.id} - Round ${template.round}${template.subMatch ? ` (${template.subMatch})` : ''}`,
+                round: template.round,
+                templateId: template.id,
+                createdAt: new Date().toISOString()
+            };
+
+            gameState.gameQueue.push(queueEntry);
+            importedCount++;
+        });
+
+        // Clear the templates array to prevent re-importing
+        gameState.matches = [];
+
+        // Save to Firebase
+        await saveGameState();
+
+        // Update UI
+        updateGameQueue();
+        updateTemplateDisplay();
+
+        addLog(`📥 Imported ${importedCount} match templates into queue`, 'success');
+        showStatus(`Successfully imported ${importedCount} match templates! Assign players in the Plan Game tab.`, 'success');
+
+    } catch (error) {
+        console.error('Error importing templates:', error);
+        showStatus('Error importing templates: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Updates the template display section with tournament info
+ * Shows tournament details and game queue status when a tournament is loaded
+ */
+function updateTemplateDisplay() {
+    const container = document.getElementById('templateDisplay');
+    if (!container) return;
+
+    if (!gameState || !gameState.tournamentId) {
+        container.innerHTML = '<p style="text-align: center; opacity: 0.7;">Load a game to see templates</p>';
+        return;
+    }
+
+    const tournamentName = gameState.name || gameState.gameId || gameState.tournamentId;
+    const teamCount = gameState.teams?.length || 0;
+    const queueCount = gameState.gameQueue?.filter(g => g.status === 'pending').length || 0;
+    const completedCount = gameState.gameQueue?.filter(g => g.status === 'completed').length || 0;
+    const templatesCount = gameState.matches?.length || 0;
+
+    container.innerHTML = `
+        <div style="background: rgba(6, 182, 212, 0.1); padding: 20px; border-radius: 10px; border: 2px solid #06b6d4;">
+            <h3 style="color: #06b6d4; margin-bottom: 15px;">
+                🏆 Tournament: ${tournamentName}
+            </h3>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 15px;">
+                <div style="text-align: center; background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 8px;">
+                    <div style="font-size: 1.8rem; font-weight: bold; color: #10b981;">${teamCount}</div>
+                    <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 5px;">Teams</div>
+                </div>
+                <div style="text-align: center; background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 8px;">
+                    <div style="font-size: 1.8rem; font-weight: bold; color: #f7ba32;">${templatesCount}</div>
+                    <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 5px;">Templates</div>
+                </div>
+                <div style="text-align: center; background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 8px;">
+                    <div style="font-size: 1.8rem; font-weight: bold; color: #ffd700;">${queueCount}</div>
+                    <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 5px;">Queued</div>
+                </div>
+                <div style="text-align: center; background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 8px;">
+                    <div style="font-size: 1.8rem; font-weight: bold; color: #a855f7;">${completedCount}</div>
+                    <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 5px;">Completed</div>
+                </div>
+            </div>
+            ${templatesCount > 0 ? `
+                <div style="margin-top: 15px; padding: 15px; background: rgba(247, 186, 50, 0.1); border-radius: 8px; border: 1px solid rgba(247, 186, 50, 0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong style="color: #f7ba32;">📋 ${templatesCount} Match Templates Available</strong>
+                            <p style="color: #94a3b8; font-size: 0.85rem; margin: 5px 0 0 0;">
+                                Templates from setup wizard. Import them to game queue to start playing.
+                            </p>
+                        </div>
+                        <button class="btn" onclick="importMatchTemplates()" style="background: #f7ba32; color: #22241d; white-space: nowrap;">
+                            ⬇️ Import Templates
+                        </button>
+                    </div>
+                </div>
+            ` : ''}
+            <div style="margin-top: 15px; padding: 12px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; text-align: center;">
+                <p style="color: #94a3b8; font-size: 0.9rem; margin: 0;">
+                    ${queueCount > 0
+                        ? `Use the <strong style="color: #ffd700;">Plan Game</strong> tab below to add matches, or <strong style="color: #10b981;">Confirm Result</strong> to complete queued matches.`
+                        : templatesCount > 0
+                        ? `Import the match templates above or use the <strong style="color: #ffd700;">Plan Game</strong> tab to manually create matches.`
+                        : `Use the <strong style="color: #ffd700;">Plan Game</strong> tab below to create your first match!`
+                    }
+                </p>
+            </div>
+        </div>
+    `;
 }
 
 
@@ -2154,27 +2512,73 @@ function updateStatistics() {
  */
 document.addEventListener('DOMContentLoaded', function() {
     addLog('👑 God Mode Admin Panel Ready');
-    
+
     // Initialize the board rendering system
     initializeBoardModules();
-    
+
     // Check if game ID or tournament was passed in URL
     const urlParams = new URLSearchParams(window.location.search);
     const gameId = urlParams.get('tournament') || urlParams.get('gameId') || urlParams.get('game');
+    const requestedTab = urlParams.get('tab');
+
     if (gameId) {
         document.getElementById('gameId').value = gameId;
-        // Only auto-load if we're on the matches tab
-        const currentTab = urlParams.get('tab') || sessionStorage.getItem('godActiveTab');
-        if (currentTab === 'matches') {
-            setTimeout(() => loadGame(), 1000);
-        }
+
+        // Auto-load the tournament after Firebase is ready
+        document.addEventListener('firebase-ready', function() {
+            setTimeout(async () => {
+                addLog(`📂 Auto-loading tournament from URL: ${gameId}`);
+
+                // Load the tournament
+                if (typeof loadTournamentDirectly === 'function') {
+                    await loadTournamentDirectly(gameId);
+                } else if (typeof loadGame === 'function') {
+                    await loadGame();
+                }
+
+                // Switch to requested tab, or default to 'matches' when tournament is specified
+                const targetTab = requestedTab || 'matches';
+                if (typeof switchGodTab === 'function') {
+                    switchGodTab(targetTab);
+                }
+            }, 500);
+        }, { once: true });
     } else {
-        // Don't set a default - leave it empty for user to select a tournament
+        // No tournament specified - stay on tournaments list
         document.getElementById('gameId').value = '';
+
+        // If a tab was requested, switch to it after Firebase is ready
+        if (requestedTab) {
+            document.addEventListener('firebase-ready', function() {
+                setTimeout(() => {
+                    if (typeof switchGodTab === 'function') {
+                        switchGodTab(requestedTab);
+                    }
+                }, 500);
+            }, { once: true });
+        }
     }
-    
+
     // Initialize the manual game display
     updateManualGameDisplay();
+
+    // Listen for tournament changes from navbar
+    document.addEventListener('tournament-changed', async function(event) {
+        const { tournamentId, tournamentName } = event.detail;
+        if (tournamentId) {
+            addLog(`🔄 Tournament changed from navbar: ${tournamentId}`);
+
+            // Update the gameId input
+            document.getElementById('gameId').value = tournamentId;
+
+            // Load the tournament
+            if (typeof loadTournamentDirectly === 'function') {
+                await loadTournamentDirectly(tournamentId);
+            } else if (typeof loadGame === 'function') {
+                await loadGame();
+            }
+        }
+    });
 });
 
 /**
@@ -2193,7 +2597,7 @@ let matchTemplates = [];
 
 async function loadMatchTemplates() {
     try {
-        const gameDoc = await db.collection('games').doc(currentGameId).get();
+        const gameDoc = await db.collection('tournaments').doc(currentGameId).get();
         if (!gameDoc.exists) return;
         
         const data = gameDoc.data();
@@ -2319,7 +2723,7 @@ async function confirmMatchPlanning(actualPlayers) {
     };
     
     // Update in Firebase
-    const gameDoc = await db.collection('games').doc(currentGameId).get();
+    const gameDoc = await db.collection('tournaments').doc(currentGameId).get();
     const data = gameDoc.data();
     const matches = data.matches || [];
     
@@ -2327,7 +2731,7 @@ async function confirmMatchPlanning(actualPlayers) {
     if (matchIndex >= 0) {
         matches[matchIndex] = updatedMatch;
         
-        await db.collection('games').doc(currentGameId).update({
+        await db.collection('tournaments').doc(currentGameId).update({
             matches: matches
         });
         
@@ -2809,19 +3213,281 @@ function dragEnd(event) {
 
 /**
  * Helper function: get team color by ID
+ * First checks Firebase team data, falls back to CSS variable defaults
+ * Uses string comparison to handle type mismatches (string vs number IDs)
  */
 function getTeamColor(teamId) {
+    if (teamId == null) return '#6b7280';
+
+    // First check if team has a custom color set in Firebase
+    if (window.gameState?.teams) {
+        const team = window.gameState.teams.find(t => String(t.id) === String(teamId));
+        if (team?.color) {
+            return team.color;
+        }
+    }
+
+    // Fallback to default colors matching CSS variables in brand-theme.css
     const colors = [
-        '#3b82f6', // blue
-        '#ef4444', // red
-        '#10b981', // green
-        '#f59e0b', // amber
-        '#8b5cf6', // purple
-        '#ec4899', // pink
-        '#14b8a6', // teal
-        '#f97316'  // orange
+        '#de392c', // Team 1: Red (--team-1-color)
+        '#2278a3', // Team 2: Blue (--team-2-color)
+        '#2e9158', // Team 3: Green (--team-3-color)
+        '#f7ba32', // Team 4: Orange (--team-4-color)
+        '#a855f7'  // Team 5: Purple (--team-5-color)
     ];
     return colors[(teamId - 1) % colors.length] || '#6b7280';
+}
+
+/**
+ * Generate and display smart match suggestion
+ */
+function generateMatchSuggestion() {
+    if (!window.gameState || !window.MatchSuggester) {
+        showStatus('Load a tournament first', 'error');
+        return;
+    }
+
+    try {
+        const suggester = new MatchSuggester(window.gameState);
+        const suggestion = suggester.generateSuggestion();
+
+        displayMatchSuggestion(suggestion);
+    } catch (error) {
+        console.error('Error generating suggestion:', error);
+        showStatus('Error generating suggestion: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Display the match suggestion in the UI
+ */
+function displayMatchSuggestion(suggestion) {
+    const container = document.getElementById('suggestionDisplay');
+    if (!container) return;
+
+    const { game, round, matches, selectedPlayers, benchedPlayers, confidence, alternativeGames, alternativeRounds } = suggestion;
+
+    container.innerHTML = `
+        <div style="margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div>
+                    <h4 style="color: #10b981; margin: 0 0 5px 0;">
+                        ${game.emoji} ${game.game}
+                    </h4>
+                    <p style="color: #f7ba32; font-size: 0.9rem; margin: 5px 0;">
+                        <strong>Round Format:</strong> ${round.round}
+                    </p>
+                    <p style="color: #94a3b8; font-size: 0.85rem; margin: 0;">
+                        ${round.description} • Confidence: <strong style="color: ${confidence > 70 ? '#10b981' : confidence > 40 ? '#f7ba32' : '#ef4444'}">${confidence}%</strong>
+                    </p>
+                </div>
+                <button class="btn primary" onclick="applySuggestion(${JSON.stringify(suggestion).replace(/"/g, '&quot;')})" style="white-space: nowrap;">
+                    ✅ Use This Round
+                </button>
+            </div>
+
+            <!-- Reasoning -->
+            <div style="background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem;">
+                    <div>
+                        <strong style="color: #10b981;">🎮 Game:</strong> ${game.reason}
+                    </div>
+                    <div>
+                        <strong style="color: #10b981;">📊 Round:</strong> ${round.reason}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Match Breakdown -->
+            <div style="margin-bottom: 15px;">
+                <h5 style="color: #06b6d4; margin: 0 0 10px 0;">Match Breakdown (${matches.length} game${matches.length > 1 ? 's' : ''}):</h5>
+                ${matches.map((match, matchIdx) => `
+                    <div style="background: rgba(6, 182, 212, 0.1); padding: 12px; border-radius: 6px; margin-bottom: 10px; border: 1px solid rgba(6, 182, 212, 0.3);">
+                        <div style="font-weight: 600; color: #06b6d4; margin-bottom: 8px;">
+                            Game ${match.gameNumber}: ${game.game} (${match.format})
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(${match.teams.length}, 1fr); gap: 8px;">
+                            ${match.teams.map((team, idx) => `
+                                <div style="background: rgba(${idx === 0 ? '59, 130, 246' : idx === 1 ? '239, 68, 68' : idx === 2 ? '16, 185, 129' : '168, 85, 247'}, 0.15); padding: 8px; border-radius: 4px;">
+                                    <strong style="color: ${idx === 0 ? '#3b82f6' : idx === 1 ? '#ef4444' : idx === 2 ? '#10b981' : '#a855f7'}; font-size: 0.85rem;">${team.name}</strong>
+                                    <div style="margin-top: 4px; font-size: 0.8rem;">
+                                        ${team.players.map(p => `<div>• ${p}</div>`).join('')}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+
+            <!-- Player Status -->
+            <div style="margin-bottom: 15px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <h5 style="color: #10b981; margin: 0 0 8px 0;">✅ Playing (${selectedPlayers.length}):</h5>
+                        <div style="font-size: 0.85rem;">
+                            ${selectedPlayers.map(p => `
+                                <div style="padding: 4px; background: rgba(255, 255, 255, 0.03); margin-bottom: 3px; border-radius: 3px;">
+                                    <strong>${p.name}</strong>
+                                    <span style="opacity: 0.7; font-size: 0.8rem; margin-left: 5px;">${p.reason}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div>
+                        <h5 style="color: #f7ba32; margin: 0 0 8px 0;">⏸️ Resting (${benchedPlayers.length}):</h5>
+                        <div style="font-size: 0.85rem;">
+                            ${benchedPlayers.slice(0, 3).map(p => `
+                                <div style="padding: 4px; background: rgba(255, 255, 255, 0.03); margin-bottom: 3px; border-radius: 3px;">
+                                    <strong>${p.name}</strong>
+                                    <span style="opacity: 0.7; font-size: 0.8rem; margin-left: 5px;">${p.reason}</span>
+                                </div>
+                            `).join('')}
+                            ${benchedPlayers.length > 3 ? `<div style="opacity: 0.5; font-size: 0.8rem;">... and ${benchedPlayers.length - 3} more</div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alternatives -->
+            <details style="margin-top: 15px;">
+                <summary style="cursor: pointer; color: #06b6d4; font-weight: 600; padding: 8px; background: rgba(6, 182, 212, 0.1); border-radius: 6px;">
+                    Alternative Suggestions
+                </summary>
+                <div style="margin-top: 10px; padding: 10px; background: rgba(255, 255, 255, 0.03); border-radius: 6px;">
+                    <div style="margin-bottom: 10px;">
+                        <strong>Alternative Games:</strong>
+                        ${alternativeGames.map(g => `
+                            <div style="padding: 6px; margin-top: 5px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; font-size: 0.85rem;">
+                                ${g.emoji} ${g.game} - ${g.reason}
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div>
+                        <strong>Alternative Rounds:</strong>
+                        ${alternativeRounds.map(r => `
+                            <div style="padding: 6px; margin-top: 5px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; font-size: 0.85rem;">
+                                ${r.round} - ${r.reason}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </details>
+        </div>
+    `;
+
+    // Show the panel if hidden
+    const panel = document.getElementById('smartSuggestionPanel');
+    if (panel) panel.style.display = 'block';
+}
+
+/**
+ * Split players into balanced teams based on format
+ */
+function splitPlayersIntoTeams(playerNames, format) {
+    const teams = [];
+
+    if (format === '5v5') {
+        teams.push({ name: 'Team A', players: playerNames.slice(0, 5) });
+        teams.push({ name: 'Team B', players: playerNames.slice(5, 10) });
+    } else if (format === '2v2') {
+        teams.push({ name: 'Team A', players: playerNames.slice(0, 2) });
+        teams.push({ name: 'Team B', players: playerNames.slice(2, 4) });
+    } else if (format === '3v3') {
+        teams.push({ name: 'Team A', players: playerNames.slice(0, 3) });
+        teams.push({ name: 'Team B', players: playerNames.slice(3, 6) });
+    } else if (format === '2v2v2') {
+        teams.push({ name: 'Team A', players: playerNames.slice(0, 2) });
+        teams.push({ name: 'Team B', players: playerNames.slice(2, 4) });
+        teams.push({ name: 'Team C', players: playerNames.slice(4, 6) });
+    } else if (format === '2v2v2v2') {
+        teams.push({ name: 'Team A', players: playerNames.slice(0, 2) });
+        teams.push({ name: 'Team B', players: playerNames.slice(2, 4) });
+        teams.push({ name: 'Team C', players: playerNames.slice(4, 6) });
+        teams.push({ name: 'Team D', players: playerNames.slice(6, 8) });
+    }
+
+    return teams;
+}
+
+/**
+ * Apply the suggestion to the game planning UI
+ */
+function applySuggestion(suggestion) {
+    // Set game type
+    const gameTypeSelect = document.getElementById('planGameType');
+    if (gameTypeSelect) {
+        // Try to find matching option
+        const gameName = suggestion.game.game;
+        const options = Array.from(gameTypeSelect.options);
+        const match = options.find(opt =>
+            opt.value.toLowerCase().includes(gameName.toLowerCase()) ||
+            gameName.toLowerCase().includes(opt.value.toLowerCase())
+        );
+
+        if (match) {
+            gameTypeSelect.value = match.value;
+        }
+    }
+
+    // Set format
+    const formatSelect = document.getElementById('planPlayType');
+    if (formatSelect) {
+        // Check if format exists as an option
+        const formatValue = suggestion.format.format;
+        const options = Array.from(formatSelect.options);
+        const match = options.find(opt => opt.value === formatValue);
+
+        if (match) {
+            formatSelect.value = formatValue;
+        } else {
+            // Add the format if it doesn't exist
+            const newOption = document.createElement('option');
+            newOption.value = formatValue;
+            newOption.textContent = formatValue;
+            formatSelect.appendChild(newOption);
+            formatSelect.value = formatValue;
+        }
+    }
+
+    // Clear current manual setup
+    manualGameSetup.teamA = [];
+    manualGameSetup.teamB = [];
+
+    // Populate teams based on suggestion
+    const teams = splitPlayersIntoTeams(suggestion.selectedPlayers.map(p => p.name), suggestion.format.format);
+
+    // We need to find matching players from teams and add them
+    teams.forEach((suggestedTeam, teamIndex) => {
+        suggestedTeam.players.forEach(playerName => {
+            // Find this player in the actual teams
+            gameState.teams.forEach(team => {
+                const playerIndex = team.players.findIndex(p =>
+                    p.name.toLowerCase() === playerName.toLowerCase()
+                );
+
+                if (playerIndex !== -1) {
+                    const player = team.players[playerIndex];
+                    const targetTeam = teamIndex === 0 ? manualGameSetup.teamA : manualGameSetup.teamB;
+
+                    targetTeam.push({
+                        id: playerIndex,
+                        name: player.name,
+                        originalTeamId: team.id,
+                        originalTeamName: team.name,
+                        originalTeamColor: team.color || getTeamColor(team.id)
+                    });
+                }
+            });
+        });
+    });
+
+    // Re-render the UI
+    renderManualGameSetup();
+    renderPlanTeamPool();
+
+    showStatus('Suggestion applied! Review and add to queue when ready.', 'success');
+    addLog(`🧠 Applied smart suggestion: ${suggestion.game.game} ${suggestion.format.format}`, 'info');
 }
 
 // Auto-load tournaments when Firebase is ready
@@ -2829,3 +3495,33 @@ document.addEventListener('firebase-ready', function() {
     // Wait a bit for god-scripts to initialize
     setTimeout(loadAllTournaments, 1000);
 });
+
+// =============================================================================
+// SECTION: EXPOSE FUNCTIONS TO WINDOW FOR MODULE ACCESS
+// =============================================================================
+// These functions need to be accessible from admin-panel.html modules
+window.loadGame = loadGame;
+window.loadTournamentDirectly = loadTournamentDirectly;
+window.loadTournamentForAppointment = loadTournamentForAppointment;
+window.loadAllTournaments = loadAllTournaments;
+window.loadTournamentById = loadTournamentById;
+window.loadTournamentList = loadAllTournaments; // Alias for admin-panel compatibility
+window.initializeBoardModules = initializeBoardModules;
+window.renderBoard = renderBoard;
+window.updateTournamentStats = updateTournamentStats;
+
+// Stub functions for tabs that need data loading but don't have dedicated functions
+window.updateStats = function() {
+    console.log('[god-scripts] updateStats called');
+    if (window.gameState) {
+        updateDisplay();
+        updateTournamentStats();
+    }
+};
+window.updateHistoryDisplay = function() {
+    console.log('[god-scripts] updateHistoryDisplay called');
+    // History display is updated automatically when gameState changes
+    if (window.gameState && typeof updateDisplay === 'function') {
+        updateDisplay();
+    }
+};

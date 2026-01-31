@@ -199,11 +199,12 @@ body {
     opacity: 0.5;
 }
 
-.team-box.team1 { border-left-color: #ff4444; }
-.team-box.team2 { border-left-color: #44ff44; }
-.team-box.team3 { border-left-color: #4444ff; }
-.team-box.team4 { border-left-color: #ffff44; }
-.team-box.team5 { border-left-color: #ff44ff; }
+/* Team color borders - using CSS variables */
+.team-box.team1 { border-left-color: var(--team-1-color); } /* Red */
+.team-box.team2 { border-left-color: var(--team-2-color); } /* Blue */
+.team-box.team3 { border-left-color: var(--team-3-color); } /* Green */
+.team-box.team4 { border-left-color: var(--team-4-color); } /* Orange */
+.team-box.team5 { border-left-color: var(--team-5-color); } /* Purple */
 
 .team-box.in-slot {
     cursor: default;
@@ -264,11 +265,12 @@ body {
     opacity: 0.5;
 }
 
-.team-box.team1 .player-tag { background: rgba(255, 68, 68, 0.4); border: 1px solid rgba(255, 68, 68, 0.6); }
-.team-box.team2 .player-tag { background: rgba(68, 255, 68, 0.4); border: 1px solid rgba(68, 255, 68, 0.6); }
-.team-box.team3 .player-tag { background: rgba(68, 68, 255, 0.4); border: 1px solid rgba(68, 68, 255, 0.6); }
-.team-box.team4 .player-tag { background: rgba(255, 255, 68, 0.4); border: 1px solid rgba(255, 255, 68, 0.6); }
-.team-box.team5 .player-tag { background: rgba(255, 68, 255, 0.4); border: 1px solid rgba(255, 68, 255, 0.6); }
+/* Team color player tags - using CSS variables */
+.team-box.team1 .player-tag { background: var(--team-1-alpha); border: 1px solid var(--team-1-color); } /* Red */
+.team-box.team2 .player-tag { background: var(--team-2-alpha); border: 1px solid var(--team-2-color); } /* Blue */
+.team-box.team3 .player-tag { background: var(--team-3-alpha); border: 1px solid var(--team-3-color); } /* Green */
+.team-box.team4 .player-tag { background: var(--team-4-alpha); border: 1px solid var(--team-4-color); } /* Orange */
+.team-box.team5 .player-tag { background: var(--team-5-alpha); border: 1px solid var(--team-5-color); } /* Purple */
 
 /* Editable player names */
 .editable-player-name {

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+    ============================================================================
+    STATISTICS-LIGHTWEIGHT.HTML - TOURNAMENT STATISTICS & ANALYSIS
+    ============================================================================
+
+    PURPOSE:
+    Comprehensive statistics view for completed or ongoing tournaments.
+    Displays detailed analytics, match history, team comparisons, and charts.
+
+    FEATURES:
+    - Tournament selector (shows finished and playing tournaments)
+    - Team standings with win/loss records
+    - Match history with filtering
+    - Head-to-head comparison matrix
+    - Progress charts (points, wins over time)
+    - Game type breakdown
+    - Export functionality
+
+    USAGE:
+    - URL parameter: statistics-lightweight.html?tournamentId=xxx
+    - Or select tournament from dropdown
+
+    ACCESS:
+    Public - no authentication required.
+    ============================================================================
+-->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tournament Statistics</title>
+
+    <!-- Favicons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="images/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="images/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="images/favicon/favicon-16x16.png">
+    <link rel="shortcut icon" href="images/favicon/favicon.ico">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="css/brand-theme.css">
+    <link rel="stylesheet" href="css/navbar.css">
+    <link rel="stylesheet" href="css/statistics-lightweight.css">
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <div>Loading tournament data...</div>
+        </div>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="unified-navbar">
+        <div class="navbar-container">
+            <a href="home.html" class="navbar-brand">
+                <img src="images/favicon/android-chrome-192x192.png" alt="Logo" class="navbar-logo">
+                <div class="navbar-brand-text">
+                    <span class="navbar-brand-name">Tournament Statistics</span>
+                    <span class="navbar-tournament-name" id="navTournamentName">No Tournament</span>
+                </div>
+            </a>
+
+            <div class="navbar-user">
+                <div class="navbar-connection-status" id="connectionStatus" title="Connecting..."></div>
+                <button class="btn secondary" onclick="exportStatistics()">Export</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="stats-container">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="tournament-selector">
+                <label for="tournamentSelect">Tournament:</label>
+                <select id="tournamentSelect" onchange="onTournamentSelect(this.value)">
+                    <option value="">Select a tournament...</option>
+                </select>
+                <button class="btn secondary" onclick="refreshTournaments()">Refresh</button>
+            </div>
+
+            <div class="tournament-meta" id="tournamentMeta">
+                <span class="meta-item">Status: <strong id="metaStatus">--</strong></span>
+                <span class="meta-item">Rounds: <strong id="metaRounds">--</strong></span>
+                <span class="meta-item">Games: <strong id="metaGames">--</strong></span>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+            <button class="tab-btn" data-tab="matches" onclick="switchTab('matches')">Match History</button>
+            <button class="tab-btn" data-tab="headtohead" onclick="switchTab('headtohead')">Head-to-Head</button>
+            <button class="tab-btn" data-tab="games" onclick="switchTab('games')">Game Analysis</button>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content">
+            <!-- Overview Tab -->
+            <div class="tab-pane active" id="tab-overview">
+                <div class="overview-grid">
+                    <!-- Team Standings -->
+                    <section class="stats-card standings-card">
+                        <h3>Team Standings</h3>
+                        <div class="standings-table" id="standingsTable">
+                            <p class="no-data">Select a tournament to view standings</p>
+                        </div>
+                    </section>
+
+                    <!-- Tournament Summary -->
+                    <section class="stats-card summary-card">
+                        <h3>Tournament Summary</h3>
+                        <div class="summary-stats" id="summaryStats">
+                            <div class="summary-item">
+                                <span class="summary-label">Total Matches</span>
+                                <span class="summary-value" id="summaryMatches">--</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Total Rounds</span>
+                                <span class="summary-value" id="summaryRounds">--</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Avg Match Duration</span>
+                                <span class="summary-value" id="summaryAvgDuration">--</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Challenges Played</span>
+                                <span class="summary-value" id="summaryChallenges">--</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Win Streaks -->
+                    <section class="stats-card streaks-card">
+                        <h3>Notable Streaks</h3>
+                        <div class="streaks-list" id="streaksList">
+                            <p class="no-data">No streak data available</p>
+                        </div>
+                    </section>
+
+                    <!-- Points Progress Chart -->
+                    <section class="stats-card chart-card">
+                        <h3>Points Progress</h3>
+                        <div class="chart-container" id="pointsChartContainer">
+                            <canvas id="pointsChart"></canvas>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Match History Tab -->
+            <div class="tab-pane" id="tab-matches">
+                <div class="matches-filters">
+                    <select id="filterTeam" onchange="filterMatches()">
+                        <option value="">All Teams</option>
+                    </select>
+                    <select id="filterGame" onchange="filterMatches()">
+                        <option value="">All Games</option>
+                    </select>
+                    <select id="filterResult" onchange="filterMatches()">
+                        <option value="">All Results</option>
+                        <option value="won">Wins Only</option>
+                        <option value="lost">Losses Only</option>
+                    </select>
+                    <input type="search" id="filterSearch" placeholder="Search player names..." oninput="filterMatches()">
+                </div>
+                <div class="matches-list" id="matchesList">
+                    <p class="no-data">Select a tournament to view match history</p>
+                </div>
+            </div>
+
+            <!-- Head-to-Head Tab -->
+            <div class="tab-pane" id="tab-headtohead">
+                <div class="h2h-matrix-container" id="h2hMatrixContainer">
+                    <p class="no-data">Select a tournament to view head-to-head records</p>
+                </div>
+                <div class="h2h-detail" id="h2hDetail">
+                    <p class="h2h-hint">Click a cell in the matrix to see detailed matchup history</p>
+                </div>
+            </div>
+
+            <!-- Game Analysis Tab -->
+            <div class="tab-pane" id="tab-games">
+                <div class="games-grid">
+                    <section class="stats-card game-breakdown-card">
+                        <h3>Games Breakdown</h3>
+                        <div class="game-breakdown" id="gameBreakdown">
+                            <p class="no-data">No game data available</p>
+                        </div>
+                    </section>
+
+                    <section class="stats-card team-game-stats-card">
+                        <h3>Team Performance by Game</h3>
+                        <div class="team-game-stats" id="teamGameStats">
+                            <p class="no-data">No data available</p>
+                        </div>
+                    </section>
+
+                    <section class="stats-card format-breakdown-card">
+                        <h3>Format Breakdown</h3>
+                        <div class="format-breakdown" id="formatBreakdown">
+                            <p class="no-data">No format data available</p>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="scripts/firebase-loader.js"></script>
+    <script src="scripts/config.js"></script>
+    <script src="scripts/player-utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="scripts/statistics.js"></script>
+</body>
+</html>

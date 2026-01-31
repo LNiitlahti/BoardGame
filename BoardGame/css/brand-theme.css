@@ -12,6 +12,21 @@
     --brand-cream: #f7f0e3;
     --brand-dark: #22241d;
 
+    /* Team Colors - Used across all pages */
+    /* IMPORTANT: Must match physical board game pieces! */
+    --team-1-color: #de392c;     /* Red */
+    --team-2-color: #2278a3;     /* Blue */
+    --team-3-color: #2e9158;     /* Green */
+    --team-4-color: #f7ba32;     /* Yellow */
+    --team-5-color: #22241d;     /* Black */
+
+    /* Team Colors with Alpha (for backgrounds) */
+    --team-1-alpha: rgba(222, 57, 44, 0.4);
+    --team-2-alpha: rgba(34, 120, 163, 0.4);
+    --team-3-alpha: rgba(46, 145, 88, 0.4);
+    --team-4-alpha: rgba(247, 186, 50, 0.4);
+    --team-5-alpha: rgba(34, 36, 29, 0.4);
+
     /* Cream Alpha Variants (for backgrounds) */
     --cream-alpha-05: rgba(247, 240, 227, 0.05);
     --cream-alpha-1: rgba(247, 240, 227, 0.1);

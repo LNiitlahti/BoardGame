@@ -401,3 +401,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 });
+
+// Expose functions to window for module access
+window.loadAllSpells = loadAllSpells;
+window.loadSpellCards = loadAllSpells; // Alias for admin-panel compatibility
+window.initializeSpellManager = initializeSpellManager;
+window.populateTeamDropdownForSpells = populateTeamDropdownForSpells;
+window.updateTeamSpellInventory = updateTeamSpellInventory;

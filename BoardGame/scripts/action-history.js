@@ -693,19 +693,21 @@ async function applyAction(action) {
 
 /**
  * Helper: Get team name by ID
+ * Uses string comparison to handle type mismatches (string vs number IDs)
  */
 function getTeamName(teamId) {
     if (!teamId || !gameState?.teams) return 'Unknown';
-    const team = gameState.teams.find(t => t.id === teamId);
+    const team = gameState.teams.find(t => String(t.id) === String(teamId));
     return team?.name || teamId;
 }
 
 /**
  * Helper: Get team color by ID
+ * Uses string comparison to handle type mismatches (string vs number IDs)
  */
 function getTeamColor(teamId) {
     if (!teamId || !gameState?.teams) return null;
-    const team = gameState.teams.find(t => t.id === teamId);
+    const team = gameState.teams.find(t => String(t.id) === String(teamId));
     return team?.color || null;
 }
 
