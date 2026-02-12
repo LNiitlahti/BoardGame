@@ -6,15 +6,16 @@
   <title>Board Game - Loading...</title>
 
   <!-- Favicons -->
-  <link rel="apple-touch-icon" sizes="180x180" href="images/favicon/apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="images/favicon/favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="images/favicon/favicon-16x16.png">
-  <link rel="manifest" href="images/favicon/site.webmanifest">
-  <link rel="shortcut icon" href="images/favicon/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="shared/images/favicon/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="shared/images/favicon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="shared/images/favicon/favicon-16x16.png">
+  <link rel="manifest" href="shared/images/favicon/site.webmanifest">
+  <link rel="shortcut icon" href="shared/images/favicon/favicon.ico">
 
-  <link rel="stylesheet" href="css/slate-theme.css">
-  <link rel="stylesheet" href="css/auth-modern.css">
-  <script src="scripts/firebase-loader.js"></script>
+  <link rel="stylesheet" href="shared/css/slate-theme.css">
+  <link rel="stylesheet" href="shared/css/auth-modern.css">
+  <script>window.BOARDGAME_BASE = '.';</script>
+  <script src="shared/scripts/firebase-loader.js"></script>
 </head>
 <body class="auth-page">
   <div class="auth-container">
@@ -78,7 +79,7 @@
             console.log('[Router] No profile found, redirecting to setup...');
             updateStatus('Setting up your profile...');
             setTimeout(() => {
-              window.location.href = 'setup.html';
+              window.location.href = 'full/setup.html';
             }, 500);
             return;
           }
@@ -106,7 +107,7 @@
 
           // On error, default to app page (it will handle the error)
           setTimeout(() => {
-            window.location.href = 'app.html';
+            window.location.href = 'full/app.html';
           }, 1000);
         }
       });

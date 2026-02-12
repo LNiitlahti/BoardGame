@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dev Match Scheduler - Pre-generate Tournament Matches</title>
+    <link rel="stylesheet" href="../shared/css/brand-theme.css">
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-tertiary: #0f3460;
+            --text-primary: #eee;
+            --text-secondary: #aaa;
+            --accent-primary: #2278a3;
+            --accent-success: #2e9158;
+            --accent-warning: #f7ba32;
+            --accent-danger: #de392c;
+            --border-color: #333;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        h1, h2, h3 {
+            font-family: 'Orbitron', monospace;
+            margin: 0 0 15px 0;
+        }
+
+        h1 {
+            color: var(--accent-primary);
+            font-size: 1.5rem;
+            border-bottom: 2px solid var(--accent-primary);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        .panels {
+            display: grid;
+            grid-template-columns: 400px 1fr 350px;
+            gap: 20px;
+        }
+
+        .panel {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+        }
+
+        .panel h2 {
+            font-size: 1rem;
+            color: var(--accent-primary);
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .config-section { margin-bottom: 20px; }
+        .config-section h3 {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+
+        /* Game Order Config */
+        .game-order-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .game-order-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            cursor: grab;
+        }
+
+        .game-order-item:active { cursor: grabbing; }
+
+        .game-order-item .order-num {
+            font-weight: 700;
+            color: var(--accent-primary);
+            min-width: 25px;
+        }
+
+        .game-order-item select {
+            flex: 1;
+            padding: 6px 10px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }
+
+        .game-order-item .format-badge {
+            padding: 4px 10px;
+            background: var(--bg-primary);
+            border-radius: 12px;
+            font-size: 0.75rem;
+            color: var(--accent-warning);
+            min-width: 70px;
+            text-align: center;
+        }
+
+        .game-order-item .repeat-count {
+            width: 50px;
+            padding: 6px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            text-align: center;
+            font-size: 0.85rem;
+        }
+
+        .game-order-item .remove-btn {
+            background: var(--accent-danger);
+            border: none;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            line-height: 1;
+        }
+
+        .add-game-btn {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg-tertiary);
+            border: 2px dashed var(--border-color);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+
+        .add-game-btn:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        /* Settings */
+        .setting-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .setting-row label {
+            flex: 1;
+            font-size: 0.85rem;
+        }
+
+        .setting-row input, .setting-row select {
+            width: 100px;
+            padding: 8px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn.primary { background: var(--accent-primary); color: white; }
+        .btn.primary:hover { background: #1a5f80; }
+        .btn.success { background: var(--accent-success); color: white; }
+        .btn.warning { background: var(--accent-warning); color: #1a1a2e; }
+        .btn.danger { background: var(--accent-danger); color: white; }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        /* Match Preview */
+        .match-list {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .match-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            margin-bottom: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        .match-item .match-num {
+            font-weight: 700;
+            color: var(--accent-primary);
+            min-width: 40px;
+        }
+
+        .match-item .match-game {
+            flex: 1;
+        }
+
+        .match-item .match-format {
+            padding: 2px 8px;
+            background: var(--bg-primary);
+            border-radius: 10px;
+            font-size: 0.75rem;
+            color: var(--accent-warning);
+        }
+
+        .match-item .match-split {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            min-width: 60px;
+        }
+
+        .match-item .match-rotation {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            min-width: 30px;
+        }
+
+        .match-item.simultaneous {
+            border-left: 3px solid var(--accent-warning);
+        }
+
+        .match-item.simultaneous + .match-item.simultaneous {
+            margin-top: -2px;
+            border-top: 1px dashed var(--border-color);
+        }
+
+        /* Export Panel */
+        .export-stats {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 0.85rem;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            color: var(--accent-primary);
+        }
+
+        .split-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 4px;
+            margin-top: 8px;
+        }
+
+        .split-cell {
+            text-align: center;
+            padding: 4px;
+            background: var(--bg-primary);
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+
+        .split-cell .team-label { color: var(--text-secondary); }
+        .split-cell .split-count { font-weight: 700; color: var(--accent-warning); }
+
+        .export-preview {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 250px;
+            overflow: auto;
+            font-family: monospace;
+            font-size: 0.7rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-size: 0.85rem;
+        }
+
+        .status.success {
+            background: rgba(46, 145, 88, 0.2);
+            border: 1px solid var(--accent-success);
+            color: var(--accent-success);
+        }
+
+        .status.error {
+            background: rgba(222, 57, 44, 0.2);
+            border: 1px solid var(--accent-danger);
+            color: var(--accent-danger);
+        }
+
+        /* Info box */
+        .info-box {
+            background: rgba(34, 120, 163, 0.15);
+            border: 1px solid var(--accent-primary);
+            border-radius: 4px;
+            padding: 10px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+        }
+
+        .info-box strong { color: var(--accent-primary); }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+
+        /* Analysis Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .modal-overlay.active { display: block; }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: var(--accent-primary);
+        }
+
+        .modal-close {
+            background: var(--accent-danger);
+            border: none;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .analysis-section h3 {
+            font-size: 0.9rem;
+            color: var(--accent-warning);
+            margin-bottom: 10px;
+        }
+
+        .matrix-container {
+            overflow-x: auto;
+        }
+
+        .pairing-matrix {
+            border-collapse: collapse;
+            font-size: 0.75rem;
+            width: 100%;
+        }
+
+        .pairing-matrix th, .pairing-matrix td {
+            border: 1px solid var(--border-color);
+            padding: 4px 6px;
+            text-align: center;
+            min-width: 35px;
+        }
+
+        .pairing-matrix th {
+            background: var(--bg-tertiary);
+            color: var(--accent-primary);
+            font-weight: 600;
+        }
+
+        .pairing-matrix td.player-label {
+            background: var(--bg-tertiary);
+            color: var(--accent-primary);
+            font-weight: 600;
+        }
+
+        .pairing-matrix td.self {
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+        }
+
+        .pairing-matrix td.balanced { background: rgba(46, 145, 88, 0.3); }
+        .pairing-matrix td.low { background: rgba(222, 57, 44, 0.3); }
+        .pairing-matrix td.high { background: rgba(247, 186, 50, 0.3); }
+
+        .analysis-summary {
+            background: var(--bg-tertiary);
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 0.85rem;
+        }
+
+        .summary-row .label { color: var(--text-secondary); }
+        .summary-row .value { font-weight: 600; }
+        .summary-row .value.good { color: var(--accent-success); }
+        .summary-row .value.warn { color: var(--accent-warning); }
+        .summary-row .value.bad { color: var(--accent-danger); }
+
+        .legend {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+            font-size: 0.75rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+        }
+
+        .legend-color.balanced { background: rgba(46, 145, 88, 0.5); }
+        .legend-color.low { background: rgba(222, 57, 44, 0.5); }
+        .legend-color.high { background: rgba(247, 186, 50, 0.5); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Match Scheduler - Minimal Format</h1>
+
+        <div class="panels">
+            <!-- Config Panel -->
+            <div class="panel config-panel">
+                <h2>Game Rotation Order</h2>
+
+                <div class="info-box">
+                    <strong>Greedy Variance Minimization Algorithm</strong>
+                    <br>Each match selection evaluates all valid partitions (60 for 5v5, 120 for 3v3+2v2) and picks the one that minimizes the cost function:
+                    <br><code style="font-size: 0.7rem;">C = Σ[(W_ij - μW)² + (A_ij - μA)²]</code>
+                    <br><strong>Result:</strong> Near-perfect balance regardless of repeat count or game order!
+                </div>
+
+                <div class="config-section">
+                    <div class="game-order-list" id="gameOrderList">
+                        <!-- Generated by JS -->
+                    </div>
+                    <button class="add-game-btn" onclick="addGameToOrder()">+ Add Game</button>
+                </div>
+
+                <div class="config-section">
+                    <h3>Settings</h3>
+                    <div class="setting-row">
+                        <label>Total matches to generate:</label>
+                        <input type="number" id="totalMatches" value="60" min="1" max="500">
+                    </div>
+                    <div class="setting-row">
+                        <label>Use rotating orders (3 cycles):</label>
+                        <input type="checkbox" id="useRotatingOrders" checked style="width: auto;">
+                    </div>
+                    <div class="info-box" style="margin-top: 10px; font-size: 0.7rem;">
+                        <strong>Rotating Orders:</strong><br>
+                        <strong>1:</strong> Predecessor → AoE4 → SM2 → CS2 → DoW2 → COD<br>
+                        <strong>2:</strong> CS2 → DoW2 → AoE4 → COD → Predecessor → SM2<br>
+                        <strong>3:</strong> AoE4 → Predecessor → COD → DoW2 → SM2 → CS2<br>
+                        <em>Each game 3x, then next. After 18 matches → next order.</em>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn primary" onclick="generateMatches()">Generate Matches</button>
+                    <button class="btn warning" onclick="analyzeBalance()">Analyze Balance</button>
+                    <button class="btn danger" onclick="clearMatches()">Clear</button>
+                </div>
+
+                <div id="configStatus"></div>
+            </div>
+
+            <!-- Match Preview Panel -->
+            <div class="panel preview-panel">
+                <h2>Match Preview <span id="matchPreviewCount">(0 matches)</span></h2>
+                <div class="match-list" id="matchList">
+                    <p style="color: var(--text-secondary); text-align: center; padding: 40px;">
+                        Configure game order and click "Generate Matches"
+                    </p>
+                </div>
+            </div>
+
+            <!-- Export Panel -->
+            <div class="panel export-panel">
+                <h2>Export</h2>
+
+                <div class="export-stats" id="exportStats">
+                    <div class="stat-row">
+                        <span>Total Matches:</span>
+                        <span class="stat-value" id="statTotal">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>5v5 Matches:</span>
+                        <span class="stat-value" id="stat5v5">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>3v3 Matches:</span>
+                        <span class="stat-value" id="stat3v3">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>2v2 Matches:</span>
+                        <span class="stat-value" id="stat2v2">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Split Distribution (5v5+3v3):</span>
+                    </div>
+                    <div class="split-grid" id="splitGrid">
+                        <div class="split-cell"><div class="team-label">T1</div><div class="split-count">0</div></div>
+                        <div class="split-cell"><div class="team-label">T2</div><div class="split-count">0</div></div>
+                        <div class="split-cell"><div class="team-label">T3</div><div class="split-count">0</div></div>
+                        <div class="split-cell"><div class="team-label">T4</div><div class="split-count">0</div></div>
+                        <div class="split-cell"><div class="team-label">T5</div><div class="split-count">0</div></div>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn success" onclick="exportJSON()">Export JSON</button>
+                    <button class="btn primary" onclick="copyToClipboard()">Copy</button>
+                </div>
+
+                <h3 style="margin-top: 15px; font-size: 0.85rem; color: var(--text-secondary);">Text Listing</h3>
+                <div class="export-preview" id="textListing" style="max-height: 350px; white-space: pre; font-size: 0.75rem;">// Generated listing will appear here</div>
+
+                <h3 style="margin-top: 15px; font-size: 0.85rem; color: var(--text-secondary);">JSON Preview</h3>
+                <div class="export-preview" id="exportPreview">// Generated JSON will appear here</div>
+
+                <div id="exportStatus"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analysis Modal -->
+    <div class="modal-overlay" id="analysisModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Player Pairing Analysis</h2>
+                <button class="modal-close" onclick="closeAnalysisModal()">&times;</button>
+            </div>
+            <div id="analysisContent">
+                <!-- Generated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <script>window.BOARDGAME_BASE = '..';</script>
+    <script src="../shared/scripts/games-config.js"></script>
+    <script src="../lightweight/scripts/balance-optimizer.js"></script>
+    <script>
+        // =============================================================================
+        // GAME DEFINITIONS - Use GAMES_CONFIG as source of truth
+        // =============================================================================
+
+        // Build GAMES object from GAMES_CONFIG for local use
+        const GAMES = {};
+        if (typeof GAMES_CONFIG !== 'undefined') {
+            Object.entries(GAMES_CONFIG.games).forEach(([id, game]) => {
+                GAMES[id] = {
+                    name: game.shortName || game.name,
+                    format: game.format,
+                    splitFormat: game.splitFormat || false
+                };
+            });
+        }
+
+        // =============================================================================
+        // ROTATING GAME ORDERS (Cycle after each full pass of 18 matches)
+        // =============================================================================
+        // Order 1: Predecessor, Age of Empires IV, Space Marine 2, CS2, Dawn of War 2, COD
+        // Order 2: CS2, Dawn of War 2, Age of Empires IV, COD, Predecessor, Space Marine 2
+        // Order 3: Age of Empires IV, Predecessor, COD, Dawn of War 2, Space Marine 2, CS2
+
+        const ROTATING_ORDERS = [
+            // Order 1
+            [
+                { game: 'predecessor', repeatCount: 3 },
+                { game: 'aoe4', repeatCount: 3 },
+                { game: 'spacemarine2', repeatCount: 3 },
+                { game: 'cs2', repeatCount: 3 },
+                { game: 'dow2', repeatCount: 3 },
+                { game: 'cod', repeatCount: 3 }
+            ],
+            // Order 2
+            [
+                { game: 'cs2', repeatCount: 3 },
+                { game: 'dow2', repeatCount: 3 },
+                { game: 'aoe4', repeatCount: 3 },
+                { game: 'cod', repeatCount: 3 },
+                { game: 'predecessor', repeatCount: 3 },
+                { game: 'spacemarine2', repeatCount: 3 }
+            ],
+            // Order 3
+            [
+                { game: 'aoe4', repeatCount: 3 },
+                { game: 'predecessor', repeatCount: 3 },
+                { game: 'cod', repeatCount: 3 },
+                { game: 'dow2', repeatCount: 3 },
+                { game: 'spacemarine2', repeatCount: 3 },
+                { game: 'cs2', repeatCount: 3 }
+            ]
+        ];
+
+        // =============================================================================
+        // BALANCE OPTIMIZER (Greedy Variance Minimization)
+        // =============================================================================
+        // Instead of fixed rotation patterns, we use a greedy algorithm that:
+        // - Tracks W (with) and A (against) matrices for all player pairs
+        // - At each match, enumerates all valid partitions (60 for 5v5, 120 for 3v3+2v2)
+        // - Selects the partition that minimizes cost function increase
+        // - Cost function: C = Σ(i<j) [(W_ij - μW)² + (A_ij - μA)²]
+        // =============================================================================
+
+        // Initialize the optimizer
+        let optimizer = new BalanceOptimizer(5, 2);  // 5 teams, 2 players each
+
+        // =============================================================================
+        // STATE
+        // =============================================================================
+
+        // Start with rotating order 1
+        let gameOrder = [...ROTATING_ORDERS[0]];
+        let currentRotatingOrderIndex = 0;
+
+        let generatedMatches = [];
+
+        // =============================================================================
+        // INITIALIZATION
+        // =============================================================================
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderGameOrderList();
+        });
+
+        function renderGameOrderList() {
+            const container = document.getElementById('gameOrderList');
+            container.innerHTML = gameOrder.map((item, idx) => {
+                const game = GAMES[item.game];
+                return `
+                    <div class="game-order-item" data-index="${idx}">
+                        <span class="order-num">${idx + 1}.</span>
+                        <select onchange="updateGameOrder(${idx}, 'game', this.value)">
+                            ${Object.entries(GAMES).map(([id, g]) =>
+                                `<option value="${id}" ${id === item.game ? 'selected' : ''}>${g.name}</option>`
+                            ).join('')}
+                        </select>
+                        <span class="format-badge">${game?.format || '?'}</span>
+                        <input type="number" class="repeat-count" value="${item.repeatCount}" min="1" max="20"
+                               onchange="updateGameOrder(${idx}, 'repeatCount', parseInt(this.value))"
+                               title="Times to repeat before switching">
+                        <button class="remove-btn" onclick="removeGameFromOrder(${idx})" title="Remove">&times;</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // =============================================================================
+        // GAME ORDER MANAGEMENT
+        // =============================================================================
+
+        function addGameToOrder() {
+            gameOrder.push({ game: 'cs2', repeatCount: 3 });
+            renderGameOrderList();
+        }
+
+        function removeGameFromOrder(idx) {
+            if (gameOrder.length <= 1) {
+                showStatus('configStatus', 'Need at least one game', 'error');
+                return;
+            }
+            gameOrder.splice(idx, 1);
+            renderGameOrderList();
+        }
+
+        function updateGameOrder(idx, field, value) {
+            gameOrder[idx][field] = value;
+            renderGameOrderList(); // Re-render to update format badge
+        }
+
+        // =============================================================================
+        // MATCH GENERATION (Using Greedy Variance Minimization)
+        // =============================================================================
+
+        function generateMatches() {
+            const totalMatches = parseInt(document.getElementById('totalMatches').value) || 100;
+            const useRotatingOrders = document.getElementById('useRotatingOrders').checked;
+
+            generatedMatches = [];
+            optimizer.reset();  // Reset the balance optimizer
+
+            let matchNumber = 1;
+            let orderIndex = 0;
+            let repeatCounter = 0;
+            let currentRotation = 0;  // Which of the 3 rotating orders we're using
+            let matchesInCurrentCycle = 0;  // Matches played in current 18-match cycle
+
+            // Get the active game order (either rotating or custom)
+            const getActiveOrder = () => {
+                if (useRotatingOrders) {
+                    return ROTATING_ORDERS[currentRotation];
+                }
+                return gameOrder;
+            };
+
+            while (matchNumber <= totalMatches) {
+                let activeOrder = getActiveOrder();
+
+                if (orderIndex >= activeOrder.length) {
+                    // Finished one pass through the game order
+                    orderIndex = 0;
+
+                    if (useRotatingOrders) {
+                        // Move to next rotating order
+                        currentRotation = (currentRotation + 1) % ROTATING_ORDERS.length;
+                        matchesInCurrentCycle = 0;
+                    }
+                }
+
+                const currentGame = activeOrder[orderIndex];
+                const gameInfo = GAMES[currentGame.game];
+                const format = gameInfo?.format || '5v5';
+
+                // For split format games (3v3+2v2), create TWO separate matches
+                if (gameInfo?.splitFormat) {
+                    const matches = createSplitMatches(matchNumber, currentGame.game);
+                    matches.forEach(m => m.rotationOrder = currentRotation + 1);
+                    generatedMatches.push(...matches);
+                    matchNumber += 2; // Two matches created
+                    matchesInCurrentCycle += 2;
+                } else if (format === '5v5') {
+                    const match = create5v5Match(matchNumber, currentGame.game);
+                    match.rotationOrder = currentRotation + 1;
+                    generatedMatches.push(match);
+                    matchNumber++;
+                    matchesInCurrentCycle++;
+                } else {
+                    // Fallback for other formats
+                    const match = createGenericMatch(matchNumber, currentGame.game, format);
+                    match.rotationOrder = currentRotation + 1;
+                    generatedMatches.push(match);
+                    matchNumber++;
+                    matchesInCurrentCycle++;
+                }
+
+                repeatCounter++;
+
+                // Check if we should move to next game
+                if (repeatCounter >= currentGame.repeatCount) {
+                    repeatCounter = 0;
+                    orderIndex++;
+                }
+            }
+
+            renderMatchList();
+            updateExportStats();
+            updateExportPreview();
+            updateTextListing();
+
+            // Show balance stats
+            const stats = optimizer.getBalanceStats();
+            const balanceInfo = stats.isBalanced ?
+                `✓ Balanced! W range: ${stats.with.range}, A range: ${stats.against.range}` :
+                `W range: ${stats.with.range}, A range: ${stats.against.range}`;
+            showStatus('configStatus', `Generated ${generatedMatches.length} matches! ${balanceInfo}`, 'success');
+        }
+
+        /**
+         * Create a 5v5 match using the greedy optimizer
+         */
+        function create5v5Match(matchNumber, gameId) {
+            // Advance match counter before selection (so fairness calculation is accurate)
+            optimizer.advanceMatch();
+
+            const result = optimizer.selectOptimal5v5();
+            const partition = result.partition;
+
+            // Apply to optimizer matrices and record the split
+            optimizer.applyPartition(partition.sideA, partition.sideB);
+            optimizer.recordSplit(partition.splitTeam);
+            optimizer.totalMatches['5v5']++;
+
+            return {
+                matchNumber,
+                game: gameId,
+                playType: '5v5',
+                splitTeamId: partition.splitTeam,
+                sideATeams: partition.sideATeams,
+                sideBTeams: partition.sideBTeams,
+                sideA: partition.sideATeams,  // Team IDs for export compatibility
+                sideB: partition.sideBTeams,
+                sideAPlayers: partition.sideA,  // Full player list
+                sideBPlayers: partition.sideB,
+                splitPlayerA: partition.splitPlayerA,
+                splitPlayerB: partition.splitPlayerB,
+                costDelta: result.costDelta
+            };
+        }
+
+        /**
+         * Create TWO separate matches for 3v3+2v2 games using the greedy optimizer
+         * Returns array of [3v3 match, 2v2 match]
+         */
+        function createSplitMatches(startMatchNumber, gameId) {
+            // Advance match counter before selection (counts as one "rotation" even though it's 2 matches)
+            optimizer.advanceMatch();
+
+            const result = optimizer.selectOptimal3v3_2v2();
+            const partition = result.partition;
+
+            // Apply both matches to optimizer matrices and record the split
+            optimizer.applyPartition(partition.match3v3.sideA, partition.match3v3.sideB);
+            optimizer.applyPartition(partition.match2v2.sideA, partition.match2v2.sideB);
+            optimizer.recordSplit(partition.splitTeam);
+            optimizer.totalMatches['3v3']++;
+            optimizer.totalMatches['2v2']++;
+
+            // 3v3 match
+            const match3v3 = {
+                matchNumber: startMatchNumber,
+                game: gameId,
+                playType: '3v3',
+                splitTeamId: partition.splitTeam,
+                sideA: [partition.match3v3.sideATeam],
+                sideB: [partition.match3v3.sideBTeam],
+                sideAPlayers: partition.match3v3.sideA,
+                sideBPlayers: partition.match3v3.sideB,
+                linkedMatch: startMatchNumber + 1,
+                isSimultaneous: true,
+                costDelta: result.costDelta
+            };
+
+            // 2v2 match - no split team, two full teams face each other
+            const match2v2 = {
+                matchNumber: startMatchNumber + 1,
+                game: gameId,
+                playType: '2v2',
+                splitTeamId: null,  // 2v2 has no split - two full teams (2 players each)
+                sideA: [partition.match2v2.sideATeam],
+                sideB: [partition.match2v2.sideBTeam],
+                sideAPlayers: partition.match2v2.sideA,
+                sideBPlayers: partition.match2v2.sideB,
+                linkedMatch: startMatchNumber,
+                isSimultaneous: true
+            };
+
+            return [match3v3, match2v2];
+        }
+
+        /**
+         * Generic match creation for unsupported formats
+         */
+        function createGenericMatch(matchNumber, gameId, format) {
+            return {
+                matchNumber,
+                game: gameId,
+                playType: format,
+                splitTeamId: null,
+                sideA: null,
+                sideB: null
+            };
+        }
+
+        // =============================================================================
+        // RENDERING
+        // =============================================================================
+
+        function renderMatchList() {
+            const container = document.getElementById('matchList');
+            document.getElementById('matchPreviewCount').textContent = `(${generatedMatches.length} matches)`;
+
+            if (generatedMatches.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">No matches generated</p>';
+                return;
+            }
+
+            container.innerHTML = generatedMatches.map(match => {
+                const gameName = GAMES[match.game]?.name || match.game;
+                const splitInfo = match.splitTeamId ? `Split T${match.splitTeamId}` : '';
+                const rotationInfo = match.rotationOrder ? `O${match.rotationOrder}` : '';
+
+                return `
+                    <div class="match-item ${match.isSimultaneous ? 'simultaneous' : ''}">
+                        <span class="match-num">#${match.matchNumber}</span>
+                        <span class="match-game">${gameName}</span>
+                        <span class="match-format">${match.playType}</span>
+                        <span class="match-split">${splitInfo}</span>
+                        <span class="match-rotation">${rotationInfo}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateExportStats() {
+            document.getElementById('statTotal').textContent = generatedMatches.length;
+
+            const count5v5 = generatedMatches.filter(m => m.playType === '5v5').length;
+            const count3v3 = generatedMatches.filter(m => m.playType === '3v3').length;
+            const count2v2 = generatedMatches.filter(m => m.playType === '2v2').length;
+
+            document.getElementById('stat5v5').textContent = count5v5;
+            document.getElementById('stat3v3').textContent = count3v3;
+            document.getElementById('stat2v2').textContent = count2v2;
+
+            // Count splits per team for each format
+            const splits5v5 = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+            const splits3v3 = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };  // 3v3 has splits (2v2 doesn't)
+
+            generatedMatches.forEach(m => {
+                if (m.splitTeamId) {
+                    if (m.playType === '5v5') {
+                        splits5v5[m.splitTeamId]++;
+                    } else if (m.playType === '3v3') {
+                        splits3v3[m.splitTeamId]++;
+                    }
+                    // 2v2 matches don't have splits (full teams only)
+                }
+            });
+
+            // Calculate totals
+            const splitsTotal = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+            for (let t = 1; t <= 5; t++) {
+                splitsTotal[t] = splits5v5[t] + splits3v3[t];
+            }
+
+            const splitGrid = document.getElementById('splitGrid');
+            splitGrid.innerHTML = Object.entries(splitsTotal).map(([teamId, count]) => {
+                const s5 = splits5v5[teamId];
+                const s3 = splits3v3[teamId];
+                return `<div class="split-cell" title="5v5: ${s5}, 3v3: ${s3}">
+                    <div class="team-label">T${teamId}</div>
+                    <div class="split-count">${count}</div>
+                    <div style="font-size: 0.6rem; color: var(--text-secondary);">${s5}+${s3}</div>
+                </div>`;
+            }).join('');
+        }
+
+        // =============================================================================
+        // EXPORT
+        // =============================================================================
+
+        function updateExportPreview() {
+            const data = getExportData();
+            const preview = document.getElementById('exportPreview');
+
+            if (generatedMatches.length === 0) {
+                preview.textContent = '// No matches generated';
+                return;
+            }
+
+            const sample = {
+                ...data,
+                matches: data.matches.slice(0, 5)
+            };
+
+            preview.textContent = JSON.stringify(sample, null, 2) +
+                (data.matches.length > 5 ? `\n\n// ... and ${data.matches.length - 5} more matches` : '');
+        }
+
+        function getExportData() {
+            return {
+                version: '3.0',
+                format: 'full',
+                generatedAt: new Date().toISOString(),
+                gameOrder: gameOrder,
+                totalMatches: generatedMatches.length,
+                matches: generatedMatches.map(m => ({
+                    matchNumber: m.matchNumber,
+                    game: m.game,
+                    playType: m.playType,
+                    splitTeamId: m.splitTeamId || null,
+                    // Use sideA/sideB for compatibility with import
+                    sideA: m.sideATeams || m.sideA || null,
+                    sideB: m.sideBTeams || m.sideB || null,
+                    // Player-level assignments (primary source for import)
+                    sideAPlayers: m.sideAPlayers || null,
+                    sideBPlayers: m.sideBPlayers || null,
+                    splitPlayerA: m.splitPlayerA || null,
+                    splitPlayerB: m.splitPlayerB || null,
+                    linkedMatch: m.linkedMatch || null,
+                    isSimultaneous: m.isSimultaneous || false,
+                    rotationOrder: m.rotationOrder || null
+                }))
+            };
+        }
+
+        function exportJSON() {
+            if (generatedMatches.length === 0) {
+                showStatus('exportStatus', 'No matches to export', 'error');
+                return;
+            }
+
+            const data = getExportData();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `match-schedule-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            showStatus('exportStatus', 'Exported JSON!', 'success');
+        }
+
+        function copyToClipboard() {
+            if (generatedMatches.length === 0) {
+                showStatus('exportStatus', 'No matches to copy', 'error');
+                return;
+            }
+
+            const data = getExportData();
+            navigator.clipboard.writeText(JSON.stringify(data, null, 2))
+                .then(() => showStatus('exportStatus', 'Copied to clipboard!', 'success'))
+                .catch(() => showStatus('exportStatus', 'Failed to copy', 'error'));
+        }
+
+        function clearMatches() {
+            generatedMatches = [];
+            optimizer.reset();  // Reset the balance optimizer
+            renderMatchList();
+            updateExportStats();
+            document.getElementById('exportPreview').textContent = '// Cleared';
+            document.getElementById('textListing').textContent = '// Cleared';
+        }
+
+        /**
+         * Generate text listing of matches
+         */
+        function updateTextListing() {
+            const container = document.getElementById('textListing');
+
+            if (generatedMatches.length === 0) {
+                container.textContent = '// No matches generated';
+                return;
+            }
+
+            let lines = [];
+            let currentOrder = 0;
+            let matchesInOrder = 0;
+
+            lines.push('=== 60 MATCHES WITH ROTATING GAME ORDERS ===');
+            lines.push('');
+
+            generatedMatches.forEach((match, idx) => {
+                // Check if we're starting a new rotation order
+                if (match.rotationOrder !== currentOrder) {
+                    currentOrder = match.rotationOrder;
+                    const orderStart = (currentOrder - 1) * 18 + 1;
+                    const orderEnd = Math.min(currentOrder * 18, generatedMatches.length);
+                    lines.push('');
+                    lines.push(`--- ORDER ${currentOrder} (Matches ${orderStart}-${orderEnd}) ---`);
+
+                    // Show which order is being used
+                    const orderGames = ROTATING_ORDERS[currentOrder - 1];
+                    const orderStr = orderGames.map(g => {
+                        const name = GAMES[g.game]?.name || g.game;
+                        // Abbreviate long names
+                        if (name === 'Age of Empires IV') return 'AoE4';
+                        if (name === 'Space Marine 2') return 'SM2';
+                        if (name === 'Dawn of War 2') return 'DoW2';
+                        return name;
+                    }).join(' → ');
+                    lines.push(`Order: ${orderStr}`);
+                    lines.push('');
+                    matchesInOrder = 0;
+                }
+
+                const gameName = GAMES[match.game]?.name || match.game;
+                lines.push(`${String(match.matchNumber).padStart(2, ' ')}. ${gameName}`);
+            });
+
+            lines.push('');
+            lines.push(`=== TOTAL: ${generatedMatches.length} MATCHES ===`);
+
+            container.textContent = lines.join('\n');
+        }
+
+        function showStatus(elementId, message, type) {
+            const el = document.getElementById(elementId);
+            el.className = `status ${type}`;
+            el.textContent = message;
+            setTimeout(() => {
+                el.textContent = '';
+                el.className = '';
+            }, 3000);
+        }
+
+        // =============================================================================
+        // BALANCE ANALYSIS (Using Optimizer Matrices)
+        // =============================================================================
+
+        function analyzeBalance() {
+            if (generatedMatches.length === 0) {
+                showStatus('configStatus', 'Generate matches first', 'error');
+                return;
+            }
+
+            // Get matrices directly from the optimizer
+            const { players, W: withMatrix, A: againstMatrix } = optimizer.getMatrices();
+            const stats = optimizer.getBalanceStats();
+
+            // Render the analysis with optimizer stats
+            renderAnalysis(players, withMatrix, againstMatrix, stats);
+            document.getElementById('analysisModal').classList.add('active');
+        }
+
+        function renderAnalysis(players, withMatrix, againstMatrix, stats = null) {
+            const container = document.getElementById('analysisContent');
+
+            // Use optimizer stats if provided, otherwise calculate
+            let withMin, withMax, withAvg, withRange, withStdDev;
+            let againstMin, againstMax, againstAvg, againstRange, againstStdDev;
+            let totalCost;
+
+            if (stats) {
+                withMin = stats.with.min;
+                withMax = stats.with.max;
+                withAvg = stats.with.mean.toFixed(1);
+                withRange = stats.with.range;
+                withStdDev = stats.with.stdDev.toFixed(2);
+                againstMin = stats.against.min;
+                againstMax = stats.against.max;
+                againstAvg = stats.against.mean.toFixed(1);
+                againstRange = stats.against.range;
+                againstStdDev = stats.against.stdDev.toFixed(2);
+                totalCost = stats.totalCost.toFixed(1);
+            } else {
+                // Fallback calculation
+                const withValues = [];
+                const againstValues = [];
+                players.forEach(p1 => {
+                    players.forEach(p2 => {
+                        if (p1 < p2) {
+                            const team1 = p1.charAt(0);
+                            const team2 = p2.charAt(0);
+                            if (team1 !== team2) {
+                                withValues.push(withMatrix[p1][p2]);
+                                againstValues.push(againstMatrix[p1][p2]);
+                            }
+                        }
+                    });
+                });
+                withMin = Math.min(...withValues);
+                withMax = Math.max(...withValues);
+                withAvg = (withValues.reduce((a, b) => a + b, 0) / withValues.length).toFixed(1);
+                withRange = withMax - withMin;
+                againstMin = Math.min(...againstValues);
+                againstMax = Math.max(...againstValues);
+                againstAvg = (againstValues.reduce((a, b) => a + b, 0) / againstValues.length).toFixed(1);
+                againstRange = againstMax - againstMin;
+            }
+
+            const isExcellent = withRange <= 1 && againstRange <= 1;
+            const isGood = withRange <= 2 && againstRange <= 2;
+
+            container.innerHTML = `
+                <div class="analysis-grid">
+                    <div class="analysis-section">
+                        <h3>Played WITH (same side)</h3>
+                        <div class="matrix-container">
+                            ${renderMatrix(players, withMatrix, parseFloat(withAvg))}
+                        </div>
+                    </div>
+                    <div class="analysis-section">
+                        <h3>Played AGAINST (opposite sides)</h3>
+                        <div class="matrix-container">
+                            ${renderMatrix(players, againstMatrix, parseFloat(againstAvg))}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color balanced"></div>
+                        <span>Balanced (within ±1 of avg)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color low"></div>
+                        <span>Low (below avg-1)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color high"></div>
+                        <span>High (above avg+1)</span>
+                    </div>
+                </div>
+
+                <div class="analysis-summary">
+                    <h3 style="margin-bottom: 10px; color: var(--accent-primary);">Summary (cross-team pairings only)</h3>
+                    <div class="summary-row">
+                        <span class="label">Total Matches Analyzed:</span>
+                        <span class="value">${generatedMatches.length}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="label">"With" Stats:</span>
+                        <span class="value ${withRange <= 1 ? 'good' : withRange <= 2 ? 'warn' : 'bad'}">
+                            ${withMin} - ${withMax} (μ=${withAvg}, range=${withRange}${withStdDev ? ', σ=' + withStdDev : ''})
+                        </span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="label">"Against" Stats:</span>
+                        <span class="value ${againstRange <= 1 ? 'good' : againstRange <= 2 ? 'warn' : 'bad'}">
+                            ${againstMin} - ${againstMax} (μ=${againstAvg}, range=${againstRange}${againstStdDev ? ', σ=' + againstStdDev : ''})
+                        </span>
+                    </div>
+                    ${totalCost ? `
+                    <div class="summary-row">
+                        <span class="label">Cost Function (Σ deviations²):</span>
+                        <span class="value">${totalCost}</span>
+                    </div>
+                    ` : ''}
+                    <div class="summary-row">
+                        <span class="label">Balance Rating:</span>
+                        <span class="value ${isExcellent ? 'good' : isGood ? 'warn' : 'bad'}">
+                            ${isExcellent ? '★ PERFECT - All pairs within ±1!' :
+                              isGood ? '✓ EXCELLENT - All pairs within ±2' :
+                              '⚠ NEEDS WORK - Some pairs outside ±2'}
+                        </span>
+                    </div>
+                    <div class="summary-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color);">
+                        <span class="label" style="font-size: 0.75rem; color: var(--text-secondary);">
+                            Algorithm: Greedy Variance Minimization<br>
+                            At each match, evaluates ${stats?.totalMatches?.['5v5'] ? '60' : '60-120'} possible partitions and selects the one that minimizes cost increase.
+                        </span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderMatrix(players, matrix, avg) {
+            const avgNum = typeof avg === 'number' ? avg : parseFloat(avg);
+
+            let html = '<table class="pairing-matrix"><thead><tr><th></th>';
+            players.forEach(p => {
+                html += `<th>${p}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+
+            players.forEach(p1 => {
+                html += `<tr><td class="player-label">${p1}</td>`;
+                players.forEach(p2 => {
+                    if (p1 === p2) {
+                        html += '<td class="self">-</td>';
+                    } else {
+                        const value = matrix[p1][p2];
+                        const team1 = p1.charAt(0);
+                        const team2 = p2.charAt(0);
+
+                        // Determine color class (only for cross-team)
+                        let colorClass = '';
+                        if (team1 !== team2) {
+                            if (value >= avgNum - 1 && value <= avgNum + 1) {
+                                colorClass = 'balanced';
+                            } else if (value < avgNum - 1) {
+                                colorClass = 'low';
+                            } else {
+                                colorClass = 'high';
+                            }
+                        }
+
+                        html += `<td class="${colorClass}">${value}</td>`;
+                    }
+                });
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            return html;
+        }
+
+        function closeAnalysisModal() {
+            document.getElementById('analysisModal').classList.remove('active');
+        }
+
+        // Close modal on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeAnalysisModal();
+        });
+    </script>
+</body>
+</html>

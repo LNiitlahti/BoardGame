@@ -6,11 +6,11 @@
 # SECRETS & CREDENTIALS
 # ===========================
 # Firebase config (contains API keys)
-scripts/firebase.js
+shared/scripts/firebase.js
 
 # Any backup of firebase config
-scripts/firebase.*.js
-!scripts/firebase.example.js
+shared/scripts/firebase.*.js
+!shared/scripts/firebase.example.js
 
 # Environment variables
 .env

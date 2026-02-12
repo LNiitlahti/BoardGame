@@ -6,18 +6,18 @@
     <title>Under Development - Board Game</title>
 
     <!-- Favicons -->
-    <link rel="apple-touch-icon" sizes="180x180" href="images/favicon/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="images/favicon/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="images/favicon/favicon-16x16.png">
-    <link rel="shortcut icon" href="images/favicon/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="shared/images/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="shared/images/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="shared/images/favicon/favicon-16x16.png">
+    <link rel="shortcut icon" href="shared/images/favicon/favicon.ico">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
-    <link rel="stylesheet" href="css/brand-theme.css">
-    <link rel="stylesheet" href="css/navbar.css">
-    <link rel="stylesheet" href="css/fantasy-mountain-theme.css">
+    <link rel="stylesheet" href="shared/css/brand-theme.css">
+    <link rel="stylesheet" href="shared/css/navbar.css">
+    <link rel="stylesheet" href="shared/css/fantasy-mountain-theme.css">
 
     <style>
         body {
@@ -190,7 +190,7 @@
     <nav class="unified-navbar">
         <div class="navbar-container">
             <a href="development-landing-page.html" class="navbar-brand">
-                <img src="images/favicon/android-chrome-192x192.png" alt="Logo" class="navbar-logo">
+                <img src="shared/images/favicon/android-chrome-192x192.png" alt="Logo" class="navbar-logo">
                 <div class="navbar-brand-text">
                     <span class="navbar-brand-name">Board Game</span>
                     <span class="navbar-tournament-name" id="navTournamentName">Development</span>
@@ -223,24 +223,37 @@
                 View on GitHub
             </a>
 
+            <!-- Public links visible to everyone -->
+            <div class="nav-links" style="display: block;">
+                <div class="nav-links-title">Resources</div>
+                <div class="nav-links-grid">
+                    <a href="rulebook.html" class="nav-link-btn">Rulebook</a>
+                    <a href="lightweight/statistics.html" class="nav-link-btn">Statistics</a>
+                    <a href="lightweight/onboarding.html" class="nav-link-btn">Player Onboarding</a>
+                </div>
+            </div>
+
             <div class="nav-links" id="navLinks">
                 <div class="nav-links-title">Dev Tools</div>
                 <div class="nav-links-grid">
-                    <a href="home.html" class="nav-link-btn">Home</a>
-                    <a href="god.html" class="nav-link-btn">God Mode</a>
-                    <a href="admin-lightweight.html" class="nav-link-btn">Lightweight Admin</a>
-                    <a href="view-lightweight.html" class="nav-link-btn">Lightweight View</a>
-                    <a href="setup-lightweight.html" class="nav-link-btn god-only">Lightweight Setup</a>
-                    <a href="dev-tools.html" class="nav-link-btn god-only">Dev Tools</a>
-                    <a href="upload-spells.html" class="nav-link-btn god-only">Upload Spells</a>
-                    <a href="board-test2.html" class="nav-link-btn god-only">Board Test</a>
-                    <a href="hex-tile-slicer.html" class="nav-link-btn god-only">Hex Tile Slicer</a>
+                    <a href="full/home.html" class="nav-link-btn">Home</a>
+                    <a href="full/god.html" class="nav-link-btn">God Mode</a>
+                    <a href="lightweight/admin.html" class="nav-link-btn">Lightweight Admin</a>
+                    <a href="lightweight/view.html" class="nav-link-btn">Lightweight View</a>
+                    <a href="lightweight/view-onboarding.html" class="nav-link-btn">Onboarding View</a>
+                    <a href="lightweight/setup.html" class="nav-link-btn god-only">Lightweight Setup</a>
+                    <a href="dev/dev-tools.html" class="nav-link-btn god-only">Dev Tools</a>
+                    <a href="dev/dev-matchscheduler.html" class="nav-link-btn god-only">Match Scheduler</a>
+                    <a href="tools/upload-spells.html" class="nav-link-btn god-only">Upload Spells</a>
+                    <a href="dev/board-test2.html" class="nav-link-btn god-only">Board Test</a>
+                    <a href="tools/hex-tile-slicer.html" class="nav-link-btn god-only">Hex Tile Slicer</a>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="scripts/firebase-loader.js"></script>
+    <script>window.BOARDGAME_BASE = '.';</script>
+    <script src="shared/scripts/firebase-loader.js"></script>
     <script>
         let auth;
         let db;

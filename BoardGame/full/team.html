@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Controls - Board Game</title>
+
+    <!-- Favicons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="../shared/images/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../shared/images/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../shared/images/favicon/favicon-16x16.png">
+    <link rel="manifest" href="../shared/images/favicon/site.webmanifest">
+    <link rel="shortcut icon" href="../shared/images/favicon/favicon.ico">
+
+    <!-- Unified Falcon Design System -->
+    <link rel="stylesheet" href="../shared/css/slate-theme.css">
+    <link rel="stylesheet" href="../shared/css/navbar.css">
+    <link rel="stylesheet" href="css/team-modern.css">
+    <link rel="stylesheet" href="../shared/css/theme-toggle-button.css">
+</head>
+<body class="team-page">
+    <!-- Navbar container - populated by navbar.js -->
+    <div id="navbar-container"></div>
+
+    <div class="team-container">
+        <!-- Header with Team Name and Points -->
+        <div class="team-header">
+            <div class="team-header-left">
+                <h1 class="team-name-display" id="teamNameDisplay">Loading...</h1>
+                <div class="team-quick-stats">
+                    <div class="team-quick-stat">
+                        <div class="team-quick-stat-value" id="teamWins">0</div>
+                        <div class="team-quick-stat-label">Wins</div>
+                    </div>
+                    <div class="team-quick-stat">
+                        <div class="team-quick-stat-value" id="teamLosses">0</div>
+                        <div class="team-quick-stat-label">Losses</div>
+                    </div>
+                    <div class="team-quick-stat">
+                        <div class="team-quick-stat-value" id="teamGamesPlayed">0</div>
+                        <div class="team-quick-stat-label">Games</div>
+                    </div>
+                    <div class="team-quick-stat">
+                        <div class="team-quick-stat-value" id="teamHeartsControlled">0</div>
+                        <div class="team-quick-stat-label">Hearts</div>
+                    </div>
+                </div>
+            </div>
+            <div class="team-points">
+                <span id="teamPointsDisplay">0</span> pts
+            </div>
+        </div>
+
+        <div class="team-status-message" id="statusMessage" style="display: none;"></div>
+
+        <!-- Main Grid: Team Info | Board | Match Info -->
+        <div class="team-main-layout">
+            <!-- Left Sidebar: Team Info -->
+            <div>
+                <div class="team-section">
+                    <div class="team-section-header">Teammates</div>
+                    <div id="teammatesList">
+                        <p class="empty-state-inline">Loading teammates...</p>
+                    </div>
+                </div>
+
+                <div class="team-section">
+                    <div class="team-section-header">Spell Cards (<span id="spellCardsCount">0</span>)</div>
+                    <div class="spell-cards-grid" id="spellCardsList">
+                        <p class="empty-state-inline">No spell cards available</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center: Game Board -->
+            <div class="team-board-section">
+                <div class="team-board-header">
+                    <div class="team-board-title">Game Board</div>
+                    <div class="turn-indicator" id="turnIndicator" style="display: none;">
+                        <span class="turn-indicator-label">Your Turn</span>
+                    </div>
+                </div>
+                <div id="hexBoard"></div>
+                <div class="team-board-note">
+                    Board updates in real-time during matches
+                </div>
+            </div>
+
+            <!-- Right Sidebar: Current Match -->
+            <div>
+                <div class="team-section">
+                    <div class="team-section-header">Current Match</div>
+                    <div id="currentMatchDisplay">
+                        <div class="empty-state">
+                            No active match. Waiting for next game...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="team-section">
+                    <div class="team-section-header">Upcoming Matches</div>
+                    <div id="upcomingMatchesList">
+                        <p class="empty-state-inline">No upcoming matches scheduled</p>
+                    </div>
+                </div>
+
+                <div class="team-section">
+                    <div class="team-section-header">Recent Events</div>
+                    <div id="recentEventsList" class="scrollable-list">
+                        <p class="empty-state-inline">No recent events</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Match Result Voting Section -->
+        <div class="voting-section" id="votingSection" style="display: none;">
+            <h3>🗳️ Match Result Voting</h3>
+            <div id="votingMatchInfo" style="margin-bottom: 15px; color: var(--cream-alpha-7);">
+                <!-- Match info will be inserted here -->
+            </div>
+
+            <div class="vote-options" id="voteOptions">
+                <!-- Vote options will be inserted here -->
+            </div>
+
+            <button class="btn primary" onclick="submitVote()" id="submitVoteBtn" style="width: 100%; margin-top: 10px;">
+                Submit Vote
+            </button>
+
+            <div class="vote-progress" id="voteProgress" style="display: none;">
+                <h4 style="color: var(--accent-primary); margin-bottom: 10px;">Voting Progress</h4>
+                <div id="voteProgressList">
+                    <!-- Vote progress will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Team Name Modal -->
+    <div id="editTeamNameModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>✏️ Edit Team Name</h2>
+                <button onclick="closeEditTeamNameModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Team Name</label>
+                    <input type="text" id="newTeamNameInput" placeholder="Enter new team name..."
+                           style="width: 100%; padding: 12px; background: var(--cream-alpha-05); border: 1px solid var(--cream-alpha-2); border-radius: var(--radius-md); color: var(--text-primary); font-size: 1rem;">
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn secondary" onclick="closeEditTeamNameModal()" style="flex: 1;">Cancel</button>
+                    <button class="btn primary" onclick="saveTeamName()" style="flex: 1;">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Theme toggle (loads first for no flash) -->
+    <script>window.BOARDGAME_BASE = '..';</script>
+    <script src="../shared/scripts/theme-toggle.js"></script>
+
+    <!-- Load infrastructure first -->
+    <script type="module" src="scripts/errorHandler.js"></script>
+    <script type="module" src="scripts/stateManager.js"></script>
+    <script type="module" src="scripts/utils.js"></script>
+
+    <!-- Load board modules -->
+    <script src="../shared/scripts/board-module.js"></script>
+    <script src="../shared/scripts/board-renderer.js"></script>
+
+    <!-- Firebase SDK -->
+    <script src="../shared/scripts/firebase-loader.js"></script>
+    <script src="scripts/navbar.js"></script>
+
+    <!-- Spell Manager -->
+    <script src="scripts/spell-manager.js"></script>
+
+    <!-- Team Controls Script -->
+    <script src="scripts/team-controls.js"></script>
+
+    <!-- Navigation -->
+    <script>
+        function goBackToHome() {
+            window.location.href = '../index.html';
+        }
+
+        function openEditTeamNameModal() {
+            const modal = document.getElementById('editTeamNameModal');
+            const input = document.getElementById('newTeamNameInput');
+            const currentName = document.getElementById('teamNameDisplay').textContent;
+
+            input.value = currentName;
+            modal.style.display = 'flex';
+        }
+
+        function closeEditTeamNameModal() {
+            const modal = document.getElementById('editTeamNameModal');
+            modal.style.display = 'none';
+        }
+
+        // Apply team color theme when team ID is loaded
+        window.addEventListener('teamLoaded', function(event) {
+            const teamId = event.detail.teamId;
+            if (teamId) {
+                // Remove any existing theme classes
+                document.body.classList.remove('team-1-theme', 'team-2-theme', 'team-3-theme', 'team-4-theme', 'team-5-theme');
+                // Add the new theme class
+                document.body.classList.add(`team-${teamId}-theme`);
+                console.log(`Applied team-${teamId}-theme`);
+            }
+        });
+
+        // Also check URL params for team ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const teamId = urlParams.get('teamId');
+        if (teamId) {
+            document.body.classList.add(`team-${teamId}-theme`);
+        }
+    </script>
+</body>
+</html>

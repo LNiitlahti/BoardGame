@@ -28,9 +28,9 @@ We're building the **lightweight version first** before the full-featured releas
 
 ## Quick Start
 
-1. **Configure Firebase:** Copy `scripts/firebase.example.js` to `scripts/firebase.js` and add your credentials
-2. **Create Tournament:** Open `admin-lightweight.html` → Create tournament → Add teams
-3. **Start Playing:** Players use `team.html`, spectators watch on `view-lightweight.html`
+1. **Configure Firebase:** Copy `shared/scripts/firebase.example.js` to `shared/scripts/firebase.js` and add your credentials
+2. **Create Tournament:** Open `lightweight/admin.html` → Create tournament → Add teams
+3. **Start Playing:** Players use `full/team.html`, spectators watch on `lightweight/view.html`
 
 ## Key Features
 
@@ -55,31 +55,32 @@ We're building the **lightweight version first** before the full-featured releas
 
 ```
 BoardGame/
-├── Lightweight Pages (Current Focus)
-│   ├── admin-lightweight.html    # Tournament admin panel
-│   ├── setup-lightweight.html    # Tournament creation wizard
-│   ├── view-lightweight.html     # Digital signage (1920x1080)
-│   └── statistics-lightweight.html # Analytics & export
+├── lightweight/                    # Lightweight App (Current Focus)
+│   ├── admin.html                  # Tournament admin panel
+│   ├── setup.html                  # Tournament creation wizard
+│   ├── view.html                   # Digital signage (1920x1080)
+│   ├── statistics.html             # Analytics & export
+│   ├── onboarding.html             # Player onboarding
+│   ├── css/                        # Lightweight-only styles
+│   └── scripts/                    # Lightweight-only scripts
 │
-├── Full Version Pages
-│   ├── god.html                  # Full admin panel
-│   ├── team.html                 # Team management
-│   ├── view.html                 # Public display
-│   └── login.html                # Authentication
+├── full/                           # Full Version (Planned)
+│   ├── app.html                    # SPA router
+│   ├── home.html, god.html, ...    # Full version pages
+│   ├── modules/                    # Dynamically loaded modules
+│   ├── css/                        # Full-only styles
+│   └── scripts/                    # Full-only scripts
 │
-├── Scripts
-│   ├── firebase-loader.js        # Firebase SDK initialization
-│   ├── player-utils.js           # Player ID utilities
-│   ├── tournament-manager.js     # Tournament lifecycle
-│   ├── board-module.js           # Hex grid logic
-│   ├── board-renderer.js         # Canvas rendering
-│   ├── match-suggester.js        # AI match planning
-│   └── statistics.js             # Analytics logic
+├── shared/                         # Shared between both apps
+│   ├── scripts/                    # Firebase, board, games-config, etc.
+│   ├── css/                        # Brand theme, navbar, etc.
+│   └── images/                     # Favicons, game logos, hex tiles
 │
-└── Styles
-    ├── css/admin-lightweight.css
-    ├── css/brand-theme.css
-    └── css/dark-theme.css
+├── index.html                      # Auth entry point
+├── login.html                      # Authentication
+├── development-landing-page.html   # Navigation hub
+├── dev/                            # Dev tools
+└── tools/                          # Utility tools
 ```
 
 ## User Roles
@@ -101,7 +102,7 @@ BoardGame/
 ## Game Flow
 
 ```
-1. Create tournament & teams      [admin-lightweight.html]
+1. Create tournament & teams      [lightweight/admin.html]
 2. Assign players to teams
 3. Queue matches
 
@@ -113,7 +114,7 @@ BoardGame/
 8. Check win condition            [automatic]
 --- REPEAT ---
 
-9. View statistics                [statistics-lightweight.html]
+9. View statistics                [lightweight/statistics.html]
 ```
 
 ## Security
@@ -126,7 +127,7 @@ BoardGame/
 
 1. Clone the repository
 2. Create Firebase project with Authentication and Firestore
-3. Copy `scripts/firebase.example.js` to `scripts/firebase.js`
+3. Copy `shared/scripts/firebase.example.js` to `shared/scripts/firebase.js`
 4. Add your Firebase credentials
 5. Serve locally (Live Server, Python http.server, etc.)
 6. Register a user and set `isAdmin: true` in Firestore

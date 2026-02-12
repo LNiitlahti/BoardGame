@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dev Tools - Page Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: #252526;
+            padding: 15px 20px;
+            border-bottom: 1px solid #3e3e42;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #cccccc;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .dev-badge {
+            background: #007acc;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 280px;
+            background: #252526;
+            border-right: 1px solid #3e3e42;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .page-list {
+            list-style: none;
+        }
+
+        .page-item {
+            margin-bottom: 5px;
+        }
+
+        .page-link {
+            display: block;
+            padding: 10px 12px;
+            background: #2d2d30;
+            color: #cccccc;
+            text-decoration: none;
+            border-radius: 4px;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        .page-link:hover {
+            background: #37373d;
+            color: #ffffff;
+        }
+
+        .page-link.active {
+            background: #007acc;
+            color: #ffffff;
+        }
+
+        .page-icon {
+            margin-right: 8px;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #1e1e1e;
+        }
+
+        .toolbar {
+            background: #2d2d30;
+            padding: 10px 15px;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .toolbar button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+
+        .toolbar button:hover {
+            background: #1177bb;
+        }
+
+        .current-page {
+            flex: 1;
+            color: #cccccc;
+            font-size: 14px;
+        }
+
+        .viewer {
+            flex: 1;
+            position: relative;
+            background: white;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .no-page {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #858585;
+            font-size: 16px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #424242;
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4e4e4e;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>
+            <span>🛠️ Dev Tools</span>
+            <span class="dev-badge">LOCAL ONLY</span>
+        </h1>
+    </header>
+
+    <div class="container">
+        <aside class="sidebar">
+            <ul class="page-list" id="pageList">
+                <!-- Pages will be loaded here -->
+            </ul>
+        </aside>
+
+        <main class="content">
+            <div class="toolbar">
+                <button onclick="refreshPage()">🔄 Refresh</button>
+                <button onclick="openInNewTab()">🔗 Open in New Tab</button>
+                <span class="current-page" id="currentPage">Select a page to view</span>
+            </div>
+            <div class="viewer" id="viewer">
+                <div class="no-page">← Select a page from the sidebar</div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const pages = [
+            { name: 'Home', file: '../full/home.html', icon: '🏠' },
+            { name: 'Index', file: '../index.html', icon: '📄' },
+            { name: 'Login', file: '../login.html', icon: '🔐' },
+            { name: 'Profile', file: '../full/profile.html', icon: '👤' },
+            { name: 'God View', file: '../full/god.html', icon: '👁️' },
+            { name: 'View', file: '../full/view.html', icon: '👁️' },
+            { name: 'Setup', file: '../full/setup.html', icon: '⚙️' },
+            { name: 'Team', file: '../full/team.html', icon: '👥' },
+            { name: 'Board Test 2', file: 'board-test2.html', icon: '🎲' },
+            { name: 'Upload Spells', file: '../tools/upload-spells.html', icon: '📤' }
+        ];
+
+        let currentPageFile = null;
+        let currentMode = 'pages'; // 'pages' or 'docs'
+
+        function loadPageList() {
+            const pageList = document.getElementById('pageList');
+            pageList.innerHTML = '';
+
+            // Add mode toggle
+            const modeToggle = document.createElement('li');
+            modeToggle.innerHTML = `
+                <div style="padding: 10px; border-bottom: 1px solid #3e3e42; margin-bottom: 10px;">
+                    <button onclick="switchMode('pages')" id="pagesModeBtn" style="margin-right: 5px; padding: 5px 10px; background: #007acc; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">Pages</button>
+                    <button onclick="switchMode('docs')" id="docsModeBtn" style="padding: 5px 10px; background: #2d2d30; color: #cccccc; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">Plans</button>
+                </div>
+            `;
+            pageList.appendChild(modeToggle);
+
+            pages.forEach(page => {
+                const li = document.createElement('li');
+                li.className = 'page-item';
+
+                const link = document.createElement('a');
+                link.href = '#';
+                link.className = 'page-link';
+                link.innerHTML = `<span class="page-icon">${page.icon}</span>${page.name}`;
+                link.onclick = (e) => {
+                    e.preventDefault();
+                    loadPage(page.file);
+                };
+
+                li.appendChild(link);
+                pageList.appendChild(li);
+            });
+        }
+
+        function switchMode(mode) {
+            currentMode = mode;
+            const pagesModeBtn = document.getElementById('pagesModeBtn');
+            const docsModeBtn = document.getElementById('docsModeBtn');
+            const viewer = document.getElementById('viewer');
+            const toolbar = document.querySelector('.toolbar');
+            const currentPage = document.getElementById('currentPage');
+
+            if (mode === 'pages') {
+                pagesModeBtn.style.background = '#007acc';
+                pagesModeBtn.style.color = 'white';
+                docsModeBtn.style.background = '#2d2d30';
+                docsModeBtn.style.color = '#cccccc';
+                toolbar.style.display = 'flex';
+                viewer.style.overflow = 'hidden';
+                viewer.style.background = 'white';
+                viewer.innerHTML = '<div class="no-page">← Select a page from the sidebar</div>';
+                currentPage.textContent = 'Select a page to view';
+            } else {
+                docsModeBtn.style.background = '#007acc';
+                docsModeBtn.style.color = 'white';
+                pagesModeBtn.style.background = '#2d2d30';
+                pagesModeBtn.style.color = '#cccccc';
+                toolbar.style.display = 'none';
+                loadGameplayVisualization();
+            }
+        }
+
+        function loadGameplayVisualization() {
+            const viewer = document.getElementById('viewer');
+            viewer.style.overflow = 'auto';
+            viewer.style.background = '#1e1e1e';
+            viewer.innerHTML = `
+                <div style="padding: 30px; min-height: 100%; background: #1e1e1e; color: #d4d4d4;">
+                    <h1 style="color: #cccccc; margin-bottom: 20px; border-bottom: 2px solid #007acc; padding-bottom: 10px;">🎮 4-Day Tournament Gameplay Structure</h1>
+
+                    <div style="background: #252526; padding: 20px; border-radius: 8px; margin-bottom: 30px; border-left: 4px solid #007acc;">
+                        <h2 style="color: #4ec9b0; margin-top: 0;">Event Overview</h2>
+                        <p style="line-height: 1.6;">A <strong>4-day LAN tournament</strong> combining <strong>Esports Matches</strong> (CS2, Dota 2, Valorant, etc.) with <strong>Hex Board Strategy</strong> (virtual copy of physical board game).</p>
+                        <p style="line-height: 1.6;"><strong>Format:</strong> 10 players (5 teams × 2 players) | <strong>Win Condition:</strong> First to 50 victory points</p>
+                        <p style="line-height: 1.6; color: #4ec9b0;"><strong>✅ Game-Based System:</strong> Immediate tile placement after EACH match (not round-based)</p>
+                        <p style="line-height: 1.6; color: #ce9178;"><strong>Points:</strong> +1 per tile placed + passive income from heart hexes</p>
+                    </div>
+
+                    <div style="background: #252526; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+                        <h2 style="color: #4ec9b0;">4-Day Event Timeline</h2>
+                        <pre style="background: #1e1e1e; padding: 15px; border-radius: 4px; overflow-x: auto; border: 1px solid #3e3e42; line-height: 1.8; font-size: 14px;">
+╔══════════════════════════════════════════════════════════════════╗
+║                  🗓️ 4-DAY TOURNAMENT FLOW                        ║
+╚══════════════════════════════════════════════════════════════════╝
+
+<span style="color: #ce9178;">DAY 0: SETUP NIGHT</span>
+    → Install games on all machines
+    → Add friends (Steam/Epic)
+    → Test connections
+    → <span style="color: #4fc1ff;">Status Checkboard on view.html</span>
+    → Hide checkboard after first match
+
+<span style="color: #dcdcaa;">DAY 1-4: TOURNAMENT</span> (Game-Based Flow)
+    ┌────────────────────────────────────────┐
+    │  <span style="color: #4fc1ff;">MATCH CYCLE</span> (Repeats Until Winner)    │
+    │                                        │
+    │  1. Plan Match                         │
+    │  2. Play Match (external game)         │
+    │  3. Confirm Result (vote + admin)      │
+    │  4. Winner Places Tile → IMMEDIATE!    │
+    │     • +1 victory point per tile        │
+    │     • Check starting square rules      │
+    │     • Check if room → Draw spell card  │
+    │     • Check if adjacent to heart hex   │
+    │       → Trigger 1v1 challenge          │
+    │  5. Passive Income Calculated          │
+    │     • +1 per side heart controlled     │
+    │     • +2 for mountain heart            │
+    │  6. Check Win Condition                │
+    │     • ≥ 50 points → Victory! 🏆        │
+    │     • < 50 points → Next Match         │
+    └────────────────────────────────────────┘
+
+<span style="color: #4ec9b0;">KEY: No "rounds"! Each match → immediate placement</span>
+                        </pre>
+                    </div>
+
+                    <div style="background: #252526; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+                        <h2 style="color: #4ec9b0;">Game-Based System Explained</h2>
+
+                        <div style="margin-bottom: 20px; padding: 15px; background: #2d2d30; border-radius: 4px; border-left: 4px solid #007acc;">
+                            <h3 style="color: #4fc1ff; margin-top: 0;">🎯 Victory Point System</h3>
+                            <p style="line-height: 1.8; margin: 0;"><strong>Simple:</strong> +1 victory point per tile placed</p>
+                            <ul style="line-height: 1.8; margin-top: 10px;">
+                                <li><strong>Tile placement:</strong> +1 point immediately when placed</li>
+                                <li><strong>Passive income:</strong> +1 per side heart, +2 per mountain heart (per game)</li>
+                                <li><strong>Win condition:</strong> First team to 50 victory points</li>
+                                <li><strong>Example:</strong> 12 tiles placed + 16 passive income = 28 victory points</li>
+                            </ul>
+                        </div>
+
+                        <div style="margin-bottom: 20px; padding: 15px; background: #2d2d30; border-radius: 4px; border-left: 4px solid #ce9178;">
+                            <h3 style="color: #ce9178; margin-top: 0;">❤️ Heart Hex Challenge System</h3>
+                            <ul style="line-height: 1.8;">
+                                <li><strong>Trigger:</strong> Place tile adjacent to opponent's heart hex</li>
+                                <li><strong>Format:</strong> Forced 1v1 match between teams</li>
+                                <li><strong>Game choice:</strong> Challenger picks which game to play</li>
+                                <li><strong>Result:</strong> Winner gains/keeps control of heart hex</li>
+                                <li><strong>No tile placement:</strong> Challenge only determines heart control</li>
+                                <li><strong>Passive income:</strong> +1 per side heart, +2 for mountain (per game)</li>
+                            </ul>
+                            <p style="color: #858585; font-size: 13px; margin: 10px 0 0 0;"><strong>Strategic:</strong> Challenging hearts can swing passive income dramatically</p>
+                        </div>
+
+                        <div style="margin-bottom: 20px; padding: 15px; background: #2d2d30; border-radius: 4px; border-left: 4px solid #dcdcaa;">
+                            <h3 style="color: #dcdcaa; margin-top: 0;">🏠 Starting Squares & Rooms</h3>
+                            <ul style="line-height: 1.8;">
+                                <li><strong>Starting Square (aloitusruutu):</strong> First tile must be placed here</li>
+                                <li>Each team has designated starting position</li>
+                                <li><strong>Rooms (huone):</strong> Special hexes that award spell cards</li>
+                                <li><strong>Areas (alue):</strong> Normal hexes with no special bonus</li>
+                                <li><strong>Adjacency rule:</strong> Subsequent tiles must connect to existing tiles</li>
+                            </ul>
+                            <p style="color: #858585; font-size: 13px; margin: 10px 0 0 0;"><strong>Board layout:</strong> 91 hexes total (starting squares + rooms + areas + hearts)</p>
+                        </div>
+
+                        <div style="margin-bottom: 20px; padding: 15px; background: #2d2d30; border-radius: 4px; border-left: 4px solid #4ec9b0;">
+                            <h3 style="color: #4ec9b0; margin-top: 0;">🔮 Spell Card System</h3>
+                            <ul style="line-height: 1.8;">
+                                <li><strong>Limit:</strong> ONE spell per turn (official rule)</li>
+                                <li><strong>Timing:</strong> During your tile placement turn only</li>
+                                <li><strong>Acquiring:</strong> Place tile in room hex OR initial distribution</li>
+                                <li><strong>Strategic choice:</strong> 15 different spells available</li>
+                                <li><strong>Consumed:</strong> Spell cards used once and discarded</li>
+                            </ul>
+                            <p style="color: #858585; font-size: 13px; margin: 10px 0 0 0;"><strong>UI needed:</strong> Simple, clear spell management (spells can be confusing)</p>
+                        </div>
+
+                        <div style="margin-bottom: 20px; padding: 15px; background: #2d2d30; border-radius: 4px; border-left: 4px solid #ce9178;">
+                            <h3 style="color: #ce9178; margin-top: 0;">📋 Phase 0: Setup Night (Day 0)</h3>
+                            <ul style="line-height: 1.8;">
+                                <li><strong>NEW FEATURE:</strong> Status checkboard on view.html</li>
+                                <li>Install games on all machines</li>
+                                <li>Add Steam/Epic friends, test connections</li>
+                                <li>Track player readiness & game installation progress</li>
+                                <li>Progress bars for each player</li>
+                                <li><strong>Hide checkboard after first match starts</strong></li>
+                            </ul>
+                            <p style="color: #858585; font-size: 13px; margin: 10px 0 0 0;"><strong>Duration:</strong> 2-4 hours (evening before tournament)</p>
+                        </div>
+
+                        <div style="margin-bottom: 20px; padding: 15px; background: #2d2d30; border-radius: 4px; border-left: 4px solid #dcdcaa;">
+                            <h3 style="color: #dcdcaa; margin-top: 0;">🎮 Phase 1: Match & Placement</h3>
+                            <ul style="line-height: 1.8;">
+                                <li>Plan match (AI scheduler or manual)</li>
+                                <li><strong>Parallel matches:</strong> Multiple matches can run simultaneously</li>
+                                <li>Play match externally (CS2, Dota 2, etc.)</li>
+                                <li><strong>Result confirmation:</strong> Player voting (60%) OR admin manual</li>
+                                <li><strong>Winner places tile IMMEDIATELY</strong> (not after round)</li>
+                                <li>Validate starting square, adjacency, room/heart checks</li>
+                                <li><strong>Dynamic games:</strong> Add/swap games on-the-fly if issues</li>
+                            </ul>
+                            <p style="color: #858585; font-size: 13px; margin: 10px 0 0 0;"><strong>Duration:</strong> 20-45 minutes per match</p>
+                        </div>
+
+                        <div style="margin-bottom: 20px; padding: 15px; background: #2d2d30; border-radius: 4px; border-left: 4px solid #4ec9b0;">
+                            <h3 style="color: #4ec9b0; margin-top: 0;">🎲 Phase 2: Tile Placement (After EACH Match)</h3>
+                            <ul style="line-height: 1.8;">
+                                <li><strong>CRITICAL:</strong> ONE team at a time (prevents Firebase sync errors)</li>
+                                <li>Winner team places tile immediately</li>
+                                <li><strong>+1 victory point</strong> for tile placement</li>
+                                <li>Check if first tile → Must be in starting square</li>
+                                <li>Check if room hex → Draw spell card</li>
+                                <li>Check if adjacent to heart hex → Trigger challenge</li>
+                                <li><strong>Spell usage:</strong> One spell per turn (during placement)</li>
+                            </ul>
+                            <p style="color: #858585; font-size: 13px; margin: 10px 0 0 0;"><strong>Duration:</strong> ~30 seconds per team</p>
+                        </div>
+
+                        <div style="margin-bottom: 20px; padding: 15px; background: #2d2d30; border-radius: 4px; border-left: 4px solid #569cd6;">
+                            <h3 style="color: #569cd6; margin-top: 0;">💰 Phase 3: Passive Income (After Each Game)</h3>
+                            <ul style="line-height: 1.8;">
+                                <li>Calculate passive income for ALL teams</li>
+                                <li>+1 victory point per side heart controlled</li>
+                                <li>+2 victory points for mountain heart controlled</li>
+                                <li><strong>Not awarded:</strong> Challenge matches don't give passive income</li>
+                                <li><strong>Automatic:</strong> Calculated after regular match completes</li>
+                            </ul>
+                            <p style="color: #858585; font-size: 13px; margin: 10px 0 0 0;"><strong>Example:</strong> Team controls 2 side hearts + mountain = +4 points per game</p>
+                        </div>
+
+                        <div style="margin-bottom: 20px; padding: 15px; background: #2d2d30; border-radius: 4px; border-left: 4px solid #569cd6;">
+                            <h3 style="color: #569cd6; margin-top: 0;">👥 Split Team Handling</h3>
+                            <ul style="line-height: 1.8;">
+                                <li><strong>Full teams:</strong> Get team victory points + tile placement</li>
+                                <li><strong>Split team members:</strong> Get personal points ONLY</li>
+                                <li><strong>Split teams:</strong> Do NOT get victory points or tile placement</li>
+                                <li><strong>Tracking:</strong> Personal points tracked separately for individual stats</li>
+                            </ul>
+                            <p style="color: #ce9178; font-size: 13px; margin: 10px 0 0 0;"><strong>Example:</strong> Team1(full) + Team2(1) vs Team3(full) → Winner: Team1 gets +1VP & places tile, Team2 player gets personal points only</p>
+                        </div>
+
+                        <div style="margin-bottom: 20px; padding: 15px; background: #2d2d30; border-radius: 4px; border-left: 4px solid #c586c0;">
+                            <h3 style="color: #c586c0; margin-top: 0;">🏆 Phase 4: Win Check</h3>
+                            <ul style="line-height: 1.8;">
+                                <li>After tile placement & passive income calculated</li>
+                                <li>Check if any team ≥ 50 victory points (configurable)</li>
+                                <li><strong>If NO:</strong> Next match begins</li>
+                                <li><strong>If YES:</strong> Victory! Lock tournament, show final standings</li>
+                                <li>Archive tournament for history</li>
+                            </ul>
+                            <p style="color: #858585; font-size: 13px; margin: 10px 0 0 0;"><strong>Duration:</strong> Instant (automatic check)</p>
+                        </div>
+                    </div>
+
+                    <div style="background: #252526; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+                        <h2 style="color: #4ec9b0;">🎯 User Roles</h2>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                            <div style="background: #2d2d30; padding: 15px; border-radius: 4px;">
+                                <h4 style="color: #ce9178; margin-top: 0;">👑 GOD/Admin</h4>
+                                <ul style="font-size: 13px; line-height: 1.6;">
+                                    <li>Create tournaments</li>
+                                    <li>Manage teams & players</li>
+                                    <li>Schedule matches</li>
+                                    <li>Confirm results</li>
+                                    <li>Control board state</li>
+                                    <li>Distribute spells</li>
+                                    <li>Undo/redo actions</li>
+                                </ul>
+                            </div>
+
+                            <div style="background: #2d2d30; padding: 15px; border-radius: 4px;">
+                                <h4 style="color: #4ec9b0; margin-top: 0;">👥 Player</h4>
+                                <ul style="font-size: 13px; line-height: 1.6;">
+                                    <li>View team info</li>
+                                    <li>See spell inventory</li>
+                                    <li>Cast spell cards</li>
+                                    <li>View match schedules</li>
+                                    <li>Track standings</li>
+                                    <li>Vote on results</li>
+                                </ul>
+                            </div>
+
+                            <div style="background: #2d2d30; padding: 15px; border-radius: 4px;">
+                                <h4 style="color: #569cd6; margin-top: 0;">👁️ Spectator</h4>
+                                <ul style="font-size: 13px; line-height: 1.6;">
+                                    <li>Watch view.html</li>
+                                    <li>See live updates</li>
+                                    <li>Track favorite teams</li>
+                                    <li>No authentication</li>
+                                    <li>Read-only access</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="background: #252526; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+                        <h2 style="color: #4ec9b0;">⚡ Key Features</h2>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">
+                            <div style="background: #2d2d30; padding: 15px; border-radius: 4px; border-top: 3px solid #ce9178;">
+                                <h4 style="color: #ce9178; margin-top: 0;">🔮 Spell Card System</h4>
+                                <p style="font-size: 13px; line-height: 1.6; margin: 0;">15 unique spell cards with offensive, defensive, and utility effects. Strategic depth with pre-game buffs and instant counters.</p>
+                            </div>
+
+                            <div style="background: #2d2d30; padding: 15px; border-radius: 4px; border-top: 3px solid #dcdcaa;">
+                                <h4 style="color: #dcdcaa; margin-top: 0;">🎲 Hex Grid Board</h4>
+                                <p style="font-size: 13px; line-height: 1.6; margin: 0;">91-hex game board with heart hexes, rooms, and starting squares. Victory points: +1 per tile + passive income from hearts.</p>
+                            </div>
+
+                            <div style="background: #2d2d30; padding: 15px; border-radius: 4px; border-top: 3px solid #4ec9b0;">
+                                <h4 style="color: #4ec9b0; margin-top: 0;">🔄 Real-time Sync</h4>
+                                <p style="font-size: 13px; line-height: 1.6; margin: 0;">Firebase real-time listeners keep all devices synchronized. Instant updates across god, team, and view pages.</p>
+                            </div>
+
+                            <div style="background: #2d2d30; padding: 15px; border-radius: 4px; border-top: 3px solid #569cd6;">
+                                <h4 style="color: #569cd6; margin-top: 0;">↩️ Undo/Redo</h4>
+                                <p style="font-size: 13px; line-height: 1.6; margin: 0;">Full action history with reversal support. Admins can undo match results, tile placements, and spell effects.</p>
+                            </div>
+
+                            <div style="background: #2d2d30; padding: 15px; border-radius: 4px; border-top: 3px solid #c586c0;">
+                                <h4 style="color: #c586c0; margin-top: 0;">🎮 Multi-Game Support</h4>
+                                <p style="font-size: 13px; line-height: 1.6; margin: 0;">CS2, Dota 2, Valorant, StarCraft II, and more. External match integration with result confirmation.</p>
+                            </div>
+
+                            <div style="background: #2d2d30; padding: 15px; border-radius: 4px; border-top: 3px solid #4fc1ff;">
+                                <h4 style="color: #4fc1ff; margin-top: 0;">🗳️ Voting System</h4>
+                                <p style="font-size: 13px; line-height: 1.6; margin: 0;">Player majority voting for match results (60% threshold). In development - currently admin confirms.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="background: #252526; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+                        <h2 style="color: #4ec9b0;">📄 Pages Overview</h2>
+
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                            <thead>
+                                <tr style="background: #2d2d30; border-bottom: 2px solid #3e3e42;">
+                                    <th style="padding: 10px; text-align: left; color: #cccccc;">Page</th>
+                                    <th style="padding: 10px; text-align: left; color: #cccccc;">Purpose</th>
+                                    <th style="padding: 10px; text-align: left; color: #cccccc;">Access</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style="border-bottom: 1px solid #3e3e42;">
+                                    <td style="padding: 10px; color: #4fc1ff;">index.html</td>
+                                    <td style="padding: 10px;">Entry point with auth routing</td>
+                                    <td style="padding: 10px;">Public</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #3e3e42;">
+                                    <td style="padding: 10px; color: #4fc1ff;">login.html</td>
+                                    <td style="padding: 10px;">User authentication</td>
+                                    <td style="padding: 10px;">Public</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #3e3e42;">
+                                    <td style="padding: 10px; color: #4fc1ff;">home.html</td>
+                                    <td style="padding: 10px;">Role-based dashboard</td>
+                                    <td style="padding: 10px;">Authenticated</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #3e3e42;">
+                                    <td style="padding: 10px; color: #4fc1ff;">god.html</td>
+                                    <td style="padding: 10px;">Admin control panel (5 tabs)</td>
+                                    <td style="padding: 10px;">Admin only</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #3e3e42;">
+                                    <td style="padding: 10px; color: #4fc1ff;">setup.html</td>
+                                    <td style="padding: 10px;">Tournament setup wizard</td>
+                                    <td style="padding: 10px;">Admin only</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #3e3e42;">
+                                    <td style="padding: 10px; color: #4fc1ff;">team.html</td>
+                                    <td style="padding: 10px;">Team interface (spells, matches)</td>
+                                    <td style="padding: 10px;">Player</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #3e3e42;">
+                                    <td style="padding: 10px; color: #4fc1ff;">view.html</td>
+                                    <td style="padding: 10px;">Public signage display</td>
+                                    <td style="padding: 10px;">Public</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #3e3e42;">
+                                    <td style="padding: 10px; color: #4fc1ff;">profile.html</td>
+                                    <td style="padding: 10px;">User profile management</td>
+                                    <td style="padding: 10px;">Authenticated</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #3e3e42;">
+                                    <td style="padding: 10px; color: #4fc1ff;">upload-spells.html</td>
+                                    <td style="padding: 10px;">Upload spell cards to Firebase</td>
+                                    <td style="padding: 10px;">Admin only</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div style="background: #252526; padding: 20px; border-radius: 8px; margin-bottom: 30px; border: 2px solid #007acc;">
+                        <h2 style="color: #4ec9b0; margin-top: 0;">⏱️ Game-Based Timeline Example</h2>
+                        <div style="font-family: 'Courier New', monospace; font-size: 13px; line-height: 2;">
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #ce9178;">DAY 0 - 20:00</strong> - Setup night begins, status checkboard active
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #ce9178;">DAY 1 - 10:00</strong> - Tournament starts, checkboard hidden
+                            </div>
+                            <div style="padding: 8px; background: #1e1e1e; margin: 10px 0; text-align: center; color: #4fc1ff; font-weight: bold;">
+                                === MATCH 1 ===
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #dcdcaa;">10:15</strong> - Team Red(full) vs Team Blue(full) - CS2
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #4ec9b0;">10:43</strong> - Team Red wins! → Places tile in starting square
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #4ec9b0;">10:43</strong> - Victory Points: Red +1 (1 total) | Passive income: +0
+                            </div>
+                            <div style="padding: 8px; background: #1e1e1e; margin: 10px 0; text-align: center; color: #4fc1ff; font-weight: bold;">
+                                === MATCH 2 ===
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #dcdcaa;">11:00</strong> - Team Green(full) vs Team Yellow(full) - Dota 2
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #4ec9b0;">11:45</strong> - Team Green wins! → Places tile in starting square
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #4ec9b0;">11:45</strong> - Victory Points: Green +1 (1 total) | Passive income: +0
+                            </div>
+                            <div style="padding: 8px; background: #1e1e1e; margin: 10px 0; text-align: center; color: #4fc1ff; font-weight: bold;">
+                                === MATCH 3 ===
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #dcdcaa;">12:30</strong> - Team Red(full) vs Team Purple(full) - CS2
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #4ec9b0;">12:58</strong> - Team Red wins! → Places tile in ROOM hex
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #ce9178;">12:58</strong> - 🏠 Room bonus! Red draws spell card: "Teleport Hex"
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #4ec9b0;">12:58</strong> - Victory Points: Red +1 (2 total)
+                            </div>
+                            <div style="padding: 8px; background: #1e1e1e; margin: 10px 0; text-align: center; color: #4fc1ff; font-weight: bold;">
+                                === MATCH 4 ===
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #dcdcaa;">13:30</strong> - Team Blue(full) vs Team Green(full) - Valorant
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #4ec9b0;">14:00</strong> - Team Blue wins! → Places tile adjacent to Side Heart #1
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px; border: 2px solid #ce9178;">
+                                <strong style="color: #ce9178;">14:00</strong> - ⚔️ CHALLENGE TRIGGERED! Blue challenges Red's Side Heart #1
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #dcdcaa;">14:02</strong> - Blue chooses CS2 for 1v1 challenge
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #dcdcaa;">14:25</strong> - Challenge: Blue player wins! → Blue gains Side Heart #1
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #4ec9b0;">14:25</strong> - Victory Points: Blue +1 (1 total) | No passive income (challenge)
+                            </div>
+                            <div style="padding: 8px; background: #1e1e1e; margin: 10px 0; text-align: center; color: #4fc1ff; font-weight: bold;">
+                                === MATCH 5 ===
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #dcdcaa;">15:00</strong> - Team Red(full) vs Team Yellow(full) - Age of Empires
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #4ec9b0;">15:45</strong> - Team Red wins! → Places tile
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px; border: 2px solid #569cd6;">
+                                <strong style="color: #569cd6;">15:45</strong> - 💰 Passive income calculated for ALL teams:
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #858585;">→</strong> Blue: +1 (controls 1 side heart) | Total: 2 VP
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #858585;">→</strong> Red: +0 (no hearts) | Total: 3 VP
+                            </div>
+                            <div style="padding: 8px; background: #1e1e1e; margin: 10px 0; text-align: center; color: #858585;">
+                                ... <em>Matches continue over 4 days</em> ...
+                            </div>
+                            <div style="padding: 8px; background: #1e1e1e; margin: 10px 0; text-align: center; color: #4fc1ff; font-weight: bold;">
+                                === MATCH 47 - DAY 3 ===
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #dcdcaa;">18:30</strong> - Team Red(full) vs Team Purple(full) - Dota 2
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #4ec9b0;">19:15</strong> - Team Red wins! → Places tile (connects to mountain heart)
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #4ec9b0;">19:15</strong> - Victory Points: Red +1 (48 total from tiles)
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px;">
+                                <strong style="color: #569cd6;">19:15</strong> - 💰 Passive income: Red +4 (2 side hearts + 1 mountain)
+                            </div>
+                            <div style="padding: 8px; background: #2d2d30; margin-bottom: 5px; border-radius: 3px; border: 2px solid #4ec9b0;">
+                                <strong style="color: #4ec9b0;">🏆 19:15</strong> - <strong>Team Red wins! 52 victory points (48 tiles + 4 passive)</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="text-align: center; padding: 30px; color: #858585;">
+                        <p style="font-size: 14px;">📚 For detailed documentation, see the <code style="background: #2d2d30; padding: 2px 6px; border-radius: 3px;">.plan/</code> directory</p>
+                        <p style="font-size: 12px; margin-top: 10px;">Switch back to "Pages" mode to view HTML files</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function loadPage(filename) {
+            currentPageFile = filename;
+            const viewer = document.getElementById('viewer');
+            const currentPage = document.getElementById('currentPage');
+
+            // Update active state
+            document.querySelectorAll('.page-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            event.target.closest('.page-link').classList.add('active');
+
+            // Load page in iframe
+            viewer.innerHTML = `<iframe src="${filename}"></iframe>`;
+            currentPage.textContent = filename;
+        }
+
+        function refreshPage() {
+            if (currentPageFile) {
+                const iframe = document.querySelector('iframe');
+                if (iframe) {
+                    iframe.src = iframe.src;
+                }
+            }
+        }
+
+        function openInNewTab() {
+            if (currentPageFile) {
+                window.open(currentPageFile, '_blank');
+            }
+        }
+
+        // Initialize
+        loadPageList();
+    </script>
+</body>
+</html>

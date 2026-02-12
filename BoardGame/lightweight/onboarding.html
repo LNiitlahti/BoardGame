@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+    ============================================================================
+    ONBOARDING.HTML (lightweight) - PLAYER READINESS CHECKLIST
+    ============================================================================
+
+    PURPOSE:
+    Simple onboarding page for tournament players to confirm they have:
+    - Added all other players as friends on game platforms
+    - Tested each tournament game by running it once
+
+    USAGE:
+    - Player view: lightweight/onboarding.html?tournamentId=xxx&player=1
+    - Admin view: lightweight/onboarding.html?tournamentId=xxx&view=true
+
+    ACCESS:
+    Public - no authentication required (lightweight approach).
+    ============================================================================
+-->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tournament Onboarding</title>
+
+    <!-- Favicons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="../shared/images/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../shared/images/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../shared/images/favicon/favicon-16x16.png">
+    <link rel="shortcut icon" href="../shared/images/favicon/favicon.ico">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="../shared/css/brand-theme.css">
+    <link rel="stylesheet" href="css/onboarding.css">
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <div>Loading tournament data...</div>
+        </div>
+    </div>
+
+    <!-- Error Container (hidden by default) -->
+    <div id="errorContainer" class="error-container" style="display: none;">
+        <div class="error-message">
+            <h2>Error</h2>
+            <p id="errorText">Something went wrong.</p>
+        </div>
+    </div>
+
+    <!-- Player View Container -->
+    <div id="playerView" class="container player-view" style="display: none;">
+        <header class="onboarding-header">
+            <div class="header-brand">
+                <img src="../shared/images/favicon/android-chrome-192x192.png" alt="Logo" class="header-logo">
+                <div class="header-text">
+                    <h1 id="tournamentName">Tournament</h1>
+                    <p id="playerInfo">Player Onboarding</p>
+                </div>
+            </div>
+            <div class="header-status">
+                <div class="progress-ring" id="progressRing" style="--progress: 0;">
+                    <span id="progressPercent">0%</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="checklist-container">
+            <!-- Step 1: Platform IDs -->
+            <section class="checklist-section platform-section">
+                <h2><span class="step-number">1</span> Update Your Platform IDs</h2>
+                <p class="section-desc">Enter your IDs so other players can find and add you</p>
+                <div class="platform-ids-form" id="platformIdsForm">
+                    <!-- Dynamically populated -->
+                </div>
+            </section>
+
+            <!-- Step 2: Add Friends -->
+            <section class="checklist-section">
+                <h2><span class="step-number">2</span> Add Friends</h2>
+                <p class="section-desc">Add all other tournament players as friends on each platform</p>
+                <div class="friends-checklist" id="friendsChecklist">
+                    <!-- Dynamically populated -->
+                </div>
+            </section>
+
+            <!-- Step 3: Test Games -->
+            <section class="checklist-section">
+                <h2><span class="step-number">3</span> Test Games</h2>
+                <p class="section-desc">Launch each game once to make sure it runs properly</p>
+                <div class="games-checklist" id="gamesChecklist">
+                    <!-- Dynamically populated -->
+                </div>
+            </section>
+        </main>
+
+        <footer class="onboarding-footer" id="completionFooter">
+            <div class="completion-message" id="completionMessage">
+                Complete all tasks above
+            </div>
+        </footer>
+    </div>
+
+    <!-- Admin View Container -->
+    <div id="adminView" class="container admin-view" style="display: none;">
+        <header class="onboarding-header">
+            <div class="header-brand">
+                <img src="../shared/images/favicon/android-chrome-192x192.png" alt="Logo" class="header-logo">
+                <div class="header-text">
+                    <h1 id="adminTournamentName">Tournament</h1>
+                    <p>Onboarding Progress Overview</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn secondary" onclick="openSecretModal()">Set Secret</button>
+                <button class="btn secondary" onclick="copyAllLinks()">Copy All Links</button>
+            </div>
+        </header>
+
+        <!-- Summary Grid -->
+        <div class="summary-grid" id="summaryGrid">
+            <!-- 10 player cards dynamically populated -->
+        </div>
+
+        <!-- Player Links Section -->
+        <section class="detail-section">
+            <h3>Player Links</h3>
+            <div class="links-list" id="linksList">
+                <!-- Player links dynamically populated -->
+            </div>
+        </section>
+    </div>
+
+    <!-- Secret Setup Modal (Admin only) -->
+    <div id="secretModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Access Secret</h3>
+                <button class="modal-close" onclick="closeSecretModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); margin-bottom: var(--spacing-md);">
+                    The secret is stored as a hash (not readable). Enter your secret phrase to:
+                </p>
+                <ul style="color: var(--text-tertiary); font-size: 0.875rem; margin-bottom: var(--spacing-md); padding-left: var(--spacing-lg);">
+                    <li><strong>Verify</strong> - Confirm your secret and enable link generation</li>
+                    <li><strong>Save New</strong> - Set a new secret (replaces existing)</li>
+                </ul>
+                <label style="display: block; margin-bottom: var(--spacing-sm); color: var(--text-secondary);">Secret phrase:</label>
+                <input type="text" id="secretInput" placeholder="e.g. tournament2025" style="margin-bottom: var(--spacing-md);">
+                <p style="font-size: 0.75rem; color: var(--text-tertiary);">
+                    Status: <span id="currentSecretDisplay">Not set</span>
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn secondary" onclick="closeSecretModal()">Cancel</button>
+                <button class="btn secondary" onclick="verifySecret()" id="verifySecretBtn" style="display: none;">Verify</button>
+                <button class="btn primary" onclick="saveSecret()">Save New</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Player Modal -->
+    <div id="editPlayerModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="editModalTitle">Edit Player</h3>
+                <button class="modal-close" onclick="closeEditModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <section class="checklist-section" style="background: var(--bg-primary); margin-bottom: var(--spacing-md);">
+                    <h2 style="font-size: 1rem;">Friends Added</h2>
+                    <div class="friends-checklist" id="editFriendsChecklist">
+                        <!-- Dynamically populated -->
+                    </div>
+                </section>
+                <section class="checklist-section" style="background: var(--bg-primary);">
+                    <h2 style="font-size: 1rem;">Games Tested</h2>
+                    <div class="games-checklist" id="editGamesChecklist">
+                        <!-- Dynamically populated -->
+                    </div>
+                </section>
+            </div>
+            <div class="modal-footer">
+                <button class="btn secondary" onclick="closeEditModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script>window.BOARDGAME_BASE = '..';</script>
+    <script src="../shared/scripts/firebase-loader.js"></script>
+    <script src="../shared/scripts/games-config.js"></script>
+    <script src="scripts/onboarding.js"></script>
+</body>
+</html>

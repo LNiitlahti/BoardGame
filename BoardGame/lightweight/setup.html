@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="fi">
+<!--
+    ============================================================================
+    SETUP.HTML (lightweight) - SIMPLIFIED TOURNAMENT SETUP
+    ============================================================================
+
+    PURPOSE:
+    Streamlined tournament setup - no spells, no match scheduling.
+    Focus on: games selection, team creation, and winning condition.
+
+    FEATURES:
+    - Game selection (preset + custom games)
+    - Team creation with player names and colors
+    - Win condition (points)
+    - Direct tournament creation
+
+    USAGE:
+    - Navigate to lightweight/setup.html
+    - Select games, create teams, set win condition
+    - Launch tournament
+
+    ACCESS:
+    Requires God or Admin role.
+    ============================================================================
+-->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tournament Setup - Lightweight</title>
+
+    <!-- Favicons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="../shared/images/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../shared/images/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../shared/images/favicon/favicon-16x16.png">
+    <link rel="shortcut icon" href="../shared/images/favicon/favicon.ico">
+
+    <script>window.BOARDGAME_BASE = '..';</script>
+    <script src="../shared/scripts/firebase-loader.js"></script>
+    <script src="../shared/scripts/games-config.js"></script>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Shared Styles -->
+    <link rel="stylesheet" href="../shared/css/brand-theme.css">
+    <link rel="stylesheet" href="css/setup.css">
+    <link rel="stylesheet" href="../shared/css/fantasy-mountain-theme.css">
+</head>
+<body>
+    <!-- Simple status bar for lightweight version -->
+    <div class="status-bar">
+        <div class="status-user">
+            <span id="userDisplay">Loading...</span>
+        </div>
+        <div class="status-connection">
+            <span class="traffic-light" id="connectionLight" title="Firebase connection"></span>
+            <span id="connectionText">Connecting...</span>
+        </div>
+    </div>
+
+    <div id="content" class="container" style="display:none">
+        <div class="header">
+            <h1>Tournament Setup</h1>
+            <p>Create a new tournament quickly</p>
+        </div>
+
+        <!-- Progress Steps -->
+        <div class="progress-steps">
+            <div class="progress-line"></div>
+            <div class="progress-line-fill" id="progressFill"></div>
+
+            <div class="progress-step" data-step="1">
+                <div class="progress-circle active" id="circle1">🎮</div>
+                <span class="progress-label active">Pelit</span>
+            </div>
+            <div class="progress-step" data-step="2">
+                <div class="progress-circle" id="circle2">👥</div>
+                <span class="progress-label">Tiimit</span>
+            </div>
+            <div class="progress-step" data-step="3">
+                <div class="progress-circle" id="circle3">🚀</div>
+                <span class="progress-label">Käynnistä</span>
+            </div>
+        </div>
+
+        <div class="step-content">
+            <!-- Step 1: Select Games -->
+            <div class="step active" id="step1">
+                <h2 class="step-title">
+                    <span>🎮</span>
+                    Valitse Pelit
+                </h2>
+                <p class="step-description">
+                    Valitse mitkä pelit pelataan turnauksessa
+                </p>
+
+                <div class="games-grid" id="gamesGrid"></div>
+
+                <!-- Custom Game Section -->
+                <div class="custom-game-section">
+                    <h3>Lisää Oma Peli</h3>
+                    <div class="custom-game-input-group">
+                        <input type="text" id="customGameInput" placeholder="Syötä pelin nimi...">
+                        <button class="btn" onclick="addCustomGame()">Lisää Peli</button>
+                    </div>
+                </div>
+
+                <div class="error-message" id="error1">
+                    Valitse vähintään yksi peli
+                </div>
+            </div>
+
+            <!-- Step 2: Create Teams -->
+            <div class="step" id="step2">
+                <h2 class="step-title">
+                    <span>👥</span>
+                    Tiimit
+                </h2>
+                <p class="step-description">
+                    5 tiimiä, 2 pelaajaa per tiimi - muokkaa nimet ja värit
+                </p>
+
+                <div class="teams-container" id="teamsContainer"></div>
+
+                <div class="error-message" id="error2">
+                    Kaikilla pelaajilla tulee olla nimi
+                </div>
+            </div>
+
+            <!-- Step 3: Summary & Launch -->
+            <div class="step" id="step3">
+                <h2 class="step-title">
+                    <span>🚀</span>
+                    Käynnistä Turnaus
+                </h2>
+
+                <div class="summary-grid">
+                    <div class="summary-card">
+                        <div class="summary-number" id="summaryGames">0</div>
+                        <div class="summary-label">Peliä</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-number" id="summaryTeams">0</div>
+                        <div class="summary-label">Tiimiä</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-number" id="summaryPlayers">0</div>
+                        <div class="summary-label">Pelaajaa</div>
+                    </div>
+                </div>
+
+                <div class="final-form">
+                    <div class="form-group">
+                        <label>Turnauksen Nimi</label>
+                        <input type="text" id="tournamentName" placeholder="esim. LAN Party 2025 Talvi" oninput="autoGenerateId()">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Turnaus ID (automaattinen)</label>
+                        <input type="text" id="gameId" placeholder="esim. lan-2025-talvi" pattern="[a-z0-9\-]+" oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9\-]/g, '')">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Voittoehto (Pisteet)</label>
+                        <input type="number" id="winCondition" value="50" min="10" max="200">
+                    </div>
+                </div>
+
+                <button class="btn btn-launch" onclick="uploadTournament()">Luo Turnaus</button>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="navigation">
+            <button class="btn btn-secondary" id="prevBtn" onclick="prevStep()" style="display:none;">
+                Edellinen
+            </button>
+            <button class="btn" id="nextBtn" onclick="nextStep()">
+                Seuraava
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 1;
+        const totalSteps = 3;
+        let selectedGames = [];
+        let teams = [];
+        let db;
+
+        // Get games from GAMES_CONFIG (master games list)
+        const games = (typeof GAMES_CONFIG !== 'undefined')
+            ? GAMES_CONFIG.getAllGames()
+            : [
+                // Fallback if GAMES_CONFIG not loaded
+                { id: 'cs2', name: 'Counter-Strike 2', icon: '🎯', image: 'shared/images/game-logos/Counter-Strike_2/Counter-Strike_2_icon.png' },
+                { id: 'predecessor', name: 'Predecessor', icon: '🏆', image: 'shared/images/game-logos/Predecessor/Predecessor_icon.png' },
+                { id: 'aoe4', name: 'Age of Empires IV', icon: '🏰', image: 'shared/images/game-logos/Age_of_Empires_IV/Age_of_Empires_IV_icon.png' },
+            ];
+
+        const teamColors = [
+            { id: 'red', name: 'Punainen', hex: '#ef4444' },
+            { id: 'blue', name: 'Sininen', hex: '#3b82f6' },
+            { id: 'green', name: 'Vihreä', hex: '#10b981' },
+            { id: 'yellow', name: 'Keltainen', hex: '#f59e0b' },
+            { id: 'purple', name: 'Violetti', hex: '#a855f7' },
+        ];
+
+        document.addEventListener('firebase-ready', () => {
+            db = firebase.firestore();
+            updateConnectionStatus(true);
+            initializeSetup();
+
+            // Listen for auth state changes
+            firebase.auth().onAuthStateChanged(user => {
+                if (user) {
+                    document.getElementById('userDisplay').textContent = user.email || user.displayName || 'User';
+                } else {
+                    document.getElementById('userDisplay').textContent = 'Not logged in';
+                }
+            });
+        });
+
+        // Update connection status indicator
+        function updateConnectionStatus(connected) {
+            const light = document.getElementById('connectionLight');
+            const text = document.getElementById('connectionText');
+            if (connected) {
+                light.classList.remove('red', 'yellow');
+                light.classList.add('green');
+                text.textContent = 'Connected';
+            } else {
+                light.classList.remove('green', 'yellow');
+                light.classList.add('red');
+                text.textContent = 'Disconnected';
+            }
+        }
+
+        // Set initial state as connecting (yellow)
+        document.addEventListener('DOMContentLoaded', () => {
+            const light = document.getElementById('connectionLight');
+            light.classList.add('yellow');
+        });
+
+        function initializeSetup() {
+            renderGames();
+            initializeTeams(); // Auto-create 5 teams
+            updateProgress();
+        }
+
+        // Auto-create exactly 5 teams with 2 players each
+        function initializeTeams() {
+            teams = [];
+            for (let i = 1; i <= 5; i++) {
+                const color = teamColors[i - 1];
+                teams.push({
+                    id: i,
+                    name: `Tiimi ${i}`,
+                    color: color.hex,
+                    players: [
+                        { id: `player-${i}-1`, name: `Pelaaja ${i}A`, points: 0 },
+                        { id: `player-${i}-2`, name: `Pelaaja ${i}B`, points: 0 }
+                    ],
+                    points: 0,
+                    gamesWon: 0,
+                });
+            }
+            renderTeams();
+        }
+
+        function renderGames() {
+            const grid = document.getElementById('gamesGrid');
+            grid.innerHTML = games.map(game => `
+                <div class="game-card ${selectedGames.includes(game.id) ? 'selected' : ''} ${game.custom ? 'custom' : ''}"
+                     onclick="toggleGame('${game.id}')">
+                    ${game.custom ? `<button class="remove-game" onclick="event.stopPropagation(); removeGame('${game.id}')">×</button>` : ''}
+                    <div class="game-icon">
+                        ${game.image
+                            ? `<img src="${GAMES_CONFIG.resolveImagePath(game.image)}" alt="${game.name}" onerror="this.parentElement.innerHTML='${game.icon}'">`
+                            : game.icon}
+                    </div>
+                    <div class="game-name">${game.name}</div>
+                </div>
+            `).join('');
+        }
+
+        function toggleGame(gameId) {
+            if (selectedGames.includes(gameId)) {
+                selectedGames = selectedGames.filter(id => id !== gameId);
+            } else {
+                selectedGames.push(gameId);
+            }
+            renderGames();
+        }
+
+        function addCustomGame() {
+            const input = document.getElementById('customGameInput');
+            const gameName = input.value.trim();
+
+            if (!gameName) {
+                alert('Syötä pelin nimi');
+                return;
+            }
+
+            if (games.some(g => g.name.toLowerCase() === gameName.toLowerCase())) {
+                alert('Tämä peli on jo olemassa');
+                return;
+            }
+
+            const emojis = ['🎮', '🎯', '⚔️', '🏆', '🎲', '🃏', '🎪', '🎨', '🎭', '🎬'];
+            const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+
+            const customGame = {
+                id: `custom-${Date.now()}`,
+                name: gameName,
+                icon: randomEmoji,
+                custom: true
+            };
+
+            games.push(customGame);
+            selectedGames.push(customGame.id);
+
+            input.value = '';
+            renderGames();
+        }
+
+        function removeGame(gameId) {
+            const gameIndex = games.findIndex(g => g.id === gameId);
+            if (gameIndex > -1) {
+                games.splice(gameIndex, 1);
+                selectedGames = selectedGames.filter(id => id !== gameId);
+                renderGames();
+            }
+        }
+
+
+        function renderTeams() {
+            const container = document.getElementById('teamsContainer');
+            container.innerHTML = teams.map((team, idx) => {
+                const colorHex = team.color || '#666';
+                const colorOptions = teamColors.map(c =>
+                    `<option value="${c.hex}" ${team.color === c.hex ? 'selected' : ''}>${c.name}</option>`
+                ).join('');
+
+                return `
+                    <div class="team-card" style="border-left-color: ${colorHex}">
+                        <div class="form-group">
+                            <label>Tiimin Nimi</label>
+                            <input type="text" value="${team.name}"
+                                   oninput="updateTeam(${idx}, 'name', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label>Pelaaja 1</label>
+                            <input type="text" value="${team.players[0].name}"
+                                   oninput="updateTeam(${idx}, 'player1', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label>Pelaaja 2</label>
+                            <input type="text" value="${team.players[1].name}"
+                                   oninput="updateTeam(${idx}, 'player2', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label>Väri</label>
+                            <select onchange="updateTeam(${idx}, 'color', this.value)">
+                                ${colorOptions}
+                            </select>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateTeam(idx, field, value) {
+            if (field === 'name') {
+                teams[idx].name = value;
+            } else if (field === 'player1') {
+                teams[idx].players[0].name = value;
+            } else if (field === 'player2') {
+                teams[idx].players[1].name = value;
+            } else if (field === 'color') {
+                teams[idx].color = value;
+                renderTeams();
+            }
+        }
+
+
+        function nextStep() {
+            if (!validateStep()) return;
+
+            if (currentStep < totalSteps) {
+                currentStep++;
+                updateStepDisplay();
+                updateProgress();
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 1) {
+                currentStep--;
+                updateStepDisplay();
+                updateProgress();
+            }
+        }
+
+        function validateStep() {
+            const errorEl = document.getElementById(`error${currentStep}`);
+            if (errorEl) errorEl.classList.remove('show');
+
+            switch(currentStep) {
+                case 1:
+                    if (selectedGames.length === 0) {
+                        if (errorEl) errorEl.classList.add('show');
+                        return false;
+                    }
+                    break;
+                case 2:
+                    // Check all players have names
+                    const hasEmptyNames = teams.some(t =>
+                        !t.players[0].name.trim() || !t.players[1].name.trim()
+                    );
+                    if (hasEmptyNames) {
+                        if (errorEl) errorEl.classList.add('show');
+                        return false;
+                    }
+                    break;
+                case 3:
+                    return true;
+            }
+            return true;
+        }
+
+        function updateStepDisplay() {
+            document.querySelectorAll('.step').forEach((step, idx) => {
+                step.classList.toggle('active', idx + 1 === currentStep);
+            });
+
+            document.getElementById('prevBtn').style.display = currentStep === 1 ? 'none' : 'block';
+            document.getElementById('nextBtn').style.display = currentStep === totalSteps ? 'none' : 'block';
+
+            if (currentStep === totalSteps) {
+                updateSummary();
+            }
+        }
+
+        function updateProgress() {
+            const progressWidth = ((currentStep - 1) / (totalSteps - 1)) * 100;
+            document.getElementById('progressFill').style.width = `calc(${progressWidth}% - 100px)`;
+
+            for (let i = 1; i <= totalSteps; i++) {
+                const circle = document.getElementById(`circle${i}`);
+                circle.classList.toggle('active', i === currentStep);
+                circle.classList.toggle('completed', i < currentStep);
+
+                const label = document.querySelector(`[data-step="${i}"] .progress-label`);
+                label.classList.toggle('active', i === currentStep);
+            }
+        }
+
+        function updateSummary() {
+            document.getElementById('summaryGames').textContent = selectedGames.length;
+            document.getElementById('summaryTeams').textContent = teams.length;
+            document.getElementById('summaryPlayers').textContent = teams.length * 2;
+        }
+
+        // Auto-generate tournament ID from name
+        function autoGenerateId() {
+            const name = document.getElementById('tournamentName').value;
+            const gameIdInput = document.getElementById('gameId');
+
+            // Only auto-generate if user hasn't manually edited the ID
+            if (!gameIdInput.dataset.manualEdit) {
+                const id = name
+                    .toLowerCase()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents
+                    .replace(/[^a-z0-9\s\-]/g, '') // Remove special chars
+                    .replace(/\s+/g, '-') // Spaces to hyphens
+                    .replace(/-+/g, '-') // Multiple hyphens to single
+                    .replace(/^-|-$/g, ''); // Trim hyphens
+                gameIdInput.value = id;
+            }
+        }
+
+        async function uploadTournament() {
+            const tournamentName = document.getElementById('tournamentName').value.trim();
+            const gameId = document.getElementById('gameId').value.trim();
+            const winCondition = parseInt(document.getElementById('winCondition').value);
+
+            if (!tournamentName) {
+                alert('Turnauksen nimi vaaditaan');
+                return;
+            }
+
+            if (!gameId) {
+                alert('Turnaus ID vaaditaan');
+                return;
+            }
+
+            // Validate gameId format
+            if (!/^[a-z0-9\-]+$/.test(gameId)) {
+                alert('Turnaus ID saa sisältää vain pieniä kirjaimia, numeroita ja viivoja');
+                return;
+            }
+
+            // Build game definitions object with ID -> name/icon mapping
+            const gameDefinitions = {};
+            selectedGames.forEach(id => {
+                const game = games.find(g => g.id === id);
+                if (game) {
+                    gameDefinitions[id] = {
+                        name: game.name,
+                        icon: game.icon || '🎮',
+                        custom: game.custom || false
+                    };
+                }
+            });
+
+            const tournamentData = {
+                gameId,
+                name: tournamentName,
+                teams,
+                matches: [],
+                schedule: { matches: [], rounds: [] },
+                selectedGames,
+                gameDefinitions,
+                spellCards: [],
+                winCondition,
+                createdAt: new Date().toISOString(),
+                status: 'setup',
+                board: {},
+                heartHexes: ['q2r-4', 'q4r-2', 'q2r2', 'q-2r4', 'q-4r2', 'q-2r-2'],
+                heartHexControl: {},
+                currentRound: 0,
+                gamesPlayed: 0,
+                gameHistory: [],
+                currentTurn: null,
+                gamePhase: 'playing',
+                lightweight: true,
+            };
+
+            try {
+                await db.collection('tournaments').doc(gameId).set(tournamentData);
+
+                alert('Turnaus luotu onnistuneesti!');
+                window.location.href = `admin.html?tournamentId=${gameId}`;
+            } catch (error) {
+                alert('Virhe turnauksen luomisessa: ' + error.message);
+                console.error(error);
+            }
+        }
+    </script>
+    <script src="../shared/scripts/theme-toggle.js"></script>
+    <script src="../shared/scripts/restrict-access.js"></script>
+</body>
+</html>
