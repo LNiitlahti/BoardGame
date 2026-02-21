@@ -46,6 +46,7 @@
 
     <!-- Shared Styles -->
     <link rel="stylesheet" href="../shared/css/brand-theme.css">
+    <link rel="stylesheet" href="../shared/css/toast.css">
     <link rel="stylesheet" href="css/setup.css">
     <link rel="stylesheet" href="../shared/css/fantasy-mountain-theme.css">
 </head>
@@ -169,7 +170,7 @@
                     </div>
                 </div>
 
-                <button class="btn btn-launch" onclick="uploadTournament()">Luo Turnaus</button>
+                <button class="btn btn-launch" onclick="uploadTournament(this)">Luo Turnaus</button>
             </div>
         </div>
 
@@ -301,12 +302,12 @@
             const gameName = input.value.trim();
 
             if (!gameName) {
-                alert('Syötä pelin nimi');
+                showToast('Syötä pelin nimi', 'warning');
                 return;
             }
 
             if (games.some(g => g.name.toLowerCase() === gameName.toLowerCase())) {
-                alert('Tämä peli on jo olemassa');
+                showToast('Tämä peli on jo olemassa', 'warning');
                 return;
             }
 
@@ -483,24 +484,24 @@
             }
         }
 
-        async function uploadTournament() {
+        async function uploadTournament(triggerBtn) {
             const tournamentName = document.getElementById('tournamentName').value.trim();
             const gameId = document.getElementById('gameId').value.trim();
             const winCondition = parseInt(document.getElementById('winCondition').value);
 
             if (!tournamentName) {
-                alert('Turnauksen nimi vaaditaan');
+                showToast('Turnauksen nimi vaaditaan', 'warning');
                 return;
             }
 
             if (!gameId) {
-                alert('Turnaus ID vaaditaan');
+                showToast('Turnaus ID vaaditaan', 'warning');
                 return;
             }
 
             // Validate gameId format
             if (!/^[a-z0-9\-]+$/.test(gameId)) {
-                alert('Turnaus ID saa sisältää vain pieniä kirjaimia, numeroita ja viivoja');
+                showToast('Turnaus ID saa sisältää vain pieniä kirjaimia, numeroita ja viivoja', 'warning');
                 return;
             }
 
@@ -540,17 +541,24 @@
                 lightweight: true,
             };
 
+            const stopLoading = (typeof btnLoading === 'function' && triggerBtn) ? btnLoading(triggerBtn) : null;
+
             try {
                 await db.collection('tournaments').doc(gameId).set(tournamentData);
 
-                alert('Turnaus luotu onnistuneesti!');
-                window.location.href = `admin.html?tournamentId=${gameId}`;
+                showToast('Turnaus luotu onnistuneesti!', 'success');
+                setTimeout(() => {
+                    window.location.href = `admin.html?tournamentId=${gameId}`;
+                }, 1000);
             } catch (error) {
-                alert('Virhe turnauksen luomisessa: ' + error.message);
+                showToast('Virhe turnauksen luomisessa: ' + error.message, 'error');
                 console.error(error);
+            } finally {
+                if (stopLoading) stopLoading();
             }
         }
     </script>
+    <script src="../shared/scripts/toast.js"></script>
     <script src="../shared/scripts/theme-toggle.js"></script>
     <script src="../shared/scripts/restrict-access.js"></script>
 </body>

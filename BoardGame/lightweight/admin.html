@@ -42,6 +42,7 @@
 
     <link rel="stylesheet" href="../shared/css/brand-theme.css">
     <link rel="stylesheet" href="../shared/css/navbar.css">
+    <link rel="stylesheet" href="../shared/css/toast.css">
     <link rel="stylesheet" href="css/admin.css">
     <link rel="stylesheet" href="../shared/css/fantasy-mountain-theme.css">
 </head>
@@ -99,6 +100,7 @@
                 <button class="btn secondary" onclick="openStatsWindow()" title="Open tournament statistics">Stats</button>
                 <button class="btn secondary" onclick="openOnboardingWindow()" title="Open player onboarding checklist">Onboarding</button>
                 <button class="btn secondary" onclick="openOnboardingViewWindow()" title="Open onboarding TV display">Onboarding TV</button>
+                <button class="btn secondary" onclick="openSeatingOrder()" title="Configure player seating positions">Seating</button>
             </div>
         </div>
 
@@ -169,7 +171,7 @@
                 </div>
 
                 <div class="match-buttons">
-                    <button class="btn primary" onclick="addMatchToQueue()">Add to Queue</button>
+                    <button class="btn primary" onclick="addMatchToQueue(this)">Add to Queue</button>
                     <button class="btn secondary" onclick="clearMatchSetup()">Clear</button>
                 </div>
             </div>
@@ -209,6 +211,30 @@
         </div>
     </div>
 
+    <!-- Seating Order Modal -->
+    <div class="modal-overlay" id="seatingOrderModal">
+        <div class="modal-content seating-order-modal">
+            <h4>Seating Order</h4>
+            <p class="modal-hint">Drag players to rearrange physical seating. Left wall = seats 1-5, right wall = seats 6-10.</p>
+
+            <div class="seating-columns">
+                <div class="seating-wall">
+                    <div class="seating-wall-label">Left Wall</div>
+                    <div class="seating-list" id="seatingLeftWall"></div>
+                </div>
+                <div class="seating-wall">
+                    <div class="seating-wall-label">Right Wall</div>
+                    <div class="seating-list" id="seatingRightWall"></div>
+                </div>
+            </div>
+
+            <div class="seating-order-actions">
+                <button class="btn-small secondary" onclick="resetSeatingOrder()">Reset to Default</button>
+                <button class="btn secondary" onclick="closeSeatingOrder()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Next Round Confirmation Modal -->
     <div class="modal-overlay" id="nextRoundModal">
         <div class="modal-content next-round-modal">
@@ -221,7 +247,7 @@
             </div>
 
             <div class="next-round-actions">
-                <button class="btn primary" onclick="confirmAdvanceRound()">Yes, Advance Round</button>
+                <button class="btn primary" onclick="confirmAdvanceRound(this)">Yes, Advance Round</button>
                 <button class="btn secondary" onclick="closeNextRoundModal()">Cancel</button>
             </div>
         </div>
@@ -244,7 +270,7 @@
                 <!-- Import preview rendered here -->
             </div>
             <div class="import-actions">
-                <button class="btn primary" onclick="confirmMassImport()">Import All</button>
+                <button class="btn primary" onclick="confirmMassImport(this)">Import All</button>
                 <button class="btn secondary" onclick="closeMassImport()">Cancel</button>
             </div>
         </div>
@@ -262,7 +288,7 @@
             </div>
 
             <div class="clear-queue-actions">
-                <button class="btn danger" onclick="confirmClearQueue()">Yes, Clear All Matches</button>
+                <button class="btn danger" onclick="confirmClearQueue(this)">Yes, Clear All Matches</button>
                 <button class="btn secondary" onclick="closeClearQueueModal()">Cancel</button>
             </div>
         </div>
@@ -309,7 +335,7 @@
             </div>
 
             <div class="challenge-setup-actions">
-                <button class="btn primary" onclick="confirmChallengeSetup()">Create Challenge</button>
+                <button class="btn primary" onclick="confirmChallengeSetup(this)">Create Challenge</button>
                 <button class="btn secondary" onclick="closeChallengeSetupModal()">Cancel</button>
             </div>
         </div>
@@ -340,7 +366,7 @@
             </div>
 
             <div class="edit-match-actions">
-                <button class="btn primary" onclick="saveMatchEdits()">Save Changes</button>
+                <button class="btn primary" onclick="saveMatchEdits(this)">Save Changes</button>
                 <button class="btn secondary" onclick="closeEditMatchModal()">Cancel</button>
             </div>
         </div>
@@ -408,7 +434,7 @@
                             <label for="gmCustomImage">Image URL (optional)</label>
                             <input type="text" id="gmCustomImage" placeholder="https://example.com/icon.png">
                         </div>
-                        <button class="btn primary" onclick="addCustomGameToTournament()">Add Custom Game</button>
+                        <button class="btn primary" onclick="addCustomGameToTournament(this)">Add Custom Game</button>
                     </div>
                 </div>
             </div>
@@ -430,6 +456,7 @@
     <script src="scripts/balance-optimizer.js"></script>
     <script src="scripts/smart-match-generator.js"></script>
     <script src="../shared/scripts/player-utils.js"></script>
+    <script src="../shared/scripts/toast.js"></script>
     <script src="scripts/admin.js"></script>
 </body>
 </html>

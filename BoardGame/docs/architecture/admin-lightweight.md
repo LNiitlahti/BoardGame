@@ -11,8 +11,8 @@ flowchart TD
     B -->|user is null| C[Redirect to login.html]
     B -->|user exists| D[Fetch userDoc from Firestore]
     D --> E{userData.isGod OR userData.isAdmin?}
-    E -->|No| F[alert Access Denied then Redirect home.html]
-    E -->|Yes| G[Load Tournament UI]
+    E -->|No| F[showToast Access Denied then Redirect home.html]
+    E -->|Yes| G[Load Tournament UI + initConnectionMonitor]
     G --> H{URL has tournamentId param?}
     H -->|Yes| I[loadTournament id]
     H -->|No| J[Show tournament selector]
@@ -145,11 +145,55 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[saveGameState] --> B[Create cleanData copy]
+    A["saveGameState(triggerBtn)"] --> A2{"window._isOffline?"}
+    A2 -->|Yes| A3["showToast offline warning — RETURN"]
+    A2 -->|No| A4["btnLoading(triggerBtn) — disable button"]
+    A4 --> B[Create cleanData copy]
     B --> C[Remove tournamentId field]
     C --> D[Remove undefined fields]
     D --> E["tournamentRef.set cleanData with merge: true"]
     E --> F[Firebase listener detects change]
     F --> G[gameState = updated data from Firebase]
     G --> H["updateDisplay — full re-render of all UI"]
+    E --> I["finally: stopLoading — re-enable button"]
+```
+
+## 9. Connection Monitor
+
+```mermaid
+flowchart TD
+    A[initConnectionMonitor] --> B{navigator.onLine?}
+    B -->|No| C["updateConnectionStatus('disconnected')"]
+    A --> D["window.addEventListener('online')"]
+    A --> E["window.addEventListener('offline')"]
+    D --> F["updateConnectionStatus('connected')"]
+    E --> C
+    F --> G[hideConnectionBanner]
+    F --> H["window._isOffline = false"]
+    C --> I[showConnectionBanner]
+    C --> J["window._isOffline = true"]
+```
+
+## 10. Seating Order Management
+
+```mermaid
+flowchart TD
+    A[openSeatingOrder] --> B{gameState.teams exists?}
+    B -->|No| C[showStatus warning — RETURN]
+    B -->|Yes| D[renderSeatingOrder]
+    D --> E[getSeatingOrder from gameState or default 1..10]
+    D --> F[getAllPlayersInOrder — iterate teams]
+    E --> G[Render left wall seats 1-5]
+    F --> G
+    E --> H[Render right wall seats 6-10]
+    F --> H
+    G --> I[setupSeatingDragDrop listeners]
+    H --> I
+    I --> J[User drags player to new seat]
+    J --> K[swapSeatingPositions seatA seatB]
+    K --> L[Swap values in seatingOrder array]
+    L --> M[gameState.seatingOrder = updated]
+    M --> N[saveGameState — merge to Firebase]
+    N --> O[Firebase listener fires on view page]
+    O --> P[view-onboarding-layout re-renders with new seating]
 ```

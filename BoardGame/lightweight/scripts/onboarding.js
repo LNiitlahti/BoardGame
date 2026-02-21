@@ -834,7 +834,7 @@ function copyAllLinks() {
 
     // Warn if secret is set but not available
     if (hasSecretHash && !plainSecret) {
-        alert('Warning: Secret is set but not available. Links will not work!\n\nClick "Set Secret" and enter the secret phrase first.');
+        showToast('Secret is set but not available. Click "Set Secret" and enter the secret phrase first.', 'warning', 5000);
         return;
     }
 
@@ -891,7 +891,7 @@ async function savePlatformId(platformKey, value) {
         }
     } catch (error) {
         console.error('Failed to save platform ID:', error);
-        alert('Failed to save. Please try again.');
+        showToast('Failed to save. Please try again.', 'error');
     }
 }
 
@@ -960,7 +960,7 @@ function closeSecretModal() {
 async function verifySecret() {
     const enteredSecret = document.getElementById('secretInput').value.trim();
     if (!enteredSecret) {
-        alert('Please enter the secret phrase.');
+        showToast('Please enter the secret phrase.', 'warning');
         return;
     }
 
@@ -972,9 +972,9 @@ async function verifySecret() {
         onboardingState._plainSecret = enteredSecret;
         closeSecretModal();
         renderAdminView();
-        alert('Secret verified! Links are now ready to copy.');
+        showToast('Secret verified! Links are now ready to copy.', 'success');
     } else {
-        alert('Secret does not match. Please check and try again.');
+        showToast('Secret does not match. Please check and try again.', 'error');
     }
 }
 
@@ -1004,11 +1004,11 @@ async function saveSecret() {
 
         // Show the secret once so admin can copy it
         if (newSecret) {
-            alert(`Secret saved! Your secret phrase is:\n\n${newSecret}\n\nThis is the ONLY time you'll see it. The links below already include it.`);
+            showToast(`Secret saved! Your phrase: ${newSecret} — This is the ONLY time you'll see it.`, 'success', 0);
         }
     } catch (error) {
         console.error('Failed to save secret:', error);
-        alert('Failed to save secret. Please try again.');
+        showToast('Failed to save secret. Please try again.', 'error');
     }
 }
 

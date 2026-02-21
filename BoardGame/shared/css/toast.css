@@ -1,0 +1,193 @@
+/**
+ * ============================================================================
+ * TOAST.CSS - Non-blocking toast notification styles
+ * ============================================================================
+ * Shared across all lightweight pages. Replaces browser alert() calls.
+ * Uses brand-theme.css variables.
+ */
+
+/* Toast Container - fixed position, stacks from top-right */
+.toast-container {
+    position: fixed;
+    top: 70px; /* Below navbar */
+    right: 16px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+    max-width: 420px;
+    width: 100%;
+}
+
+/* Individual Toast */
+.toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: var(--radius-md, 8px);
+    background: var(--bg-elevated, #3d4039);
+    border: 1px solid var(--border-color, rgba(247, 240, 227, 0.1));
+    box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.5));
+    color: var(--text-primary, #f7f0e3);
+    font-family: var(--font-secondary, 'Segoe UI', sans-serif);
+    font-size: 0.875rem;
+    line-height: 1.4;
+    pointer-events: auto;
+    opacity: 0;
+    transform: translateX(100%);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    cursor: pointer;
+}
+
+.toast.visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast.removing {
+    opacity: 0;
+    transform: translateX(100%);
+}
+
+/* Toast Icon */
+.toast-icon {
+    flex-shrink: 0;
+    font-size: 1.1rem;
+    line-height: 1.4;
+}
+
+/* Toast Content */
+.toast-content {
+    flex: 1;
+    min-width: 0;
+    word-wrap: break-word;
+}
+
+/* Toast Close Button */
+.toast-close {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--text-tertiary, #a8a49a);
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+    transition: color 0.2s ease;
+}
+
+.toast-close:hover {
+    color: var(--text-primary, #f7f0e3);
+}
+
+/* Toast Type Variants */
+.toast.success {
+    border-left: 4px solid var(--accent-success, #2e9158);
+    background: linear-gradient(90deg, rgba(46, 145, 88, 0.15) 0%, var(--bg-elevated, #3d4039) 30%);
+}
+
+.toast.error {
+    border-left: 4px solid var(--accent-danger, #de392c);
+    background: linear-gradient(90deg, rgba(222, 57, 44, 0.15) 0%, var(--bg-elevated, #3d4039) 30%);
+}
+
+.toast.warning {
+    border-left: 4px solid var(--accent-warning, #f7ba32);
+    background: linear-gradient(90deg, rgba(247, 186, 50, 0.15) 0%, var(--bg-elevated, #3d4039) 30%);
+}
+
+.toast.info {
+    border-left: 4px solid var(--accent-primary, #2278a3);
+    background: linear-gradient(90deg, rgba(34, 120, 163, 0.15) 0%, var(--bg-elevated, #3d4039) 30%);
+}
+
+/* Progress bar for auto-dismiss */
+.toast-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    border-radius: 0 0 0 var(--radius-md, 8px);
+    transition: width linear;
+}
+
+.toast.success .toast-progress { background: var(--accent-success, #2e9158); }
+.toast.error .toast-progress { background: var(--accent-danger, #de392c); }
+.toast.warning .toast-progress { background: var(--accent-warning, #f7ba32); }
+.toast.info .toast-progress { background: var(--accent-primary, #2278a3); }
+
+/* Position relative for progress bar */
+.toast {
+    position: relative;
+    overflow: hidden;
+}
+
+/* Connection Banner - full-width offline warning */
+.connection-banner {
+    position: fixed;
+    top: 56px; /* Below navbar */
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    padding: 8px 16px;
+    background: rgba(222, 57, 44, 0.95);
+    color: #fff;
+    text-align: center;
+    font-family: var(--font-secondary, 'Segoe UI', sans-serif);
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.connection-banner.active {
+    display: flex;
+}
+
+.connection-banner .banner-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #fff;
+    animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* Button loading state */
+.btn-loading {
+    position: relative;
+    pointer-events: none;
+}
+
+.btn-loading::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    top: 50%;
+    left: 50%;
+    margin-top: -7px;
+    margin-left: -7px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+.btn-loading > * {
+    visibility: hidden;
+}
+
+/* When button text is direct child text node, hide via color */
+.btn-loading {
+    color: transparent !important;
+}

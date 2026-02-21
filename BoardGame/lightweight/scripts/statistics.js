@@ -1707,7 +1707,7 @@ function renderTeammateSynergy(playerId) {
 
 function exportStatistics() {
     if (!gameState) {
-        alert('No tournament selected');
+        showToast('No tournament selected', 'warning');
         return;
     }
 

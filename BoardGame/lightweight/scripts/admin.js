@@ -161,8 +161,10 @@ document.addEventListener('firebase-ready', async function() {
             const userData = userDoc.data();
 
             if (!userData || (!userData.isGod && !userData.isAdmin)) {
-                alert('Access denied. God or Admin role required.');
-                window.location.href = (window.BOARDGAME_BASE || '.') + '/full/home.html';
+                showToast('Access denied. God or Admin role required.', 'error', 4000);
+                setTimeout(() => {
+                    window.location.href = (window.BOARDGAME_BASE || '.') + '/full/home.html';
+                }, 1500);
                 return;
             }
 
@@ -173,6 +175,9 @@ document.addEventListener('firebase-ready', async function() {
 
             // Initialize modules
             initializeBoardModules();
+
+            // Monitor Firebase connection status
+            initConnectionMonitor();
 
             // Load tournaments
             await loadTournamentsList();
@@ -452,6 +457,32 @@ function updateConnectionStatus(status) {
     indicator.classList.remove('connected', 'disconnected', 'warning');
     indicator.classList.add(status);
     indicator.title = `Firebase: ${status}`;
+
+    // Sync with connection banner from toast.js
+    if (status === 'disconnected') {
+        if (typeof showConnectionBanner === 'function') showConnectionBanner();
+    } else {
+        if (typeof hideConnectionBanner === 'function') hideConnectionBanner();
+    }
+}
+
+/**
+ * Monitor browser connection state using native online/offline events.
+ * Shows/hides the offline banner and sets window._isOffline flag.
+ */
+function initConnectionMonitor() {
+    // Set initial state
+    if (!navigator.onLine) {
+        updateConnectionStatus('disconnected');
+    }
+
+    window.addEventListener('online', () => {
+        updateConnectionStatus('connected');
+    });
+
+    window.addEventListener('offline', () => {
+        updateConnectionStatus('disconnected');
+    });
 }
 
 // =============================================================================
@@ -808,6 +839,207 @@ function applyTeamColors() {
 }
 
 // =============================================================================
+// SEATING ORDER
+// =============================================================================
+
+/**
+ * Escape HTML to prevent XSS in rendered player names
+ */
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Get the current seating order, validated as a permutation of 1..10.
+ * Falls back to default [1..10] if absent or invalid.
+ */
+function getSeatingOrder() {
+    const order = gameState?.seatingOrder;
+    if (!Array.isArray(order) || order.length !== 10) return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+    const sorted = [...order].sort((a, b) => a - b);
+    const isValid = sorted.every((val, idx) => val === idx + 1);
+    if (!isValid) return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+    return [...order];
+}
+
+/**
+ * Build a lookup of logical player numbers to player info.
+ * Iterates teams in the same order as getPlayerMapping() in the view page.
+ */
+function getAllPlayersInOrder() {
+    const players = [];
+    const teams = gameState?.teams || [];
+    let playerNum = 1;
+
+    for (const team of teams) {
+        const teamPlayers = team.players || [];
+        for (const player of teamPlayers) {
+            if (playerNum <= 10) {
+                players.push({
+                    playerNum,
+                    name: player.name || 'Player ' + playerNum,
+                    teamId: team.id,
+                    teamName: team.name || 'Team ' + team.id,
+                    teamColor: team.color || '#666666'
+                });
+                playerNum++;
+            }
+        }
+    }
+
+    while (playerNum <= 10) {
+        const teamIndex = Math.floor((playerNum - 1) / 2);
+        const team = teams[teamIndex] || {};
+        players.push({
+            playerNum,
+            name: 'Player ' + playerNum,
+            teamId: team.id || teamIndex + 1,
+            teamName: team.name || 'Team ' + (teamIndex + 1),
+            teamColor: team.color || '#666666'
+        });
+        playerNum++;
+    }
+
+    return players;
+}
+
+/**
+ * Open the seating order modal
+ */
+function openSeatingOrder() {
+    if (!gameState?.teams) {
+        showStatus('Load a tournament first', 'warning');
+        return;
+    }
+
+    renderSeatingOrder();
+    document.getElementById('seatingOrderModal').classList.add('active');
+}
+
+/**
+ * Close the seating order modal
+ */
+function closeSeatingOrder() {
+    document.getElementById('seatingOrderModal').classList.remove('active');
+}
+
+/**
+ * Render the seating order modal contents
+ */
+function renderSeatingOrder() {
+    const order = getSeatingOrder();
+    const allPlayers = getAllPlayersInOrder();
+    const playerLookup = {};
+    for (const p of allPlayers) {
+        playerLookup[p.playerNum] = p;
+    }
+
+    const leftWall = document.getElementById('seatingLeftWall');
+    const rightWall = document.getElementById('seatingRightWall');
+
+    let leftHtml = '';
+    for (let seat = 1; seat <= 5; seat++) {
+        const pNum = order[seat - 1];
+        leftHtml += buildSeatItemHTML(seat, pNum, playerLookup[pNum]);
+    }
+    leftWall.innerHTML = leftHtml;
+
+    let rightHtml = '';
+    for (let seat = 6; seat <= 10; seat++) {
+        const pNum = order[seat - 1];
+        rightHtml += buildSeatItemHTML(seat, pNum, playerLookup[pNum]);
+    }
+    rightWall.innerHTML = rightHtml;
+
+    setupSeatingDragDrop();
+}
+
+/**
+ * Build HTML for a single seat item
+ */
+function buildSeatItemHTML(seatNum, playerNum, info) {
+    const name = info ? escapeHtml(info.name) : 'Player ' + playerNum;
+    const color = info ? info.teamColor : '#666666';
+
+    return `<div class="seating-item" draggable="true" data-seat="${seatNum}">
+        <span class="seating-drag-handle">&#9776;</span>
+        <span class="seating-seat-num">${seatNum}</span>
+        <span class="seating-team-dot" style="background: ${color}"></span>
+        <span class="seating-player-name">${name}</span>
+    </div>`;
+}
+
+/**
+ * Set up drag-and-drop on all seating items (swap on drop, across both walls)
+ */
+function setupSeatingDragDrop() {
+    const items = document.querySelectorAll('.seating-item');
+    let draggedSeat = null;
+
+    items.forEach(item => {
+        item.addEventListener('dragstart', (e) => {
+            draggedSeat = parseInt(item.dataset.seat);
+            item.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+
+        item.addEventListener('dragend', () => {
+            item.classList.remove('dragging');
+            draggedSeat = null;
+            items.forEach(el => el.classList.remove('drag-over'));
+        });
+
+        item.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (parseInt(item.dataset.seat) !== draggedSeat) {
+                item.classList.add('drag-over');
+            }
+        });
+
+        item.addEventListener('dragleave', () => {
+            item.classList.remove('drag-over');
+        });
+
+        item.addEventListener('drop', (e) => {
+            e.preventDefault();
+            item.classList.remove('drag-over');
+            const targetSeat = parseInt(item.dataset.seat);
+            if (draggedSeat !== null && draggedSeat !== targetSeat) {
+                swapSeatingPositions(draggedSeat, targetSeat);
+            }
+        });
+    });
+}
+
+/**
+ * Swap two seats in the seating order and save
+ */
+async function swapSeatingPositions(seatA, seatB) {
+    const order = getSeatingOrder();
+    const temp = order[seatA - 1];
+    order[seatA - 1] = order[seatB - 1];
+    order[seatB - 1] = temp;
+
+    gameState.seatingOrder = order;
+    await saveGameState();
+    renderSeatingOrder();
+}
+
+/**
+ * Reset seating order to default [1..10]
+ */
+async function resetSeatingOrder() {
+    gameState.seatingOrder = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    await saveGameState();
+    renderSeatingOrder();
+    showStatus('Seating order reset to default', 'success');
+}
+
+// =============================================================================
 // GAME MANAGER
 // =============================================================================
 
@@ -982,7 +1214,7 @@ async function addCatalogGameToTournament(gameId) {
 /**
  * Add a custom game to the tournament
  */
-async function addCustomGameToTournament() {
+async function addCustomGameToTournament(triggerBtn) {
     if (!gameState) return;
 
     const id = document.getElementById('gmCustomId').value.trim().toLowerCase().replace(/[^a-z0-9\-]/g, '');
@@ -1023,7 +1255,7 @@ async function addCustomGameToTournament() {
         custom: true
     };
 
-    await saveGameState();
+    await saveGameState(triggerBtn);
     reinitializeMatchGenerator();
     updateDisplay();
     renderGameManagerList();
@@ -1500,7 +1732,7 @@ function removeMatchSide() {
     renderMatchCreationZones();
 }
 
-async function addMatchToQueue() {
+async function addMatchToQueue(triggerBtn) {
     // Check all sides have at least one player
     const emptySides = manualGameSetup.sides.filter(s => s.length === 0);
     if (emptySides.length > 0) {
@@ -1532,7 +1764,7 @@ async function addMatchToQueue() {
     gameState.gameQueue = gameState.gameQueue || [];
     gameState.gameQueue.push(queueEntry);
 
-    await saveGameState();
+    await saveGameState(triggerBtn);
     clearMatchSetup();
     showStatus(`Match #${matchNumber} (${playType}) added to queue!`, 'success');
 }
@@ -1577,10 +1809,10 @@ function addChallengeToQueue() {
         document.getElementById('challengeSideB1').value = gameState.teams[1].id;
     }
 
-    // Apply color styling to all dropdowns
+    // Apply color styling to all dropdowns (use onchange to avoid listener accumulation)
     ['challengeSideA1', 'challengeSideA2', 'challengeSideB1', 'challengeSideB2'].forEach(id => {
         const select = document.getElementById(id);
-        select.addEventListener('change', () => updateChallengeSelectColor(id));
+        select.onchange = () => updateChallengeSelectColor(id);
         updateChallengeSelectColor(id);
     });
 
@@ -1615,7 +1847,7 @@ function closeChallengeSetupModal() {
  * Confirm and create the challenge match with selected disputing teams
  * Supports multiple disputes - Side A teams vs Side B teams
  */
-async function confirmChallengeSetup() {
+async function confirmChallengeSetup(triggerBtn) {
     // Get teams from each side
     const sideA1 = document.getElementById('challengeSideA1').value;
     const sideA2 = document.getElementById('challengeSideA2').value;
@@ -1707,7 +1939,7 @@ async function confirmChallengeSetup() {
     const disputeCount = Math.max(sideATeams.length, sideBTeams.length);
     const disputeLabel = disputeCount > 1 ? `${disputeCount} disputes` : '1 dispute';
 
-    await saveGameState();
+    await saveGameState(triggerBtn);
     clearMatchSetup();
     showStatus(`⚔️ CHALLENGE #${matchNumber}: ${sideANames} vs ${sideBNames} (${disputeLabel})`, 'success');
 }
@@ -2065,7 +2297,7 @@ function buildTeamsFor2v2(match) {
 /**
  * Confirm and execute the mass import
  */
-async function confirmMassImport() {
+async function confirmMassImport(triggerBtn) {
     if (!pendingImportData || !pendingImportData.matches) {
         showStatus('No import data', 'error');
         closeMassImport();
@@ -2165,7 +2397,7 @@ async function confirmMassImport() {
         imported++;
     }
 
-    await saveGameState();
+    await saveGameState(triggerBtn);
     closeMassImport();
     showStatus(`Imported ${imported} matches to queue!`, 'success');
 }
@@ -2247,7 +2479,7 @@ function closeClearQueueModal() {
 /**
  * Confirm and clear all matches from the queue
  */
-async function confirmClearQueue() {
+async function confirmClearQueue(triggerBtn) {
     closeClearQueueModal();
 
     const removedCount = (gameState.gameQueue || []).filter(g => g.status !== 'completed').length;
@@ -2255,7 +2487,7 @@ async function confirmClearQueue() {
     // Keep only completed matches (preserve match history)
     gameState.gameQueue = (gameState.gameQueue || []).filter(g => g.status === 'completed');
 
-    await saveGameState();
+    await saveGameState(triggerBtn);
 
     // Log the clear event
     logEvent('queue_cleared', {
@@ -2532,7 +2764,7 @@ function removeEditMatchSide() {
 /**
  * Save the edited match back to the queue
  */
-async function saveMatchEdits() {
+async function saveMatchEdits(triggerBtn) {
     // Validate - at least 2 sides with players
     const sidesWithPlayers = editMatchState.sides.filter(s => s.length > 0);
     if (sidesWithPlayers.length < 2) {
@@ -2569,7 +2801,7 @@ async function saveMatchEdits() {
     delete match.teamA;
     delete match.teamB;
 
-    await saveGameState();
+    await saveGameState(triggerBtn);
     closeEditMatchModal();
     showStatus('Match updated successfully', 'success');
 }
@@ -3028,6 +3260,7 @@ function renderMatchQueue() {
                 </div>
                 ${!isOngoing ? `<button class="start-btn" onclick="event.stopPropagation(); startMatch(${game.id})" title="Start match">▶</button>` : ''}
                 ${!isOngoing ? `<button class="edit-btn" onclick="event.stopPropagation(); openEditMatchModal(${game.id})" title="Edit match">⚙</button>` : ''}
+                ${!isOngoing ? `<button class="move-top-btn" onclick="event.stopPropagation(); moveMatchToTop(${game.id})" title="Play next">⤴</button>` : ''}
                 <button class="delete-btn" onclick="event.stopPropagation(); removeFromQueue(${game.id})" title="Remove">✕</button>
             </div>
         `;
@@ -3120,6 +3353,23 @@ async function dropQueueItem(event, targetId) {
 
     await saveGameState();
     showStatus('Queue reordered', 'success');
+}
+
+async function moveMatchToTop(gameId) {
+    const queue = gameState.gameQueue || [];
+    const ongoingGames = queue.filter(g => g.status === 'ongoing');
+    const pendingGames = queue.filter(g => g.status === 'pending' || g.status === undefined || g.status === 'queued');
+    const completedGames = queue.filter(g => g.status === 'completed');
+
+    const idx = pendingGames.findIndex(g => g.id === gameId);
+    if (idx <= 0) return; // Already first or not found
+
+    const [match] = pendingGames.splice(idx, 1);
+    pendingGames.unshift(match);
+
+    gameState.gameQueue = [...ongoingGames, ...pendingGames, ...completedGames];
+    await saveGameState();
+    showStatus('Match moved to play next', 'success');
 }
 
 async function removeFromQueue(gameId) {
@@ -4008,7 +4258,7 @@ function closeNextRoundModal() {
 /**
  * Confirm and advance to next round, awarding points
  */
-async function confirmAdvanceRound() {
+async function confirmAdvanceRound(triggerBtn) {
     closeNextRoundModal();
 
     // Award points BEFORE advancing round
@@ -4036,7 +4286,7 @@ async function confirmAdvanceRound() {
         timestamp: new Date().toISOString()
     });
 
-    await saveGameState();
+    await saveGameState(triggerBtn);
 
     // Log round advance event
     logEvent('round_advance', {
@@ -4052,11 +4302,19 @@ async function confirmAdvanceRound() {
 // FIREBASE OPERATIONS
 // =============================================================================
 
-async function saveGameState() {
+async function saveGameState(triggerBtn) {
     if (!gameState || !currentTournamentId) {
         showStatus('No game state to save', 'warning');
         return;
     }
+
+    // Guard against offline saves
+    if (window._isOffline) {
+        showToast('Cannot save while offline. Waiting for connection...', 'warning');
+        return;
+    }
+
+    const stopLoading = (typeof btnLoading === 'function' && triggerBtn) ? btnLoading(triggerBtn) : null;
 
     try {
         const tournamentRef = window.firebaseDB.collection('tournaments').doc(currentTournamentId);
@@ -4077,6 +4335,8 @@ async function saveGameState() {
         console.error('Error saving game state:', error);
         updateConnectionStatus('disconnected');
         showStatus('Error saving to Firebase', 'error');
+    } finally {
+        if (stopLoading) stopLoading();
     }
 }
 
@@ -4371,6 +4631,7 @@ document.addEventListener('keydown', (e) => {
         closeTeamPicker();
         closeResultConfirm();
         closePlayerManager();
+        closeSeatingOrder();
         closeNextRoundModal();
         closeAutoMatchModal();
     }
@@ -4394,6 +4655,13 @@ document.getElementById('resultConfirmModal').addEventListener('click', (e) => {
 document.getElementById('playerManagerModal').addEventListener('click', (e) => {
     if (e.target.id === 'playerManagerModal') {
         closePlayerManager();
+    }
+});
+
+// Close seating order modal on outside click
+document.getElementById('seatingOrderModal').addEventListener('click', (e) => {
+    if (e.target.id === 'seatingOrderModal') {
+        closeSeatingOrder();
     }
 });
 

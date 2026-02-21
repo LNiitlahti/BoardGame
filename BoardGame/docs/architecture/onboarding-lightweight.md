@@ -91,16 +91,16 @@ flowchart TD
     H --> I[Store hash in Firebase]
     I --> J[Store plain in memory only]
     J --> K[Delete legacy .secret field]
-    K --> L["Alert: show secret ONCE"]
+    K --> L["showToast: secret shown ONCE, no auto-dismiss"]
     L --> M[Re-render admin view]
 
     N["verifySecret(enteredSecret)"] --> O{enteredSecret empty?}
-    O -->|Yes| P["Alert: enter a secret"]
+    O -->|Yes| P["showToast warning: enter a secret"]
     O -->|No| Q[Hash entered secret]
     Q --> R{hash matches stored hash?}
     R -->|Yes| S[Store plain in memory]
     S --> T["Close modal — re-render — links now work"]
-    R -->|No| U["Alert: Secret does not match"]
+    R -->|No| U["showToast error: Secret does not match"]
 ```
 
 ## 5. Platform ID Profile URLs

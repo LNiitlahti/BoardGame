@@ -92,6 +92,22 @@
             margin-right: 8px;
         }
 
+        .section-header {
+            padding: 8px 12px 4px;
+            margin-top: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #858585;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            border-top: 1px solid #3e3e42;
+        }
+
+        .section-header:first-child {
+            margin-top: 0;
+            border-top: none;
+        }
+
         .content {
             flex: 1;
             display: flex;
@@ -197,16 +213,31 @@
 
     <script>
         const pages = [
+            { section: 'Lightweight' },
+            { name: 'Admin', file: '../lightweight/admin.html', icon: '⚙️' },
+            { name: 'View', file: '../lightweight/view.html', icon: '👁️' },
+            { name: 'Onboarding View', file: '../lightweight/view-onboarding.html', icon: '📋' },
+            { name: 'Statistics', file: '../lightweight/statistics.html', icon: '📊' },
+            { name: 'Setup', file: '../lightweight/setup.html', icon: '🔧' },
+            { name: 'Onboarding', file: '../lightweight/onboarding.html', icon: '👋' },
+
+            { section: 'Full' },
             { name: 'Home', file: '../full/home.html', icon: '🏠' },
-            { name: 'Index', file: '../index.html', icon: '📄' },
-            { name: 'Login', file: '../login.html', icon: '🔐' },
-            { name: 'Profile', file: '../full/profile.html', icon: '👤' },
             { name: 'God View', file: '../full/god.html', icon: '👁️' },
-            { name: 'View', file: '../full/view.html', icon: '👁️' },
+            { name: 'View', file: '../full/view.html', icon: '📺' },
             { name: 'Setup', file: '../full/setup.html', icon: '⚙️' },
             { name: 'Team', file: '../full/team.html', icon: '👥' },
-            { name: 'Board Test 2', file: 'board-test2.html', icon: '🎲' },
-            { name: 'Upload Spells', file: '../tools/upload-spells.html', icon: '📤' }
+            { name: 'Profile', file: '../full/profile.html', icon: '👤' },
+
+            { section: 'Auth' },
+            { name: 'Index', file: '../index.html', icon: '📄' },
+            { name: 'Login', file: '../login.html', icon: '🔐' },
+
+            { section: 'Dev / Tools' },
+            { name: 'Board Test', file: 'board-test2.html', icon: '🎲' },
+            { name: 'Match Scheduler', file: 'dev-matchscheduler.html', icon: '📅' },
+            { name: 'Upload Spells', file: '../tools/upload-spells.html', icon: '📤' },
+            { name: 'Hex Tile Slicer', file: '../tools/hex-tile-slicer.html', icon: '🔪' },
         ];
 
         let currentPageFile = null;
@@ -227,6 +258,14 @@
             pageList.appendChild(modeToggle);
 
             pages.forEach(page => {
+                if (page.section) {
+                    const li = document.createElement('li');
+                    li.className = 'section-header';
+                    li.textContent = page.section;
+                    pageList.appendChild(li);
+                    return;
+                }
+
                 const li = document.createElement('li');
                 li.className = 'page-item';
 

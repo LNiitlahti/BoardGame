@@ -7,7 +7,7 @@ A real-time tournament management system for LAN events with hex-grid board visu
 ## Project Status
 
 **Current Phase:** Lightweight-First Development
-**Last Updated:** January 2026
+**Last Updated:** February 2026
 
 ### Development Strategy
 
@@ -18,12 +18,14 @@ We're building the **lightweight version first** before the full-featured releas
 | Lightweight | In Development | Simplified UI, essential features, optimized for 1920x1080 |
 | Full Version | Planned | Rich UI, animations, mobile support |
 
-### Recent Updates (January 2026)
+### Recent Updates (February 2026)
 
-- Normalized player data structure with unique IDs
+- Toast notification system replacing browser `alert()` calls
+- Room seating layout view for onboarding progress (`view-onboarding-layout.html`)
+- Seating order management with drag-and-drop in admin
+- Connection monitor with offline detection and save guards
+- Button loading states for async operations
 - Statistics page with charts and JSON export
-- Lightweight admin interface (`admin-lightweight.html`)
-- Digital signage display (`view-lightweight.html`)
 - Match suggester for automated scheduling
 
 ## Quick Start
@@ -59,6 +61,7 @@ BoardGame/
 │   ├── admin.html                  # Tournament admin panel
 │   ├── setup.html                  # Tournament creation wizard
 │   ├── view.html                   # Digital signage (1920x1080)
+│   ├── view-onboarding-layout.html # Room seating onboarding view
 │   ├── statistics.html             # Analytics & export
 │   ├── onboarding.html             # Player onboarding
 │   ├── css/                        # Lightweight-only styles
@@ -72,8 +75,8 @@ BoardGame/
 │   └── scripts/                    # Full-only scripts
 │
 ├── shared/                         # Shared between both apps
-│   ├── scripts/                    # Firebase, board, games-config, etc.
-│   ├── css/                        # Brand theme, navbar, etc.
+│   ├── scripts/                    # Firebase, board, games-config, toast, etc.
+│   ├── css/                        # Brand theme, navbar, toast, etc.
 │   └── images/                     # Favicons, game logos, hex tiles
 │
 ├── index.html                      # Auth entry point
@@ -138,4 +141,4 @@ Free to use for **non-profit purposes only**. For commercial use, contact the ma
 
 ---
 
-**Status:** Active Development | **Phase:** Lightweight-First | **Updated:** January 2026
+**Status:** Active Development | **Phase:** Lightweight-First | **Updated:** February 2026

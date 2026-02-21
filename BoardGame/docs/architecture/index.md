@@ -24,6 +24,7 @@ graph TB
         BR[board-renderer.js]
         ST[statistics.js]
         OB[onboarding-lightweight.js]
+        TOAST[toast.js]
     end
 
     subgraph Firebase
@@ -46,6 +47,10 @@ graph TB
     ST -->|looks up names| GC
     OB -->|looks up games| GC
 
+    ADM_JS -->|uses| TOAST
+    ST -->|uses| TOAST
+    OB -->|uses| TOAST
+
     ADM_JS -->|read/write| FB
     ST -->|read| FB
     OB -->|read/write| FB
@@ -57,7 +62,7 @@ graph TB
 
 | Diagram File | Source JS | Diagrams | Description |
 |---|---|---|---|
-| [admin-lightweight.md](admin-lightweight.md) | `lightweight/scripts/admin.js` | 8 | Auth, match results, challenges, player formats, game names, queue colors |
+| [admin-lightweight.md](admin-lightweight.md) | `lightweight/scripts/admin.js` | 10 | Auth, match results, challenges, player formats, game names, queue colors, connection monitor, seating order |
 | [smart-match-generator.md](smart-match-generator.md) | `scripts/smart-match-generator.js` | 5 | Main pipeline, 5v5 vs 3v3+2v2, rotation state machine, repeat counts |
 | [balance-optimizer.md](balance-optimizer.md) | `scripts/balance-optimizer.js` | 5 | Selection algorithm, split penalty, matrix updates, state restore, stats |
 | [match-suggester.md](match-suggester.md) | `scripts/match-suggester.js` | 2 | 10-match rotation pattern, fairness note |
@@ -65,6 +70,7 @@ graph TB
 | [statistics.md](statistics.md) | `scripts/statistics.js` | 8 | Data pipeline, player stats, leaderboards, filters, H2H, streaks, charts |
 | [onboarding-lightweight.md](onboarding-lightweight.md) | `scripts/onboarding-lightweight.js` | 5 | View routing, completion, progress grid, secret management, platform IDs |
 | [board-renderer.md](board-renderer.md) | `scripts/board-renderer.js` | 3 | Render pipeline, responsive scaling, incremental updates |
+| [toast.md](toast.md) | `shared/scripts/toast.js` | 3 | Toast lifecycle, connection banner state machine, button loading |
 | [cross-system.md](cross-system.md) | All files | 1 | End-to-end data flow sequence diagram |
 
 ## How to Update
