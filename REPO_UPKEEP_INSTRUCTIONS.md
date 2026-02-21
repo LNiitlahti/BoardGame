@@ -16,6 +16,7 @@ Full logic maps live in `BoardGame/docs/architecture/`. **These must stay in syn
 | Change `lightweight/scripts/balance-optimizer.js` | `docs/architecture/balance-optimizer.md` |
 | Change `shared/scripts/match-suggester.js` | `docs/architecture/match-suggester.md` |
 | Change `shared/scripts/games-config.js` | `docs/architecture/games-config.md` |
+| Change `shared/scripts/platforms-config.js` | `docs/architecture/platforms-config.md` |
 | Change `lightweight/scripts/statistics.js` | `docs/architecture/statistics.md` |
 | Change `lightweight/scripts/onboarding.js` | `docs/architecture/onboarding-lightweight.md` |
 | Change `shared/scripts/board-renderer.js` | `docs/architecture/board-renderer.md` |

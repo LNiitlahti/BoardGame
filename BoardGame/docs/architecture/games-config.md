@@ -1,7 +1,7 @@
 # games-config.js — Logic Diagrams
 
 > Source: `BoardGame/scripts/games-config.js`
-> Master catalog: 15 games, 40+ aliases, 10 helper methods.
+> Master catalog: 17 games, 48+ aliases, 10 helper methods.
 > Single source of truth for game definitions.
 
 ## 1. Resolution & Lookup Chain
@@ -51,15 +51,15 @@ flowchart TD
     A[getActiveGames] --> B[Object.entries games]
     B --> C["Filter: game.active === true"]
     C --> D["Map: add id property, spread game"]
-    D --> E[Return 7 active game objects]
+    D --> E[Return 6 active game objects]
 
     F[getAllGames] --> G[Object.entries games]
     G --> H["Map: add id property, spread game"]
-    H --> I[Return all 15 game objects]
+    H --> I[Return all 17 game objects]
 
     J["getGamesForSelect(activeOnly)"] --> K{activeOnly === true?}
-    K -->|Yes| L["games = getActiveGames() — 7"]
-    K -->|No| M["games = getAllGames() — 15"]
+    K -->|Yes| L["games = getActiveGames() — 6"]
+    K -->|No| M["games = getAllGames() — 17"]
     L --> N["Map to {value, label, format}"]
     M --> N
     N --> O[Return select-ready array]
@@ -69,7 +69,7 @@ flowchart TD
     R --> S{"games[aliasTarget] has name?"}
     S -->|Yes| T["map[alias] = game.name"]
     S -->|No| U["map[alias] = aliasTarget id"]
-    T --> V["Return flat name map — 40+ entries"]
+    T --> V["Return flat name map — 48+ entries"]
     U --> V
 ```
 
@@ -79,11 +79,13 @@ flowchart TD
 |---|---|---|---|---|
 | predecessor | Predecessor | 5v5 | No | Yes |
 | aoe4 | Age of Empires IV | 3v3+2v2 | Yes | Yes |
-| spacemarine2 | Space Marine 2 | 5v5 | No | Yes |
+| overwatch2 | Overwatch 2 | 5v5 | No | Yes |
 | cs2 | Counter-Strike 2 | 5v5 | No | Yes |
-| dow2 | Dawn of War 2 | 3v3+2v2 | Yes | Yes |
+| wc3 | Warcraft 3 | 3v3+2v2 | Yes | Yes |
 | cod | Call of Duty | 5v5 | No | Yes |
-| spellbreak | Spellbreak | 5v5 | No | Yes |
+| spellbreak | Spellbreak | 5v5 | No | No |
+| spacemarine2 | Space Marine 2 | 5v5 | No | No |
+| dow2 | Dawn of War 2 | 3v3+2v2 | Yes | No |
 | sc2 | StarCraft II | 3v3+2v2 | Yes | No |
 | valorant | Valorant | 5v5 | No | No |
 | dota2 | Dota 2 | 5v5 | No | No |

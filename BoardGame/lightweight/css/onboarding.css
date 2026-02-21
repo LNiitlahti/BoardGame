@@ -574,6 +574,29 @@
     color: var(--text-primary);
 }
 
+.game-tutorial-link {
+    font-size: 0.75rem;
+    color: var(--accent-primary);
+    text-decoration: none;
+    flex-shrink: 0;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(var(--accent-primary-rgb, 100,149,237), 0.2);
+    transition: all 0.2s ease;
+}
+
+.game-tutorial-link:hover {
+    background: rgba(var(--accent-primary-rgb, 100,149,237), 0.1);
+    text-decoration: none;
+}
+
+.game-tutorial-text {
+    font-size: 0.7rem;
+    color: var(--text-tertiary);
+    font-style: italic;
+    flex-shrink: 0;
+}
+
 /* =============================================================================
    FOOTER / COMPLETION STATUS
    ============================================================================= */

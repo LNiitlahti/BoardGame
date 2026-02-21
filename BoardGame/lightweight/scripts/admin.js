@@ -923,7 +923,8 @@ function openSeatingOrder() {
  * Close the seating order modal
  */
 function closeSeatingOrder() {
-    document.getElementById('seatingOrderModal').classList.remove('active');
+    const modal = document.getElementById('seatingOrderModal');
+    if (modal) modal.classList.remove('active');
 }
 
 /**
@@ -2437,6 +2438,18 @@ function closeMassImport() {
 // =============================================================================
 // CLEAR QUEUE
 // =============================================================================
+
+/**
+ * Open the match queue page in a new tab
+ */
+function openMatchQueuePage() {
+    if (!currentTournamentId) {
+        showStatus('No tournament selected', 'warning');
+        return;
+    }
+    const url = `match-queue.html?tournamentId=${encodeURIComponent(currentTournamentId)}`;
+    window.open(url, '_blank');
+}
 
 /**
  * Open the Clear Queue confirmation modal
@@ -4637,51 +4650,22 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Close modal on outside click
-document.getElementById('teamPickerModal').addEventListener('click', (e) => {
-    if (e.target.id === 'teamPickerModal') {
-        closeTeamPicker();
-    }
-});
+// Close modals on outside click (null-safe for pages that omit optional modals)
+const modalDismissMap = {
+    'teamPickerModal': closeTeamPicker,
+    'resultConfirmModal': closeResultConfirm,
+    'playerManagerModal': closePlayerManager,
+    'seatingOrderModal': closeSeatingOrder,
+    'nextRoundModal': closeNextRoundModal,
+    'autoMatchModal': closeAutoMatchModal,
+    'clearQueueModal': closeClearQueueModal
+};
 
-// Close result confirm modal on outside click
-document.getElementById('resultConfirmModal').addEventListener('click', (e) => {
-    if (e.target.id === 'resultConfirmModal') {
-        closeResultConfirm();
-    }
-});
-
-// Close player manager modal on outside click
-document.getElementById('playerManagerModal').addEventListener('click', (e) => {
-    if (e.target.id === 'playerManagerModal') {
-        closePlayerManager();
-    }
-});
-
-// Close seating order modal on outside click
-document.getElementById('seatingOrderModal').addEventListener('click', (e) => {
-    if (e.target.id === 'seatingOrderModal') {
-        closeSeatingOrder();
-    }
-});
-
-// Close next round modal on outside click
-document.getElementById('nextRoundModal').addEventListener('click', (e) => {
-    if (e.target.id === 'nextRoundModal') {
-        closeNextRoundModal();
-    }
-});
-
-// Close auto match modal on outside click
-document.getElementById('autoMatchModal').addEventListener('click', (e) => {
-    if (e.target.id === 'autoMatchModal') {
-        closeAutoMatchModal();
-    }
-});
-
-// Close clear queue modal on outside click
-document.getElementById('clearQueueModal').addEventListener('click', (e) => {
-    if (e.target.id === 'clearQueueModal') {
-        closeClearQueueModal();
+Object.entries(modalDismissMap).forEach(([id, closeFn]) => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('click', (e) => {
+            if (e.target.id === id) closeFn();
+        });
     }
 });

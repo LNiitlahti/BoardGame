@@ -25,71 +25,6 @@ let secretValidated = false;
 let onboardingReady = false;
 
 // =============================================================================
-// PLATFORM CONFIGURATIONS
-// =============================================================================
-
-const PLATFORMS = {
-    steam: {
-        name: 'Steam',
-        icon: '<img src="https://cdn.simpleicons.org/steam/c6d4df" class="platform-logo" alt="Steam">',
-        games: ['CS2', 'Predecessor', 'AoE4', 'DoW2', 'Space Marine 2'],
-        placeholder: 'Steam Friend Code or Profile URL',
-        help: 'Find your Friend Code: Steam → Friends → Add a Friend → Your code is shown at top',
-        helpUrl: 'https://store.steampowered.com/friends',
-        getProfileUrl: (id) => {
-            if (id.startsWith('http')) return id;
-            if (/^\d+$/.test(id)) return `https://steamcommunity.com/profiles/${id}`;
-            return `https://steamcommunity.com/id/${id}`;
-        }
-    },
-    battlenet: {
-        name: 'Battle.net',
-        icon: '<img src="https://cdn.simpleicons.org/battledotnet/00AEFF" class="platform-logo" alt="Battle.net">',
-        games: ['StarCraft II', 'Hearthstone', 'Call of Duty'],
-        placeholder: 'BattleTag (e.g., Player#1234)',
-        help: 'Find your BattleTag: Battle.net app → Click your name (top right)',
-        helpUrl: 'https://battle.net/account',
-        getProfileUrl: null
-    },
-    xbox: {
-        name: 'Xbox / Microsoft',
-        icon: '<img src="https://upload.wikimedia.org/wikipedia/commons/f/f9/Xbox_one_logo.svg" class="platform-logo" alt="Xbox">',
-        games: ['AoE4 (Game Pass)', 'Call of Duty'],
-        placeholder: 'Xbox Gamertag',
-        help: 'Find your Gamertag: Xbox app → Profile → Your gamertag is shown',
-        helpUrl: 'https://account.xbox.com/profile',
-        getProfileUrl: (id) => `https://www.xbox.com/play/user/${encodeURIComponent(id)}`
-    },
-    epic: {
-        name: 'Epic Games',
-        icon: '<img src="https://cdn.simpleicons.org/epicgames/cccccc" class="platform-logo" alt="Epic Games">',
-        games: ['Predecessor', 'Spellbreak'],
-        placeholder: 'Epic Display Name',
-        help: 'Find your name: Epic Games Launcher → Your name (bottom left)',
-        helpUrl: 'https://www.epicgames.com/account/personal',
-        getProfileUrl: null
-    },
-    discord: {
-        name: 'Discord',
-        icon: '<img src="https://cdn.simpleicons.org/discord/5865F2" class="platform-logo" alt="Discord">',
-        games: ['Voice chat & coordination'],
-        placeholder: 'Username (e.g., player123)',
-        help: 'Find your username: Discord → Settings (gear icon) → My Account → Username',
-        helpUrl: 'https://discord.com/app',
-        getProfileUrl: null
-    },
-    riot: {
-        name: 'Riot Games',
-        icon: '<img src="https://cdn.simpleicons.org/riotgames/D32936" class="platform-logo" alt="Riot Games">',
-        games: ['League of Legends', 'Valorant', 'TFT'],
-        placeholder: 'Riot ID (e.g., Player#TAG)',
-        help: 'Find your Riot ID: Open any Riot game → Profile → Your Riot ID is shown',
-        helpUrl: 'https://account.riotgames.com',
-        getProfileUrl: null
-    }
-};
-
-// =============================================================================
 // INITIALIZATION
 // =============================================================================
 
@@ -453,9 +388,10 @@ function renderPlatformIdsForm(forPlayerNum) {
     const playerData = onboardingState?.players?.[String(forPlayerNum)] || {};
     const platformIds = playerData.platformIds || {};
 
+    const activePlatforms = PLATFORMS_CONFIG.getActivePlatforms();
     let html = '';
-    for (const [platformKey, platform] of Object.entries(PLATFORMS)) {
-        const currentValue = platformIds[platformKey] || '';
+    for (const platform of activePlatforms) {
+        const currentValue = platformIds[platform.id] || '';
         const hasValue = currentValue.length > 0;
 
         html += `
@@ -466,11 +402,11 @@ function renderPlatformIdsForm(forPlayerNum) {
                 </div>
                 <div class="platform-id-input-row">
                     <input type="text"
-                           id="platform-${platformKey}"
+                           id="platform-${platform.id}"
                            placeholder="${platform.placeholder}"
                            value="${currentValue}"
-                           onchange="savePlatformId('${platformKey}', this.value)">
-                    <button class="btn secondary" onclick="savePlatformId('${platformKey}', document.getElementById('platform-${platformKey}').value)">Save</button>
+                           onchange="savePlatformId('${platform.id}', this.value)">
+                    <button class="btn secondary" onclick="savePlatformId('${platform.id}', document.getElementById('platform-${platform.id}').value)">Save</button>
                 </div>
                 <div class="platform-help">
                     ${platform.help}
@@ -501,8 +437,9 @@ function renderFriendsChecklist(playerMapping, forPlayerNum, containerId) {
         // Build platform IDs display
         let platformIdsHtml = '';
         let hasPlatformIds = false;
-        for (const [platformKey, platform] of Object.entries(PLATFORMS)) {
-            const platformId = friendPlatformIds[platformKey];
+        const activePlatforms = PLATFORMS_CONFIG.getActivePlatforms();
+        for (const platform of activePlatforms) {
+            const platformId = friendPlatformIds[platform.id];
             if (platformId) {
                 hasPlatformIds = true;
                 const escapedId = platformId.replace(/'/g, "\\'");
@@ -546,6 +483,16 @@ function renderFriendsChecklist(playerMapping, forPlayerNum, containerId) {
     container.innerHTML = html;
 }
 
+// Game tutorial links (hardcoded for current event)
+const GAME_TUTORIALS = {
+    'predecessor': { url: 'https://www.youtube.com/watch?v=Wdf4sEEg2h0&t=47s', label: 'How to Play' },
+    'wc3':         { url: 'https://youtu.be/5ygNDJdUVnY', label: 'How to Play' },
+    'aoe4':        { url: 'https://youtu.be/V-XbTO0TZN4', label: 'How to Play' },
+    'overwatch2':  { url: 'https://youtu.be/u2mMbSKf6iE', label: 'How to Play' },
+    'cs2':         { text: 'You shoot.' },
+    'cod':         { text: 'You also shoot, but from the left.' }
+};
+
 function renderGamesChecklist(forPlayerNum, containerId) {
     const container = document.getElementById(containerId);
     const games = getSelectedGames();
@@ -566,6 +513,16 @@ function renderGamesChecklist(forPlayerNum, containerId) {
             ? `<img src="${resolvedImage}" alt="${game.name}" onerror="this.parentNode.innerHTML='${game.icon || '🎮'}'">`
             : (game.icon || '🎮');
 
+        const tutorial = GAME_TUTORIALS[game.id];
+        let tutorialHtml = '';
+        if (tutorial) {
+            if (tutorial.url) {
+                tutorialHtml = `<a class="game-tutorial-link" href="${tutorial.url}" target="_blank" onclick="event.stopPropagation();">${tutorial.label} \u2192</a>`;
+            } else if (tutorial.text) {
+                tutorialHtml = `<span class="game-tutorial-text">${tutorial.text}</span>`;
+            }
+        }
+
         html += `
             <label class="checklist-item game-item ${isChecked ? 'checked' : ''}">
                 <input type="checkbox"
@@ -573,6 +530,7 @@ function renderGamesChecklist(forPlayerNum, containerId) {
                        onchange="${isEditMode ? `toggleGameStatusEdit('${game.id}')` : `toggleGameStatus('${game.id}')`}">
                 <span class="game-icon">${imageHtml}</span>
                 <span class="game-name">${game.name}</span>
+                ${tutorialHtml}
             </label>
         `;
     }

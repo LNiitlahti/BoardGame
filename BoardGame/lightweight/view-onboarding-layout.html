@@ -514,6 +514,23 @@
     transition: border-color 0.5s, box-shadow 0.5s;
   }
 
+  .game-cell-logo {
+    width: 48px;
+    height: 48px;
+    border-radius: 6px;
+    object-fit: cover;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .game-cell-logo-fallback {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+  }
+
   .game-cell.all-tested {
     border-color: rgba(0, 224, 128, 0.25);
     box-shadow: 0 0 12px rgba(0, 224, 128, 0.1);
@@ -1067,6 +1084,14 @@
         let html = '';
         for (const game of games) {
             html += '<div class="game-cell" data-game-cell="' + game.id + '">';
+
+            if (game.image) {
+                var resolvedImg = (window.BOARDGAME_BASE || '.') + '/' + game.image;
+                html += '<img src="' + resolvedImg + '" alt="' + escapeHtml(game.name) + '" class="game-cell-logo" onerror="this.outerHTML=\'<div class=game-cell-logo-fallback>' + (game.icon || '🎮') + '</div>\'">';
+            } else {
+                html += '<div class="game-cell-logo-fallback">' + (game.icon || '🎮') + '</div>';
+            }
+
             html += '<div class="game-cell-name">' + escapeHtml(game.shortName || game.name) + '</div>';
             html += '<div class="game-cell-dots" data-game-dots="' + game.id + '">';
             for (let i = 1; i <= 10; i++) {

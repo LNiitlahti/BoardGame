@@ -22,7 +22,7 @@ const GAMES_CONFIG = {
             shortName: 'Predecessor',
             format: '5v5',
             icon: '🏆',
-            image: 'images/game-logos/Predecessor/Predecessor_icon.png',
+            image: 'shared/images/game-logos/Predecessor/Predecessor_icon.png',
             active: true
         },
         'aoe4': {
@@ -31,15 +31,15 @@ const GAMES_CONFIG = {
             format: '3v3+2v2',
             splitFormat: true,
             icon: '🏰',
-            image: 'images/game-logos/Age_of_Empires_IV/Age_of_Empires_IV_icon.png',
+            image: 'shared/images/game-logos/Age_of_Empires_IV/Age_of_Empires_IV_icon.png',
             active: true
         },
-        'spacemarine2': {
-            name: 'Space Marine 2',
-            shortName: 'SM2',
+        'overwatch2': {
+            name: 'Overwatch 2',
+            shortName: 'OW2',
             format: '5v5',
-            icon: '⚔️',
-            image: 'images/game-logos/Space_Marine_2/Space_Marine_2_icon.png',
+            icon: '🎮',
+            image: 'shared/images/game-logos/Overwatch_2/Overwatch_2_icon.png',
             active: true
         },
         'cs2': {
@@ -47,16 +47,16 @@ const GAMES_CONFIG = {
             shortName: 'CS2',
             format: '5v5',
             icon: '🎯',
-            image: 'images/game-logos/Counter-Strike_2/Counter-Strike_2_icon.png',
+            image: 'shared/images/game-logos/Counter-Strike_2/Counter-Strike_2_icon.png',
             active: true
         },
-        'dow2': {
-            name: 'Dawn of War 2',
-            shortName: 'DoW2',
+        'wc3': {
+            name: 'Warcraft 3',
+            shortName: 'WC3',
             format: '3v3+2v2',
             splitFormat: true,
-            icon: '💀',
-            image: 'images/game-logos/Dawn_of_War_2/Dawn_of_War_2_icon.png',
+            icon: '⚔️',
+            image: 'shared/images/game-logos/Warcraft_3/Warcraft_3_icon.png',
             active: true
         },
         'cod': {
@@ -64,26 +64,43 @@ const GAMES_CONFIG = {
             shortName: 'COD',
             format: '5v5',
             icon: '🔫',
-            image: 'images/game-logos/Call_of_Duty/Call_of_Duty_icon.png',
+            image: 'shared/images/game-logos/Call_of_Duty/Call_of_Duty_icon.png',
             active: true
         },
+
+        // === OTHER AVAILABLE GAMES ===
         'spellbreak': {
             name: 'Spellbreak',
             shortName: 'Spellbreak',
             format: '5v5',
             icon: '✨',
-            image: 'images/game-logos/Spellbreak/Spellbreak_icon.png',
-            active: true
+            image: 'shared/images/game-logos/Spellbreak/Spellbreak_icon.png',
+            active: false
         },
-
-        // === OTHER AVAILABLE GAMES ===
+        'spacemarine2': {
+            name: 'Space Marine 2',
+            shortName: 'SM2',
+            format: '5v5',
+            icon: '⚔️',
+            image: 'shared/images/game-logos/Space_Marine_2/Space_Marine_2_icon.png',
+            active: false
+        },
+        'dow2': {
+            name: 'Dawn of War 2',
+            shortName: 'DoW2',
+            format: '3v3+2v2',
+            splitFormat: true,
+            icon: '💀',
+            image: 'shared/images/game-logos/Dawn_of_War_2/Dawn_of_War_2_icon.png',
+            active: false
+        },
         'sc2': {
             name: 'StarCraft II',
             shortName: 'SC2',
             format: '3v3+2v2',
             splitFormat: true,
             icon: '⚔️',
-            image: 'images/game-logos/StarCraft_II/StarCraft_II_icon.png',
+            image: 'shared/images/game-logos/StarCraft_II/StarCraft_II_icon.png',
             active: false
         },
         'valorant': {
@@ -91,7 +108,7 @@ const GAMES_CONFIG = {
             shortName: 'Valorant',
             format: '5v5',
             icon: '🔫',
-            image: 'images/game-logos/Valorant/Valorant_icon.png',
+            image: 'shared/images/game-logos/Valorant/Valorant_icon.png',
             active: false
         },
         'dota2': {
@@ -99,7 +116,7 @@ const GAMES_CONFIG = {
             shortName: 'Dota 2',
             format: '5v5',
             icon: '🗡️',
-            image: 'images/game-logos/Dota_2/Dota_2_icon.png',
+            image: 'shared/images/game-logos/Dota_2/Dota_2_icon.png',
             active: false
         },
         'hearthstone': {
@@ -107,7 +124,7 @@ const GAMES_CONFIG = {
             shortName: 'HS',
             format: '1v1',
             icon: '🃏',
-            image: 'images/game-logos/Hearthstone/Hearthstone_icon.png',
+            image: 'shared/images/game-logos/Hearthstone/Hearthstone_icon.png',
             active: false
         },
         'rocketleague': {
@@ -115,7 +132,7 @@ const GAMES_CONFIG = {
             shortName: 'RL',
             format: '3v3',
             icon: '🚗',
-            image: 'images/game-logos/Rocket_League/Rocket_League_icon.png',
+            image: 'shared/images/game-logos/Rocket_League/Rocket_League_icon.png',
             active: false
         },
         'tekken8': {
@@ -123,7 +140,7 @@ const GAMES_CONFIG = {
             shortName: 'Tekken 8',
             format: '1v1',
             icon: '👊',
-            image: 'images/game-logos/Tekken_8/Tekken_8_icon.png',
+            image: 'shared/images/game-logos/Tekken_8/Tekken_8_icon.png',
             active: false
         }
     },
@@ -146,6 +163,14 @@ const GAMES_CONFIG = {
         'aoe 4': 'aoe4',
         'age of empires': 'aoe4',
         'Age of Empires IV': 'aoe4',
+        'OW2': 'overwatch2',
+        'ow2': 'overwatch2',
+        'overwatch': 'overwatch2',
+        'Overwatch 2': 'overwatch2',
+        'WC3': 'wc3',
+        'warcraft': 'wc3',
+        'warcraft 3': 'wc3',
+        'Warcraft 3': 'wc3',
         'SM2': 'spacemarine2',
         'space marine': 'spacemarine2',
         'Space Marine 2': 'spacemarine2',

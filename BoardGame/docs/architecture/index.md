@@ -23,6 +23,7 @@ graph TB
         GC[games-config.js]
         BR[board-renderer.js]
         ST[statistics.js]
+        PC[platforms-config.js]
         OB[onboarding-lightweight.js]
         TOAST[toast.js]
     end
@@ -46,6 +47,7 @@ graph TB
     ADM_JS -->|looks up names| GC
     ST -->|looks up names| GC
     OB -->|looks up games| GC
+    OB -->|looks up platforms| PC
 
     ADM_JS -->|uses| TOAST
     ST -->|uses| TOAST
@@ -67,6 +69,7 @@ graph TB
 | [balance-optimizer.md](balance-optimizer.md) | `scripts/balance-optimizer.js` | 5 | Selection algorithm, split penalty, matrix updates, state restore, stats |
 | [match-suggester.md](match-suggester.md) | `scripts/match-suggester.js` | 2 | 10-match rotation pattern, fairness note |
 | [games-config.md](games-config.md) | `scripts/games-config.js` | 2 | Resolution chain, filtering & export |
+| [platforms-config.md](platforms-config.md) | `shared/scripts/platforms-config.js` | 1 | Platform lookup, game-platform mapping |
 | [statistics.md](statistics.md) | `scripts/statistics.js` | 8 | Data pipeline, player stats, leaderboards, filters, H2H, streaks, charts |
 | [onboarding-lightweight.md](onboarding-lightweight.md) | `scripts/onboarding-lightweight.js` | 5 | View routing, completion, progress grid, secret management, platform IDs |
 | [board-renderer.md](board-renderer.md) | `scripts/board-renderer.js` | 3 | Render pipeline, responsive scaling, incremental updates |

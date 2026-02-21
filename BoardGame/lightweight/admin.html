@@ -2,33 +2,37 @@
 <html lang="en">
 <!--
     ============================================================================
-    ADMIN.HTML (lightweight) - SIMPLIFIED TOURNAMENT MANAGEMENT
+    ADMIN V2 (lightweight) — MODERN TOURNAMENT MANAGEMENT
     ============================================================================
 
     PURPOSE:
-    Streamlined admin tool for tournament management - no spells, no complex rules.
-    Focus on: matches, results, board control, and scoring.
+    Redesigned admin interface with dark void / gold accent theme matching
+    the view_v2 infoscreen. 3-column layout for better workflow.
+
+    LAYOUT:
+    ┌──────────────────────────────────────────────────────┐
+    │  NAVBAR — Logo, tournament name, connection, user    │
+    ├──────────────────────────────────────────────────────┤
+    │  TOP BAR — Selector | Stats | Actions               │
+    ├──────────┬──────────────────────┬────────────────────┤
+    │  TEAMS   │  HEX BOARD           │ MATCH QUEUE        │
+    │  (left)  │  + MATCH CREATION    │ (right)            │
+    ├──────────┴──────────────────────┴────────────────────┤
 
     FEATURES:
-    - Match creation with drag-drop
-    - Match queue management
-    - Result confirmation
-    - Click-to-assign hex control
-    - Manual points adjustment
-    - Round management
+    - Same as admin.html (reuses scripts/admin.js)
+    - Modern dark void / gold accent visual theme
+    - 3-column layout: Teams | Board+Create | Queue
 
     USAGE:
-    - URL parameter: lightweight/admin.html?tournamentId=xxx
+    - URL parameter: lightweight/admin_v2.html?tournamentId=xxx
     - Or select tournament from dropdown
-
-    ACCESS:
-    Requires God or Admin role.
     ============================================================================
 -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lightweight Admin - Tournament Manager</title>
+    <title>Tournament Admin v2</title>
 
     <!-- Favicons -->
     <link rel="apple-touch-icon" sizes="180x180" href="../shared/images/favicon/apple-touch-icon.png">
@@ -36,17 +40,22 @@
     <link rel="icon" type="image/png" sizes="16x16" href="../shared/images/favicon/favicon-16x16.png">
     <link rel="shortcut icon" href="../shared/images/favicon/favicon.ico">
 
+    <!-- Fonts: Russo One (titles) + Quantico (body) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
 
-    <link rel="stylesheet" href="../shared/css/brand-theme.css">
+    <!-- CSS: navbar base → fantasy atmosphere → toast → v2 admin (final authority) -->
     <link rel="stylesheet" href="../shared/css/navbar.css">
     <link rel="stylesheet" href="../shared/css/toast.css">
-    <link rel="stylesheet" href="css/admin.css">
     <link rel="stylesheet" href="../shared/css/fantasy-mountain-theme.css">
+    <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
+    <!-- Atmosphere Layers -->
+    <div class="atmo atmo-grad"></div>
+    <div class="atmo atmo-noise"></div>
+
     <!-- Loading Overlay -->
     <div id="loadingOverlay" class="loading-overlay">
         <div class="loading-spinner">
@@ -61,7 +70,7 @@
             <a href="../full/home.html" class="navbar-brand">
                 <img src="../shared/images/favicon/android-chrome-192x192.png" alt="Logo" class="navbar-logo">
                 <div class="navbar-brand-text">
-                    <span class="navbar-brand-name">Lightweight Admin</span>
+                    <span class="navbar-brand-name">Admin v2</span>
                     <span class="navbar-tournament-name" id="navTournamentName">No Tournament</span>
                 </div>
             </a>
@@ -78,50 +87,115 @@
     <div class="admin-container">
         <!-- Top Bar -->
         <div class="top-bar">
+            <!-- Left: Tournament selector -->
             <div class="tournament-selector">
-                <label for="tournamentSelect">Tournament:</label>
+                <label for="tournamentSelect">Tournament</label>
                 <select id="tournamentSelect" onchange="onTournamentSelect(this.value)">
                     <option value="">Select a tournament...</option>
                 </select>
                 <button class="btn secondary" onclick="refreshTournaments()">Refresh</button>
             </div>
 
-            <div class="top-bar-center">
-                <span>Hearts: <strong id="heartsControlled">0</strong></span>
-                <button class="btn primary" onclick="advanceRound()">Next Round</button>
-                <div class="status-message" id="statusMessage"></div>
+            <!-- Center: Gold stat badges -->
+            <div class="stat-badges">
+                <div class="stat-badge">
+                    <span class="stat-label">Round</span>
+                    <span class="stat-value" id="currentRound">0</span>
+                </div>
+                <div class="stat-sep"></div>
+                <div class="stat-badge">
+                    <span class="stat-label">Games</span>
+                    <span class="stat-value" id="gamesPlayed">0</span>
+                </div>
+                <div class="stat-sep"></div>
+                <div class="stat-badge">
+                    <span class="stat-label">Hearts</span>
+                    <span class="stat-value" id="heartsControlled">0</span>
+                </div>
+                <div class="stat-sep"></div>
+                <div class="stat-badge">
+                    <span class="stat-label">Hexes</span>
+                    <span class="stat-value" id="hexCount">0</span>
+                </div>
             </div>
 
-            <div class="round-info">
-                <span>Round: <strong id="currentRound">0</strong></span>
-                <span>Games: <strong id="gamesPlayed">0</strong></span>
-                <span>Hexes: <strong id="hexCount">0</strong></span>
-                <button class="btn secondary" onclick="openViewWindow()" title="Open digital signage view in new window">Open View</button>
+            <!-- Right: Actions + Status -->
+            <div class="top-bar-actions">
+                <div class="status-message" id="statusMessage"></div>
+                <button class="btn primary" onclick="advanceRound()">Next Round</button>
+                <button class="btn secondary" onclick="openViewWindow()" title="Open digital signage view in new window">View</button>
                 <button class="btn secondary" onclick="openStatsWindow()" title="Open tournament statistics">Stats</button>
-                <button class="btn secondary" onclick="openOnboardingWindow()" title="Open player onboarding checklist">Onboarding</button>
-                <button class="btn secondary" onclick="openOnboardingViewWindow()" title="Open onboarding TV display">Onboarding TV</button>
+                <button class="btn secondary" onclick="openOnboardingWindow()" title="Open player onboarding checklist">Onboard</button>
+                <button class="btn secondary" onclick="openOnboardingViewWindow()" title="Open onboarding TV display">OB TV</button>
                 <button class="btn secondary" onclick="openSeatingOrder()" title="Configure player seating positions">Seating</button>
             </div>
         </div>
 
-        <!-- Main Content: Board + Queue -->
-        <div class="main-content">
-            <!-- Board Section -->
-            <section class="board-section">
-                <!-- Effects Panel -->
-                <div class="effects-panel" id="effectsPanel">
-                    <button class="effect-btn active" data-effect="hex-images" title="Hex Terrain Images">Map</button>
-                    <button class="effect-btn active" data-effect="heart-glow" title="Heart Glow">Glow</button>
-                    <button class="effect-btn active" data-effect="pulse-hearts" title="Pulse Hearts">Pulse</button>
-                    <button class="effect-btn active" data-effect="rooms" title="Show Rooms">Rooms</button>
-                    <button class="effect-btn active" data-effect="heart-images" title="Heart Images">Hearts</button>
-                </div>
-                <div id="hexBoard"></div>
-            </section>
+        <!-- 3-Column Layout -->
+        <div class="admin-layout">
 
-            <!-- Queue Panel (right side) -->
+            <!-- LEFT COLUMN: Teams -->
+            <aside class="teams-column">
+                <div class="panel-header">
+                    <h3 class="panel-title">Teams</h3>
+                    <button class="btn-icon" onclick="openPlayerManager()" title="Manage Players">&#9998;</button>
+                </div>
+                <div class="teams-list" id="teamsList">
+                    <p class="queue-empty">Load a tournament to see teams</p>
+                </div>
+            </aside>
+
+            <!-- CENTER COLUMN -->
+            <div class="center-column">
+                <!-- Board Section -->
+                <section class="board-section">
+                    <!-- Effects Panel -->
+                    <div class="effects-panel" id="effectsPanel">
+                        <button class="effect-btn active" data-effect="hex-images" title="Hex Terrain Images">Map</button>
+                        <button class="effect-btn active" data-effect="heart-glow" title="Heart Glow">Glow</button>
+                        <button class="effect-btn active" data-effect="pulse-hearts" title="Pulse Hearts">Pulse</button>
+                        <button class="effect-btn active" data-effect="rooms" title="Show Rooms">Rooms</button>
+                        <button class="effect-btn active" data-effect="heart-images" title="Heart Images">Hearts</button>
+                    </div>
+                    <div id="hexBoard"></div>
+                </section>
+
+                <!-- Match Creation Panel -->
+                <div class="panel create-match-panel">
+                    <h4>Create Match
+                        <button class="btn-small secondary" onclick="generateSuggestedMatches()" title="Auto-generate matches based on rotation">Auto</button>
+                        <button class="btn-small challenge" onclick="addChallengeToQueue()" title="Create a challenge match (hex dispute)">Challenge</button>
+                        <button class="btn-small secondary" onclick="openMassImport()" title="Import matches from JSON file">Import</button>
+                        <button class="btn-small secondary" onclick="openGameManager()" title="Add, remove, or edit tournament games">Games</button>
+                        <input type="file" id="importFileInput" accept=".json" style="display:none" onchange="handleImportFile(event)">
+                    </h4>
+
+                    <div class="game-selects">
+                        <select id="gameType">
+                            <option value="">Load tournament first...</option>
+                        </select>
+                        <span class="auto-format" id="autoFormat">--</span>
+                    </div>
+
+                    <div class="sides-container" id="sidesContainer">
+                        <!-- Dynamic sides rendered by JS -->
+                    </div>
+                    <div class="sides-actions">
+                        <button class="btn-small secondary" onclick="addMatchSide()" title="Add another team side">+ Side</button>
+                        <button class="btn-small secondary" onclick="removeMatchSide()" title="Remove last side">- Side</button>
+                    </div>
+
+                    <div class="match-buttons">
+                        <button class="btn primary" onclick="addMatchToQueue(this)">Add to Queue</button>
+                        <button class="btn secondary" onclick="clearMatchSetup()">Clear</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Queue -->
             <aside class="queue-panel">
                 <h3>Match Queue <span class="count" id="queueCount">0</span>
+                    <button class="btn-small secondary" onclick="openMatchQueuePage()" title="Open match list in new tab">View All</button>
                     <button class="btn-small danger" onclick="openClearQueueModal()" title="Clear all matches from queue">Clear All</button>
                 </h3>
 
@@ -133,51 +207,11 @@
                     <p class="queue-empty">No matches in queue</p>
                 </div>
             </aside>
+
         </div>
-
-        <!-- Bottom Panels: Teams + Create Match -->
-        <div class="bottom-panels">
-            <!-- Teams Panel -->
-            <div class="panel teams-panel">
-                <h4>Teams <button class="btn-icon" onclick="openPlayerManager()" title="Manage Players">&#9998;</button></h4>
-                <div class="teams-grid" id="teamsList">
-                    <p class="queue-empty">Load a tournament to see teams</p>
-                </div>
-            </div>
-
-            <!-- Match Creation -->
-            <div class="panel create-match-panel">
-                <h4>Create Match
-                    <button class="btn-small secondary" onclick="generateSuggestedMatches()" title="Auto-generate matches based on rotation">Auto</button>
-                    <button class="btn-small challenge" onclick="addChallengeToQueue()" title="Create a challenge match (hex dispute)">Challenge</button>
-                    <button class="btn-small secondary" onclick="openMassImport()" title="Import matches from JSON file">Import</button>
-                    <button class="btn-small secondary" onclick="openGameManager()" title="Add, remove, or edit tournament games">Games</button>
-                    <input type="file" id="importFileInput" accept=".json" style="display:none" onchange="handleImportFile(event)">
-                </h4>
-
-                <div class="game-selects">
-                    <select id="gameType">
-                        <option value="">Load tournament first...</option>
-                    </select>
-                    <span class="auto-format" id="autoFormat">--</span>
-                </div>
-
-                <div class="sides-container" id="sidesContainer">
-                    <!-- Dynamic sides rendered by JS -->
-                </div>
-                <div class="sides-actions">
-                    <button class="btn-small secondary" onclick="addMatchSide()" title="Add another team side">+ Side</button>
-                    <button class="btn-small secondary" onclick="removeMatchSide()" title="Remove last side">- Side</button>
-                </div>
-
-                <div class="match-buttons">
-                    <button class="btn primary" onclick="addMatchToQueue(this)">Add to Queue</button>
-                    <button class="btn secondary" onclick="clearMatchSetup()">Clear</button>
-                </div>
-            </div>
-        </div>
-
     </div>
+
+    <!-- ==================== MODALS ==================== -->
 
     <!-- Team Picker Modal -->
     <div class="modal-overlay" id="teamPickerModal">
@@ -238,7 +272,7 @@
     <!-- Next Round Confirmation Modal -->
     <div class="modal-overlay" id="nextRoundModal">
         <div class="modal-content next-round-modal">
-            <h4>⚠️ Advance to Next Round?</h4>
+            <h4>Advance to Next Round?</h4>
             <p class="modal-warning">This will add hex control points to corresponding teams.</p>
             <p class="modal-danger">YOU CANNOT GO BACK IN ROUNDS!</p>
 
@@ -297,7 +331,7 @@
     <!-- Challenge Setup Modal -->
     <div class="modal-overlay" id="challengeSetupModal">
         <div class="modal-content challenge-setup-modal">
-            <h4>⚔️ Create Challenge Match</h4>
+            <h4>Create Challenge Match</h4>
             <p class="modal-hint">Select teams disputing hexes. Up to 2 disputes can be resolved in one match.</p>
 
             <div class="challenge-sides-container">

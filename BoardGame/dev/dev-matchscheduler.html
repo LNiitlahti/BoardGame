@@ -520,7 +520,7 @@
                     <h3>Settings</h3>
                     <div class="setting-row">
                         <label>Total matches to generate:</label>
-                        <input type="number" id="totalMatches" value="60" min="1" max="500">
+                        <input type="number" id="totalMatches" value="72" min="1" max="500">
                     </div>
                     <div class="setting-row">
                         <label>Use rotating orders (3 cycles):</label>
@@ -528,10 +528,10 @@
                     </div>
                     <div class="info-box" style="margin-top: 10px; font-size: 0.7rem;">
                         <strong>Rotating Orders:</strong><br>
-                        <strong>1:</strong> Predecessor → AoE4 → SM2 → CS2 → DoW2 → COD<br>
-                        <strong>2:</strong> CS2 → DoW2 → AoE4 → COD → Predecessor → SM2<br>
-                        <strong>3:</strong> AoE4 → Predecessor → COD → DoW2 → SM2 → CS2<br>
-                        <em>Each game 3x, then next. After 18 matches → next order.</em>
+                        <strong>1:</strong> Predecessor → AoE4 → OW2 → CS2 → WC3 → COD<br>
+                        <strong>2:</strong> CS2 → WC3 → AoE4 → COD → Predecessor → OW2<br>
+                        <strong>3:</strong> AoE4 → Predecessor → COD → WC3 → OW2 → CS2<br>
+                        <em>Each game 3x, then next. After 24 matches → next order (split games count as 2).</em>
                     </div>
                 </div>
 
@@ -639,36 +639,36 @@
         // =============================================================================
         // ROTATING GAME ORDERS (Cycle after each full pass of 18 matches)
         // =============================================================================
-        // Order 1: Predecessor, Age of Empires IV, Space Marine 2, CS2, Dawn of War 2, COD
-        // Order 2: CS2, Dawn of War 2, Age of Empires IV, COD, Predecessor, Space Marine 2
-        // Order 3: Age of Empires IV, Predecessor, COD, Dawn of War 2, Space Marine 2, CS2
+        // Order 1: Predecessor, Age of Empires IV, Overwatch 2, CS2, Warcraft 3, COD
+        // Order 2: CS2, Warcraft 3, Age of Empires IV, COD, Predecessor, Overwatch 2
+        // Order 3: Age of Empires IV, Predecessor, COD, Warcraft 3, Overwatch 2, CS2
 
         const ROTATING_ORDERS = [
             // Order 1
             [
                 { game: 'predecessor', repeatCount: 3 },
                 { game: 'aoe4', repeatCount: 3 },
-                { game: 'spacemarine2', repeatCount: 3 },
+                { game: 'overwatch2', repeatCount: 3 },
                 { game: 'cs2', repeatCount: 3 },
-                { game: 'dow2', repeatCount: 3 },
+                { game: 'wc3', repeatCount: 3 },
                 { game: 'cod', repeatCount: 3 }
             ],
             // Order 2
             [
                 { game: 'cs2', repeatCount: 3 },
-                { game: 'dow2', repeatCount: 3 },
+                { game: 'wc3', repeatCount: 3 },
                 { game: 'aoe4', repeatCount: 3 },
                 { game: 'cod', repeatCount: 3 },
                 { game: 'predecessor', repeatCount: 3 },
-                { game: 'spacemarine2', repeatCount: 3 }
+                { game: 'overwatch2', repeatCount: 3 }
             ],
             // Order 3
             [
                 { game: 'aoe4', repeatCount: 3 },
                 { game: 'predecessor', repeatCount: 3 },
                 { game: 'cod', repeatCount: 3 },
-                { game: 'dow2', repeatCount: 3 },
-                { game: 'spacemarine2', repeatCount: 3 },
+                { game: 'wc3', repeatCount: 3 },
+                { game: 'overwatch2', repeatCount: 3 },
                 { game: 'cs2', repeatCount: 3 }
             ]
         ];
@@ -764,7 +764,7 @@
             let orderIndex = 0;
             let repeatCounter = 0;
             let currentRotation = 0;  // Which of the 3 rotating orders we're using
-            let matchesInCurrentCycle = 0;  // Matches played in current 18-match cycle
+            let matchesInCurrentCycle = 0;  // Matches played in current 24-match cycle
 
             // Get the active game order (either rotating or custom)
             const getActiveOrder = () => {
@@ -785,6 +785,7 @@
                         // Move to next rotating order
                         currentRotation = (currentRotation + 1) % ROTATING_ORDERS.length;
                         matchesInCurrentCycle = 0;
+                        activeOrder = getActiveOrder();  // Re-fetch for new rotation
                     }
                 }
 
@@ -1127,8 +1128,8 @@
                         const name = GAMES[g.game]?.name || g.game;
                         // Abbreviate long names
                         if (name === 'Age of Empires IV') return 'AoE4';
-                        if (name === 'Space Marine 2') return 'SM2';
-                        if (name === 'Dawn of War 2') return 'DoW2';
+                        if (name === 'Overwatch 2') return 'OW2';
+                        if (name === 'Warcraft 3') return 'WC3';
                         return name;
                     }).join(' → ');
                     lines.push(`Order: ${orderStr}`);
