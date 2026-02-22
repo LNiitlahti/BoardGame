@@ -142,6 +142,14 @@ const GAMES_CONFIG = {
             icon: '👊',
             image: 'shared/images/game-logos/Tekken_8/Tekken_8_icon.png',
             active: false
+        },
+        'beerdrinking': {
+            name: 'Beer Drinking',
+            shortName: 'Beer',
+            format: 'FFA',
+            icon: '🍺',
+            image: 'shared/images/game-logos/Beer_Drinking/Beer_Drinking_icon.png',
+            active: false
         }
     },
 

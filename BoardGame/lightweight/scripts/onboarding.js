@@ -17,6 +17,7 @@ let onboardingState = null;  // Separate state from subcollection
 let tournamentId = null;
 let currentPlayerNumber = null;
 let isAdminView = false;
+let isPlatformOnly = false;
 let editingPlayerNumber = null;
 let unsubscribe = null;
 let onboardingUnsubscribe = null;
@@ -38,6 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Determine mode
     isAdminView = viewParam === 'true';
+    isPlatformOnly = urlParams.get('platform-only') === '1';
     currentPlayerNumber = playerParam ? parseInt(playerParam, 10) : null;
 
     // Validate parameters
@@ -55,7 +57,7 @@ document.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('firebase-ready', function() {
     if (!tournamentId) return;
 
-    // Set up real-time listener
+    // Anonymous auth is handled by firebase-loader.js
     setupTournamentListener();
 });
 
@@ -370,12 +372,20 @@ function renderPlayerView() {
     document.getElementById('tournamentName').textContent = gameState.name || 'Tournament';
     document.getElementById('playerInfo').textContent = `Welcome, ${currentPlayer.name}`;
 
+    // Render status buttons
+    renderStatusButtons(currentPlayerNumber);
+
     // Render platform IDs form
     renderPlatformIdsForm(currentPlayerNumber);
 
-    // Render checklists
-    renderFriendsChecklist(playerMapping, currentPlayerNumber, 'friendsChecklist');
-    renderGamesChecklist(currentPlayerNumber, 'gamesChecklist');
+    if (isPlatformOnly) {
+        // Hide friends and games sections
+        document.querySelectorAll('.checklist-section:not(.platform-section)').forEach(s => s.style.display = 'none');
+    } else {
+        // Render checklists
+        renderFriendsChecklist(playerMapping, currentPlayerNumber, 'friendsChecklist');
+        renderGamesChecklist(currentPlayerNumber, 'gamesChecklist');
+    }
 
     // Update progress
     updateProgress(currentPlayerNumber);
@@ -406,7 +416,6 @@ function renderPlatformIdsForm(forPlayerNum) {
                            placeholder="${platform.placeholder}"
                            value="${currentValue}"
                            onchange="savePlatformId('${platform.id}', this.value)">
-                    <button class="btn secondary" onclick="savePlatformId('${platform.id}', document.getElementById('platform-${platform.id}').value)">Save</button>
                 </div>
                 <div class="platform-help">
                     ${platform.help}
@@ -415,6 +424,8 @@ function renderPlatformIdsForm(forPlayerNum) {
             </div>
         `;
     }
+
+    html += `<button class="btn primary save-all-btn" onclick="saveAllPlatformIds()">Save All</button>`;
 
     container.innerHTML = html;
 }
@@ -443,16 +454,11 @@ function renderFriendsChecklist(playerMapping, forPlayerNum, containerId) {
             if (platformId) {
                 hasPlatformIds = true;
                 const escapedId = platformId.replace(/'/g, "\\'");
-                const profileUrl = platform.getProfileUrl ? platform.getProfileUrl(platformId) : null;
                 platformIdsHtml += `
                     <span class="friend-platform-id-group">
                         <span class="friend-platform-id" onclick="copyPlatformId(this, '${escapedId}')" title="Click to copy">
                             <span class="platform-label">${platform.icon}</span>
                             ${platformId}
-                        </span>
-                        <span class="friend-platform-actions">
-                            <button class="platform-action-btn copy-btn" onclick="copyPlatformId(this, '${escapedId}')" title="Copy ${platform.name} ID">📋</button>
-                            ${profileUrl ? `<a class="platform-action-btn link-btn" href="${profileUrl}" target="_blank" title="Open ${platform.name} profile">🔗</a>` : ''}
                         </span>
                     </span>
                 `;
@@ -489,8 +495,10 @@ const GAME_TUTORIALS = {
     'wc3':         { url: 'https://youtu.be/5ygNDJdUVnY', label: 'How to Play' },
     'aoe4':        { url: 'https://youtu.be/V-XbTO0TZN4', label: 'How to Play' },
     'overwatch2':  { url: 'https://youtu.be/u2mMbSKf6iE', label: 'How to Play' },
-    'cs2':         { text: 'You shoot.' },
-    'cod':         { text: 'You also shoot, but from the left.' }
+    'cs2':         { text: 'Mouse1 to shoot.' },
+    'cod':         { text: 'Also Mouse1 to shoot.' },
+    'spellbreak':  { url: 'https://www.youtube.com/watch?v=ZqyoxdEY1PY', label: 'How to Play' },
+    'beerdrinking': { url: 'https://www.youtube.com/watch?v=iyNmwu1R21c&si=URDInlLZG4vU4eVX', label: 'How to Drink' }
 };
 
 function renderGamesChecklist(forPlayerNum, containerId) {
@@ -542,20 +550,33 @@ function updateProgress(playerNum) {
     const playerData = onboardingState?.players?.[String(playerNum)] || {};
     const games = getSelectedGames();
 
-    const totalTasks = 9 + games.length; // 9 friends + games
-    let completed = 0;
+    let totalTasks, completed;
 
-    // Count friends
-    for (let i = 1; i <= 10; i++) {
-        if (i !== playerNum && playerData.friendsAdded?.[String(i)]) {
-            completed++;
+    if (isPlatformOnly) {
+        // Only count platform IDs
+        const activePlatforms = typeof PLATFORMS_CONFIG !== 'undefined' ? PLATFORMS_CONFIG.getActivePlatforms() : [];
+        totalTasks = activePlatforms.length;
+        completed = 0;
+        const platformIds = playerData.platformIds || {};
+        for (const platform of activePlatforms) {
+            if (platformIds[platform.id]?.trim()) completed++;
         }
-    }
+    } else {
+        totalTasks = 9 + games.length; // 9 friends + games
+        completed = 0;
 
-    // Count games
-    for (const game of games) {
-        if (playerData.gamesTested?.[game.id]) {
-            completed++;
+        // Count friends
+        for (let i = 1; i <= 10; i++) {
+            if (i !== playerNum && playerData.friendsAdded?.[String(i)]) {
+                completed++;
+            }
+        }
+
+        // Count games
+        for (const game of games) {
+            if (playerData.gamesTested?.[game.id]) {
+                completed++;
+            }
         }
     }
 
@@ -666,6 +687,7 @@ function renderSummaryGrid(playerMapping) {
                 <div class="team-indicator" style="background: ${info.teamColor}"></div>
                 <div class="player-name">${info.name}</div>
                 <div class="team-name">${info.teamName}</div>
+                <div class="player-status-icons">${getPlayerStatusIcons(i)}</div>
                 <div class="progress-stats">
                     <div>Friends: ${friendsComplete}/9</div>
                     <div>Games: ${gamesComplete}/${games.length}</div>
@@ -820,6 +842,73 @@ function copyAllLinks() {
 }
 
 // =============================================================================
+// PLAYER STATUS EMOJIS
+// =============================================================================
+
+const STATUS_EMOJIS = {
+    eating: '🍔',
+    smoking: '🚬',
+    wc: '🚽',
+    sleeping: '😴',
+    alert: '❗',
+    question: '❓'
+};
+
+function renderStatusButtons(playerNum) {
+    const playerData = onboardingState?.players?.[String(playerNum)] || {};
+    const activeStatuses = playerData.statuses || {};
+
+    document.querySelectorAll('#statusEmojis .status-btn').forEach(btn => {
+        const status = btn.dataset.status;
+        btn.classList.toggle('active', !!activeStatuses[status]);
+    });
+}
+
+async function togglePlayerStatus(statusKey) {
+    const playerData = onboardingState.players[String(currentPlayerNumber)];
+    if (!playerData) return;
+
+    if (!playerData.statuses) playerData.statuses = {};
+    const wasActive = playerData.statuses[statusKey] || false;
+
+    // Exclusive: clear all statuses, then set the new one (unless toggling off)
+    const updates = {};
+    for (const key of Object.keys(STATUS_EMOJIS)) {
+        playerData.statuses[key] = false;
+        updates[`statuses.${key}`] = false;
+    }
+    if (!wasActive) {
+        playerData.statuses[statusKey] = true;
+        updates[`statuses.${statusKey}`] = true;
+    }
+
+    // Update buttons immediately
+    document.querySelectorAll('#statusEmojis .status-btn').forEach(btn => {
+        btn.classList.toggle('active', !!playerData.statuses[btn.dataset.status]);
+    });
+
+    await savePlayerField(currentPlayerNumber, updates);
+}
+
+function openStatusPopup() {
+    const baseUrl = window.location.pathname.replace('onboarding.html', 'onboarding-status.html');
+    let popupUrl = `${baseUrl}?tournamentId=${tournamentId}&player=${currentPlayerNumber}`;
+    if (urlSecret) popupUrl += `&secret=${encodeURIComponent(urlSecret)}`;
+    window.open(popupUrl, 'statusPopup',
+        'width=240,height=200,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no');
+}
+
+function getPlayerStatusIcons(playerNum) {
+    const playerData = onboardingState?.players?.[String(playerNum)] || {};
+    const statuses = playerData.statuses || {};
+    let icons = '';
+    for (const [key, emoji] of Object.entries(STATUS_EMOJIS)) {
+        if (statuses[key]) icons += emoji;
+    }
+    return icons;
+}
+
+// =============================================================================
 // PLATFORM ID MANAGEMENT
 // =============================================================================
 
@@ -849,6 +938,37 @@ async function savePlatformId(platformKey, value) {
         }
     } catch (error) {
         console.error('Failed to save platform ID:', error);
+        showToast('Failed to save. Please try again.', 'error');
+    }
+}
+
+async function saveAllPlatformIds() {
+    const activePlatforms = PLATFORMS_CONFIG.getActivePlatforms();
+    const playerData = onboardingState.players[String(currentPlayerNumber)];
+    if (!playerData.platformIds) playerData.platformIds = {};
+
+    const updates = {};
+    for (const platform of activePlatforms) {
+        const input = document.getElementById(`platform-${platform.id}`);
+        if (!input) continue;
+        const val = input.value.trim();
+        playerData.platformIds[platform.id] = val;
+        updates[`players.${currentPlayerNumber}.platformIds.${platform.id}`] = val;
+    }
+
+    playerData.lastUpdated = new Date().toISOString();
+    updates[`players.${currentPlayerNumber}.lastUpdated`] = playerData.lastUpdated;
+
+    try {
+        await getOnboardingRef().update(updates);
+        // Update row styling
+        for (const platform of activePlatforms) {
+            const row = document.getElementById(`platform-${platform.id}`)?.closest('.platform-id-row');
+            if (row) row.classList.toggle('has-value', !!playerData.platformIds[platform.id]);
+        }
+        showToast('All platform IDs saved!', 'success');
+    } catch (error) {
+        console.error('Failed to save platform IDs:', error);
         showToast('Failed to save. Please try again.', 'error');
     }
 }
@@ -947,12 +1067,12 @@ async function saveSecret() {
     // Remove old plain text secret if it exists
     delete onboardingState.secret;
 
-    // Save to Firebase subcollection (only the hash)
+    // Save to Firebase subcollection (hash + plain text for admin reference)
     try {
         const onboardingRef = getOnboardingRef();
         await onboardingRef.update({
             'secretHash': secretHash,
-            'secret': null // Remove old plain text field
+            'secret': newSecret || null
         });
 
         closeSecretModal();
@@ -960,9 +1080,8 @@ async function saveSecret() {
         // Re-render links with new secret
         renderAdminView();
 
-        // Show the secret once so admin can copy it
         if (newSecret) {
-            showToast(`Secret saved! Your phrase: ${newSecret} — This is the ONLY time you'll see it.`, 'success', 0);
+            showToast('Secret saved!', 'success');
         }
     } catch (error) {
         console.error('Failed to save secret:', error);
@@ -1006,4 +1125,7 @@ window.closeSecretModal = closeSecretModal;
 window.saveSecret = saveSecret;
 window.verifySecret = verifySecret;
 window.savePlatformId = savePlatformId;
+window.saveAllPlatformIds = saveAllPlatformIds;
 window.copyPlatformId = copyPlatformId;
+window.togglePlayerStatus = togglePlayerStatus;
+window.openStatusPopup = openStatusPopup;

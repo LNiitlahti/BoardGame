@@ -3,7 +3,7 @@
  * ADMIN-LIGHTWEIGHT V2 — Dark Void / Gold Accent Theme
  * ============================================================================
  * Self-contained CSS — does NOT depend on brand-theme.css
- * Visual language matches view_v2.html
+ * Visual language matches view.html
  * Fonts: Russo One (titles) + Quantico (body/data)
  * ============================================================================
  */
@@ -329,6 +329,32 @@ h1, h2, h3, h4, h5, h6 {
     align-items: center;
     gap: 8px;
     flex-shrink: 0;
+}
+
+.top-bar-actions .btn-group-separator {
+    width: 1px;
+    height: 20px;
+    background: var(--border-color);
+    margin: 0 2px;
+}
+
+.top-bar-actions .btn-group {
+    display: flex;
+    gap: 0;
+}
+
+.top-bar-actions .btn-group .btn {
+    border-radius: 0;
+    border-right-width: 0;
+}
+
+.top-bar-actions .btn-group .btn:first-child {
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.top-bar-actions .btn-group .btn:last-child {
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    border-right-width: 1px;
 }
 
 .top-bar-center {
@@ -1071,17 +1097,118 @@ h1, h2, h3, h4, h5, h6 {
     letter-spacing: 0.5px;
 }
 
+/* Break queue items */
+.queue-item.break {
+    border-left: 3px solid #f7ba32;
+    background: rgba(247,186,50,0.06);
+}
+
+.queue-item.break:hover {
+    border-left: 3px solid #f7ba32;
+    background: rgba(247,186,50,0.10);
+}
+
+.ongoing-match.break {
+    border-left-color: #f7ba32;
+    background: rgba(247,186,50,0.06);
+}
+
+.ongoing-match.break:hover {
+    background: rgba(247,186,50,0.10);
+    border-left-color: #f7ba32;
+}
+
+.break-badge {
+    display: inline-block;
+    background: #f7ba32;
+    color: #1a1a1a;
+    font-family: 'Quantico', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 5px;
+    border-radius: 3px;
+    margin-right: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Break dropdown menu */
+.break-dropdown { vertical-align: middle; }
+
+.break-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 100;
+    background: var(--bg-secondary, #1e1e1e);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    min-width: 160px;
+    padding: 4px 0;
+}
+
+.break-menu.active { display: block; }
+
+.break-menu button {
+    display: block;
+    width: 100%;
+    padding: 8px 14px;
+    border: none;
+    background: none;
+    color: var(--text-primary, #eee);
+    font-family: 'Quantico', sans-serif;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.break-menu button:hover {
+    background: rgba(247,186,50,0.15);
+}
+
+.btn-small.break {
+    background: rgba(247,186,50,0.15);
+    border-color: #f7ba32;
+    color: #f7ba32;
+}
+
+.btn-small.break:hover {
+    background: rgba(247,186,50,0.25);
+    color: #fff;
+}
+
 .queue-item .drag-handle { color: var(--text-dim); cursor: grab; }
 
 .queue-item .game-info {
     flex: 1;
     font-size: 12px;
+    min-width: 0;
+}
+
+.queue-item .game-type-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+}
+
+.queue-item .match-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
 }
 
 .queue-item .game-type {
     font-family: 'Quantico', sans-serif;
     font-weight: 700;
     color: var(--text-bright);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .queue-item .matchup {

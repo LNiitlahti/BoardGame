@@ -65,6 +65,15 @@
                 </div>
             </div>
             <div class="header-status">
+                <div class="status-emojis" id="statusEmojis">
+                    <button class="status-btn" data-status="eating" onclick="togglePlayerStatus('eating')" title="Eating">🍔</button>
+                    <button class="status-btn" data-status="smoking" onclick="togglePlayerStatus('smoking')" title="Smoke break">🚬</button>
+                    <button class="status-btn" data-status="wc" onclick="togglePlayerStatus('wc')" title="Bathroom">🚽</button>
+                    <button class="status-btn" data-status="sleeping" onclick="togglePlayerStatus('sleeping')" title="Sleeping">😴</button>
+                    <button class="status-btn" data-status="alert" onclick="togglePlayerStatus('alert')" title="Need attention">❗</button>
+                    <button class="status-btn" data-status="question" onclick="togglePlayerStatus('question')" title="Have a question">❓</button>
+                    <button class="status-btn popup-btn" onclick="openStatusPopup()" title="Open mini panel">⏏️</button>
+                </div>
                 <div class="progress-ring" id="progressRing" style="--progress: 0;">
                     <span id="progressPercent">0%</span>
                 </div>

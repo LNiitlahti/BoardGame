@@ -71,6 +71,7 @@
     font-family: 'Quantico', sans-serif;
     color: var(--text-primary);
     overflow: hidden;
+    transform-origin: top left;
   }
 
   #mainContent {
@@ -318,6 +319,13 @@
     text-overflow: ellipsis;
     flex: 1;
     color: var(--text-bright);
+  }
+
+  .player-status {
+    font-size: 22px;
+    flex-shrink: 0;
+    min-width: 0;
+    transition: opacity 0.3s ease;
   }
 
   .player-pct {
@@ -700,6 +708,113 @@
     50% { box-shadow: 0 0 30px rgba(0, 224, 128, 0.3), 0 4px 12px rgba(0, 0, 0, 0.4); }
   }
 
+  /* ── Completion overlay ── */
+  .completion-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .completion-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .completion-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(5, 7, 16, 0.6);
+    animation: overlay-fade-in 2s ease forwards;
+  }
+
+  @keyframes overlay-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  body.onboarding-complete #mainContent,
+  body.onboarding-complete .stars,
+  body.onboarding-complete .mountain-bg,
+  body.onboarding-complete .atmo,
+  body.onboarding-complete .status-corner,
+  body.onboarding-complete .page-title {
+    transition: filter 3s ease;
+    filter: blur(12px);
+  }
+
+  .completion-text {
+    position: relative;
+    z-index: 1;
+    font-family: 'Russo One', sans-serif;
+    color: var(--live);
+    text-transform: uppercase;
+    letter-spacing: 0.3em;
+    white-space: nowrap;
+    text-align: center;
+    font-size: 20px;
+    width: 90%;
+    animation: text-grow 4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    text-shadow:
+      0 0 60px rgba(0, 224, 128, 0.6),
+      0 0 120px rgba(0, 224, 128, 0.3);
+  }
+
+  @keyframes text-grow {
+    0%   { font-size: 20px; opacity: 0; letter-spacing: 0.3em; }
+    15%  { opacity: 1; }
+    100% { font-size: 90px; letter-spacing: 0.15em; }
+  }
+
+  .completion-countdown {
+    position: fixed;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 201;
+    font-family: 'Quantico', sans-serif;
+    font-size: 16px;
+    color: var(--text-muted);
+    letter-spacing: 3px;
+    opacity: 0;
+    animation: fade-in-delayed 1s 4s ease forwards;
+  }
+
+  @keyframes fade-in-delayed {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* ── Dev controls ── */
+  .dev-controls {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    padding: 8px 0;
+  }
+
+  .dev-controls button {
+    background: none;
+    border: 1px solid var(--border-gold);
+    color: var(--text-dim);
+    font-family: 'Quantico', sans-serif;
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+  }
+
+  .dev-controls button:hover {
+    color: var(--gold);
+    border-color: var(--gold);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
@@ -746,6 +861,10 @@
           <div class="overall-ready" id="readyCount">0/10 Ready</div>
         </div>
         <div class="middle-games" id="gamesGrid"></div>
+        <div class="dev-controls" id="devControls">
+          <button onclick="triggerCompletion()">Complete</button>
+          <button onclick="resetCompletion()">Reset</button>
+        </div>
         <div class="door-label">&#8595; Door &#8595;</div>
       </div>
 
@@ -755,8 +874,25 @@
     <div class="door-floor"></div>
 </div>
 
+<!-- Completion Overlay -->
+<div class="completion-overlay" id="completionOverlay">
+    <div class="completion-text">Onboarding Complete</div>
+</div>
+<div class="completion-countdown" id="completionCountdown"></div>
+
 <!-- Scripts -->
 <script>window.BOARDGAME_BASE = '..';</script>
+<script>
+    function applyScale() {
+        const sx = window.innerWidth / 1920;
+        const sy = window.innerHeight / 1080;
+        const scale = Math.min(sx, sy);
+        document.body.style.transform = `scale(${scale})`;
+    }
+    window.addEventListener('resize', applyScale);
+    window.addEventListener('load', applyScale);
+    applyScale();
+</script>
 <script src="../shared/scripts/firebase-loader.js"></script>
 <script src="../shared/scripts/games-config.js"></script>
 
@@ -764,6 +900,8 @@
     // =================================================================
     // STATE
     // =================================================================
+
+    const STATUS_EMOJIS = { eating: '🍔', smoking: '🚬', wc: '🚽', sleeping: '😴', alert: '❗', question: '❓' };
 
     let gameState = null;
     let onboardingState = null;
@@ -773,6 +911,8 @@
     let isFirstRender = true;
     let prevGameIds = null;
     let prevSeatingOrder = null;
+    let completionTriggered = false;
+    let redirectTimer = null;
 
     // =================================================================
     // INITIALIZATION
@@ -986,6 +1126,11 @@
         readyEl.textContent = totalReady + '/10 Ready';
         readyEl.classList.toggle('all-ready', totalReady === 10);
 
+        // Trigger completion sequence when all players are done
+        if (totalReady === 10 && !completionTriggered) {
+            triggerCompletion();
+        }
+
         // Force rebuild if game list changed
         const currentGameIds = games.map(g => g.id).join(',');
         if (prevGameIds !== null && prevGameIds !== currentGameIds) {
@@ -1042,6 +1187,7 @@
         html += '<div class="player-top">';
         html += '<span class="seat-num">' + seatNum + '</span>';
         html += '<span class="player-name">' + escapeHtml(info.name) + '</span>';
+        html += '<span class="player-status" data-status="' + seatNum + '"></span>';
         html += '<span class="player-pct" data-percent="' + seatNum + '">0%</span>';
         html += '</div>';
         html += '<div class="player-bar-bg"><div class="player-bar-fill" data-bar="' + seatNum + '"></div></div>';
@@ -1165,6 +1311,17 @@
 
         const playerData = onboardingState?.players?.[String(logicalPlayerNum)] || {};
 
+        // Status emoji
+        const statusEl = document.querySelector('[data-status="' + seatNum + '"]');
+        if (statusEl) {
+            const statuses = playerData.statuses || {};
+            let emoji = '';
+            for (const [key, icon] of Object.entries(STATUS_EMOJIS)) {
+                if (statuses[key]) { emoji = icon; break; }
+            }
+            statusEl.textContent = emoji;
+        }
+
         // Friend dots
         const friendsDots = document.querySelector('[data-friends-dots="' + seatNum + '"]');
         if (friendsDots) {
@@ -1200,6 +1357,58 @@
         if (gamesCountEl) {
             gamesCountEl.textContent = progress.gamesComplete + '/' + progress.gamesTotal;
         }
+    }
+
+    // =================================================================
+    // COMPLETION SEQUENCE
+    // =================================================================
+
+    function triggerCompletion() {
+        completionTriggered = true;
+
+        // Blur the background content
+        document.body.classList.add('onboarding-complete');
+
+        // Show the overlay with growing text
+        const overlay = document.getElementById('completionOverlay');
+        overlay.classList.add('active');
+
+        // Start countdown to redirect
+        const countdownEl = document.getElementById('completionCountdown');
+        let secondsLeft = 60;
+
+        countdownEl.textContent = 'Redirecting to tournament view in ' + secondsLeft + 's';
+
+        redirectTimer = setInterval(() => {
+            secondsLeft--;
+            if (secondsLeft <= 0) {
+                clearInterval(redirectTimer);
+                window.location.href = 'view.html?tournamentId=' + encodeURIComponent(tournamentId);
+            } else {
+                countdownEl.textContent = 'Redirecting to tournament view in ' + secondsLeft + 's';
+            }
+        }, 1000);
+    }
+
+    function resetCompletion() {
+        completionTriggered = false;
+        if (redirectTimer) { clearInterval(redirectTimer); redirectTimer = null; }
+
+        document.body.classList.remove('onboarding-complete');
+
+        const overlay = document.getElementById('completionOverlay');
+        overlay.classList.remove('active');
+
+        // Re-create the text element to reset animation
+        const textEl = overlay.querySelector('.completion-text');
+        const clone = textEl.cloneNode(true);
+        textEl.replaceWith(clone);
+
+        const countdownEl = document.getElementById('completionCountdown');
+        countdownEl.textContent = '';
+        // Reset countdown fade animation
+        const countdownClone = countdownEl.cloneNode(true);
+        countdownEl.replaceWith(countdownClone);
     }
 
     // =================================================================

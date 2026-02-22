@@ -96,17 +96,34 @@ document.addEventListener('DOMContentLoaded', function() {
                     };
                     
                     console.log("Firebase initialized successfully");
-                    
-                    // Dispatch an event so we know Firebase is ready
-                    document.dispatchEvent(new CustomEvent('firebase-ready'));
-                    
-                    // Update status if it exists
-                    const status = document.getElementById('connectionStatus');
-                    if (status) {
-                        status.title = 'Firebase: Connected';
-                        if (status.classList) {
-                            status.classList.remove('disconnected', 'warning');
-                            status.classList.add('connected');
+
+                    // Ensure a Firebase Auth session exists so Firestore
+                    // rules (isAuthenticated) pass. Pages with real login
+                    // (admin, setup) will override the anonymous session
+                    // when the user signs in with credentials.
+                    const auth = firebase.auth();
+                    if (auth.currentUser) {
+                        // Already signed in (e.g. persisted session)
+                        firebaseReady();
+                    } else {
+                        auth.signInAnonymously()
+                            .then(() => firebaseReady())
+                            .catch(error => {
+                                console.error('Anonymous auth failed:', error);
+                                firebaseReady(); // Still fire event — let pages handle auth errors
+                            });
+                    }
+
+                    function firebaseReady() {
+                        document.dispatchEvent(new CustomEvent('firebase-ready'));
+
+                        const status = document.getElementById('connectionStatus');
+                        if (status) {
+                            status.title = 'Firebase: Connected';
+                            if (status.classList) {
+                                status.classList.remove('disconnected', 'warning');
+                                status.classList.add('connected');
+                            }
                         }
                     }
                 })

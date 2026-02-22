@@ -1,6 +1,6 @@
 # board-renderer.js — Logic Diagrams
 
-> Source: `BoardGame/scripts/board-renderer.js`
+> Source: `BoardGame/shared/scripts/board-renderer.js`
 > Hex grid visualization with responsive scaling, heart overlays, and incremental updates.
 > Pure rendering layer — delegates coordinate math to external `boardModule`.
 

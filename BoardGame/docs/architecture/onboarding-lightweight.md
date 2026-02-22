@@ -6,7 +6,7 @@
 >
 > **Data location:** `tournaments/{id}/onboarding/state` (Firestore subcollection).
 > Onboarding data was migrated from the main tournament document to avoid
-> triggering re-renders on unrelated pages (e.g., view_v2.html TV display).
+> triggering re-renders on unrelated pages (e.g., view.html TV display).
 
 ## 1. View Routing & Secret Validation
 
@@ -20,7 +20,7 @@ flowchart TD
     E -->|No| G{player param valid 1-10?}
     G -->|No| H[FATAL ERROR — invalid player]
     G -->|Yes| I[currentPlayerNumber = player]
-    F --> J[Wait for firebase-ready]
+    F --> J["Wait for firebase-ready<br/>(anonymous auth handled by firebase-loader.js)"]
     I --> J
     J --> K[setupTournamentListener]
     K --> L["On snapshot: gameState = data"]

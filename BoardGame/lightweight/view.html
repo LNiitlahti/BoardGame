@@ -2,793 +2,678 @@
 <html lang="en">
 <!--
     ============================================================================
-    VIEW.HTML (lightweight) - DIGITAL SIGNAGE DISPLAY
+    "War of the Mountain" Tournament Infoscreen
+    ============================================================================
+    Version:  1.0 — Production Template
+    Display:  1920×1080, scaled to fit any screen via applyScale()
+    Fonts:    Russo One (titles) + Quantico (body/data)
+
+    LAYOUT (top to bottom):
+    ┌──────────────────────────────────────────────────────┐
+    │  HEADER (56px) — Title, round/games/queue stats, clock │
+    ├──────────────────┬───────────────────────────────────┤
+    │  ARENA LEFT      │  ARENA RIGHT                      │
+    │  Match 1 (312px) │  Match 2 (312px)                  │
+    ├────────┬─────────┴──────────┬────────────────────────┤
+    │ RECENT │  TERRITORY MAP     │ UPCOMING               │
+    │ RESULTS│  Score bars + Hex  │ QUEUE                  │
+    │ (420px)│  board (center)    │ (420px)                │
+    ├────────┴────────────────────┴────────────────────────┤
+    │  SCORE STRIP (56px) — All 5 teams                    │
+    └─────────────────────────────────────────────────────-┘
+
+    ============================================================================
+    FIRESTORE INTEGRATION
     ============================================================================
 
-    PURPOSE:
-    Simplified digital signage view optimized for 1920x1080 screens.
-    Shows tournament board, team scores, and match queue in real-time.
+    Data is loaded from Firestore via firebase-loader.js.
+    Search for "TODO:FIREBASE" comments for remaining integration points.
 
-    CHARACTERISTICS:
-    - Read-only (no user interaction)
-    - Fits 1920x1080 without scrolling
-    - Real-time Firebase updates
-    - No authentication required
-    - Dark theme for digital signage
+    MATCH LIFECYCLE — How transitions work:
+    ────────────────────────────────────────
+    Content updates (matches, queue, results, scores) happen automatically
+    via Firestore listeners. When data changes, renderMatches(),
+    renderQueue(), renderResults(), and renderScoreStrip() rebuild the UI.
+    Results use incremental DOM prepending for new entries.
 
-    USAGE:
-    Open with tournament ID: lightweight/view.html?tournamentId=xxx
-    Use "Open View" button from lightweight/admin.html
+    endMatch(matchId, winningSide, onComplete) is available for manual
+    match-end animations:
+      - Shows "MATCH COMPLETE" overlay text (3.5s)
+      - Flashes the winning side bright
+      - Fades out the match block over 5s
+      - Calls onComplete callback after 6s
+
+    CSS CLASSES REFERENCE:
+    ────────────────────────────────────────
+    Used by JS:
+      .finishing       → Match block fade-out animation (5s)
+      .win-flash       → Add to winning .a-side for bright flash (4s)
+
+    Defined in CSS but not yet triggered by JS:
+      .promoting       → Match block entrance from below (4s)
+      .new-live        → LIVE badge pop-in with bounce (2s, 1.5s delay)
+      .new-result      → Result card slide-in from top (2.5s)
+      .promoting-out   → Queue NEXT card flies upward and shrinks (2s)
+      .shuffle-up      → Queue cards slide up into position (2s)
+
+    MATCH COMPLETE OVERLAY:
+    ────────────────────────────────────────
+    Each match block must contain this overlay div:
+      <div class="match-complete-overlay">
+          <span class="match-complete-text">Match Complete</span>
+      </div>
+    Add class .active to trigger the animation.
 
     ============================================================================
 -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=1920, height=1080">
-    <title>Tournament View</title>
-
-    <!-- Favicons -->
-    <link rel="apple-touch-icon" sizes="180x180" href="../shared/images/favicon/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="../shared/images/favicon/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="../shared/images/favicon/favicon-16x16.png">
-    <link rel="shortcut icon" href="../shared/images/favicon/favicon.ico">
+    <title>Tournament — Infoscreen</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../shared/css/fantasy-mountain-theme.css">
+
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        /* ============================================================
+           RESET & CSS VARIABLES
+           ============================================================
+           Team colors (--t1 through --t5) map to the 5 tournament teams.
+           These are referenced throughout via inline styles on player
+           elements, so changing them here updates everything.
+        */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { background: #000; }
 
         :root {
-            --bg-primary: #0a0a0f;
-            --bg-secondary: #12121a;
-            --bg-tertiary: #1a1a25;
-            --bg-card: #1e1e2a;
-            --text-primary: #ffffff;
-            --text-secondary: #b0b0c0;
-            --text-tertiary: #707080;
-            --accent-primary: #00d4ff;
-            --accent-success: #10b981;
-            --accent-warning: #f59e0b;
-            --accent-danger: #ef4444;
-            --border-color: #2a2a3a;
+            /* Background layers */
+            --bg-void:      #050710;
+            --bg-deep:      #080b14;
+            --bg-panel:     rgba(10, 13, 22, 0.94);
+            --bg-glass:     rgba(16, 20, 32, 0.8);
 
-            /* Team colors - can be overridden dynamically from Firebase */
-            --team-1-color: #de392c;
-            --team-2-color: #2278a3;
-            --team-3-color: #2e9158;
-            --team-4-color: #f7ba32;
-            --team-5-color: #22241d;
+            /* Text hierarchy */
+            --text-bright:  #f2f4f7;
+            --text-primary: #c8ccd6;
+            --text-muted:   #6a7088;
+            --text-dim:     #3a3f52;
+
+            /* Accent: Gold (headers, borders, highlights) */
+            --gold:         #c8b37e;
+            --gold-bright:  #e8d8a8;
+            --gold-glow:    rgba(200,179,126,0.3);
+            --gold-dim:     rgba(200,179,126,0.1);
+
+            /* Status colors */
+            --live:         #00e080;
+            --live-glow:    rgba(0,224,128,0.25);
+            --next:         #5898cc;
+            --danger:       #d84040;
+            --win:          #00d880;
+            --loss:         #c03840;
+
+            /* Borders */
+            --border-faint: rgba(255,255,255,0.05);
+            --border-gold:  rgba(200,179,126,0.2);
+
+            /* Team colors — TODO:FIREBASE load from tournament config */
+            --t1: #de392c; --t1-hex: rgba(222,57,44,0.5);   /* Karhu  */
+            --t2: #2278a3; --t2-hex: rgba(34,120,163,0.5);  /* Susi   */
+            --t3: #2e9158; --t3-hex: rgba(46,145,88,0.5);   /* Ilves  */
+            --t4: #f7ba32; --t4-hex: rgba(247,186,50,0.5);  /* Kotka  */
+            --t5: #7a4fbf; --t5-hex: rgba(122,79,191,0.5);  /* Ahma   */
+
+            /* Layout dimensions (fixed for 1920×1080) */
+            --header-h: 56px;
+            --arena-h: 312px;
+            --match-1-w: 960px;
+            --match-2-w: 960px;
+            --side-panel-w: 420px;
+            --score-strip-h: 56px;
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg-primary);
+            font-family: 'Quantico', sans-serif;
+            background: var(--bg-void);
             color: var(--text-primary);
             width: 1920px;
             height: 1080px;
             overflow: hidden;
-        }
-
-        .container {
-            display: grid;
-            grid-template-rows: 60px 1fr 180px;
-            height: 1080px;
-            max-height: 1080px;
-            gap: 10px;
-            padding: 10px;
-            overflow: hidden;
-        }
-
-        /* Header */
-        .header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: var(--bg-secondary);
-            border-radius: 10px;
-            padding: 0 20px;
-            border: 1px solid var(--border-color);
-            min-height: 60px;
-            max-height: 60px;
-        }
-
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .logo {
-            width: 40px;
-            height: 40px;
-            border-radius: 6px;
-        }
-
-        .tournament-name {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 28px;
-            font-weight: 800;
-            color: var(--accent-primary);
-            text-shadow: 0 0 15px var(--accent-primary);
-            letter-spacing: 2px;
-        }
-
-        .header-center {
-            display: flex;
-            align-items: center;
-            gap: 32px;
-        }
-
-        .stat-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            background: var(--bg-tertiary);
-            padding: 8px 20px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-        }
-
-        .stat-label {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-
-        .stat-value {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 32px;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .status-indicator {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: var(--accent-warning);
-            box-shadow: 0 0 15px currentColor;
-            animation: status-pulse 2s ease-in-out infinite;
-        }
-
-        @keyframes status-pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-        }
-
-        .status-indicator.connected {
-            background: var(--accent-success);
-            box-shadow: 0 0 15px var(--accent-success);
-        }
-
-        .status-indicator.disconnected {
-            background: var(--accent-danger);
-            box-shadow: 0 0 15px var(--accent-danger);
-            animation: disconnected-pulse 1s ease-in-out infinite;
-        }
-
-        @keyframes disconnected-pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .clock {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 32px;
-            font-weight: 700;
-            color: var(--text-primary);
-            text-shadow: 0 0 20px var(--accent-primary);
-        }
-
-        /* Main Content */
-        .main-content {
-            display: grid;
-            grid-template-columns: 1fr 24px 280px 750px;
-            gap: 12px;
-            min-height: 0;
-            overflow: hidden;
-        }
-
-        /* Score Bars Panel */
-        .score-bars-panel {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: space-between;
-            padding: 4px 0;
-        }
-
-        .score-bars-label {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 8px;
-            font-weight: 600;
-            color: var(--text-tertiary);
-            text-align: center;
-            white-space: nowrap;
-            writing-mode: horizontal-tb;
-        }
-
-        .score-bars-container {
-            flex: 1;
-            display: flex;
-            gap: 2px;
-            align-items: flex-end;
-            padding: 4px 0;
-        }
-
-        .score-bar {
-            width: 3px;
-            background: var(--bg-tertiary);
-            border-radius: 2px;
             position: relative;
-            height: 100%;
+            transform-origin: top left;
         }
 
-        .score-bar-fill {
+        /* ============================================================
+           ATMOSPHERE — Background gradients and noise texture
+           ============================================================ */
+        .atmo { position: fixed; inset: 0; pointer-events: none; }
+        .atmo-grad {
+            background:
+                radial-gradient(ellipse 100% 60% at 50% 25%, rgba(200,179,126,0.025), transparent 60%),
+                linear-gradient(180deg, var(--bg-deep), var(--bg-void));
+        }
+        .atmo-noise {
+            opacity: 0.014;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+
+        /* ============================================================
+           HEADER — Tournament title, stats, clock
+           ============================================================ */
+        .header {
             position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            border-radius: 2px;
-            transition: height 0.5s ease-out;
-            box-shadow: 0 0 4px currentColor;
+            top: 0; left: 0; right: 0;
+            height: var(--header-h);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 28px;
+            background: rgba(5,7,16,0.92);
+            border-bottom: 1px solid var(--border-gold);
+            z-index: 40;
         }
 
-        .score-bar.team-1 .score-bar-fill { background: var(--team-1-color); color: var(--team-1-color); }
-        .score-bar.team-2 .score-bar-fill { background: var(--team-2-color); color: var(--team-2-color); }
-        .score-bar.team-3 .score-bar-fill { background: var(--team-3-color); color: var(--team-3-color); }
-        .score-bar.team-4 .score-bar-fill { background: var(--team-4-color); color: var(--team-4-color); }
-        .score-bar.team-5 .score-bar-fill { background: var(--team-5-color); color: var(--team-5-color); }
+        .h-left { display: flex; align-items: center; gap: 12px; }
+        .h-icon {
+            width: 28px; height: 28px; border-radius: 5px;
+            background: linear-gradient(135deg, var(--gold), #8a7a52);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; box-shadow: 0 0 8px var(--gold-glow);
+        }
+        .h-title {
+            font-family: 'Russo One', sans-serif;
+            font-size: 34px; color: var(--gold-bright); letter-spacing: 5px;
+        }
 
-        /* Board Section */
-        .board-section {
+        .h-stats { display: flex; gap: 24px; align-items: center; }
+        .h-stat { display: flex; align-items: baseline; gap: 6px; }
+        .h-stat-lbl { font-size: 12px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 2px; }
+        .h-stat-val { font-family: 'Quantico', sans-serif; font-size: 24px; font-weight: 700; color: var(--gold); }
+        .h-sep { width: 1px; height: 18px; background: var(--border-faint); }
+        .h-right { display: flex; align-items: center; gap: 10px; }
+
+        .h-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: var(--live); box-shadow: 0 0 6px var(--live);
+            animation: pulse 6s ease-in-out infinite;
+        }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .h-clock { font-family: 'Quantico', sans-serif; font-size: 24px; font-weight: 600; color: var(--text-muted); }
+
+        /* ============================================================
+           STATUS STRIP — Player status emojis (from onboarding)
+           ============================================================ */
+        .status-strip {
+            position: absolute;
+            top: var(--header-h);
+            left: 0; right: 0;
+            height: 26px;
             display: flex;
             align-items: center;
             justify-content: center;
-            position: relative;
+            gap: 20px;
+            background: rgba(5,7,16,0.85);
+            border-bottom: 1px solid var(--border-faint);
+            z-index: 35;
+            font-size: 13px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+        .status-strip.visible {
+            opacity: 1;
+        }
+        .ss-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .ss-emoji { font-size: 14px; }
+        .ss-name { color: var(--text-muted); font-weight: 700; font-size: 12px; }
+
+        /* ============================================================
+           DUAL ARENA — Two side-by-side match blocks
+           ============================================================
+           Each .match-block is a 3-column grid: left side | center | right side
+           Player cards slide in from their respective sides on load.
+        */
+        .dual-arena {
+            position: absolute;
+            top: var(--header-h);
+            left: 0; right: 0;
+            height: var(--arena-h);
+            display: grid;
+            grid-template-columns: var(--match-1-w) var(--match-2-w);
             overflow: hidden;
-            min-height: 0;
-            border-radius: 10px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
+            z-index: 25;
+        }
+
+        .match-block {
+            position: relative;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            overflow: hidden;
+            border-bottom: 1px solid var(--border-faint);
+        }
+        .match-block:first-child { border-right: 1px solid var(--border-gold); }
+
+        /* Player sides — left & right with angled edge overlays */
+        .a-side {
+            position: relative;
+            display: flex; flex-direction: column;
+            justify-content: center;
+            padding: 14px 0; overflow: hidden;
+        }
+        .a-side::before { content: ''; position: absolute; inset: 0; opacity: 0.05; z-index: 0; }
+        .a-side.left::before { background: linear-gradient(135deg, var(--side-color, #888), transparent 70%); }
+        .a-side.right::before { background: linear-gradient(225deg, var(--side-color, #888), transparent 70%); }
+        .a-side.left::after { content: ''; position: absolute; top: 0; right: -30px; bottom: 0; width: 60px; background: linear-gradient(105deg, transparent 40%, var(--bg-void) 40.5%); z-index: 2; }
+        .a-side.right::after { content: ''; position: absolute; top: 0; left: -30px; bottom: 0; width: 60px; background: linear-gradient(255deg, transparent 40%, var(--bg-void) 40.5%); z-index: 2; }
+
+        /* Player cards */
+        .a-players { display: flex; flex-direction: column; gap: 4px; position: relative; z-index: 3; }
+        .a-side.left .a-players { align-items: flex-end; padding-right: 40px; }
+        .a-side.right .a-players { align-items: flex-start; padding-left: 40px; }
+
+        .a-player {
+            display: flex; align-items: center; gap: 8px;
+            padding: 5px 14px; border-radius: 5px;
+            background: rgba(255,255,255,0.02);
+            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+            min-width: 220px;
+            animation: p-enter 1.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        .a-side.left .a-player { flex-direction: row-reverse; border-right: 3px solid var(--pc); }
+        .a-side.right .a-player { border-left: 3px solid var(--pc); }
+
+        /* Staggered entrance delays for player cards */
+        .a-player:nth-child(1) { animation-delay: 0.1s; }
+        .a-player:nth-child(2) { animation-delay: 0.25s; }
+        .a-player:nth-child(3) { animation-delay: 0.4s; }
+        .a-player:nth-child(4) { animation-delay: 0.55s; }
+        .a-player:nth-child(5) { animation-delay: 0.7s; }
+        .a-side.left .a-player { animation-name: ent-l; }
+        .a-side.right .a-player { animation-name: ent-r; }
+        @keyframes ent-l { from { opacity: 0; transform: translateX(60px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes ent-r { from { opacity: 0; transform: translateX(-60px); } to { opacity: 1; transform: translateX(0); } }
+
+        .a-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 5px currentColor; }
+        .a-info { display: flex; flex-direction: column; gap: 0px; }
+        .a-side.left .a-info { align-items: flex-end; }
+        .a-name { font-family: 'Quantico', sans-serif; font-size: 24px; font-weight: 800; letter-spacing: -0.3px; white-space: nowrap; }
+        .a-team { font-family: 'Quantico', sans-serif; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; opacity: 0.4; }
+
+        /* Center column — LIVE badge, game name, VS, format, timer */
+        .a-center {
+            width: 130px; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 5px;
+            position: relative; z-index: 10;
+        }
+        .a-center::before { content: ''; position: absolute; top: 0; bottom: 0; width: 1px; background: linear-gradient(to bottom, transparent, var(--gold), transparent); opacity: 0.2; }
+
+        .a-live-badge {
+            font-family: 'Quantico', sans-serif; font-size: 13px; font-weight: 900;
+            color: #fff; background: linear-gradient(135deg, var(--live), #00b870);
+            padding: 4px 16px; border-radius: 4px; letter-spacing: 2px;
+            box-shadow: 0 0 16px var(--live-glow);
+            animation: bg 4s ease-in-out infinite;
+        }
+        @keyframes bg { 0%,100% { box-shadow: 0 0 16px var(--live-glow); } 50% { box-shadow: 0 0 40px rgba(0,224,128,0.5); } }
+
+        .a-game-name { font-family: 'Quantico', sans-serif; font-size: 15px; font-weight: 700; color: var(--text-bright); text-align: center; }
+        .a-vs { font-family: 'Russo One', sans-serif; font-size: 58px; color: var(--gold); line-height: 0.85; text-shadow: 0 0 24px var(--gold-glow); letter-spacing: 3px; }
+        .a-format { font-family: 'Quantico', sans-serif; font-size: 14px; font-weight: 700; color: var(--gold); background: var(--gold-dim); padding: 3px 10px; border-radius: 3px; border: 1px solid var(--border-gold); }
+        .a-timer { font-family: 'Quantico', sans-serif; font-size: 18px; font-weight: 700; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+
+        /* 3-team match layout (2v2v2) */
+        .match-block.three-team {
+            grid-template-columns: 1fr auto 1fr auto 1fr;
+        }
+        .match-block.three-team .a-side.center {
+            padding: 14px 10px;
+        }
+        .match-block.three-team .a-side.center::before {
+            background: radial-gradient(ellipse at center, var(--side-color, #888), transparent 70%);
+        }
+        .match-block.three-team .a-side.center::after { display: none; }
+        .match-block.three-team .a-side.center .a-players {
+            align-items: center;
+            padding: 0;
+        }
+        .match-block.three-team .a-side.center .a-player {
+            flex-direction: row;
+            border-left: 3px solid var(--pc);
+            border-right: none;
+        }
+        .match-block.three-team .a-side.center .a-info {
+            align-items: flex-start;
+        }
+        .match-block.three-team .a-player {
+            min-width: 160px;
+            padding: 4px 10px;
+        }
+        .match-block.three-team .a-name {
+            font-size: 18px;
+        }
+        .a-vs-divider {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 0 4px; position: relative; z-index: 10;
+        }
+        .a-vs-divider::before {
+            content: ''; position: absolute; top: 0; bottom: 0; width: 1px;
+            background: linear-gradient(to bottom, transparent, var(--gold), transparent); opacity: 0.15;
+        }
+        .a-vs-small {
+            font-family: 'Russo One', sans-serif; font-size: 28px;
+            color: var(--gold); line-height: 1; text-shadow: 0 0 12px var(--gold-glow);
+        }
+        .match-block.three-team .a-center {
+            width: auto; padding: 0 8px;
+        }
+        .match-block.three-team .a-vs { font-size: 32px; }
+
+        /* ============================================================
+           BOTTOM ZONE — 3 columns: Results | Board+Scores | Queue
+           ============================================================ */
+        .bottom-zone {
+            position: absolute;
+            top: calc(var(--header-h) + var(--arena-h) - 1px);
+            left: 0; right: 0; bottom: 0;
+            display: grid;
+            grid-template-columns: var(--side-panel-w) 1fr var(--side-panel-w);
+            grid-template-rows: 1fr var(--score-strip-h);
+            z-index: 15;
+        }
+
+        /* Shared side panel styles (Results & Queue) */
+        .side-panel {
+            grid-row: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 12px 14px;
+            overflow: hidden;
+            position: relative;
+        }
+        .side-panel::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0; height: 40px;
+            background: linear-gradient(to bottom, transparent, rgba(6,8,14,0.96));
+            pointer-events: none; z-index: 3;
+        }
+
+        .panel-title {
+            font-family: 'Russo One', sans-serif;
+            font-size: 24px; color: var(--gold);
+            letter-spacing: 5px; margin-bottom: 10px;
+            padding-bottom: 8px; border-bottom: 1px solid var(--border-gold);
+            flex-shrink: 0;
+        }
+
+        .panel-list {
+            display: flex; flex-direction: column;
+            gap: 8px; flex: 1; overflow: hidden;
+        }
+
+        .results-panel {
+            grid-column: 1;
+            background: linear-gradient(90deg, rgb(6,8,14), rgb(8,10,17));
+            border-right: 1px solid var(--border-faint);
+        }
+
+        .queue-panel {
+            grid-column: 3;
+            background: linear-gradient(270deg, rgb(6,8,14), rgb(8,10,17));
+            border: none;
+            border-left: 1px solid var(--border-faint);
+            box-shadow: none;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+        }
+
+        /* ============================================================
+           RESULT CARDS
+           ============================================================
+           Structure per card:
+             .r-card
+               .r-top (.r-game + .r-time)
+               .r-matchup
+                 .r-side.a.winner|loser  → [WIN badge] + .r-names
+                 .r-vs                   → scores
+                 .r-side.b.winner|loser  → .r-names + [WIN badge]
+           
+           WIN badge sits OUTSIDE .r-names, on the outer edge of the
+           winning side. LOSS badge is hidden via display:none.
+           
+           For side A winners: badge comes before .r-names (left edge)
+           For side B winners: badge comes after .r-names (right edge)
+        */
+        .r-card {
+            border-radius: 6px; flex-shrink: 0;
+            background: rgba(255,255,255,0.015);
+            border: 1px solid var(--border-faint);
+            padding: 8px 12px;
+            animation: r-in 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        .r-card:nth-child(1) { animation-delay: 0s; }
+        .r-card:nth-child(2) { animation-delay: 0.15s; }
+        .r-card:nth-child(3) { animation-delay: 0.3s; }
+        .r-card:nth-child(4) { animation-delay: 0.45s; }
+        .r-card:nth-child(5) { animation-delay: 0.6s; }
+        .r-card:nth-child(6) { animation-delay: 0.75s; }
+        .r-card:nth-child(7) { animation-delay: 0.9s; }
+
+        @keyframes r-in {
+            from { opacity: 0; transform: translateX(-30px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .r-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .r-game { font-family: 'Quantico', sans-serif; font-size: 13px; font-weight: 700; color: var(--gold); text-transform: uppercase; }
+        .r-time { font-family: 'Quantico', sans-serif; font-size: 11px; font-weight: 600; color: var(--text-dim); }
+
+        .r-matchup { display: flex; align-items: center; gap: 0; }
+
+        .r-side { flex: 1; display: flex; align-items: center; gap: 20px; }
+        .r-side.a { justify-content: flex-end; }
+        .r-side.b { justify-content: flex-start; }
+
+        .r-names { display: flex; flex-direction: column; gap: 2px; }
+        .r-side.a .r-names { align-items: flex-end; }
+        .r-side.b .r-names { align-items: flex-start; }
+
+        .r-badge {
+            font-family: 'Quantico', sans-serif; font-size: 10px; font-weight: 800;
+            padding: 2px 6px; border-radius: 2px;
+            letter-spacing: 1px; flex-shrink: 0;
+        }
+        .r-badge.win {
+            background: rgba(0, 216, 128, 0.15); color: var(--win);
+            border: 1px solid rgba(0, 216, 128, 0.2);
+        }
+        .r-badge.loss { display: none; }
+
+        .r-player {
+            font-size: 14px; font-weight: 600;
+            padding: 2px 6px; border-radius: 2px;
+            white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; max-width: 140px;
+        }
+        .r-side.winner .r-player { background: rgba(0, 216, 128, 0.08); }
+        .r-side.loser .r-player { opacity: 0.45; }
+
+        .r-vs {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 1px; flex-shrink: 0; min-width: 36px; padding: 0 6px;
+        }
+        .r-score { font-family: 'Quantico', sans-serif; font-size: 20px; font-weight: 800; }
+        .r-score.w { color: var(--win); }
+        .r-score.l { color: var(--loss); }
+        .r-score-sep { font-size: 10px; color: var(--text-dim); letter-spacing: 1px; }
+
+        /* ============================================================
+           QUEUE CARDS
+           ============================================================
+           Two card types:
+             .q-next    — Expanded "NEXT" card with full player names
+             .q-compact — Smaller queued cards
+           
+           Challenge matches get .challenge class (red left border).
+        */
+        .q-card {
+            border-radius: 6px; flex-shrink: 0;
+            animation: q-in 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        .q-card:nth-child(1) { animation-delay: 0s; }
+        .q-card:nth-child(2) { animation-delay: 0.15s; }
+        .q-card:nth-child(3) { animation-delay: 0.3s; }
+        .q-card:nth-child(4) { animation-delay: 0.45s; }
+        .q-card:nth-child(5) { animation-delay: 0.6s; }
+
+        @keyframes q-in {
+            from { opacity: 0; transform: translateX(30px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* NEXT card (expanded) */
+        .q-card.q-next { background: var(--bg-glass); border: 1px solid rgba(88,152,204,0.2); padding: 10px 12px; }
+        .q-next-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .q-next-game { font-family: 'Quantico', sans-serif; font-size: 14px; font-weight: 700; color: var(--text-bright); }
+        .q-next-badge { font-family: 'Quantico', sans-serif; font-size: 11px; font-weight: 800; background: var(--next); color: var(--bg-void); padding: 3px 9px; border-radius: 3px; letter-spacing: 1.5px; }
+        .q-next-matchup { display: flex; align-items: center; gap: 5px; justify-content: center; }
+        .q-next-side { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+        .q-next-side.a { align-items: flex-end; }
+        .q-next-name { font-size: 14px; font-weight: 700; padding: 3px 6px; border-radius: 3px; background: rgba(255,255,255,0.03); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
+        .q-next-side.a .q-next-name { border-right: 3px solid; text-align: right; }
+        .q-next-side.b .q-next-name { border-left: 3px solid; }
+        .q-next-vs { font-family: 'Quantico', sans-serif; font-size: 12px; font-weight: 700; color: var(--text-dim); }
+
+        /* Compact queued cards */
+        .q-card.q-compact { background: rgba(255,255,255,0.015); border: 1px solid var(--border-faint); padding: 6px 10px; opacity: 0.75; }
+        .q-card.q-compact.challenge { border-left: 3px solid var(--danger); background: rgba(216,64,64,0.03); }
+        .q-card.q-next.break { border-left: 3px solid #f7ba32; background: rgba(247,186,50,0.05); }
+        .q-card.q-compact.break { border-left: 3px solid #f7ba32; background: rgba(247,186,50,0.03); }
+        .qc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .qc-game { font-family: 'Quantico', sans-serif; font-size: 13px; font-weight: 700; color: var(--gold); text-transform: uppercase; white-space: nowrap; }
+        .qc-format { font-family: 'Quantico', sans-serif; font-size: 10px; font-weight: 600; color: var(--text-dim); letter-spacing: 1px; background: rgba(255,255,255,0.04); padding: 1px 6px; border-radius: 3px; }
+        .qc-matchup { display: flex; align-items: center; gap: 5px; justify-content: center; }
+        .qc-side { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+        .qc-side.a { align-items: flex-end; }
+        .qc-side.b { align-items: flex-start; }
+        .qc-name { font-size: 14px; font-weight: 600; padding: 2px 6px; border-radius: 2px; background: rgba(255,255,255,0.03); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+        .qc-side.a .qc-name { border-right: 3px solid; text-align: right; }
+        .qc-side.b .qc-name { border-left: 3px solid; }
+        .qc-vs { font-family: 'Quantico', sans-serif; font-size: 10px; font-weight: 700; color: var(--text-dim); }
+
+        /* ============================================================
+           BOARD AREA — Center column (score bars + hex territory map)
+           ============================================================ */
+        .board-area {
+            grid-row: 1; grid-column: 2;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: flex-start;
+            position: relative; padding: 8px 30px 10px;
+            overflow: hidden;
+        }
+        .board-area::before {
+            content: ''; position: absolute; top: 0; left: 10px; right: 10px; height: 1px;
+            background: linear-gradient(to right, transparent, var(--border-gold), transparent);
+        }
+        /* Territory map score bars */
+        .territory-map { width: 100%; display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; align-self: stretch; }
+
+        .tm-header-row { display: grid; grid-template-columns: 100px 1fr 32px; gap: 8px; height: 14px; align-items: flex-end; }
+        .tm-scale { display: flex; justify-content: space-between; align-items: flex-end; }
+        .tm-scale-num { font-family: 'Quantico', sans-serif; font-size: 8px; font-weight: 600; color: var(--text-dim); line-height: 1; }
+
+        .tm-row { display: grid; grid-template-columns: 100px 1fr 32px; gap: 8px; height: 22px; }
+        .tm-name { font-family: 'Russo One', sans-serif; font-size: 18px; letter-spacing: 1px; text-align: right; line-height: 22px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tm-pts { font-family: 'Quantico', sans-serif; font-size: 15px; font-weight: 700; color: var(--text-bright); line-height: 22px; text-align: left; }
+
+        .tm-track { position: relative; height: 16px; align-self: center; overflow: visible; }
+        .tm-track::after { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: rgba(255,255,255,0.05); z-index: 0; }
+
+        .tm-ticks { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+        .tm-tick { position: absolute; top: 0; width: 1px; height: 100%; background: rgba(255,255,255,0.05); }
+
+        .tm-fill { position: absolute; top: 0; left: 0; height: 100%; display: flex; overflow: visible; z-index: 1; transition: width 3s cubic-bezier(0.22, 1, 0.36, 1); }
+        .tm-fill::after { content: ''; position: absolute; right: 0; top: -1px; width: 2px; height: calc(100% + 2px); background: var(--text-bright); box-shadow: 0 0 5px var(--text-bright), 0 0 10px rgba(255,255,255,0.25); z-index: 5; }
+
+        .tm-seg { height: 100%; position: relative; border-radius: 1px; }
+        .tm-seg.w {
+            background: linear-gradient(180deg, color-mix(in srgb, var(--c) 88%, #fff) 0%, var(--c) 30%, color-mix(in srgb, var(--c) 92%, #000) 100%);
+            border-top: 1px solid color-mix(in srgb, var(--c) 60%, #fff);
+            box-shadow: 0 0 6px var(--c), 0 0 12px color-mix(in srgb, var(--c) 35%, transparent);
+        }
+        .tm-seg.h {
+            background: repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(200,179,126,0.22) 2px, rgba(200,179,126,0.22) 3px), linear-gradient(180deg, color-mix(in srgb, var(--c) 80%, #fff) 0%, color-mix(in srgb, var(--c) 90%, #000) 40%, color-mix(in srgb, var(--c) 70%, #000) 100%);
+            background-size: 7.07px 7.07px, 100% 100%;
+            border-top: 1px solid color-mix(in srgb, var(--c) 50%, #fff);
+            border-left: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 0 4px color-mix(in srgb, var(--c) 30%, transparent), 0 0 8px color-mix(in srgb, var(--c) 15%, transparent);
+        }
+
+        /* Glow pulse — shadows breathe */
+        @keyframes tmGlowPulse { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.2); } }
+        .territory-map .tm-row:nth-child(2) .tm-fill { animation: tmGlowPulse 6s ease-in-out infinite 0s; }
+        .territory-map .tm-row:nth-child(3) .tm-fill { animation: tmGlowPulse 6s ease-in-out infinite 1.2s; }
+        .territory-map .tm-row:nth-child(4) .tm-fill { animation: tmGlowPulse 6s ease-in-out infinite 2.4s; }
+        .territory-map .tm-row:nth-child(5) .tm-fill { animation: tmGlowPulse 6s ease-in-out infinite 3.6s; }
+        .territory-map .tm-row:nth-child(6) .tm-fill { animation: tmGlowPulse 6s ease-in-out infinite 4.8s; }
+
+        /* End-cap beacon — stopper pulses */
+        @keyframes tmBeacon { 0%, 100% { opacity: 0.5; box-shadow: 0 0 3px var(--text-bright); } 50% { opacity: 1; box-shadow: 0 0 8px var(--text-bright), 0 0 18px rgba(255,255,255,0.3); } }
+        .territory-map .tm-row:nth-child(2) .tm-fill::after { animation: tmBeacon 4s ease-in-out infinite 0.3s; }
+        .territory-map .tm-row:nth-child(3) .tm-fill::after { animation: tmBeacon 4s ease-in-out infinite 0.8s; }
+        .territory-map .tm-row:nth-child(4) .tm-fill::after { animation: tmBeacon 4s ease-in-out infinite 1.3s; }
+        .territory-map .tm-row:nth-child(5) .tm-fill::after { animation: tmBeacon 4s ease-in-out infinite 1.8s; }
+        .territory-map .tm-row:nth-child(6) .tm-fill::after { animation: tmBeacon 4s ease-in-out infinite 2.3s; }
+
+        /* Stripe drift — hex stripes scroll */
+        @keyframes tmStripeDrift { 0% { background-position: 0 0, 0 0; } 100% { background-position: 7.07px 7.07px, 0 0; } }
+        .territory-map .tm-seg.h { animation: tmStripeDrift 8s linear infinite; }
+
+        /* Hex territory board - using BoardRenderer */
+        .board-wrap {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            position: relative;
+            border-radius: 8px;
+            background: var(--bg-panel);
+            overflow: hidden;
         }
 
         /* Glass overlay on top of the gameboard */
-        .board-section::after {
+        .board-wrap::after {
             content: '';
             position: absolute;
             inset: 0;
-            border-radius: 10px;
+            border-radius: 8px;
             pointer-events: none;
             z-index: 100;
-
             background: linear-gradient(
                 135deg,
-                rgba(255, 255, 255, 0.12),
-                rgba(255, 255, 255, 0.02)
+                rgba(255, 255, 255, 0.08),
+                rgba(255, 255, 255, 0.01)
             );
             mix-blend-mode: soft-light;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.04);
         }
 
         #hexBoard {
             position: relative;
-            /* Transform handled by BoardRenderer responsive scaling */
-        }
-
-        /* Event Log Panel */
-        .event-log-panel {
-            background: var(--bg-secondary);
-            border-radius: 10px;
-            border: 1px solid var(--border-color);
-            padding: 12px;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            min-height: 0;
-        }
-
-        .event-log-panel .panel-title {
-            font-size: 14px;
-            margin-bottom: 8px;
-            padding-bottom: 6px;
-        }
-
-        .event-log-wrapper {
-            flex: 1;
-            min-height: 0;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .event-log-list {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            height: 100%;
-            overflow: hidden;
-        }
-
-        /* Fade effect for overflow - positioned on wrapper so it's not clipped */
-        .event-log-panel.has-overflow .event-log-wrapper::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 40px;
-            background: linear-gradient(to bottom, transparent, var(--bg-secondary));
-            pointer-events: none;
-            z-index: 10;
-        }
-
-        .event-item {
-            background: var(--bg-tertiary);
-            border-radius: 6px;
-            padding: 8px 10px;
-            border-left: 3px solid var(--border-color);
-            font-size: 11px;
-        }
-
-        .event-item.event-game-win {
-            border-left-color: var(--accent-success);
-        }
-
-        .event-item.event-tile-capture {
-            border-left-color: var(--accent-primary);
-        }
-
-        .event-item.event-spell {
-            border-left-color: #a855f7;
-        }
-
-        .event-item.event-round {
-            border-left-color: var(--accent-warning);
-            background: rgba(245, 158, 11, 0.1);
-        }
-
-        .event-item.event-challenge {
-            border-left-color: var(--accent-danger);
-        }
-
-        .event-time {
-            font-size: 11px;
-            color: var(--text-secondary);
-            margin-bottom: 3px;
-            font-family: 'Orbitron', sans-serif;
-        }
-
-        .event-text {
-            color: var(--text-secondary);
-            line-height: 1.3;
-        }
-
-        .event-team {
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .event-type-icon {
-            margin-right: 4px;
-        }
-
-        /* Match Queue Panel */
-        .queue-panel {
-            background: var(--bg-secondary);
-            border-radius: 10px;
-            border: 2px solid var(--border-color);
-            padding: 12px 14px;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            min-height: 0;
-        }
-
-        .panel-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 18px;
-            font-weight: 800;
-            color: var(--accent-primary);
-            text-transform: uppercase;
-            letter-spacing: 3px;
-            margin-bottom: 10px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid var(--accent-primary);
-            flex-shrink: 0;
-            text-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
-        }
-
-        .matches-list-wrapper {
-            flex: 1;
-            min-height: 0;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .matches-list {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            height: 100%;
-            overflow: hidden;
-        }
-
-        /* Fade effect for overflow - positioned on wrapper so it's not clipped */
-        .queue-panel.has-overflow .matches-list-wrapper::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 60px;
-            background: linear-gradient(to bottom, transparent, var(--bg-secondary));
-            pointer-events: none;
-            z-index: 10;
-        }
-
-        .match-card {
-            background: var(--bg-tertiary);
-            border-radius: 8px;
-            padding: 10px 12px;
-            border-left: 4px solid var(--border-color);
-            flex-shrink: 0;
-        }
-
-        /* ===== LIVE MATCH - MAXIMUM VISIBILITY ===== */
-        .match-card.ongoing {
-            border: 2px solid var(--accent-success);
-            border-left-width: 6px;
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.1) 100%);
-            box-shadow: 0 0 25px rgba(16, 185, 129, 0.4), inset 0 0 15px rgba(16, 185, 129, 0.1);
-            padding: 12px 16px;
-            animation: live-glow 2s ease-in-out infinite;
-        }
-
-        @keyframes live-glow {
-            0%, 100% { box-shadow: 0 0 25px rgba(16, 185, 129, 0.4), inset 0 0 15px rgba(16, 185, 129, 0.1); }
-            50% { box-shadow: 0 0 40px rgba(16, 185, 129, 0.6), inset 0 0 25px rgba(16, 185, 129, 0.2); }
-        }
-
-        /* ===== NEXT MATCH - CLEARLY VISIBLE ===== */
-        .match-card.next {
-            border: 2px solid var(--accent-primary);
-            border-left-width: 5px;
-            background: linear-gradient(135deg, rgba(0, 212, 255, 0.15) 0%, rgba(0, 212, 255, 0.05) 100%);
-            box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
-            padding: 10px 14px;
-        }
-
-        /* Challenge match styling */
-        .match-card.challenge {
-            border-left-color: var(--accent-danger);
-            background: rgba(239, 68, 68, 0.12);
-        }
-
-        .match-card.challenge.ongoing {
-            box-shadow: 0 0 25px rgba(239, 68, 68, 0.4);
-            animation: pulse-challenge 2s ease-in-out infinite;
-        }
-
-        @keyframes pulse-challenge {
-            0%, 100% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.3); }
-            50% { box-shadow: 0 0 35px rgba(239, 68, 68, 0.6); }
-        }
-
-        .challenge-badge {
-            display: inline-block;
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            color: white;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 10px;
-            font-weight: 700;
-            padding: 4px 8px;
-            border-radius: 4px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            animation: challenge-pulse 1.5s ease-in-out infinite;
-            box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
-        }
-
-        @keyframes challenge-pulse {
-            0%, 100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); }
-            50% { box-shadow: 0 0 25px rgba(239, 68, 68, 0.8); }
-        }
-
-        .match-card.compact.challenge {
-            border-left-color: var(--accent-danger);
-            background: rgba(239, 68, 68, 0.08);
-        }
-
-        .compact-challenge-badge {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 11px;
-            font-weight: 700;
-            color: var(--accent-danger);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            padding: 4px 8px;
-            background: rgba(239, 68, 68, 0.2);
-            border: 1px solid var(--accent-danger);
-            border-radius: 4px;
-            white-space: nowrap;
-        }
-
-        .match-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-            gap: 8px;
-        }
-
-        .match-game {
-            font-family: 'Orbitron', sans-serif;
-            font-weight: 700;
-            font-size: 14px;
-            color: var(--text-primary);
-        }
-
-        /* Larger game name for LIVE/NEXT */
-        .match-card.ongoing .match-game,
-        .match-card.next .match-game {
-            font-size: 16px;
-        }
-
-        .match-format {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 12px;
-            font-weight: 700;
-            color: var(--accent-primary);
-            background: var(--bg-card);
-            padding: 4px 10px;
-            border-radius: 5px;
-            border: 1px solid var(--accent-primary);
-        }
-
-        /* Larger format badge for LIVE */
-        .match-card.ongoing .match-format {
-            font-size: 14px;
-            padding: 5px 12px;
-        }
-
-        .match-status {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 12px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            padding: 5px 12px;
-            border-radius: 5px;
-        }
-
-        .match-status.live {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: white;
-            font-size: 14px;
-            padding: 6px 14px;
-            animation: pulse-live 1.5s ease-in-out infinite;
-            box-shadow: 0 0 15px rgba(16, 185, 129, 0.6);
-            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-        }
-
-        @keyframes pulse-live {
-            0%, 100% {
-                box-shadow: 0 0 15px rgba(16, 185, 129, 0.6);
-                transform: scale(1);
-            }
-            50% {
-                box-shadow: 0 0 30px rgba(16, 185, 129, 0.9);
-                transform: scale(1.03);
-            }
-        }
-
-        .match-status.next {
-            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
-            color: #0a0a0f;
-            box-shadow: 0 0 10px rgba(0, 212, 255, 0.4);
-        }
-
-        .match-teams {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            justify-content: center;
-            margin-top: 6px;
-        }
-
-        .match-side {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            flex: 1;
-        }
-
-        .match-side.side-a {
-            align-items: flex-end;
-        }
-
-        .match-side.side-b {
-            align-items: flex-start;
-        }
-
-        .match-player {
-            font-size: 14px;
-            font-weight: 600;
-            padding: 4px 10px;
-            border-radius: 5px;
-            background: var(--bg-card);
-            border-left: 4px solid var(--text-tertiary);
-            white-space: nowrap;
-            max-width: 110px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        /* Larger names for LIVE match */
-        .match-card.ongoing .match-player {
-            font-size: 16px;
-            padding: 5px 12px;
-            max-width: 130px;
-            border-left-width: 5px;
-        }
-
-        .match-side.side-a .match-player {
-            border-left: none;
-            border-right: 4px solid var(--text-tertiary);
-        }
-
-        .match-card.ongoing .match-side.side-a .match-player {
-            border-right-width: 5px;
-        }
-
-        .match-vs {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 18px;
-            color: var(--text-secondary);
-            font-weight: 700;
-            text-transform: uppercase;
-            flex-shrink: 0;
-            padding: 0 10px;
-            background: var(--bg-secondary);
-            border-radius: 6px;
-            line-height: 1.6;
-        }
-
-        /* Larger VS for LIVE match */
-        .match-card.ongoing .match-vs {
-            font-size: 22px;
-            padding: 2px 12px;
-        }
-
-        /* Teams Footer */
-        .teams-footer {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 10px;
-            min-height: 0;
-            max-height: 180px;
-        }
-
-        .team-card {
-            background: var(--bg-secondary);
-            border-radius: 10px;
-            border: 1px solid var(--border-color);
-            padding: 10px 14px;
-            display: flex;
-            flex-direction: column;
-            border-top: 4px solid var(--text-tertiary);
-            overflow: hidden;
-        }
-
-        .team-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            flex: 1;
-            min-height: 0;
-        }
-
-        .team-name {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 26px;
-            font-weight: 700;
-            flex: 1;
-            line-height: 1.2;
-            padding-right: 10px;
-            text-shadow: 0 0 10px currentColor;
-        }
-
-        .team-stats {
-            display: flex;
-            gap: 12px;
-            flex-shrink: 0;
-        }
-
-        .team-stat {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .team-stat-value {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 48px;
-            font-weight: 800;
-            color: var(--text-primary);
-            line-height: 1;
-            text-shadow: 0 0 10px rgba(255,255,255,0.2);
-        }
-
-        .team-stat-label {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            margin-top: 4px;
-            letter-spacing: 1px;
-        }
-
-        .team-players {
-            display: flex;
-            gap: 8px;
-            flex: 1;
-            align-items: center;
-            min-height: 0;
-            padding-top: 8px;
-            border-top: 1px solid var(--border-color);
-            margin-top: 8px;
-        }
-
-        .player-tag {
-            font-size: 20px;
-            font-weight: 600;
-            padding: 6px 10px;
-            background: var(--bg-tertiary);
-            border-radius: 6px;
-            flex: 1;
-            text-align: center;
-            white-space: nowrap;
-            border-bottom: 3px solid currentColor;
-        }
-
-        .player-tag.long-name {
-            font-size: 16px;
-        }
-
-        .player-tag.very-long-name {
-            font-size: 14px;
-        }
-
-        /* Hide scrollbars - digital signage doesn't need them */
-        .event-log-list::-webkit-scrollbar,
-        .matches-list::-webkit-scrollbar {
-            display: none;
-        }
-
-        .event-log-list,
-        .matches-list {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
+            filter: brightness(0.8) saturate(0.9);
         }
 
         /* Board hex team colors - transparent overlay using ::after */
-        /* Note: 3px matches the 1.5x hexScale used for higher quality rendering */
         .board-hex.occupied::after {
             content: '';
             position: absolute;
@@ -800,12 +685,11 @@
             pointer-events: none;
             z-index: 6;
         }
-        .board-hex.team-1::after { background: var(--team-1-alpha, rgba(239, 68, 68, 0.65)); }
-        .board-hex.team-2::after { background: var(--team-2-alpha, rgba(59, 130, 246, 0.65)); }
-        .board-hex.team-3::after { background: var(--team-3-alpha, rgba(16, 185, 129, 0.65)); }
-        .board-hex.team-4::after { background: var(--team-4-alpha, rgba(168, 85, 247, 0.65)); }
-        .board-hex.team-5::after { background: var(--team-5-alpha, rgba(245, 158, 11, 0.65)); }
-        .board-hex.team-6::after { background: var(--team-6-alpha, rgba(236, 72, 153, 0.65)); }
+        .board-hex.team-1::after { background: var(--t1-hex); }
+        .board-hex.team-2::after { background: var(--t2-hex); }
+        .board-hex.team-3::after { background: var(--t3-hex); }
+        .board-hex.team-4::after { background: var(--t4-hex); }
+        .board-hex.team-5::after { background: var(--t5-hex); }
 
         /* ===========================================
            VISUAL EFFECTS - Always enabled for display
@@ -865,16 +749,13 @@
             transform: translate(-50%, -50%);
             z-index: 8;
             pointer-events: none;
-            /* Radial gradient: transparent center fading to solid black edge */
             background: radial-gradient(ellipse 70% 70% at center, transparent 40%, rgba(0, 0, 0, 0.7) 100%);
-            /* Hex-shaped mask (solid hex, no inner cutout) */
             -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z' fill='white'/%3E%3C/svg%3E");
             mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z' fill='white'/%3E%3C/svg%3E");
             -webkit-mask-size: 100% 100%;
             mask-size: 100% 100%;
         }
 
-        /* Solid black ring border on top of the feathered gradient */
         .room-border::after {
             content: '';
             position: absolute;
@@ -883,7 +764,6 @@
             width: 100%;
             height: 100%;
             background: rgba(0, 0, 0, 0.4);
-            /* Ring mask: outer hex minus inner hex cutout */
             -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath fill-rule='evenodd' d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z M21.5,8.8 L44.5,8.8 L56,29 L44.5,49.2 L21.5,49.2 L10,29 Z' fill='white'/%3E%3C/svg%3E");
             mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath fill-rule='evenodd' d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z M21.5,8.8 L44.5,8.8 L56,29 L44.5,49.2 L21.5,49.2 L10,29 Z' fill='white'/%3E%3C/svg%3E");
             -webkit-mask-size: 100% 100%;
@@ -902,224 +782,348 @@
             z-index: 1;
         }
 
-        /* Mini compact match card for queued games - grid layout */
-        .match-card.compact {
-            padding: 4px 8px;
-            opacity: 0.9;
-            border-left-width: 3px;
-            display: grid;
-            grid-template-columns: 68px 28px 1fr 18px 1fr;
-            align-items: center;
-            gap: 6px;
-            border-radius: 6px;
+        /* ============================================================
+           SCORE STRIP — Bottom bar showing all 5 teams
+           ============================================================ */
+        .score-strip {
+            grid-row: 2; grid-column: 1 / -1;
+            display: flex; gap: 2px;
+            background: var(--bg-void);
+            z-index: 25;
+        }
+        .sc {
+            flex: 1;
+            display: grid; grid-template-columns: 1fr auto; grid-template-rows: 1fr 1fr;
+            position: relative; overflow: hidden;
+            background: linear-gradient(180deg, color-mix(in srgb, var(--c) 35%, var(--bg-deep)) 0%, color-mix(in srgb, var(--c) 18%, var(--bg-deep)) 100%);
+            border-bottom: 3px solid var(--c);
+            box-shadow: inset 0 0 40px color-mix(in srgb, var(--c) 10%, transparent), inset 0 1px 0 color-mix(in srgb, var(--c) 15%, transparent);
+        }
+        .sc::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c); box-shadow: 0 0 12px color-mix(in srgb, var(--c) 60%, transparent); }
+
+        .sc-tname-area { grid-column: 1; grid-row: 1; display: flex; align-items: flex-end; padding: 0 0 1px 10px; }
+        .sc-tname { font-family: 'Russo One', sans-serif; font-size: 20px; color: #fff; letter-spacing: 1px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1; text-shadow: 0 0 20px color-mix(in srgb, var(--c) 50%, transparent), 0 1px 2px rgba(0,0,0,0.6); }
+
+        .sc-players-area { grid-column: 1; grid-row: 2; display: flex; align-items: flex-start; gap: 8px; padding: 2px 0 0 10px; }
+        .sc-player { display: flex; align-items: center; gap: 4px; }
+        .sc-pname { font-family: 'Quantico', sans-serif; font-weight: 700; font-size: 17px; color: color-mix(in srgb, var(--c) 70%, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75px; line-height: 1; }
+        .sc-pstar { font-family: 'Quantico', sans-serif; display: flex; align-items: center; gap: 1px; flex-shrink: 0; }
+        .sc-pstar .star { font-size: 14px; color: var(--gold); text-shadow: 0 0 5px var(--gold-glow); }
+        .sc-pstar .pcount { font-weight: 700; font-size: 16px; color: var(--gold-bright); text-shadow: 0 0 5px var(--gold-glow); }
+        .sc-psep { color: rgba(255,255,255,0.12); font-size: 11px; user-select: none; }
+
+        .sc-score-area { grid-column: 2; grid-row: 1 / 3; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 0 10px 0 12px; border-left: 1px solid rgba(255,255,255,0.06); }
+        .sc-score-num { font-family: 'Russo One', sans-serif; line-height: 1; min-width: 30px; text-align: center; }
+        .sc-score-num.w { font-size: 26px; color: var(--win); text-shadow: 0 0 10px rgba(0, 216, 128, 0.35); }
+        .sc-score-num.pts { font-size: 26px; color: color-mix(in srgb, var(--c) 80%, #fff); text-shadow: 0 0 10px color-mix(in srgb, var(--c) 50%, transparent); }
+        .sc-score-num.total { font-size: 34px; color: var(--text-bright); text-shadow: 0 0 16px rgba(242, 244, 247, 0.25), 0 0 4px rgba(242, 244, 247, 0.1); }
+
+        /* ============================================================
+           TRANSITION ANIMATIONS — Match lifecycle
+           ============================================================
+           These CSS classes are applied/removed by JS to animate
+           match endings, new match promotions, and list updates.
+           See the FIREBASE INTEGRATION GUIDE in the HTML comment
+           at the top for the full lifecycle sequence.
+        */
+
+        /* Phase 1: Match ending — block fades out with brightness flash */
+        .match-block.finishing {
+            animation: match-finish 5s ease-in-out forwards;
+        }
+        @keyframes match-finish {
+            0%   { opacity: 1; filter: brightness(1); }
+            10%  { filter: brightness(1.6); }
+            25%  { filter: brightness(1); }
+            50%  { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(0.95) translateY(-15px); filter: brightness(0.4); }
         }
 
-        .match-card.compact .compact-game {
-            font-family: 'Orbitron', sans-serif;
-            font-weight: 700;
-            font-size: 10px;
-            color: var(--accent-primary);
+        /* "MATCH COMPLETE" overlay — flashes over the match block */
+        .match-complete-overlay {
+            position: absolute; inset: 0; z-index: 50;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0);
+            pointer-events: none; opacity: 0;
+        }
+        .match-complete-overlay.active {
+            animation: overlay-flash 5s ease-in-out forwards;
+        }
+        @keyframes overlay-flash {
+            0%   { opacity: 0; background: rgba(0,0,0,0); }
+            8%   { opacity: 1; background: rgba(200,179,126,0.1); }
+            25%  { opacity: 1; background: rgba(0,0,0,0); }
+            100% { opacity: 0; }
+        }
+        .match-complete-text {
+            font-family: 'Russo One', sans-serif;
+            font-size: 36px; color: var(--gold-bright);
+            letter-spacing: 8px; text-transform: uppercase;
+            text-shadow: 0 0 40px var(--gold-glow), 0 0 80px var(--gold-glow);
+            opacity: 0;
+        }
+        .match-complete-overlay.active .match-complete-text {
+            animation: complete-text 5s ease-in-out forwards;
+        }
+        @keyframes complete-text {
+            0%   { opacity: 0; transform: scale(0.8); }
+            8%   { opacity: 1; transform: scale(1.05); }
+            20%  { opacity: 1; transform: scale(1); }
+            40%  { opacity: 0; transform: scale(1) translateY(-15px); }
+            100% { opacity: 0; }
+        }
+
+        /* Winner side flash — brighter gradient on the winning side */
+        .a-side.win-flash::before {
+            animation: side-win-flash 4s ease-out forwards !important;
+            opacity: 0.3 !important;
+        }
+        @keyframes side-win-flash {
+            0%   { opacity: 0; }
+            10%  { opacity: 0.5; }
+            40%  { opacity: 0.2; }
+            100% { opacity: 0; }
+        }
+
+        /* Phase 2: New match rising into the arena */
+        .match-block.promoting {
+            animation: match-promote 4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @keyframes match-promote {
+            0%   { opacity: 0; transform: translateY(80px) scale(0.85); filter: brightness(0.2); }
+            35%  { opacity: 0.6; transform: translateY(15px) scale(0.97); }
+            65%  { opacity: 1; transform: translateY(-5px) scale(1.02); filter: brightness(1.15); }
+            85%  { transform: translateY(2px) scale(1); }
+            100% { opacity: 1; transform: translateY(0) scale(1); filter: brightness(1); }
+        }
+
+        /* LIVE badge pop-in (used on newly promoted matches) */
+        .a-live-badge.new-live {
+            animation: live-badge-entrance 2s ease-out 1.5s forwards;
+            opacity: 0;
+        }
+        @keyframes live-badge-entrance {
+            0%   { opacity: 0; transform: scale(0.4); }
+            40%  { opacity: 1; transform: scale(1.2); }
+            70%  { transform: scale(0.95); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        /* New result card sliding in from top */
+        .r-card.new-result {
+            animation: result-slide-in 2.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @keyframes result-slide-in {
+            0%   { opacity: 0; transform: translateY(-60px) scale(0.85); max-height: 0; padding-top: 0; padding-bottom: 0; margin-bottom: 0; }
+            25%  { max-height: 200px; padding-top: 8px; padding-bottom: 8px; }
+            100% { opacity: 1; transform: translateY(0) scale(1); max-height: 200px; }
+        }
+
+        /* Queue card sliding up into new position */
+        .q-card.shuffle-up {
+            animation: queue-shuffle 2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @keyframes queue-shuffle {
+            0%   { opacity: 0.4; transform: translateY(30px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        /* NEXT queue card promoting out (flies up and shrinks) */
+        .q-card.promoting-out {
+            animation: queue-promote-out 2s ease-in-out forwards;
+        }
+        @keyframes queue-promote-out {
+            0%   { opacity: 1; transform: translateY(0) scale(1); max-height: 200px; }
+            35%  { opacity: 0.8; transform: translateY(-15px) scale(1.03); filter: brightness(1.2); }
+            100% { opacity: 0; transform: translateY(-80px) scale(0.75); max-height: 0; padding: 0; margin: 0; overflow: hidden; }
+        }
+
+        /* ============================================================
+           GLOBAL STYLES
+           ============================================================ */
+        .a-name, .r-player, .q-next-name, .qc-name, .sc-player {
             text-transform: uppercase;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
-        .match-card.compact .compact-format {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 9px;
-            font-weight: 600;
-            color: var(--text-tertiary);
-            background: var(--bg-card);
-            padding: 1px 3px;
-            border-radius: 2px;
-            text-align: center;
+        ::-webkit-scrollbar { display: none; }
+        * { scrollbar-width: none; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        /* ============================================================
+           EMBER PARTICLES
+           ============================================================ */
+        .ember-field {
+            position: absolute; inset: 0;
+            pointer-events: none; overflow: hidden;
+            z-index: 200;
         }
 
-        .match-card.compact .compact-side {
-            display: flex;
-            gap: 2px;
-            min-width: 0;
-            align-items: center;
+        .ember {
+            position: absolute; border-radius: 50%;
+            background: #a04020;
+            box-shadow: 0 0 5px #a04020, 0 0 12px rgba(200,80,40,0.25);
+            animation: ember-rise linear infinite; opacity: 0;
+        }
+        .ember.bright {
+            background: #d05828;
+            box-shadow: 0 0 6px #d05828, 0 0 16px rgba(200,80,40,0.25);
+        }
+        .ember.spark {
+            background: #c8a858;
+            box-shadow: 0 0 6px #c8a858, 0 0 14px rgba(200,168,88,0.3);
+            animation-name: spark-rise;
         }
 
-        .match-card.compact .compact-side.side-a {
-            justify-content: flex-end;
+        @keyframes ember-rise {
+            0%   { transform: translateY(0) translateX(0) scale(1); opacity: 0; }
+            5%   { opacity: 0.5; }
+            30%  { opacity: 0.3; }
+            70%  { opacity: 0.08; }
+            100% { transform: translateY(-1200px) translateX(50px) scale(0.1); opacity: 0; }
         }
-
-        .match-card.compact .compact-side.side-b {
-            justify-content: flex-start;
-        }
-
-        .match-card.compact .compact-player {
-            font-size: 9px;
-            font-weight: 600;
-            padding: 1px 3px;
-            border-radius: 2px;
-            background: var(--bg-card);
-            border-bottom: 2px solid var(--text-tertiary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            flex: 1 1 auto;
-            min-width: 30px;
-            max-width: 55px;
-        }
-
-        .match-card.compact .compact-vs {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 8px;
-            color: var(--text-tertiary);
-            font-weight: 700;
-            text-align: center;
-        }
-
-        .match-card.compact .compact-challenge-badge {
-            font-size: 8px;
-            padding: 1px 3px;
-        }
-
-        /* Challenge compact uses different grid to fit badge */
-        .match-card.compact.challenge {
-            grid-template-columns: 14px 58px 24px 1fr 16px 1fr;
-        }
-
-        /* No data state */
-        .no-data {
-            color: var(--text-tertiary);
-            font-style: italic;
-            text-align: center;
-            padding: 20px;
-        }
-
-        /* Loading overlay */
-        .loading-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.9);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-        }
-
-        .loading-overlay.hidden {
-            display: none;
-        }
-
-        .loading-content {
-            text-align: center;
-        }
-
-        .loading-spinner {
-            width: 60px;
-            height: 60px;
-            border: 4px solid var(--border-color);
-            border-top-color: var(--accent-primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .loading-text {
-            font-size: 18px;
-            color: var(--text-secondary);
+        @keyframes spark-rise {
+            0%   { transform: translateY(0) translateX(0) scale(1); opacity: 0; }
+            4%   { opacity: 0.7; }
+            15%  { opacity: 0.4; }
+            50%  { opacity: 0.1; }
+            100% { transform: translateY(-800px) translateX(-30px) scale(0.08); opacity: 0; }
         }
     </style>
-    <link rel="stylesheet" href="../shared/css/fantasy-mountain-theme.css">
-
 </head>
 <body>
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="loading-overlay">
-        <div class="loading-content">
-            <div class="loading-spinner"></div>
-            <div class="loading-text">Connecting to tournament...</div>
+
+    <div class="atmo atmo-grad"></div>
+    <div class="atmo atmo-noise"></div>
+    <div class="ember-field" id="emberField"></div>
+
+    <!-- ====== HEADER ====== -->
+    <!-- TODO:FIREBASE — Bind round number, total games, and queue count -->
+    <div class="header">
+        <div class="h-left">
+            <div class="h-icon" id="hIcon"><img src="../shared/images/favicon/android-chrome-192x192.png" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:3px;"></div>
+            <span class="h-title" id="hTitle">Loading...</span>
+        </div>
+        <div class="h-stats">
+            <div class="h-stat"><span class="h-stat-lbl">Round</span><span class="h-stat-val" id="hRound">-</span></div>
+            <div class="h-sep"></div>
+            <div class="h-stat"><span class="h-stat-lbl">Games</span><span class="h-stat-val" id="hGames">0</span></div>
+            <div class="h-sep"></div>
+            <div class="h-stat"><span class="h-stat-lbl">Queue</span><span class="h-stat-val" id="hQueue">0</span></div>
+        </div>
+        <div class="h-right">
+            <div class="h-dot"></div>
+            <span class="h-clock" id="clock">15:42</span>
         </div>
     </div>
 
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-left">
-                <img src="../shared/images/favicon/android-chrome-192x192.png" alt="Logo" class="logo">
-                <h1 class="tournament-name" id="tournamentName">Loading Tournament...</h1>
+    <!-- ====== STATUS STRIP (player mood from onboarding) ====== -->
+    <div class="status-strip" id="statusStrip"></div>
+
+    <!-- ====== DUAL ARENA ====== -->
+    <!-- TODO:FIREBASE — Populate match blocks from active matches collection -->
+    <div class="dual-arena">
+
+        <!-- MATCH 1 — Each match-block MUST include the overlay div for transitions -->
+        <div class="match-block" id="match1">
+            <div class="match-complete-overlay">
+                <span class="match-complete-text">Match Complete</span>
             </div>
-
-            <div class="header-center">
-                <div class="stat-item">
-                    <span class="stat-label">Round</span>
-                    <span class="stat-value" id="currentRound">0</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Games</span>
-                    <span class="stat-value" id="gamesPlayed">0</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Queued</span>
-                    <span class="stat-value" id="queueCount">0</span>
-                </div>
+            <div class="a-side left">
+                <div class="a-players"></div>
             </div>
-
-            <div class="header-right">
-                <div class="status-indicator" id="connectionStatus" title="Connecting..."></div>
-                <span class="clock" id="clock">--:--</span>
+            <div class="a-center">
+                <span class="a-live-badge">● LIVE</span>
+                <span class="a-game-name"></span>
+                <span class="a-vs">VS</span>
+                <span class="a-format"></span>
+                <span class="a-timer">⏱ <span id="elapsed1">--:--</span></span>
             </div>
-        </header>
+            <div class="a-side right">
+                <div class="a-players"></div>
+            </div>
+        </div>
 
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Board -->
-            <section class="board-section">
-                <div id="hexBoard"></div>
-            </section>
+        <!-- MATCH 2 -->
+        <div class="match-block" id="match2">
+            <div class="match-complete-overlay">
+                <span class="match-complete-text">Match Complete</span>
+            </div>
+            <div class="a-side left">
+                <div class="a-players"></div>
+            </div>
+            <div class="a-center">
+                <span class="a-live-badge">● LIVE</span>
+                <span class="a-game-name"></span>
+                <span class="a-vs">VS</span>
+                <span class="a-format"></span>
+                <span class="a-timer">⏱ <span id="elapsed2">--:--</span></span>
+            </div>
+            <div class="a-side right">
+                <div class="a-players"></div>
+            </div>
+        </div>
 
-            <!-- Score Bars -->
-            <aside class="score-bars-panel" id="scoreBarsPanel">
-                <div class="score-bars-label" id="scoreBarsMax">50 pts</div>
-                <div class="score-bars-container" id="scoreBarsContainer">
-                    <div class="score-bar team-1"><div class="score-bar-fill" style="height: 0%"></div></div>
-                    <div class="score-bar team-2"><div class="score-bar-fill" style="height: 0%"></div></div>
-                    <div class="score-bar team-3"><div class="score-bar-fill" style="height: 0%"></div></div>
-                    <div class="score-bar team-4"><div class="score-bar-fill" style="height: 0%"></div></div>
-                    <div class="score-bar team-5"><div class="score-bar-fill" style="height: 0%"></div></div>
-                </div>
-                <div class="score-bars-label">0 pts</div>
-            </aside>
+    </div>
 
-            <!-- Event Log -->
-            <aside class="event-log-panel">
-                <h2 class="panel-title">Event Log</h2>
-                <div class="event-log-wrapper">
-                    <div class="event-log-list" id="eventLogList">
-                        <p class="no-data">No events yet</p>
+    <!-- ====== BOTTOM ZONE ====== -->
+    <div class="bottom-zone">
+
+        <!-- RECENT RESULTS — Left panel -->
+        <!-- TODO:FIREBASE — Listen to results collection, render with buildResultCardHTML() -->
+        <div class="side-panel results-panel">
+            <div class="panel-title">Recent Results</div>
+            <div class="panel-list" id="resultsList">
+            </div>
+        </div>
+
+        <!-- TERRITORY MAP — Center column -->
+        <!-- TODO:FIREBASE — Bind score bar widths and hex ownership from game state -->
+        <div class="board-area">
+            <div class="territory-map" id="territoryMap">
+                <div class="tm-header-row">
+                    <div></div>
+                    <div class="tm-scale">
+                        <span class="tm-scale-num">0</span><span class="tm-scale-num">10</span><span class="tm-scale-num">20</span><span class="tm-scale-num">30</span><span class="tm-scale-num">40</span><span class="tm-scale-num">50</span>
                     </div>
+                    <div></div>
                 </div>
-            </aside>
+            </div>
+            <div class="board-wrap"><div id="hexBoard"></div></div>
+        </div>
 
-            <!-- Match Queue -->
-            <aside class="queue-panel">
-                <h2 class="panel-title">Match Queue</h2>
-                <div class="matches-list-wrapper">
-                    <div class="matches-list" id="matchesList">
-                        <p class="no-data">No matches scheduled</p>
-                    </div>
-                </div>
-            </aside>
-        </main>
+        <!-- UPCOMING QUEUE — Right panel -->
+        <!-- TODO:FIREBASE — Listen to queue collection, render cards dynamically -->
+        <div class="side-panel queue-panel">
+            <div class="panel-title">Upcoming</div>
+            <div class="panel-list" id="queueList">
+            </div>
+        </div>
 
-        <!-- Teams Footer -->
-        <footer class="teams-footer" id="teamsFooter">
-            <!-- Teams rendered dynamically -->
-        </footer>
+        <!-- SCORE STRIP — Bottom -->
+        <!-- TODO:FIREBASE — Bind team points and wins from tournament state -->
+        <div class="score-strip" id="scoreStrip"></div>
+
     </div>
 
     <!-- Firebase Scripts -->
     <script>window.BOARDGAME_BASE = '..';</script>
+    <script>
+    function applyScale() {
+        const sx = window.innerWidth / 1920;
+        const sy = window.innerHeight / 1080;
+        const scale = Math.min(sx, sy);
+        document.body.style.transform = `scale(${scale})`;
+    }
+    window.addEventListener('resize', applyScale);
+    window.addEventListener('load', applyScale);
+    applyScale();
+    </script>
     <script src="../shared/scripts/firebase-loader.js"></script>
     <script src="../shared/scripts/games-config.js"></script>
     <script src="../shared/scripts/board-module.js"></script>
@@ -1127,908 +1131,1155 @@
     <script src="../shared/scripts/player-utils.js"></script>
 
     <script>
-        // =============================================================================
-        // VIEW-LIGHTWEIGHT.JS - Digital Signage Controller
-        // =============================================================================
+    // ====================================================================
+    // VIEW-LIGHTWEIGHT V2 — Firebase Integration
+    // ====================================================================
 
-        let gameState = null;
-        let boardModule = null;
-        let boardRenderer = null;
-        let activeListener = null;
-        let eventLogListener = null;
-        let eventLogCache = [];
+    let gameState = null;
+    let boardModule = null;
+    let boardRenderer = null;
+    let activeListener = null;
+    let resultLogListener = null;
+    let onboardingListener = null;
+    let onboardingState = null;
+    let resultLogCache = [];
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const tournamentId = urlParams.get('tournamentId') || urlParams.get('tournament');
+    const urlParams = new URLSearchParams(window.location.search);
+    const tournamentId = urlParams.get('tournamentId') || urlParams.get('tournament');
 
-        // Team color defaults
-        const TEAM_COLORS = {
-            1: '#de392c',
-            2: '#2278a3',
-            3: '#2e9158',
-            4: '#f7ba32',
-            5: '#22241d'
-        };
+    // Team color defaults (maps to CSS variables --t1 through --t5)
+    const TEAM_COLORS = {
+        1: '#de392c',
+        2: '#2278a3',
+        3: '#2e9158',
+        4: '#f7ba32',
+        5: '#7a4fbf'
+    };
 
-        // Game name mapping
-        const GAME_NAME_MAP = {
-            'cs2': 'Counter-Strike 2',
-            'CS2': 'Counter-Strike 2',
-            'dota2': 'Dota 2',
-            'Dota2': 'Dota 2',
-            'valorant': 'Valorant',
-            'Valorant': 'Valorant',
-            'sc2': 'StarCraft II',
-            'starcraft2': 'StarCraft II',
-            'StarCraft2': 'StarCraft II',
-            'predecessor': 'Predecessor',
-            'Predecessor': 'Predecessor'
-        };
+    // ====================================================================
+    // HEX BOARD RENDERER
+    // ====================================================================
 
-        // =============================================================================
-        // INITIALIZATION
-        // =============================================================================
+    function initBoard() {
+        const hexBoardContainer = document.getElementById('hexBoard');
+        if (!hexBoardContainer) return;
 
-        document.addEventListener('DOMContentLoaded', () => {
-            // Initialize board at 1.5x resolution for better quality when scaled down
-            const hexBoardContainer = document.getElementById('hexBoard');
-            boardModule = new BoardModule(1.5);
-            boardRenderer = new BoardRenderer(hexBoardContainer, boardModule, {
-                responsive: true,
-                showHeartImages: true,
-                hexScale: 1.5
-            });
-            boardRenderer.render({});
+        // Initialize board at 1.5x resolution for better quality when scaled down
+        boardModule = new BoardModule(1.5);
+        boardRenderer = new BoardRenderer(hexBoardContainer, boardModule, {
+            responsive: true,
+            showHeartImages: true,
+            hexScale: 1.5
+        });
+        boardRenderer.render({});
 
-            // Apply initial effect states now that boardRenderer exists
-            applyInitialEffects();
+        // Apply visual effects
+        applyInitialEffects();
+    }
 
-            // Start clock
-            updateClock();
-            setInterval(updateClock, 1000);
+    function renderBoard() {
+        if (!boardRenderer || !boardModule) return;
 
-            // Check for tournament ID
-            if (!tournamentId) {
-                document.getElementById('tournamentName').textContent = 'No Tournament Selected';
-                document.getElementById('loadingOverlay').classList.add('hidden');
-                updateConnectionStatus('disconnected');
-                return;
+        // Load room hexes into board module if available
+        if (gameState?.rooms && boardModule) {
+            boardModule.setRoomHexes(gameState.rooms);
+        }
+
+        boardRenderer.render(gameState || {});
+
+        // Add team colors to hexes based on board state
+        const hexes = document.querySelectorAll('.board-hex');
+        hexes.forEach(hex => {
+            const coord = hex.dataset.coord;
+
+            // Remove old team classes
+            hex.classList.remove('team-1', 'team-2', 'team-3', 'team-4', 'team-5');
+
+            // Add team color class if hex is controlled
+            if (gameState?.board && gameState.board[coord]) {
+                const teamId = gameState.board[coord];
+                hex.classList.add(`team-${teamId}`);
             }
         });
+    }
 
-        // Wait for Firebase
-        document.addEventListener('firebase-ready', () => {
-            console.log('Firebase ready, connecting to tournament:', tournamentId);
-            updateConnectionStatus('connecting');
-            setupTournamentListener();
+    /**
+     * Apply hex terrain images dynamically via CSS
+     */
+    function applyHexImages(enabled) {
+        let styleEl = document.getElementById('hex-images-dynamic-css');
+
+        if (!enabled) {
+            if (styleEl) styleEl.remove();
+            return;
+        }
+
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = 'hex-images-dynamic-css';
+            document.head.appendChild(styleEl);
+        }
+
+        // Generate CSS rules for each hex coordinate
+        const hexCoords = boardModule.generateHexCoordinates();
+        let css = '';
+
+        hexCoords.forEach(([q, r]) => {
+            const coord = `q${q}r${r}`;
+            css += `body.effect-hex-images .board-hex[data-coord="${coord}"]::before {
+                background-image: url('../shared/images/hexes/coords/${coord}.png');
+            }\n`;
         });
 
-        // =============================================================================
-        // FIREBASE LISTENER
-        // =============================================================================
+        styleEl.textContent = css;
+    }
 
-        function setupTournamentListener() {
-            if (!tournamentId) return;
+    /**
+     * Apply all visual effects (always enabled for display view)
+     */
+    function applyInitialEffects() {
+        // Enable all visual effects for display view
+        document.body.classList.add('effect-hex-images');
+        document.body.classList.add('effect-heart-glow');
+        document.body.classList.add('effect-pulse-hearts');
+        document.body.classList.add('effect-rooms');
 
-            const db = window.firebaseDB;
-            if (!db) {
-                console.error('Firebase database not available');
-                updateConnectionStatus('disconnected');
-                return;
+        // Apply hex terrain images
+        applyHexImages(true);
+    }
+
+    // ====================================================================
+    // CLOCK & MATCH TIMERS
+    // ====================================================================
+
+    function updateClock() {
+        document.getElementById('clock').textContent =
+            new Date().toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Track match start times for elapsed timers
+    let matchStartTimes = { match1: null, match2: null };
+
+    // Cache for diff-based rendering (avoid unnecessary innerHTML rebuilds)
+    let prevArenaSignatures = { match1: null, match2: null };
+    let prevQueueSignature = null;
+    let prevResultIds = [];
+
+    function getMatchSignature(match) {
+        if (!match) return null;
+        try { return JSON.stringify(match); }
+        catch { return String(Math.random()); }
+    }
+
+    function updateMatchTimers() {
+        const fmt = s => {
+            const secs = Math.floor(s);
+            return `${String(Math.floor(secs/60)).padStart(2,'0')}:${String(secs%60).padStart(2,'0')}`;
+        };
+
+        const now = Date.now();
+
+        ['match1', 'match2'].forEach((matchId, idx) => {
+            const el = document.getElementById(`elapsed${idx + 1}`);
+            if (el && matchStartTimes[matchId]) {
+                const elapsed = (now - matchStartTimes[matchId]) / 1000;
+                el.textContent = fmt(elapsed);
             }
+        });
+    }
 
-            const tournamentRef = db.collection('tournaments').doc(tournamentId);
+    // ====================================================================
+    // FIREBASE LISTENER
+    // ====================================================================
 
-            activeListener = window.firebaseOnSnapshot(tournamentRef, (docSnapshot) => {
-                if (docSnapshot.exists) {
-                    gameState = docSnapshot.data();
-                    gameState.tournamentId = tournamentId;
+    // Diff guard: skip re-renders when only irrelevant fields changed
+    let prevViewSignature = null;
+    const VIEW_EXCLUDED_KEYS = ['onboarding', 'smartMatchState'];
 
-                    updateConnectionStatus('connected');
-                    document.getElementById('loadingOverlay').classList.add('hidden');
+    function getViewRelevantSignature(data) {
+        const parts = [];
+        for (const key of Object.keys(data).sort()) {
+            if (VIEW_EXCLUDED_KEYS.includes(key)) continue;
+            try { parts.push(key + ':' + JSON.stringify(data[key])); }
+            catch { parts.push(key + ':' + String(data[key])); }
+        }
+        return parts.join('|');
+    }
 
-                    // Update all displays
+    function setupTournamentListener() {
+        if (!tournamentId) {
+            console.warn('No tournament ID provided');
+            return;
+        }
+
+        const db = window.firebaseDB;
+        if (!db) {
+            console.error('Firebase database not available');
+            return;
+        }
+
+        const tournamentRef = db.collection('tournaments').doc(tournamentId);
+
+        activeListener = window.firebaseOnSnapshot(tournamentRef, (docSnapshot) => {
+            if (docSnapshot.exists) {
+                const newData = docSnapshot.data();
+                const newSig = getViewRelevantSignature(newData);
+
+                gameState = newData;
+                gameState.tournamentId = tournamentId;
+
+                if (newSig !== prevViewSignature) {
+                    prevViewSignature = newSig;
                     updateDisplay();
-                } else {
-                    console.warn('Tournament not found:', tournamentId);
-                    document.getElementById('tournamentName').textContent = 'Tournament Not Found';
-                    updateConnectionStatus('disconnected');
-                    document.getElementById('loadingOverlay').classList.add('hidden');
                 }
-            }, (error) => {
-                console.error('Listener error:', error);
-                updateConnectionStatus('disconnected');
-            });
+            } else {
+                console.warn('Tournament not found:', tournamentId);
+            }
+        }, (error) => {
+            console.error('Listener error:', error);
+        });
 
-            // Set up event log listener
-            setupEventLogListener();
+        // Set up result log listener
+        setupResultLogListener();
+    }
+
+    function setupResultLogListener() {
+        if (!tournamentId) return;
+
+        const db = window.firebaseDB;
+        if (!db) return;
+
+        if (resultLogListener) {
+            resultLogListener();
+            resultLogListener = null;
         }
 
-        // =============================================================================
-        // EVENT LOG LISTENER
-        // =============================================================================
+        const resultLogRef = db.collection('tournaments')
+            .doc(tournamentId)
+            .collection('eventLog')
+            .orderBy('timestamp', 'desc')
+            .limit(30);
 
-        function setupEventLogListener() {
-            if (!tournamentId) return;
-
-            const db = window.firebaseDB;
-            if (!db) return;
-
-            // Clean up existing listener
-            if (eventLogListener) {
-                eventLogListener();
-                eventLogListener = null;
-            }
-
-            const eventLogRef = db.collection('tournaments')
-                .doc(tournamentId)
-                .collection('eventLog')
-                .orderBy('timestamp', 'desc')
-                .limit(50);
-
-            eventLogListener = window.firebaseOnSnapshot(eventLogRef, (snapshot) => {
-                eventLogCache = [];
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    data.id = doc.id;
-                    // Convert Firestore timestamp
-                    if (data.timestamp?.toDate) {
-                        data.timestamp = data.timestamp.toDate();
-                    }
-                    eventLogCache.push(data);
-                });
-
-                // Render event log (already in desc order from query)
-                renderEventLog();
-            }, (error) => {
-                console.error('Event log listener error:', error);
+        resultLogListener = window.firebaseOnSnapshot(resultLogRef, (snapshot) => {
+            resultLogCache = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                data.id = doc.id;
+                if (data.timestamp?.toDate) {
+                    data.timestamp = data.timestamp.toDate();
+                }
+                if (data.type === 'game_win' || data.type === 'match_complete') {
+                    resultLogCache.push(data);
+                }
             });
+            renderResults();
+        }, (error) => {
+            console.error('Result log listener error:', error);
+        });
+    }
+
+    // ====================================================================
+    // ONBOARDING STATUS LISTENER
+    // ====================================================================
+
+    const STATUS_EMOJIS = { eating: '🍔', smoking: '🚬', wc: '🚽', sleeping: '😴', alert: '❗', question: '❓' };
+
+    function setupOnboardingListener() {
+        if (!tournamentId) return;
+        const db = window.firebaseDB;
+        if (!db) return;
+
+        const onboardingRef = db.collection('tournaments').doc(tournamentId)
+            .collection('onboarding').doc('state');
+
+        onboardingListener = window.firebaseOnSnapshot(onboardingRef, (docSnapshot) => {
+            onboardingState = docSnapshot.exists ? docSnapshot.data() : null;
+            renderStatusStrip();
+        }, (error) => {
+            console.error('Onboarding listener error:', error);
+        });
+    }
+
+    function renderStatusStrip() {
+        const strip = document.getElementById('statusStrip');
+        if (!strip) return;
+
+        const teams = gameState?.teams || [];
+        const players = onboardingState?.players || {};
+        const items = [];
+
+        // Build a playerNumber -> name mapping from teams
+        let playerNum = 1;
+        for (const team of teams) {
+            for (const p of (team.players || [])) {
+                const pData = players[String(playerNum)] || {};
+                const statuses = pData.statuses || {};
+                const activeEmojis = Object.entries(STATUS_EMOJIS)
+                    .filter(([key]) => statuses[key])
+                    .map(([, emoji]) => emoji)
+                    .join('');
+                if (activeEmojis) {
+                    items.push(`<span class="ss-item"><span class="ss-emoji">${activeEmojis}</span><span class="ss-name">${p.name || 'Player'}</span></span>`);
+                }
+                playerNum++;
+            }
         }
 
-        function renderEventLog() {
-            const container = document.getElementById('eventLogList');
-            if (!container) return;
+        if (items.length > 0) {
+            strip.innerHTML = items.join('');
+            strip.classList.add('visible');
+        } else {
+            strip.classList.remove('visible');
+            strip.innerHTML = '';
+        }
+    }
 
-            if (eventLogCache.length === 0) {
-                container.innerHTML = '<p class="no-data">No events yet</p>';
-                return;
+    // ====================================================================
+    // DISPLAY UPDATES
+    // ====================================================================
+
+    function updateDisplay() {
+        if (!gameState) return;
+
+        // Apply team colors to CSS variables
+        applyTeamColors();
+
+        // Update tournament name and logo
+        const titleEl = document.getElementById('hTitle');
+        const iconEl = document.getElementById('hIcon');
+        if (titleEl) {
+            const tournamentName = gameState.name || gameState.friendlyName || 'Tournament';
+            titleEl.textContent = tournamentName;
+            document.title = `${tournamentName} — Infoscreen`;
+        }
+        if (iconEl && gameState.logoUrl) {
+            iconEl.innerHTML = `<img src="${gameState.logoUrl}" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:3px;">`;
+        }
+
+        // Update header stats
+        document.getElementById('hRound').textContent = gameState.currentRound || 0;
+        document.getElementById('hGames').textContent = gameState.gamesPlayed || 0;
+
+        const queuedCount = (gameState.gameQueue || []).filter(g => g.status !== 'completed').length;
+        document.getElementById('hQueue').textContent = queuedCount;
+
+        // Update board
+        renderBoard();
+
+        // Update score bars
+        renderScoreBars();
+
+        // Update matches (arena + queue)
+        renderMatches();
+
+        // Update score strip
+        renderScoreStrip();
+    }
+
+    function applyTeamColors() {
+        if (!gameState?.teams) return;
+
+        const root = document.documentElement;
+        gameState.teams.forEach(team => {
+            const color = team.color || TEAM_COLORS[team.id];
+            if (color) {
+                root.style.setProperty(`--t${team.id}`, color);
+                // Also set hex alpha version
+                const hex = color.replace('#', '');
+                const r = parseInt(hex.substring(0, 2), 16);
+                const g = parseInt(hex.substring(2, 4), 16);
+                const b = parseInt(hex.substring(4, 6), 16);
+                root.style.setProperty(`--t${team.id}-hex`, `rgba(${r}, ${g}, ${b}, 0.5)`);
+            }
+        });
+    }
+
+    function getTeamTotalPoints(team) {
+        return (team.points || 0) + (team.gamesWon || 0);
+    }
+
+    function getPlayerWinCounts() {
+        const wins = {};
+        (gameState?.gameHistory || []).forEach(match => {
+            (match.winningPlayerIds || []).forEach(id => {
+                wins[id] = (wins[id] || 0) + 1;
+            });
+        });
+        return wins;
+    }
+
+    function renderScoreBars() {
+        const container = document.getElementById('territoryMap');
+        if (!container) return;
+
+        const teams = gameState?.teams || [];
+        const victoryCondition = gameState?.victoryCondition || 50;
+        const sorted = [...teams].sort((a, b) => getTeamTotalPoints(b) - getTeamTotalPoints(a));
+        const ticks = '<div class="tm-ticks"><div class="tm-tick" style="left:20%;"></div><div class="tm-tick" style="left:40%;"></div><div class="tm-tick" style="left:60%;"></div><div class="tm-tick" style="left:80%;"></div></div>';
+
+        const rowsHtml = sorted.map(team => {
+            const color = team.color || TEAM_COLORS[team.id];
+            const hexPts = team.points || 0;
+            const wins = team.gamesWon || 0;
+            const totalPts = hexPts + wins;
+            const pct = Math.min((totalPts / victoryCondition) * 100, 100);
+
+            const segs = [];
+            if (wins > 0) segs.push(`<div class="tm-seg w" style="flex:${wins};"></div>`);
+            if (hexPts > 0) segs.push(`<div class="tm-seg h" style="flex:${hexPts};"></div>`);
+
+            return `
+                <div class="tm-row" style="--c: ${color};">
+                    <div class="tm-name" style="color:${color};">${team.name || 'Team ' + team.id}</div>
+                    <div class="tm-track">
+                        <div class="tm-fill" style="width: ${pct}%;">${segs.join('')}</div>
+                        ${ticks}
+                    </div>
+                    <div class="tm-pts">${totalPts}</div>
+                </div>`;
+        }).join('');
+
+        // Preserve header, replace team rows
+        const header = container.querySelector('.tm-header-row');
+        container.innerHTML = '';
+        if (header) container.appendChild(header);
+        container.insertAdjacentHTML('beforeend', rowsHtml);
+    }
+
+    function renderMatches() {
+        const queue = (gameState?.gameQueue || []).filter(g => g.status !== 'completed');
+
+        // Sort: ongoing first, then pending
+        const sorted = [...queue].sort((a, b) => {
+            if (a.status === 'ongoing' && b.status !== 'ongoing') return -1;
+            if (a.status !== 'ongoing' && b.status === 'ongoing') return 1;
+            return 0;
+        });
+
+        // Get ongoing matches for the arena
+        const ongoingMatches = sorted.filter(m => m.status === 'ongoing').slice(0, 2);
+        const pendingMatches = sorted.filter(m => m.status !== 'ongoing');
+
+        // Render arena matches
+        renderArenaMatch('match1', ongoingMatches[0], 1);
+        renderArenaMatch('match2', ongoingMatches[1], 2);
+
+        // Render queue
+        renderQueue(pendingMatches);
+    }
+
+    function renderArenaMatch(matchId, match, slotNum) {
+        const matchEl = document.getElementById(matchId);
+        if (!matchEl) return;
+
+        // Skip rebuild if match hasn't structurally changed (timer ticks independently)
+        const newSig = getMatchSignature(match);
+        if (newSig === prevArenaSignatures[matchId]) {
+            // Still update start time in case it was refined
+            if (match && match.startedAt) {
+                if (match.startedAt?.toDate) {
+                    matchStartTimes[matchId] = match.startedAt.toDate().getTime();
+                } else {
+                    matchStartTimes[matchId] = new Date(match.startedAt).getTime();
+                }
+            }
+            return;
+        }
+        prevArenaSignatures[matchId] = newSig;
+
+        if (!match) {
+            // Empty slot
+            matchEl.innerHTML = `
+                <div class="match-complete-overlay">
+                    <span class="match-complete-text">Match Complete</span>
+                </div>
+                <div class="a-side left" style="--side-color:var(--text-dim)">
+                    <div class="a-players">
+                        <div class="a-player" style="--pc:var(--text-dim)">
+                            <span class="a-dot" style="background:var(--text-dim)"></span>
+                            <div class="a-info"><span class="a-name" style="color:var(--text-dim)">Waiting...</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="a-center">
+                    <span class="a-game-name">No Match</span>
+                    <span class="a-vs">VS</span>
+                    <span class="a-format">—</span>
+                </div>
+                <div class="a-side right" style="--side-color:var(--text-dim)">
+                    <div class="a-players">
+                        <div class="a-player" style="--pc:var(--text-dim)">
+                            <span class="a-dot" style="background:var(--text-dim)"></span>
+                            <div class="a-info"><span class="a-name" style="color:var(--text-dim)">Waiting...</span></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            matchStartTimes[matchId] = null;
+            return;
+        }
+
+        // Break entries get a centered break display
+        if (match.isBreak === true) {
+            const breakLabel = match.breakLabel || 'Break';
+            const breakEmoji = match.breakEmoji || '⏸';
+
+            // Set start time for timer
+            if (match.startedAt?.toDate) {
+                matchStartTimes[matchId] = match.startedAt.toDate().getTime();
+            } else if (match.startedAt) {
+                matchStartTimes[matchId] = new Date(match.startedAt).getTime();
+            } else {
+                matchStartTimes[matchId] = Date.now();
             }
 
-            container.innerHTML = eventLogCache.map(event => {
-                const time = event.timestamp instanceof Date
-                    ? event.timestamp.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                    : '--:--';
+            matchEl.classList.remove('three-team');
+            matchEl.innerHTML = `
+                <div class="match-complete-overlay">
+                    <span class="match-complete-text">Break Over</span>
+                </div>
+                <div class="a-side left" style="--side-color:#f7ba32"></div>
+                <div class="a-center">
+                    <span class="a-live-badge" style="background:rgba(247,186,50,0.2);color:#f7ba32;border-color:rgba(247,186,50,0.4);">● BREAK</span>
+                    <span class="a-game-name" style="font-size:48px;">${breakEmoji}</span>
+                    <span class="a-vs" style="color:#f7ba32;">${breakLabel}</span>
+                    <span class="a-timer">⏱ <span id="elapsed${slotNum}">00:00</span></span>
+                </div>
+                <div class="a-side right" style="--side-color:#f7ba32"></div>
+            `;
+            return;
+        }
 
-                const eventClass = getEventClass(event.type);
-                const icon = getEventIcon(event.type);
+        const teams = match.teams || [];
+        const gameName = getGameDisplayName(match.game);
+        const playType = match.playType || '';
 
+        // Set match start time for timer
+        if (match.startedAt?.toDate) {
+            matchStartTimes[matchId] = match.startedAt.toDate().getTime();
+        } else if (match.startedAt) {
+            matchStartTimes[matchId] = new Date(match.startedAt).getTime();
+        } else {
+            matchStartTimes[matchId] = Date.now();
+        }
+
+        // Build player HTML for each side
+        const buildSidePlayers = (teamData) => {
+            const players = getMatchTeamPlayers(teamData);
+            return players.map(p => {
+                const color = getPlayerCurrentColor(p);
+                const teamName = getCurrentTeamName(p.originalTeamId);
                 return `
-                    <div class="event-item ${eventClass}">
-                        <div class="event-time">${time}</div>
-                        <div class="event-text">
-                            <span class="event-type-icon">${icon}</span>
-                            ${formatEventText(event)}
+                    <div class="a-player" style="--pc:${color}">
+                        <span class="a-dot" style="background:${color};color:${color}"></span>
+                        <div class="a-info">
+                            <span class="a-name" style="color:${color}">${getPlayerCurrentName(p)}</span>
+                            <span class="a-team">${teamName}</span>
                         </div>
                     </div>
                 `;
             }).join('');
+        };
 
-            // Check for overflow after rendering
-            setTimeout(checkOverflow, 0);
+        // Determine dominant color for each side
+        const getDominantColor = (teamData) => {
+            const players = getMatchTeamPlayers(teamData);
+            if (players.length === 0) return 'var(--text-dim)';
+            return getPlayerCurrentColor(players[0]);
+        };
+
+        const leftColor = getDominantColor(teams[0]);
+        const rightColor = getDominantColor(teams[1]);
+        const isThreeTeam = teams.length >= 3;
+
+        // Remove/add three-team class
+        matchEl.classList.toggle('three-team', isThreeTeam);
+
+        if (isThreeTeam) {
+            // 3-team layout (2v2v2): teams[0] VS teams[1] VS teams[2]
+            const thirdColor = getDominantColor(teams[2]);
+            matchEl.innerHTML = `
+                <div class="match-complete-overlay">
+                    <span class="match-complete-text">Match Complete</span>
+                </div>
+                <div class="a-side left" style="--side-color:${leftColor}">
+                    <div class="a-players">${buildSidePlayers(teams[0])}</div>
+                </div>
+                <div class="a-vs-divider"><span class="a-vs-small">VS</span></div>
+                <div class="a-side center" style="--side-color:${rightColor}">
+                    <div class="a-players">${buildSidePlayers(teams[1])}</div>
+                </div>
+                <div class="a-vs-divider"><span class="a-vs-small">VS</span></div>
+                <div class="a-side right" style="--side-color:${thirdColor}">
+                    <div class="a-players">${buildSidePlayers(teams[2])}</div>
+                </div>
+                <div style="position:absolute;top:calc(50% - 75px);left:50%;transform:translate(-50%,-50%);z-index:10;">
+                    <span class="a-live-badge">● LIVE</span>
+                </div>
+                <div class="a-center" style="position:absolute;top:calc(50% + 100px);left:50%;transform:translate(-50%,-50%);width:auto;">
+                    <span class="a-game-name">${gameName}</span>
+                    <span class="a-format">${playType}</span>
+                    <span class="a-timer">⏱ <span id="elapsed${slotNum}">00:00</span></span>
+                </div>
+            `;
+        } else {
+            // Standard 2-team layout
+            matchEl.innerHTML = `
+                <div class="match-complete-overlay">
+                    <span class="match-complete-text">Match Complete</span>
+                </div>
+                <div class="a-side left" style="--side-color:${leftColor}">
+                    <div class="a-players">${buildSidePlayers(teams[0])}</div>
+                </div>
+                <div class="a-center">
+                    <span class="a-live-badge">● LIVE</span>
+                    <span class="a-game-name">${gameName}</span>
+                    <span class="a-vs">VS</span>
+                    <span class="a-format">${playType}</span>
+                    <span class="a-timer">⏱ <span id="elapsed${slotNum}">00:00</span></span>
+                </div>
+                <div class="a-side right" style="--side-color:${rightColor}">
+                    <div class="a-players">${buildSidePlayers(teams[1])}</div>
+                </div>
+            `;
+        }
+    }
+
+    function renderQueue(pendingMatches) {
+        const container = document.getElementById('queueList');
+        if (!container) return;
+
+        // Skip rebuild if queue hasn't changed
+        const newQueueSig = pendingMatches.length === 0
+            ? '__empty__'
+            : pendingMatches.map(m => getMatchSignature(m)).join('||');
+        if (newQueueSig === prevQueueSignature) return;
+        prevQueueSignature = newQueueSig;
+
+        if (pendingMatches.length === 0) {
+            container.innerHTML = '<div class="q-card q-compact" style="opacity:0.5;text-align:center;padding:20px;">No upcoming matches</div>';
+            return;
         }
 
-        /**
-         * Get current team name from gameState, falling back to stored name
-         */
-        function getCurrentTeamName(teamId, fallbackName) {
-            if (teamId && gameState?.teams) {
-                const team = gameState.teams.find(t => String(t.id) === String(teamId));
-                if (team?.name) return team.name;
-            }
-            return fallbackName || 'Team';
-        }
+        container.innerHTML = pendingMatches.map((match, idx) => {
+            const isNext = idx === 0;
 
-        function getEventClass(type) {
-            const classes = {
-                'game_win': 'event-game-win',
-                'tile_capture': 'event-tile-capture',
-                'spell_used': 'event-spell',
-                'round_advance': 'event-round',
-                'challenge': 'event-challenge',
-                'match_start': 'event-game-win',
-                'match_complete': 'event-game-win'
-            };
-            return classes[type] || '';
-        }
-
-        function getEventIcon(type) {
-            const icons = {
-                'game_win': '&#127942;',
-                'tile_capture': '&#11044;',
-                'spell_used': '&#10024;',
-                'round_advance': '&#9654;',
-                'challenge': '&#9876;',
-                'match_start': '&#9654;',
-                'match_complete': '&#10004;'
-            };
-            return icons[type] || '&#8226;';
-        }
-
-        function formatEventText(event) {
-            // Get current team name and color (looks up from gameState for live updates)
-            const teamName = getCurrentTeamName(event.teamId, event.teamName);
-            const teamColor = getTeamColor(event.teamId) || event.teamColor || '#888';
-            const teamSpan = teamName
-                ? `<span class="event-team" style="color: ${teamColor}">${teamName}</span>`
-                : '';
-
-            // Handle match_start with multiple teams
-            if (event.type === 'match_start' && event.teams && event.teams.length > 0) {
-                const teamsHtml = formatMultipleTeams(event.teams);
-                return `${event.gameName || 'Match'}: ${teamsHtml}`;
-            }
-
-            // Handle game_win with winningPlayers data (shows which teams got credit)
-            if (event.type === 'game_win' && event.winningPlayers && event.winningPlayers.length > 0) {
-                const winnersHtml = formatWinningTeams(event.winningPlayers, event.splitTeamIds, event.splitTeamNames);
-                return `${winnersHtml} won ${event.gameName || 'a game'}`;
-            }
-
-            switch (event.type) {
-                case 'game_win':
-                    // Fallback for old events without winningPlayers data
-                    return `${teamSpan} won ${event.gameName || 'a game'}`;
-                case 'tile_capture':
-                    return `${teamSpan} captured ${event.hexCoord || 'hex'}`;
-                case 'spell_used':
-                    return `${teamSpan} used ${event.spellName || 'spell'}`;
-                case 'round_advance':
-                    return `Round ${event.round || '?'} started`;
-                case 'challenge':
-                    return `${teamSpan} ${event.message || 'challenge'}`;
-                case 'match_start':
-                    return `${event.gameName || 'Match'} started`;
-                case 'match_complete':
-                    return `${teamSpan} won ${event.gameName || 'match'}`;
-                default:
-                    return event.message || event.type || 'Event';
-            }
-        }
-
-        /**
-         * Format multiple teams with their colors for events involving mixed teams
-         * Shows each unique team with its color
-         */
-        function formatMultipleTeams(teams) {
-            if (!teams || teams.length === 0) return '';
-
-            // Collect unique team IDs from all players across match teams
-            const uniqueTeamIds = new Set();
-            teams.forEach(matchTeam => {
-                if (matchTeam.players) {
-                    matchTeam.players.forEach(player => {
-                        if (player.originalTeamId) {
-                            uniqueTeamIds.add(String(player.originalTeamId));
-                        }
-                    });
-                }
-            });
-
-            // Build colored team names
-            const teamSpans = Array.from(uniqueTeamIds).map(teamId => {
-                const teamName = getCurrentTeamName(teamId, `Team ${teamId}`);
-                const color = getTeamColor(teamId);
-                return `<span class="event-team" style="color: ${color}">${teamName}</span>`;
-            });
-
-            if (teamSpans.length === 0) return '';
-            if (teamSpans.length === 1) return teamSpans[0];
-            if (teamSpans.length === 2) return `${teamSpans[0]} vs ${teamSpans[1]}`;
-            return teamSpans.join(', ');
-        }
-
-        /**
-         * Format teams that got credit for a win (only teams with both players on winning side)
-         * Also shows teams that participated but didn't get full credit as "split teams"
-         * @param {Array} winningPlayers - Players from the winning match side
-         * @param {Array} splitTeamIds - IDs of teams with only 1 player on winning side
-         * @param {Array} splitTeamNames - Names of split teams (pre-computed)
-         * @returns {string} HTML string with team names
-         */
-        function formatWinningTeams(winningPlayers, splitTeamIds, splitTeamNames) {
-            if (!winningPlayers || winningPlayers.length === 0) return '';
-
-            // Count players per original team on the winning side
-            const teamPlayerCounts = {};
-            winningPlayers.forEach(player => {
-                if (player.originalTeamId) {
-                    const teamId = String(player.originalTeamId);
-                    teamPlayerCounts[teamId] = (teamPlayerCounts[teamId] || 0) + 1;
-                }
-            });
-
-            // Separate teams with full representation (2+ players) from partial (1 player)
-            const fullTeamIds = [];
-            const partialTeamIds = [];
-
-            Object.entries(teamPlayerCounts).forEach(([teamId, count]) => {
-                if (count >= 2) {
-                    fullTeamIds.push(teamId);
-                } else {
-                    partialTeamIds.push(teamId);
-                }
-            });
-
-            // Build colored team names for teams that got the win
-            const winnerSpans = fullTeamIds.map(teamId => {
-                const teamName = getCurrentTeamName(teamId, `Team ${teamId}`);
-                const color = getTeamColor(teamId);
-                return `<span class="event-team" style="color: ${color}">${teamName}</span>`;
-            });
-
-            // Build split team names (participating but not credited)
-            // Use pre-computed names from event if available, otherwise compute
-            const splitTeamsToShow = splitTeamIds && splitTeamIds.length > 0
-                ? splitTeamIds
-                : partialTeamIds;
-
-            const splitSpans = splitTeamsToShow.map((teamId, idx) => {
-                // Use pre-computed name if available
-                const teamName = (splitTeamNames && splitTeamNames[idx])
-                    ? splitTeamNames[idx]
-                    : getCurrentTeamName(teamId, `Team ${teamId}`);
-                const color = getTeamColor(teamId);
-                return `<span class="event-team" style="color: ${color}">Split ${teamName}</span>`;
-            });
-
-            let result = '';
-
-            if (winnerSpans.length > 0) {
-                result = winnerSpans.join(' & ');
-                if (splitSpans.length > 0) {
-                    result += ` <span style="color: var(--text-tertiary)">with the help of ${splitSpans.join(' & ')}</span>`;
-                }
-            } else if (splitSpans.length > 0) {
-                // No full teams, just mixed players
-                result = splitSpans.join(' & ') + ' <span style="color: var(--text-tertiary)">(mixed win)</span>';
-            }
-
-            return result;
-        }
-
-        // =============================================================================
-        // DISPLAY UPDATES
-        // =============================================================================
-
-        function updateDisplay() {
-            if (!gameState) return;
-
-            // Apply custom team colors from Firebase
-            applyTeamColors();
-
-            // Load room hexes into board module if available
-            if (gameState.rooms && boardModule) {
-                boardModule.setRoomHexes(gameState.rooms);
-            }
-
-            // Update header
-            document.getElementById('tournamentName').textContent = gameState.name || 'Tournament';
-            document.getElementById('currentRound').textContent = gameState.currentRound || 0;
-            document.getElementById('gamesPlayed').textContent = gameState.gamesPlayed || 0;
-
-            // Count queued matches
-            const queuedCount = (gameState.gameQueue || []).filter(g =>
-                g.status !== 'completed'
-            ).length;
-            document.getElementById('queueCount').textContent = queuedCount;
-
-            // Update board
-            renderBoard();
-
-            // Update score bars
-            renderScoreBars();
-
-            // Update matches
-            renderMatches();
-
-            // Update teams
-            renderTeams();
-
-            // Check for overflow and add fade effect if needed
-            checkOverflow();
-        }
-
-        /**
-         * Check if panels have overflow and add/remove fade effect class
-         */
-        function checkOverflow() {
-            // Check event log panel
-            const eventLogPanel = document.querySelector('.event-log-panel');
-            const eventLogList = document.getElementById('eventLogList');
-            if (eventLogPanel && eventLogList) {
-                if (eventLogList.scrollHeight > eventLogList.clientHeight) {
-                    eventLogPanel.classList.add('has-overflow');
-                } else {
-                    eventLogPanel.classList.remove('has-overflow');
-                }
-            }
-
-            // Check match queue panel
-            const queuePanel = document.querySelector('.queue-panel');
-            const matchesList = document.getElementById('matchesList');
-            if (queuePanel && matchesList) {
-                if (matchesList.scrollHeight > matchesList.clientHeight) {
-                    queuePanel.classList.add('has-overflow');
-                } else {
-                    queuePanel.classList.remove('has-overflow');
-                }
-            }
-        }
-
-        function renderScoreBars() {
-            const container = document.getElementById('scoreBarsContainer');
-            const maxLabel = document.getElementById('scoreBarsMax');
-            if (!container) return;
-
-            // Get victory condition (default 50)
-            const victoryCondition = gameState?.victoryCondition || 50;
-            maxLabel.textContent = `${victoryCondition} pts`;
-
-            // Update each team's bar
-            const teams = gameState?.teams || [];
-            const bars = container.querySelectorAll('.score-bar');
-
-            bars.forEach((bar, idx) => {
-                const teamId = idx + 1;
-                const team = teams.find(t => t.id === teamId);
-                const points = team?.points || 0;
-                const fill = bar.querySelector('.score-bar-fill');
-
-                if (fill) {
-                    const percentage = Math.min((points / victoryCondition) * 100, 100);
-                    fill.style.height = `${percentage}%`;
-                }
-            });
-        }
-
-        function renderBoard() {
-            if (!boardRenderer || !boardModule) return;
-            boardRenderer.render(gameState || {});
-
-            // Add team colors to hexes based on board state
-            const hexes = document.querySelectorAll('.board-hex');
-            hexes.forEach(hex => {
-                const coord = hex.dataset.coord;
-
-                // Remove old team classes
-                hex.classList.remove('team-1', 'team-2', 'team-3', 'team-4', 'team-5');
-
-                // Add team color class if hex is controlled
-                if (gameState?.board && gameState.board[coord]) {
-                    const teamId = gameState.board[coord];
-                    hex.classList.add(`team-${teamId}`);
-                }
-            });
-        }
-
-        function renderMatches() {
-            const container = document.getElementById('matchesList');
-            const queue = (gameState?.gameQueue || []).filter(g => g.status !== 'completed');
-
-            if (queue.length === 0) {
-                container.innerHTML = '<p class="no-data">No matches scheduled</p>';
-                return;
-            }
-
-            // Sort: ongoing first, then pending
-            const sorted = [...queue].sort((a, b) => {
-                if (a.status === 'ongoing' && b.status !== 'ongoing') return -1;
-                if (a.status !== 'ongoing' && b.status === 'ongoing') return 1;
-                return 0;
-            });
-
-            // Determine which index is "next" (first non-ongoing)
-            const hasOngoing = sorted.some(m => m.status === 'ongoing');
-            const nextIndex = hasOngoing ? 1 : 0;
-
-            container.innerHTML = sorted.map((match, idx) => {
-                const isOngoing = match.status === 'ongoing';
-                const isNext = !isOngoing && idx === nextIndex;
-                const isCompact = !isOngoing && !isNext;
-                const isChallenge = match.isChallenge === true;
-
-                const teams = match.teams || [];
-
-                if (isCompact) {
-                    // Mini grid-based view for queued matches
-                    const gameShort = getGameShortName(match.game);
-
-                    // Helper to build all players
-                    const buildSideHtml = (teamData) => {
-                        const players = teamData ? getMatchTeamPlayers(teamData) : [];
-                        if (players.length === 0) {
-                            return '<span class="compact-player">TBD</span>';
-                        }
-
-                        return players.map(p => {
-                            const color = getPlayerCurrentColor(p);
-                            const name = getPlayerCurrentName(p);
-                            return `<span class="compact-player" style="color: ${color}; border-bottom-color: ${color}">${name}</span>`;
-                        }).join('');
-                    };
-
-                    const sideAHtml = buildSideHtml(teams[0]);
-                    const sideBHtml = buildSideHtml(teams[1]);
-
-                    if (isChallenge) {
-                        return `
-                            <div class="match-card compact challenge">
-                                <span class="compact-challenge-badge">⚔</span>
-                                <span class="compact-game">${gameShort}</span>
-                                <span class="compact-format">${match.playType || ''}</span>
-                                <div class="compact-side side-a">${sideAHtml}</div>
-                                <span class="compact-vs">vs</span>
-                                <div class="compact-side side-b">${sideBHtml}</div>
-                            </div>
-                        `;
-                    }
-
+            // Break entries get simplified cards
+            if (match.isBreak === true) {
+                const breakLabel = match.breakLabel || 'Break';
+                const breakEmoji = match.breakEmoji || '⏸';
+                if (isNext) {
                     return `
-                        <div class="match-card compact">
-                            <span class="compact-game">${gameShort}</span>
-                            <span class="compact-format">${match.playType || ''}</span>
-                            <div class="compact-side side-a">${sideAHtml}</div>
-                            <span class="compact-vs">vs</span>
-                            <div class="compact-side side-b">${sideBHtml}</div>
+                        <div class="q-card q-next break">
+                            <div class="q-next-top">
+                                <span class="q-next-game">${breakEmoji} ${breakLabel}</span>
+                                <span class="q-next-badge">NEXT</span>
+                            </div>
+                            <div class="q-next-matchup" style="justify-content:center;">
+                                <span style="font-size:36px;">${breakEmoji}</span>
+                            </div>
                         </div>
                     `;
                 }
+                return `
+                    <div class="q-card q-compact break">
+                        <div class="qc-top">
+                            <span class="qc-game">${breakEmoji} ${breakLabel}</span>
+                        </div>
+                    </div>
+                `;
+            }
 
-                // Full detail view for live and next matches
-                const gameName = getGameDisplayName(match.game);
-                const matchNum = match.matchNumber ? `#${match.matchNumber}` : '';
+            const isChallenge = match.isChallenge === true;
+            const teams = match.teams || [];
+            const gameName = getGameDisplayName(match.game);
+            const playType = match.playType || '';
 
-                // Build teams HTML - 5v5 column layout
-                const teamsHtml = teams.map((team, tIdx) => {
-                    const teamPlayers = getMatchTeamPlayers(team);
-                    const sideClass = tIdx === 0 ? 'side-a' : 'side-b';
-                    const borderStyle = tIdx === 0 ? 'border-right-color' : 'border-left-color';
+            const isThreeTeam = teams.length >= 3;
 
-                    const players = teamPlayers.map(p => {
+            if (isNext) {
+                // NEXT card (expanded)
+                const buildNextSide = (teamData, sideClass) => {
+                    const players = getMatchTeamPlayers(teamData);
+                    const borderProp = sideClass === 'a' ? 'border-right-color' : 'border-left-color';
+                    return players.map(p => {
                         const color = getPlayerCurrentColor(p);
-                        const name = getPlayerCurrentName(p);
-                        return `<span class="match-player" style="${borderStyle}: ${color}">${name}</span>`;
+                        return `<span class="q-next-name" style="color:${color};${borderProp}:${color}">${getPlayerCurrentName(p)}</span>`;
                     }).join('');
+                };
 
+                if (isThreeTeam) {
+                    // 3-team: teams[0] VS teams[1] VS teams[2]
                     return `
-                        <div class="match-side ${sideClass}">${players || 'TBD'}</div>
-                        ${tIdx < teams.length - 1 ? '<div class="match-vs">VS</div>' : ''}
-                    `;
-                }).join('');
-
-                // Build status badges - challenge can combine with live/next
-                let statusHtml = '';
-                if (isChallenge) {
-                    statusHtml += '<span class="challenge-badge">⚔ CHALLENGE</span>';
-                }
-                if (isOngoing) {
-                    statusHtml += '<span class="match-status live">LIVE</span>';
-                } else if (isNext && !isChallenge) {
-                    statusHtml += '<span class="match-status next">NEXT</span>';
-                }
-
-                return `
-                    <div class="match-card ${isOngoing ? 'ongoing' : ''} ${isNext ? 'next' : ''} ${isChallenge ? 'challenge' : ''}">
-                        <div class="match-header">
-                            <span class="match-game">${matchNum} ${gameName}</span>
-                            ${statusHtml}
-                            <span class="match-format">${match.playType || ''}</span>
-                        </div>
-                        <div class="match-teams">${teamsHtml}</div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function getGameShortName(gameId) {
-            // Use GAMES_CONFIG if available (preferred)
-            if (window.GAMES_CONFIG) {
-                return window.GAMES_CONFIG.getShortName(gameId);
-            }
-
-            // Check game definitions from Firebase for custom short name
-            if (gameState?.gameDefinitions && gameState.gameDefinitions[gameId]) {
-                const def = gameState.gameDefinitions[gameId];
-                if (def.shortName) return def.shortName;
-                if (def.name) {
-                    const firstWord = def.name.split(' ')[0];
-                    return firstWord.length <= 5 ? firstWord : firstWord.substring(0, 4);
-                }
-            }
-
-            // Final fallback
-            return gameId ? gameId.substring(0, 4).toUpperCase() : '?';
-        }
-
-        function renderTeams() {
-            const container = document.getElementById('teamsFooter');
-            const teams = gameState?.teams || [];
-
-            if (teams.length === 0) {
-                container.innerHTML = '<p class="no-data" style="grid-column: 1/-1;">No teams found</p>';
-                return;
-            }
-
-            container.innerHTML = teams.map(team => {
-                const color = getTeamColor(team.id);
-                const players = team.players || [];
-
-                const playersHtml = players.map(p => {
-                    const name = p.name || 'Player';
-                    const sizeClass = name.length > 12 ? (name.length > 16 ? 'very-long-name' : 'long-name') : '';
-                    return `<span class="player-tag ${sizeClass}" style="color: ${color}">${name}</span>`;
-                }).join('');
-
-                return `
-                    <div class="team-card" style="border-top-color: ${color}">
-                        <div class="team-header">
-                            <span class="team-name" style="color: ${color}">${team.name || 'Team ' + team.id}</span>
-                            <div class="team-stats">
-                                <div class="team-stat">
-                                    <span class="team-stat-value">${team.points || 0}</span>
-                                    <span class="team-stat-label">Points</span>
-                                </div>
-                                <div class="team-stat">
-                                    <span class="team-stat-value">${team.gamesWon || 0}</span>
-                                    <span class="team-stat-label">Wins</span>
-                                </div>
+                        <div class="q-card q-next ${isChallenge ? 'challenge' : ''}">
+                            <div class="q-next-top">
+                                <span class="q-next-game">${isChallenge ? '⚔ ' : ''}${gameName}</span>
+                                <span class="q-next-badge">NEXT</span>
+                            </div>
+                            <div class="q-next-matchup">
+                                <div class="q-next-side a">${buildNextSide(teams[0], 'a')}</div>
+                                <span class="q-next-vs">VS</span>
+                                <div class="q-next-side" style="align-items:center">${buildNextSide(teams[1], 'b')}</div>
+                                <span class="q-next-vs">VS</span>
+                                <div class="q-next-side b">${buildNextSide(teams[2], 'b')}</div>
                             </div>
                         </div>
-                        <div class="team-players">${playersHtml || '<span class="no-data">No players</span>'}</div>
+                    `;
+                }
+
+                return `
+                    <div class="q-card q-next ${isChallenge ? 'challenge' : ''}">
+                        <div class="q-next-top">
+                            <span class="q-next-game">${isChallenge ? '⚔ ' : ''}${gameName}</span>
+                            <span class="q-next-badge">NEXT</span>
+                        </div>
+                        <div class="q-next-matchup">
+                            <div class="q-next-side a">${buildNextSide(teams[0], 'a')}</div>
+                            <span class="q-next-vs">VS</span>
+                            <div class="q-next-side b">${buildNextSide(teams[1], 'b')}</div>
+                        </div>
                     </div>
                 `;
+            }
+
+            // Compact queued card
+            const buildCompactSide = (teamData, sideClass) => {
+                const players = getMatchTeamPlayers(teamData);
+                const borderProp = sideClass === 'a' ? 'border-right-color' : 'border-left-color';
+                return players.map(p => {
+                    const color = getPlayerCurrentColor(p);
+                    return `<span class="qc-name" style="color:${color};${borderProp}:${color}">${getPlayerCurrentName(p)}</span>`;
+                }).join('');
+            };
+
+            if (isThreeTeam) {
+                // 3-team: teams[0] VS teams[1] VS teams[2]
+                return `
+                    <div class="q-card q-compact ${isChallenge ? 'challenge' : ''}">
+                        <div class="qc-top">
+                            <span class="qc-game">${isChallenge ? '⚔ ' : ''}${getGameDisplayName(match.game)}${playType ? ' · ' + playType : ''}</span>
+                        </div>
+                        <div class="qc-matchup">
+                            <div class="qc-side a">${buildCompactSide(teams[0], 'a')}</div>
+                            <span class="qc-vs">VS</span>
+                            <div class="qc-side" style="align-items:center">${buildCompactSide(teams[1], 'b')}</div>
+                            <span class="qc-vs">VS</span>
+                            <div class="qc-side b">${buildCompactSide(teams[2], 'b')}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="q-card q-compact ${isChallenge ? 'challenge' : ''}">
+                    <div class="qc-top">
+                        <span class="qc-game">${isChallenge ? '⚔ ' : ''}${getGameDisplayName(match.game)}${playType ? ' · ' + playType : ''}</span>
+                    </div>
+                    <div class="qc-matchup">
+                        <div class="qc-side a">${buildCompactSide(teams[0], 'a')}</div>
+                        <span class="qc-vs">VS</span>
+                        <div class="qc-side b">${buildCompactSide(teams[1], 'b')}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function buildResultCardHTML(event) {
+        const time = event.timestamp instanceof Date
+            ? formatTimeAgo(event.timestamp)
+            : 'Just now';
+
+        const gameName = event.gameName || 'Game';
+        const isChallenge = event.isChallenge === true;
+
+        const winningPlayers = event.winningPlayers || [];
+        const losingPlayers = event.losingPlayers || [];
+        const winningSide = event.winningSide || 'A';
+
+        const playTypeRaw = event.playType || '';
+        const hasThreeTeamFormat = /\d+v\d+v\d+/i.test(playTypeRaw);
+        const hasSideCPlayers = event.sideCPlayers && event.sideCPlayers.length > 0;
+        const isThreeTeam = event.teamsCount >= 3 || event.isThreeTeam || hasSideCPlayers || hasThreeTeamFormat;
+
+        const playerCount = winningPlayers.length;
+        const playType = playTypeRaw || (playerCount > 0 ? (isThreeTeam ? `${playerCount}v${playerCount}v${playerCount}` : `${playerCount}v${playerCount}`) : '');
+
+        const buildResultPlayers = (players) => {
+            if (!players || players.length === 0) {
+                return '<span class="r-player" style="opacity:0.4">—</span>';
+            }
+            return players.map(p => {
+                const color = getTeamColor(p.originalTeamId) || p.originalTeamColor || '#888';
+                const name = p.name || 'Player';
+                return `<span class="r-player" style="color:${color}; border-bottom: 2px solid ${color}">${name}</span>`;
             }).join('');
+        };
+
+        const aWin = winningSide?.toUpperCase() === 'A';
+        const bWin = winningSide?.toUpperCase() === 'B';
+        const cWin = winningSide?.toUpperCase() === 'C';
+
+        if (isThreeTeam) {
+            const sideAPlayers = event.sideAPlayers || (aWin ? winningPlayers : losingPlayers);
+            const sideBPlayers = event.sideBPlayers || (bWin ? winningPlayers : losingPlayers);
+            const sideCPlayers = event.sideCPlayers || (cWin ? winningPlayers : []);
+
+            return `
+                <div class="r-card" data-result-id="${event.id}" ${isChallenge ? 'style="border-left: 3px solid var(--danger)"' : ''}>
+                    <div class="r-top">
+                        <span class="r-game">${isChallenge ? '⚔ ' : ''}${gameName}${playType ? ' · ' + playType : ''}</span>
+                        <span class="r-time">${time}</span>
+                    </div>
+                    <div class="r-matchup" style="gap:4px;align-items:flex-start;">
+                        <div class="r-side a ${aWin ? 'winner' : 'loser'}" style="flex:1;flex-direction:column;align-items:flex-end;gap:4px;">
+                            <div class="r-names">${buildResultPlayers(sideAPlayers)}</div>
+                            ${aWin ? '<span class="r-badge win">WIN</span>' : ''}
+                        </div>
+                        <div class="r-vs"><span class="r-score-sep">VS</span></div>
+                        <div class="r-side ${bWin ? 'winner' : 'loser'}" style="flex:1;flex-direction:column;align-items:center;gap:4px;">
+                            <div class="r-names" style="align-items:center;">${buildResultPlayers(sideBPlayers)}</div>
+                            ${bWin ? '<span class="r-badge win">WIN</span>' : ''}
+                        </div>
+                        <div class="r-vs"><span class="r-score-sep">VS</span></div>
+                        <div class="r-side b ${cWin ? 'winner' : 'loser'}" style="flex:1;flex-direction:column;align-items:flex-start;gap:4px;">
+                            <div class="r-names">${buildResultPlayers(sideCPlayers)}</div>
+                            ${cWin ? '<span class="r-badge win">WIN</span>' : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
-        // =============================================================================
-        // UTILITIES
-        // =============================================================================
+        const sideAPlayers = aWin ? winningPlayers : losingPlayers;
+        const sideBPlayers = bWin ? winningPlayers : losingPlayers;
 
-        function getGameDisplayName(gameId) {
-            // Use GAMES_CONFIG if available (preferred)
-            if (window.GAMES_CONFIG) {
-                return window.GAMES_CONFIG.getGameName(gameId);
+        return `
+            <div class="r-card" data-result-id="${event.id}" ${isChallenge ? 'style="border-left: 3px solid var(--danger)"' : ''}>
+                <div class="r-top">
+                    <span class="r-game">${isChallenge ? '⚔ ' : ''}${gameName}${playType ? ' · ' + playType : ''}</span>
+                    <span class="r-time">${time}</span>
+                </div>
+                <div class="r-matchup">
+                    <div class="r-side a ${aWin ? 'winner' : 'loser'}">
+                        ${aWin ? '<span class="r-badge win">WIN</span>' : ''}
+                        <div class="r-names">${buildResultPlayers(sideAPlayers)}</div>
+                        ${!aWin ? '<span class="r-badge loss">LOSS</span>' : ''}
+                    </div>
+                    <div class="r-vs">
+                        <span class="r-score-sep">VS</span>
+                    </div>
+                    <div class="r-side b ${bWin ? 'winner' : 'loser'}">
+                        ${!bWin ? '<span class="r-badge loss">LOSS</span>' : ''}
+                        <div class="r-names">${buildResultPlayers(sideBPlayers)}</div>
+                        ${bWin ? '<span class="r-badge win">WIN</span>' : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderResults() {
+        const container = document.getElementById('resultsList');
+        if (!container) return;
+
+        const currentResults = resultLogCache.slice(0, 6);
+
+        if (currentResults.length === 0) {
+            if (prevResultIds.length > 0 || container.children.length === 0) {
+                container.innerHTML = '<div class="r-card" style="opacity:0.5;text-align:center;padding:20px;">No results yet</div>';
+                prevResultIds = [];
             }
-
-            // Check game definitions from Firebase
-            if (gameState?.gameDefinitions && gameState.gameDefinitions[gameId]) {
-                return gameState.gameDefinitions[gameId].name;
-            }
-
-            return GAME_NAME_MAP[gameId] || gameId || 'Unknown';
+            return;
         }
 
-        function updateConnectionStatus(status) {
-            const indicator = document.getElementById('connectionStatus');
-            indicator.className = 'status-indicator';
+        const newIds = currentResults.map(e => e.id);
 
-            switch (status) {
-                case 'connected':
-                    indicator.classList.add('connected');
-                    indicator.title = 'Connected';
-                    break;
-                case 'disconnected':
-                    indicator.classList.add('disconnected');
-                    indicator.title = 'Disconnected';
-                    break;
-                default:
-                    indicator.title = 'Connecting...';
-            }
-        }
-
-        function updateClock() {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString('fi-FI', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-            document.getElementById('clock').textContent = timeStr;
-        }
-
-        /**
-         * Apply custom team colors to CSS variables
-         * This ensures board hexes and other UI elements use the correct colors from Firebase
-         */
-        function applyTeamColors() {
-            if (!gameState?.teams) return;
-
-            const root = document.documentElement;
-
-            gameState.teams.forEach(team => {
-                const color = team.color || TEAM_COLORS[team.id];
-                if (color) {
-                    root.style.setProperty(`--team-${team.id}-color`, color);
-
-                    // Also set alpha version for backgrounds
-                    const hex = color.replace('#', '');
-                    const r = parseInt(hex.substring(0, 2), 16);
-                    const g = parseInt(hex.substring(2, 4), 16);
-                    const b = parseInt(hex.substring(4, 6), 16);
-                    root.style.setProperty(`--team-${team.id}-alpha`, `rgba(${r}, ${g}, ${b}, 0.65)`);
+        // If results haven't changed, only refresh time-ago labels
+        if (JSON.stringify(newIds) === JSON.stringify(prevResultIds)) {
+            currentResults.forEach(event => {
+                const card = container.querySelector('[data-result-id="' + event.id + '"]');
+                if (!card) return;
+                const timeEl = card.querySelector('.r-time');
+                if (timeEl) {
+                    timeEl.textContent = event.timestamp instanceof Date
+                        ? formatTimeAgo(event.timestamp)
+                        : 'Just now';
                 }
             });
+            return;
         }
 
-        /**
-         * Get current player name by looking up their ID in the team roster
-         * This allows player name changes to reflect in the match queue
-         * Falls back to stored name if player not found
-         */
-        function getPlayerCurrentName(player) {
-            if (!player) return 'Unknown';
-
-            // If player has an ID, try to look up current name from team roster
-            if (player.id && player.originalTeamId && gameState?.teams) {
-                const team = gameState.teams.find(t => String(t.id) === String(player.originalTeamId));
-                if (team && team.players) {
-                    const currentPlayer = team.players.find(p =>
-                        p.id === player.id || (p.id && p.id === player.id)
-                    );
-                    if (currentPlayer && currentPlayer.name) {
-                        return currentPlayer.name;
-                    }
-                }
+        // Find how many new results appeared at the front
+        let newCount = 0;
+        for (let i = 0; i < newIds.length; i++) {
+            if (!prevResultIds.includes(newIds[i])) {
+                newCount++;
+            } else {
+                break;
             }
-
-            // Fallback to stored name
-            return player.name || 'Unknown';
         }
 
-        /**
-         * Get current team color by looking up the team in gameState
-         * Falls back to stored originalTeamColor if team not found
-         */
-        function getPlayerCurrentColor(player) {
-            if (!player) return '#666666';
+        if (newCount > 0 && newCount < currentResults.length && prevResultIds.length > 0) {
+            // Prepend only the new cards, remove excess from the end
+            const newCardsHTML = currentResults.slice(0, newCount)
+                .map(event => buildResultCardHTML(event)).join('');
 
-            // Try to look up current color from team roster
-            if (player.originalTeamId && gameState?.teams) {
-                const team = gameState.teams.find(t => String(t.id) === String(player.originalTeamId));
-                if (team?.color) {
-                    return team.color;
-                }
+            const temp = document.createElement('div');
+            temp.innerHTML = newCardsHTML;
+
+            // Insert new cards at the top (in correct order)
+            const fragment = document.createDocumentFragment();
+            while (temp.firstChild) {
+                fragment.appendChild(temp.firstChild);
             }
+            container.insertBefore(fragment, container.firstChild);
 
-            // Fallback to stored color or default
-            return player.originalTeamColor || getTeamColor(player.originalTeamId) || '#666666';
-        }
-
-        /**
-         * Get team color from gameState or defaults
-         * Uses string comparison to handle type mismatches (string vs number IDs)
-         */
-        function getTeamColor(teamId) {
-            if (teamId == null) return '#666666';
-
-            if (gameState?.teams) {
-                // Use string comparison to handle type mismatches
-                const team = gameState.teams.find(t => String(t.id) === String(teamId));
-                if (team?.color) {
-                    return team.color;
-                }
+            // Remove excess cards from the end to keep max 6
+            while (container.children.length > 6) {
+                container.removeChild(container.lastChild);
             }
-            return TEAM_COLORS[teamId] || '#666666';
+        } else {
+            // Full rebuild (first render or all results changed)
+            container.innerHTML = currentResults.map(event => buildResultCardHTML(event)).join('');
         }
 
-        /**
-         * Get players from a match team, supporting both old and new data formats
-         * Old format: team.players = [{ name, id, originalTeamId, originalTeamColor }]
-         * New format: team.playerIds = ["p_xxx", "p_yyy"] (references to players registry)
-         * @param {Object} matchTeam - A team object from a match in the queue
-         * @returns {Array} Array of player objects with name, id, originalTeamId, and color
-         */
-        function getMatchTeamPlayers(matchTeam) {
-            if (!matchTeam) return [];
+        prevResultIds = newIds;
+    }
 
-            // New format: playerIds array referencing the central registry
-            if (matchTeam.playerIds && Array.isArray(matchTeam.playerIds)) {
-                return matchTeam.playerIds.map(playerId => {
-                    // Use PlayerUtils if available
-                    if (window.PlayerUtils) {
-                        const info = window.PlayerUtils.getPlayerDisplayInfo(gameState, playerId);
-                        return {
-                            id: playerId,
-                            name: info.name,
-                            originalTeamId: info.teamId,
-                            originalTeamColor: info.teamId ? getTeamColor(info.teamId) : '#666666'
-                        };
-                    }
+    function renderScoreStrip() {
+        const teams = gameState?.teams || [];
+        const container = document.getElementById('scoreStrip');
+        if (!container) return;
 
-                    // Fallback: look up in players registry directly
-                    if (gameState?.players && gameState.players[playerId]) {
-                        const p = gameState.players[playerId];
-                        return {
-                            id: playerId,
-                            name: p.name || 'Unknown',
-                            originalTeamId: p.teamId,
-                            originalTeamColor: p.teamId ? getTeamColor(p.teamId) : '#666666'
-                        };
-                    }
+        const playerWins = getPlayerWinCounts();
 
-                    // Last resort: return placeholder
+        container.innerHTML = teams.map(team => {
+            const color = team.color || TEAM_COLORS[team.id];
+            const players = team.players || [];
+            const hexPts = team.points || 0;
+            const victoryPts = team.gamesWon || 0;
+            const totalPts = hexPts + victoryPts;
+
+            const playersHtml = players.map((p, i) => {
+                const w = p.id ? (playerWins[p.id] || 0) : 0;
+                const sep = i < players.length - 1 ? '<span class="sc-psep">&middot;</span>' : '';
+                return `<div class="sc-player"><span class="sc-pname">${p.name || 'Player'}</span><span class="sc-pstar"><span class="star">★</span><span class="pcount">${w}</span></span></div>${sep}`;
+            }).join('');
+
+            return `
+                <div class="sc" style="--c: ${color};">
+                    <div class="sc-tname-area"><span class="sc-tname">${team.name || 'Team ' + team.id}</span></div>
+                    <div class="sc-players-area">${playersHtml}</div>
+                    <div class="sc-score-area">
+                        <span class="sc-score-num w">${victoryPts}</span>
+                        <span class="sc-score-num pts">${hexPts}</span>
+                        <span class="sc-score-num total">${totalPts}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // ====================================================================
+    // UTILITIES
+    // ====================================================================
+
+    function getGameDisplayName(gameId) {
+        if (window.GAMES_CONFIG) {
+            return window.GAMES_CONFIG.getGameName(gameId);
+        }
+        if (gameState?.gameDefinitions?.[gameId]?.name) {
+            return gameState.gameDefinitions[gameId].name;
+        }
+        return gameId || 'Unknown';
+    }
+
+    function getGameShortName(gameId) {
+        if (window.GAMES_CONFIG) {
+            return window.GAMES_CONFIG.getShortName(gameId);
+        }
+        if (gameState?.gameDefinitions?.[gameId]?.shortName) {
+            return gameState.gameDefinitions[gameId].shortName;
+        }
+        return gameId ? gameId.substring(0, 4).toUpperCase() : '?';
+    }
+
+    function getTeamColor(teamId) {
+        if (teamId == null) return '#666666';
+        if (gameState?.teams) {
+            const team = gameState.teams.find(t => String(t.id) === String(teamId));
+            if (team?.color) return team.color;
+        }
+        return TEAM_COLORS[teamId] || '#666666';
+    }
+
+    function getCurrentTeamName(teamId) {
+        if (teamId && gameState?.teams) {
+            const team = gameState.teams.find(t => String(t.id) === String(teamId));
+            if (team?.name) return team.name;
+        }
+        return '';
+    }
+
+    function getPlayerCurrentName(player) {
+        if (!player) return 'Unknown';
+        if (player.id && player.originalTeamId && gameState?.teams) {
+            const team = gameState.teams.find(t => String(t.id) === String(player.originalTeamId));
+            if (team?.players) {
+                const currentPlayer = team.players.find(p => p.id === player.id);
+                if (currentPlayer?.name) return currentPlayer.name;
+            }
+        }
+        return player.name || 'Unknown';
+    }
+
+    function getPlayerCurrentColor(player) {
+        if (!player) return '#666666';
+        if (player.originalTeamId && gameState?.teams) {
+            const team = gameState.teams.find(t => String(t.id) === String(player.originalTeamId));
+            if (team?.color) return team.color;
+        }
+        return player.originalTeamColor || getTeamColor(player.originalTeamId) || '#666666';
+    }
+
+    function getMatchTeamPlayers(matchTeam) {
+        if (!matchTeam) return [];
+
+        // New format: playerIds array
+        if (matchTeam.playerIds && Array.isArray(matchTeam.playerIds)) {
+            return matchTeam.playerIds.map(playerId => {
+                if (window.PlayerUtils) {
+                    const info = window.PlayerUtils.getPlayerDisplayInfo(gameState, playerId);
                     return {
                         id: playerId,
-                        name: playerId.substring(0, 6) + '...',
-                        originalTeamId: null,
-                        originalTeamColor: '#666666'
+                        name: info.name,
+                        originalTeamId: info.teamId,
+                        originalTeamColor: info.teamId ? getTeamColor(info.teamId) : '#666666'
                     };
-                });
-            }
-
-            // Old format: players array with full player objects
-            if (matchTeam.players && Array.isArray(matchTeam.players)) {
-                return matchTeam.players.map(p => ({
-                    id: p.id || null,
-                    name: p.name || 'Unknown',
-                    originalTeamId: p.originalTeamId,
-                    originalTeamColor: p.originalTeamColor || getTeamColor(p.originalTeamId) || '#666666'
-                }));
-            }
-
-            return [];
-        }
-
-        // =============================================================================
-        // VISUAL EFFECTS
-        // =============================================================================
-
-        /**
-         * Apply hex terrain images dynamically via CSS
-         * Creates coordinate-specific background-image rules for each hex
-         */
-        function applyHexImages(enabled) {
-            let styleEl = document.getElementById('hex-images-dynamic-css');
-
-            if (!enabled) {
-                if (styleEl) styleEl.remove();
-                return;
-            }
-
-            if (!styleEl) {
-                styleEl = document.createElement('style');
-                styleEl.id = 'hex-images-dynamic-css';
-                document.head.appendChild(styleEl);
-            }
-
-            // Generate CSS rules for each hex coordinate
-            const hexCoords = boardModule.generateHexCoordinates();
-            let css = '';
-
-            hexCoords.forEach(([q, r]) => {
-                const coord = `q${q}r${r}`;
-                css += `body.effect-hex-images .board-hex[data-coord="${coord}"]::before {
-                    background-image: url('../shared/images/hexes/coords/${coord}.png');
-                }\n`;
+                }
+                if (gameState?.players?.[playerId]) {
+                    const p = gameState.players[playerId];
+                    return {
+                        id: playerId,
+                        name: p.name || 'Unknown',
+                        originalTeamId: p.teamId,
+                        originalTeamColor: p.teamId ? getTeamColor(p.teamId) : '#666666'
+                    };
+                }
+                return { id: playerId, name: 'Unknown', originalTeamId: null, originalTeamColor: '#666666' };
             });
-
-            styleEl.textContent = css;
         }
 
-        /**
-         * Apply all visual effects (always enabled for display view)
-         */
-        function applyInitialEffects() {
-            // Enable all visual effects for display view
-            document.body.classList.add('effect-hex-images');
-            document.body.classList.add('effect-heart-glow');
-            document.body.classList.add('effect-pulse-hearts');
-            document.body.classList.add('effect-rooms');
-
-            // Apply hex terrain images
-            applyHexImages(true);
-
-            // Heart images are enabled via showHeartImages: true in BoardRenderer constructor
+        // Old format: players array
+        if (matchTeam.players && Array.isArray(matchTeam.players)) {
+            return matchTeam.players.map(p => ({
+                id: p.id || null,
+                name: p.name || 'Unknown',
+                originalTeamId: p.originalTeamId,
+                originalTeamColor: p.originalTeamColor || getTeamColor(p.originalTeamId) || '#666666'
+            }));
         }
+
+        return [];
+    }
+
+    function formatTimeAgo(date) {
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins === 1) return '1 min ago';
+        if (diffMins < 60) return `${diffMins} min ago`;
+
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours === 1) return '1h ago';
+        if (diffHours < 24) return `${diffHours}h ago`;
+
+        return date.toLocaleDateString('fi-FI');
+    }
+
+    // ====================================================================
+    // MATCH TRANSITION API (keep for future use)
+    // ====================================================================
+
+    const TIMING = {
+        OVERLAY_DURATION: 3500,      // Match the slower overlay animation
+        MATCH_FADE_COMPLETE: 6000,   // Match the 5s match-finish animation
+        QUEUE_REMOVE_DELAY: 2000,    // Match the 2s queue-promote-out animation
+        PROMOTE_SETTLE: 5000,        // Match the 4s match-promote animation
+    };
+
+    function endMatch(matchId, winningSide, onComplete) {
+        const matchEl = document.getElementById(matchId);
+        if (!matchEl) return;
+
+        const overlay = matchEl.querySelector('.match-complete-overlay');
+        const winSide = matchEl.querySelector(`.a-side.${winningSide}`);
+
+        if (winSide) winSide.classList.add('win-flash');
+        if (overlay) overlay.classList.add('active');
+
+        setTimeout(() => {
+            matchEl.classList.add('finishing');
+        }, TIMING.OVERLAY_DURATION);
+
+        setTimeout(() => {
+            if (onComplete) onComplete();
+        }, TIMING.MATCH_FADE_COMPLETE);
+    }
+
+    // ====================================================================
+    // INIT
+    // ====================================================================
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initBoard();
+        updateClock();
+        setInterval(updateClock, 1000);
+        setInterval(updateMatchTimers, 1000);
+
+        if (!tournamentId) {
+            console.warn('No tournamentId in URL. Use ?tournamentId=xxx');
+        }
+    });
+
+    document.addEventListener('firebase-ready', () => {
+        console.log('Firebase ready, connecting to tournament:', tournamentId);
+        setupTournamentListener();
+        setupOnboardingListener();
+    });
+    </script>
+
+    <!-- Ember particle system -->
+    <script>
+    (function() {
+        const field = document.getElementById('emberField');
+        let ct = 0;
+
+        function spawnEmber() {
+            const e = document.createElement('div');
+            ct++;
+            const type = ct % 12 === 0 ? 'spark' : ct % 4 === 0 ? 'bright' : '';
+            e.className = 'ember' + (type ? ' ' + type : '');
+
+            e.style.left = (960 + (Math.random() - 0.5) * 1400) + 'px';
+            e.style.bottom = (-10 + Math.random() * 80) + 'px';
+            const dur = type === 'spark' ? 6 + Math.random() * 6 : 10 + Math.random() * 12;
+            e.style.animationDuration = dur + 's';
+            e.style.animationDelay = (Math.random() * 1.5) + 's';
+            const size = type === 'spark' ? 1.5 + Math.random() * 2 : 2 + Math.random() * 3;
+            e.style.width = size + 'px';
+            e.style.height = size + 'px';
+
+            field.appendChild(e);
+            setTimeout(() => e.remove(), 26000);
+        }
+
+        setInterval(spawnEmber, 150);
+        for (let i = 0; i < 25; i++) setTimeout(spawnEmber, i * 60);
+    })();
     </script>
 </body>
 </html>

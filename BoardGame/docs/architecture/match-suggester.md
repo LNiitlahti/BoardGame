@@ -1,6 +1,6 @@
 # match-suggester.js — Logic Diagrams
 
-> Source: `BoardGame/scripts/match-suggester.js`
+> Source: `BoardGame/shared/scripts/match-suggester.js`
 > 10-match rotation pattern with fairness guarantees.
 > Each team split exactly 2 times per 10-match cycle.
 

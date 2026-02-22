@@ -31,6 +31,7 @@ graph TB
     subgraph Firebase
         FB[(Firestore DB)]
         AUTH[Firebase Auth]
+        RULES[firestore.rules]
     end
 
     ADMIN --> ADM_JS
@@ -58,6 +59,11 @@ graph TB
     OB -->|read/write| FB
     ADM_JS -->|auth gate| AUTH
     OB -->|secret validation| FB
+    RULES -->|enforces access| FB
+
+    %% firebase-loader.js provides anonymous auth fallback for all pages.
+    %% Admin/setup override with real login; public pages (view, stats,
+    %% onboarding) use the anonymous session to satisfy isAuthenticated rules.
 ```
 
 ## File Index
@@ -74,6 +80,7 @@ graph TB
 | [onboarding-lightweight.md](onboarding-lightweight.md) | `scripts/onboarding-lightweight.js` | 5 | View routing, completion, progress grid, secret management, platform IDs |
 | [board-renderer.md](board-renderer.md) | `scripts/board-renderer.js` | 3 | Render pipeline, responsive scaling, incremental updates |
 | [toast.md](toast.md) | `shared/scripts/toast.js` | 3 | Toast lifecycle, connection banner state machine, button loading |
+| [firestore-rules.md](firestore-rules.md) | `firestore.rules` | 6 | Role hierarchy, per-collection permissions, permission matrix, billing costs |
 | [cross-system.md](cross-system.md) | All files | 1 | End-to-end data flow sequence diagram |
 
 ## How to Update

@@ -404,7 +404,7 @@ function renderStandings() {
 // =============================================================================
 
 function renderSummaryStats() {
-    const history = gameState?.gameHistory || [];
+    const history = (gameState?.gameHistory || []).filter(m => !m.isBreak);
 
     // Total matches
     document.getElementById('summaryMatches').textContent = history.length;

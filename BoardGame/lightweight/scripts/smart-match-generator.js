@@ -119,7 +119,7 @@ class SmartMatchGenerator {
         const gameQueue = this.gameState?.gameQueue || [];
 
         // Find completed matches to rebuild state
-        const completedMatches = gameQueue.filter(m => m.status === 'completed' && !m.isChallenge);
+        const completedMatches = gameQueue.filter(m => m.status === 'completed' && !m.isChallenge && !m.isBreak);
 
         if (completedMatches.length > 0) {
             console.log(`SmartMatchGenerator: Rebuilding state from ${completedMatches.length} completed matches`);
@@ -152,7 +152,7 @@ class SmartMatchGenerator {
         }
 
         // Also count pending/ongoing matches for rotation position
-        const allNormalMatches = gameQueue.filter(m => !m.isChallenge);
+        const allNormalMatches = gameQueue.filter(m => !m.isChallenge && !m.isBreak);
         this.gameRotation.totalMatchesGenerated = allNormalMatches.length;
     }
 

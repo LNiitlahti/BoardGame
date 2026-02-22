@@ -7,7 +7,7 @@
 
     PURPOSE:
     Redesigned admin interface with dark void / gold accent theme matching
-    the view_v2 infoscreen. 3-column layout for better workflow.
+    the view infoscreen. 3-column layout for better workflow.
 
     LAYOUT:
     ┌──────────────────────────────────────────────────────┐
@@ -125,9 +125,12 @@
                 <button class="btn primary" onclick="advanceRound()">Next Round</button>
                 <button class="btn secondary" onclick="openViewWindow()" title="Open digital signage view in new window">View</button>
                 <button class="btn secondary" onclick="openStatsWindow()" title="Open tournament statistics">Stats</button>
-                <button class="btn secondary" onclick="openOnboardingWindow()" title="Open player onboarding checklist">Onboard</button>
-                <button class="btn secondary" onclick="openOnboardingViewWindow()" title="Open onboarding TV display">OB TV</button>
-                <button class="btn secondary" onclick="openSeatingOrder()" title="Configure player seating positions">Seating</button>
+                <div class="btn-group-separator"></div>
+                <div class="btn-group onboarding-group">
+                    <button class="btn secondary" onclick="openOnboardingWindow()" title="Open player onboarding checklist">Onboard</button>
+                    <button class="btn secondary" onclick="openOnboardingViewWindow()" title="Open onboarding TV display">OB TV</button>
+                    <button class="btn secondary" onclick="openSeatingOrder()" title="Configure player seating positions">Seating</button>
+                </div>
             </div>
         </div>
 
@@ -165,6 +168,15 @@
                     <h4>Create Match
                         <button class="btn-small secondary" onclick="generateSuggestedMatches()" title="Auto-generate matches based on rotation">Auto</button>
                         <button class="btn-small challenge" onclick="addChallengeToQueue()" title="Create a challenge match (hex dispute)">Challenge</button>
+                        <div class="break-dropdown" style="display:inline-block;position:relative;">
+                            <button class="btn-small break" onclick="toggleBreakMenu()" title="Add a break to the queue">Break ▾</button>
+                            <div class="break-menu" id="breakMenu">
+                                <button onclick="addBreakToQueue('piss')">🚽 Piss Break</button>
+                                <button onclick="addBreakToQueue('cigarette')">🚬 Cigarette Break</button>
+                                <button onclick="addBreakToQueue('food')">🍕 Food Break</button>
+                                <button onclick="addBreakToQueue('sleep')">😴 Sleep</button>
+                            </div>
+                        </div>
                         <button class="btn-small secondary" onclick="openMassImport()" title="Import matches from JSON file">Import</button>
                         <button class="btn-small secondary" onclick="openGameManager()" title="Add, remove, or edit tournament games">Games</button>
                         <input type="file" id="importFileInput" accept=".json" style="display:none" onchange="handleImportFile(event)">

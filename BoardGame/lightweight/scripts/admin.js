@@ -148,7 +148,7 @@ document.addEventListener('firebase-ready', async function() {
 
     // Check authentication
     firebase.auth().onAuthStateChanged(async (user) => {
-        if (!user) {
+        if (!user || user.isAnonymous) {
             window.location.href = (window.BOARDGAME_BASE || '.') + '/login.html';
             return;
         }
@@ -533,10 +533,10 @@ function renderTeamsList() {
                            onclick="event.stopPropagation()">
                     <button class="btn secondary points-btn" onclick="adjustTeamPoints(${team.id}, 1, event)">+</button>
                 </div>
-                <div class="team-split-count" title="Times this team has been split in matches">
-                    <span class="split-label">Split:</span> <span class="split-value">${splitCount}</span>
+                <div class="team-split-count">
+                    <span title="Times this team has been split in matches"><span class="split-label">Split:</span> <span class="split-value">${splitCount}</span></span>
                     <span class="split-separator">|</span>
-                    <span class="challenge-split-label">Challenge:</span> <span class="challenge-split-value">${challengeSplitCount}</span>
+                    <span title="Times this team has been involved in challenges"><span class="challenge-split-label">Challenge:</span> <span class="challenge-split-value">${challengeSplitCount}</span></span>
                 </div>
                 <div class="team-players-list">${playerItems}</div>
             </div>
@@ -1768,6 +1768,86 @@ async function addMatchToQueue(triggerBtn) {
     await saveGameState(triggerBtn);
     clearMatchSetup();
     showStatus(`Match #${matchNumber} (${playType}) added to queue!`, 'success');
+}
+
+// =============================================================================
+// BREAK QUEUE ENTRIES
+// =============================================================================
+
+const BREAK_TYPES = {
+    piss:      { label: 'Piss Break',      emoji: '🚽' },
+    cigarette: { label: 'Cigarette Break',  emoji: '🚬' },
+    food:      { label: 'Food Break',       emoji: '🍕' },
+    sleep:     { label: 'Sleep',            emoji: '😴' }
+};
+
+function toggleBreakMenu() {
+    const menu = document.getElementById('breakMenu');
+    menu.classList.toggle('active');
+    // Close on outside click
+    const close = (e) => {
+        if (!e.target.closest('.break-dropdown')) {
+            menu.classList.remove('active');
+            document.removeEventListener('click', close);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', close), 0);
+}
+
+async function addBreakToQueue(breakType) {
+    const def = BREAK_TYPES[breakType];
+    if (!def) return;
+
+    document.getElementById('breakMenu')?.classList.remove('active');
+
+    const breakEntry = {
+        id: Date.now(),
+        isBreak: true,
+        breakType: breakType,
+        breakLabel: def.label,
+        breakEmoji: def.emoji,
+        status: 'pending',
+        teams: [],
+        createdAt: new Date().toISOString()
+    };
+
+    gameState.gameQueue = gameState.gameQueue || [];
+
+    // Insert as next up: right after ongoing matches, before all pending
+    const queue = gameState.gameQueue;
+    const firstPendingIndex = queue.findIndex(g =>
+        g.status === 'pending' || g.status === undefined || g.status === 'queued'
+    );
+    if (firstPendingIndex === -1) {
+        queue.push(breakEntry);
+    } else {
+        queue.splice(firstPendingIndex, 0, breakEntry);
+    }
+
+    await saveGameState();
+    showStatus(`${def.emoji} ${def.label} added — playing next`, 'success');
+}
+
+async function completeBreak(breakId) {
+    const breakEntry = (gameState?.gameQueue || []).find(g => g.id === breakId && g.isBreak);
+    if (!breakEntry) {
+        showStatus('Break not found', 'error');
+        return;
+    }
+
+    breakEntry.status = 'completed';
+    breakEntry.completedAt = new Date().toISOString();
+
+    await saveGameState();
+
+    logEvent('break_completed', {
+        breakType: breakEntry.breakType,
+        breakLabel: breakEntry.breakLabel,
+        message: `${breakEntry.breakEmoji || ''} ${breakEntry.breakLabel} completed`
+    });
+
+    showStatus(`${breakEntry.breakEmoji || ''} ${breakEntry.breakLabel} completed!`, 'success');
+    closeResultConfirm();
 }
 
 /**
@@ -3219,6 +3299,37 @@ function renderMatchQueue() {
     }
 
     container.innerHTML = allToRender.map((game) => {
+        const isOngoing = game.status === 'ongoing';
+        const isBreak = game.isBreak === true;
+
+        // Break entries get simplified rendering
+        if (isBreak) {
+            const breakDef = BREAK_TYPES[game.breakType] || { label: game.breakLabel || 'Break', emoji: '⏸' };
+            return `
+                <div class="queue-item ${isOngoing ? 'ongoing' : ''} break"
+                     draggable="${!isOngoing}"
+                     data-queue-id="${game.id}"
+                     onclick="openQuickConfirm(${game.id})"
+                     ondragstart="dragQueueItem(event, ${game.id})"
+                     ondragover="allowQueueDrop(event)"
+                     ondragleave="leaveQueueDrop(event)"
+                     ondrop="dropQueueItem(event, ${game.id})"
+                     ondragend="endQueueDrag(event)">
+                    <span class="drag-handle">${isOngoing ? '▶' : '☰'}</span>
+                    <div class="game-info">
+                        <div class="game-type-row">
+                            <div class="game-type"><span class="break-badge">BREAK</span>${breakDef.emoji} ${breakDef.label}</div>
+                            <div class="match-actions">
+                                ${!isOngoing ? `<button class="start-btn" onclick="event.stopPropagation(); startMatch(${game.id})" title="Start break">▶</button>` : ''}
+                                ${!isOngoing ? `<button class="move-top-btn" onclick="event.stopPropagation(); moveMatchToTop(${game.id})" title="Play next">⤴</button>` : ''}
+                                <button class="delete-btn" onclick="event.stopPropagation(); removeFromQueue(${game.id})" title="Remove">✕</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
         // Extract teams - handle various data formats
         const teams = game.teams || game.sides || [];
 
@@ -3249,7 +3360,6 @@ function renderMatchQueue() {
 
         const gameName = getGameDisplayName(game.game || game.gameType || 'Unknown');
         const playType = game.playType || game.format || '';
-        const isOngoing = game.status === 'ongoing';
         const isChallenge = game.isChallenge === true;
         // Use persistent match number instead of queue position
         const matchNumber = game.matchNumber ? `#${game.matchNumber} ` : '';
@@ -3268,13 +3378,17 @@ function renderMatchQueue() {
                  ondragend="endQueueDrag(event)">
                 <span class="drag-handle">${isOngoing ? '▶' : '☰'}</span>
                 <div class="game-info">
-                    <div class="game-type">${challengeBadge}${matchNumber}${gameName}${playType ? ' (' + playType + ')' : ''}</div>
+                    <div class="game-type-row">
+                        <div class="game-type">${challengeBadge}${matchNumber}${gameName}${playType ? ' (' + playType + ')' : ''}</div>
+                        <div class="match-actions">
+                            ${!isOngoing ? `<button class="start-btn" onclick="event.stopPropagation(); startMatch(${game.id})" title="Start match">▶</button>` : ''}
+                            ${!isOngoing ? `<button class="edit-btn" onclick="event.stopPropagation(); openEditMatchModal(${game.id})" title="Edit match">⚙</button>` : ''}
+                            ${!isOngoing ? `<button class="move-top-btn" onclick="event.stopPropagation(); moveMatchToTop(${game.id})" title="Play next">⤴</button>` : ''}
+                            <button class="delete-btn" onclick="event.stopPropagation(); removeFromQueue(${game.id})" title="Remove">✕</button>
+                        </div>
+                    </div>
                     <div class="matchup-players">${matchupHtml || fallbackMatchup || 'TBD'}</div>
                 </div>
-                ${!isOngoing ? `<button class="start-btn" onclick="event.stopPropagation(); startMatch(${game.id})" title="Start match">▶</button>` : ''}
-                ${!isOngoing ? `<button class="edit-btn" onclick="event.stopPropagation(); openEditMatchModal(${game.id})" title="Edit match">⚙</button>` : ''}
-                ${!isOngoing ? `<button class="move-top-btn" onclick="event.stopPropagation(); moveMatchToTop(${game.id})" title="Play next">⤴</button>` : ''}
-                <button class="delete-btn" onclick="event.stopPropagation(); removeFromQueue(${game.id})" title="Remove">✕</button>
             </div>
         `;
     }).join('');
@@ -3414,6 +3528,21 @@ function renderOngoingMatches() {
     }
 
     container.innerHTML = ongoing.map(game => {
+        const isBreak = game.isBreak === true;
+
+        // Break entries get simplified rendering with a Done button
+        if (isBreak) {
+            const breakDef = BREAK_TYPES[game.breakType] || { label: game.breakLabel || 'Break', emoji: '⏸' };
+            return `
+                <div class="ongoing-match break" onclick="openQuickConfirm(${game.id})">
+                    <div class="ongoing-game-name"><span class="break-badge">BREAK</span> ${breakDef.emoji} ${breakDef.label}</div>
+                    <div class="ongoing-actions">
+                        <button class="btn team-win-btn" onclick="event.stopPropagation(); completeBreak(${game.id})">Done</button>
+                    </div>
+                </div>
+            `;
+        }
+
         const teams = game.teams || [];
         const gameName = getGameDisplayName(game.game || game.gameType);
         const matchNumDisplay = game.matchNumber ? `#${game.matchNumber} ` : '';
@@ -3487,6 +3616,30 @@ function openQuickConfirm(gameId) {
     if (!game) return;
 
     selectedQueuedGame = game;
+
+    // Break entries get a simplified confirm modal
+    if (game.isBreak === true) {
+        const breakDef = BREAK_TYPES[game.breakType] || { label: game.breakLabel || 'Break', emoji: '⏸' };
+        const isOngoing = game.status === 'ongoing';
+        const modal = document.getElementById('resultConfirmModal');
+        const content = document.getElementById('resultConfirmContent');
+
+        content.innerHTML = `
+            <h4>${isOngoing ? 'Complete Break' : 'Start Break'}</h4>
+            <div class="confirm-game-name"><span class="break-badge" style="margin-right: 8px;">BREAK</span>${breakDef.emoji} ${breakDef.label}</div>
+
+            <div class="confirm-actions">
+                ${isOngoing
+                    ? `<button class="btn primary" onclick="completeBreak(${gameId})">Break Over</button>`
+                    : `<button class="btn primary" onclick="startMatch(${gameId}); closeResultConfirm();">Start Break</button>`
+                }
+                <button class="btn secondary" onclick="closeResultConfirm()">Cancel</button>
+            </div>
+        `;
+
+        modal.classList.add('active');
+        return;
+    }
 
     const gameName = getGameDisplayName(game.game || game.gameType);
     const isOngoing = game.status === 'ongoing';
@@ -3683,23 +3836,26 @@ async function confirmResult(winnerIndex) {
         .filter(([_, count]) => count >= 2)
         .map(([teamId]) => parseInt(teamId) || teamId);
 
-    // Update team win counts - only for teams with full representation
-    teamsWithFullCredit.forEach(teamId => {
-        const team = gameState.teams.find(t => String(t.id) === String(teamId));
-        if (team) {
-            team.gamesWon = (team.gamesWon || 0) + 1;
-            team.gamesPlayed = (team.gamesPlayed || 0) + 1;
-        }
-    });
+    // Update team win/loss counts - only for non-challenge matches with full representation
+    // Challenge matches don't affect team win/loss records
+    const isChallenge = selectedQueuedGame.isChallenge === true;
+    if (!isChallenge) {
+        teamsWithFullCredit.forEach(teamId => {
+            const team = gameState.teams.find(t => String(t.id) === String(teamId));
+            if (team) {
+                team.gamesWon = (team.gamesWon || 0) + 1;
+                team.gamesPlayed = (team.gamesPlayed || 0) + 1;
+            }
+        });
 
-    // Update loss counts - only for teams with full representation on losing side
-    teamsWithFullLoss.forEach(teamId => {
-        const team = gameState.teams.find(t => String(t.id) === String(teamId));
-        if (team) {
-            team.gamesLost = (team.gamesLost || 0) + 1;
-            team.gamesPlayed = (team.gamesPlayed || 0) + 1;
-        }
-    });
+        teamsWithFullLoss.forEach(teamId => {
+            const team = gameState.teams.find(t => String(t.id) === String(teamId));
+            if (team) {
+                team.gamesLost = (team.gamesLost || 0) + 1;
+                team.gamesPlayed = (team.gamesPlayed || 0) + 1;
+            }
+        });
+    }
 
     // Get winning side label
     const winningSideLabel = `TEAM_${SIDE_LABELS[winnerIndex] || winnerIndex}`;
@@ -3809,9 +3965,6 @@ async function confirmResult(winnerIndex) {
     const logMatchNumber = queueEntry?.matchNumber;
     const logGameName = getGameDisplayName(queueEntry?.game || 'game');
     const logIsChallenge = queueEntry?.isChallenge || false;
-    const logDisputingTeamIds = queueEntry?.disputingTeamIds || [];
-    const logDisputingSideA = queueEntry?.disputingSideA || [];
-    const logDisputingSideB = queueEntry?.disputingSideB || [];
 
     selectedQueuedGame = null;
 
@@ -3910,74 +4063,25 @@ async function confirmResult(winnerIndex) {
     showStatus(`Result confirmed! Team ${SIDE_LABELS[winnerIndex] || winnerIndex} wins${matchNumMsg}!`, 'success');
 
     // Track pending hex win - remind admin to place hex
-    // For challenge matches: only the primary disputing team gets the hex (team with most players on winning side)
-    // For normal matches: all teams with full credit (2+ players) get pending hexes
-    let pendingHexTeamIds = [];
-    let pendingHexTeamNames = [];
-
-    if (logIsChallenge) {
-        // Challenge match: all disputing teams on the winning side get hexes
-        // New structure: disputingSideA and disputingSideB contain teams per side
-        // winnerIndex 0 = Side A wins, winnerIndex 1 = Side B wins
-
-        let winningSideTeams = [];
-
-        if (logDisputingSideA.length > 0 || logDisputingSideB.length > 0) {
-            // New structure with side-based teams
-            winningSideTeams = winnerIndex === 0 ? logDisputingSideA : logDisputingSideB;
-        } else if (logDisputingTeamIds.length > 0) {
-            // Legacy structure: find which disputing team is on the winning side
-            const winningDisputingTeam = logDisputingTeamIds.find(teamId =>
-                winningTeamIds.some(winId => String(winId) === String(teamId))
-            );
-            if (winningDisputingTeam) {
-                winningSideTeams = [winningDisputingTeam];
-            }
-        }
-
-        if (winningSideTeams.length > 0) {
-            pendingHexTeamIds = winningSideTeams;
-            pendingHexTeamNames = winningSideTeams.map(teamId => {
-                const team = gameState.teams.find(t => String(t.id) === String(teamId));
-                return team?.name || `Team ${teamId}`;
-            });
-        } else {
-            // Fallback: if no disputing teams set (very old challenge), use team with most players
-            let maxCount = 0;
-            let primaryTeamId = null;
-
-            Object.entries(winningTeamPlayerCounts).forEach(([teamId, count]) => {
-                if (count > maxCount) {
-                    maxCount = count;
-                    primaryTeamId = parseInt(teamId) || teamId;
-                }
-            });
-
-            if (primaryTeamId) {
-                const team = gameState.teams.find(t => String(t.id) === String(primaryTeamId));
-                pendingHexTeamIds = [primaryTeamId];
-                pendingHexTeamNames = [team?.name || `Team ${primaryTeamId}`];
-            }
-        }
-    } else {
-        // Normal match: all teams with full credit get hexes
-        pendingHexTeamIds = teamsWithFullCredit.length > 0 ? teamsWithFullCredit : winningTeamIds;
-        pendingHexTeamNames = pendingHexTeamIds.map(teamId => {
+    // Challenge matches don't grant hex placement
+    if (!logIsChallenge) {
+        const pendingHexTeamIds = teamsWithFullCredit.length > 0 ? teamsWithFullCredit : winningTeamIds;
+        const pendingHexTeamNames = pendingHexTeamIds.map(teamId => {
             const team = gameState.teams.find(t => String(t.id) === String(teamId));
             return team?.name || `Team ${teamId}`;
         });
+
+        pendingHexWins.push({
+            matchNumber: confirmedMatchNumber,
+            teamNames: pendingHexTeamNames.length > 0 ? pendingHexTeamNames : [`Team ${SIDE_LABELS[winnerIndex]}`],
+            teamIds: pendingHexTeamIds.length > 0 ? pendingHexTeamIds : winningTeamIds,
+            isChallenge: false,
+            timestamp: new Date().toISOString()
+        });
+
+        // Show persistent reminder
+        updatePendingHexNotification();
     }
-
-    pendingHexWins.push({
-        matchNumber: confirmedMatchNumber,
-        teamNames: pendingHexTeamNames.length > 0 ? pendingHexTeamNames : [`Team ${SIDE_LABELS[winnerIndex]}`],
-        teamIds: pendingHexTeamIds.length > 0 ? pendingHexTeamIds : winningTeamIds,
-        isChallenge: logIsChallenge,
-        timestamp: new Date().toISOString()
-    });
-
-    // Show persistent reminder
-    updatePendingHexNotification();
 }
 
 // =============================================================================
@@ -4009,8 +4113,10 @@ async function recalculateTeamStats() {
     let skippedSplitWins = 0;
     let skippedSplitLosses = 0;
 
-    // Process each match in history
+    // Process each match in history (skip challenge matches — they don't affect team records)
     gameState.gameHistory.forEach(match => {
+        if (match.isChallenge) return;
+
         // Get player IDs from the match
         const winningPlayerIds = match.winningPlayerIds || [];
         const losingPlayerIds = match.losingPlayerIds || [];
@@ -4591,7 +4697,7 @@ function openViewWindow() {
         return;
     }
 
-    const viewUrl = `view_v2.html?tournamentId=${encodeURIComponent(currentTournamentId)}`;
+    const viewUrl = `view.html?tournamentId=${encodeURIComponent(currentTournamentId)}`;
     window.open(viewUrl, '_blank', 'width=1920,height=1080');
 }
 
@@ -4630,7 +4736,7 @@ function openOnboardingViewWindow() {
         return;
     }
 
-    const url = `view-onboarding.html?tournamentId=${encodeURIComponent(currentTournamentId)}`;
+    const url = `view-onboarding-layout.html?tournamentId=${encodeURIComponent(currentTournamentId)}`;
     window.open(url, '_blank');
 }
 

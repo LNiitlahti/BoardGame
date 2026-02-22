@@ -1,8 +1,9 @@
 # smart-match-generator.js — Logic Diagrams
 
-> Source: `BoardGame/scripts/smart-match-generator.js`
+> Source: `BoardGame/lightweight/scripts/smart-match-generator.js`
 > Orchestrator: format routing, game rotation state machine, preview system.
 > Delegates math to `balance-optimizer.js`.
+> Note: `rebuildFromHistory()` excludes challenges AND breaks from match counts.
 
 ## 1. Main Generation Pipeline
 

@@ -1,7 +1,8 @@
 # statistics.js — Logic Diagrams
 
-> Source: `BoardGame/scripts/statistics.js`
+> Source: `BoardGame/lightweight/scripts/statistics.js`
 > Analytics engine: leaderboards, H2H matrix, streaks, charts, player detail.
+> Note: `renderSummaryStats` filters out break entries (`.filter(m => !m.isBreak)`) so breaks don't inflate match counts.
 
 ## 1. Data Loading Pipeline
 

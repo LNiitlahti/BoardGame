@@ -129,6 +129,56 @@
 }
 
 /* =============================================================================
+   STATUS EMOJI BAR
+   ============================================================================= */
+
+.status-emojis {
+    display: flex;
+    gap: 4px;
+}
+
+.status-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    opacity: 0.5;
+    filter: grayscale(0.8);
+}
+
+.status-btn:hover {
+    border-color: var(--border-color-hover);
+    opacity: 0.8;
+    filter: grayscale(0.3);
+}
+
+.status-btn.active {
+    border-color: var(--accent-warning);
+    background: rgba(247, 186, 50, 0.15);
+    opacity: 1;
+    filter: none;
+}
+
+.status-btn.popup-btn {
+    opacity: 0.3;
+    filter: none;
+    font-size: 0.8rem;
+    margin-left: 2px;
+}
+
+.status-btn.popup-btn:hover {
+    opacity: 0.6;
+}
+
+/* =============================================================================
    PROGRESS RING
    ============================================================================= */
 
@@ -733,6 +783,13 @@
 .player-card .status-badge.not-started {
     background: var(--bg-tertiary);
     color: var(--text-tertiary);
+}
+
+.player-card .player-status-icons {
+    font-size: 1rem;
+    margin-bottom: var(--spacing-xs);
+    min-height: 1.4em;
+    letter-spacing: 2px;
 }
 
 .player-card .edit-btn {

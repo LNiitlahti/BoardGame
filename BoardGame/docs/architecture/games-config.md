@@ -1,7 +1,7 @@
 # games-config.js — Logic Diagrams
 
-> Source: `BoardGame/scripts/games-config.js`
-> Master catalog: 17 games, 48+ aliases, 10 helper methods.
+> Source: `BoardGame/shared/scripts/games-config.js`
+> Master catalog: 18 games, 48+ aliases, 10 helper methods.
 > Single source of truth for game definitions.
 
 ## 1. Resolution & Lookup Chain
@@ -55,11 +55,11 @@ flowchart TD
 
     F[getAllGames] --> G[Object.entries games]
     G --> H["Map: add id property, spread game"]
-    H --> I[Return all 17 game objects]
+    H --> I[Return all 18 game objects]
 
     J["getGamesForSelect(activeOnly)"] --> K{activeOnly === true?}
     K -->|Yes| L["games = getActiveGames() — 6"]
-    K -->|No| M["games = getAllGames() — 17"]
+    K -->|No| M["games = getAllGames() — 18"]
     L --> N["Map to {value, label, format}"]
     M --> N
     N --> O[Return select-ready array]
@@ -92,3 +92,4 @@ flowchart TD
 | hearthstone | Hearthstone | 1v1 | No | No |
 | rocketleague | Rocket League | 3v3 | No | No |
 | tekken8 | Tekken 8 | 1v1 | No | No |
+| beerdrinking | Beer Drinking | FFA | No | No |

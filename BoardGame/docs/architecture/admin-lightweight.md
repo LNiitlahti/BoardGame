@@ -197,3 +197,26 @@ flowchart TD
     N --> O[Firebase listener fires on view page]
     O --> P[view-onboarding-layout re-renders with new seating]
 ```
+
+## 11. Break Queue Entries
+
+```mermaid
+flowchart TD
+    A[Break button clicked] --> B[toggleBreakMenu — show dropdown]
+    B --> C["User selects type: piss / cigarette / food / sleep"]
+    C --> D[addBreakToQueue breakType]
+    D --> E["Create entry: isBreak=true, breakType, breakLabel, breakEmoji, teams=empty"]
+    E --> F[Push to gameState.gameQueue]
+    F --> G[saveGameState]
+    G --> H[renderMatchQueue detects isBreak]
+    H --> I[Render break-badge + emoji + label — no players]
+
+    J[Break started — startMatch works as-is] --> K["status = ongoing, startedAt set"]
+    K --> L[renderOngoingMatches shows Done button]
+    L --> M[User clicks Done OR openQuickConfirm]
+    M --> N[completeBreak breakId]
+    N --> O["status = completed, completedAt set"]
+    O --> P[logEvent break_completed]
+    O --> Q[saveGameState]
+    Q --> R[No gameHistory entry — breaks excluded from stats]
+```
