@@ -346,18 +346,34 @@ function checkPlayerCompletion(playerNum) {
     }
 }
 
+// Debounced save: batches rapid checkbox toggles into a single Firebase write
+const _pendingSaves = {};
+const _saveTimers = {};
+const SAVE_DEBOUNCE_MS = 500;
+
 async function savePlayerField(playerNum, fields) {
-    try {
-        const onboardingRef = getOnboardingRef();
-        const update = {};
-        for (const [key, value] of Object.entries(fields)) {
-            update[`players.${playerNum}.${key}`] = value;
-        }
-        update[`players.${playerNum}.lastUpdated`] = new Date().toISOString();
-        await onboardingRef.update(update);
-    } catch (error) {
-        console.error('Failed to save onboarding status:', error);
+    // Merge fields into pending batch for this player
+    if (!_pendingSaves[playerNum]) _pendingSaves[playerNum] = {};
+    for (const [key, value] of Object.entries(fields)) {
+        _pendingSaves[playerNum][`players.${playerNum}.${key}`] = value;
     }
+
+    // Reset the debounce timer
+    if (_saveTimers[playerNum]) clearTimeout(_saveTimers[playerNum]);
+
+    _saveTimers[playerNum] = setTimeout(async () => {
+        const update = { ..._pendingSaves[playerNum] };
+        update[`players.${playerNum}.lastUpdated`] = new Date().toISOString();
+        delete _pendingSaves[playerNum];
+        delete _saveTimers[playerNum];
+
+        try {
+            const onboardingRef = getOnboardingRef();
+            await onboardingRef.update(update);
+        } catch (error) {
+            console.error('Failed to save onboarding status:', error);
+        }
+    }, SAVE_DEBOUNCE_MS);
 }
 
 // =============================================================================

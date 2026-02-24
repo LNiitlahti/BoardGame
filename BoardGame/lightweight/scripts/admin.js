@@ -508,7 +508,7 @@ function renderTeamsList() {
                  ondragstart="dragPlayer(event, ${team.id}, ${idx})"
                  ondragend="dragEnd(event)">
                 <span class="player-drag-handle">⋮⋮</span>
-                <span class="player-name">${p.name}</span>
+                <span class="player-name">${escapeHtml(p.name)}</span>
             </div>
         `).join('');
 
@@ -634,7 +634,7 @@ function renderPlayerManager() {
 
         const playersList = players.map((player, idx) => `
             <div class="pm-player">
-                <input type="text" value="${player.name || ''}"
+                <input type="text" value="${escapeHtml(player.name || '')}"
                        onchange="updatePlayerName(${team.id}, ${idx}, this.value)"
                        placeholder="Player name">
                 <button class="btn-remove" onclick="removePlayerFromTeam(${team.id}, ${idx})" title="Remove player">✕</button>
@@ -975,8 +975,16 @@ function buildSeatItemHTML(seatNum, playerNum, info) {
 
 /**
  * Set up drag-and-drop on all seating items (swap on drop, across both walls)
+ * Uses an AbortController so all listeners are cleaned up on re-render.
  */
+let _seatingDragAbort = null;
+
 function setupSeatingDragDrop() {
+    // Abort previous listeners before adding new ones
+    if (_seatingDragAbort) _seatingDragAbort.abort();
+    _seatingDragAbort = new AbortController();
+    const signal = _seatingDragAbort.signal;
+
     const items = document.querySelectorAll('.seating-item');
     let draggedSeat = null;
 
@@ -985,13 +993,13 @@ function setupSeatingDragDrop() {
             draggedSeat = parseInt(item.dataset.seat);
             item.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
-        });
+        }, { signal });
 
         item.addEventListener('dragend', () => {
             item.classList.remove('dragging');
             draggedSeat = null;
             items.forEach(el => el.classList.remove('drag-over'));
-        });
+        }, { signal });
 
         item.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -999,11 +1007,11 @@ function setupSeatingDragDrop() {
             if (parseInt(item.dataset.seat) !== draggedSeat) {
                 item.classList.add('drag-over');
             }
-        });
+        }, { signal });
 
         item.addEventListener('dragleave', () => {
             item.classList.remove('drag-over');
-        });
+        }, { signal });
 
         item.addEventListener('drop', (e) => {
             e.preventDefault();
@@ -1012,7 +1020,7 @@ function setupSeatingDragDrop() {
             if (draggedSeat !== null && draggedSeat !== targetSeat) {
                 swapSeatingPositions(draggedSeat, targetSeat);
             }
-        });
+        }, { signal });
     });
 }
 
@@ -1647,7 +1655,7 @@ function renderMatchCreationZones() {
 
         const playersHtml = side.map((p, playerIdx) => `
             <div class="dropped-player" style="--team-color: ${p.originalTeamColor || 'var(--text-secondary)'}">
-                <span>${p.name} (${p.originalTeamName || 'Unknown'})</span>
+                <span>${escapeHtml(p.name)} (${escapeHtml(p.originalTeamName || 'Unknown')})</span>
                 <button class="remove-btn" onclick="removeFromSide(${idx}, ${playerIdx})">x</button>
             </div>
         `).join('');
@@ -1781,17 +1789,31 @@ const BREAK_TYPES = {
     sleep:     { label: 'Sleep',            emoji: '😴' }
 };
 
+let _breakMenuCloseHandler = null;
+
 function toggleBreakMenu() {
     const menu = document.getElementById('breakMenu');
+    if (!menu) return;
+
+    // Clean up previous listener if any
+    if (_breakMenuCloseHandler) {
+        document.removeEventListener('click', _breakMenuCloseHandler);
+        _breakMenuCloseHandler = null;
+    }
+
     menu.classList.toggle('active');
-    // Close on outside click
-    const close = (e) => {
-        if (!e.target.closest('.break-dropdown')) {
-            menu.classList.remove('active');
-            document.removeEventListener('click', close);
-        }
-    };
-    setTimeout(() => document.addEventListener('click', close), 0);
+
+    if (menu.classList.contains('active')) {
+        // Close on outside click
+        _breakMenuCloseHandler = (e) => {
+            if (!e.target.closest('.break-dropdown')) {
+                menu.classList.remove('active');
+                document.removeEventListener('click', _breakMenuCloseHandler);
+                _breakMenuCloseHandler = null;
+            }
+        };
+        setTimeout(() => document.addEventListener('click', _breakMenuCloseHandler), 0);
+    }
 }
 
 async function addBreakToQueue(breakType) {
@@ -2694,7 +2716,7 @@ function renderEditMatchModal() {
 
             return `
                 <div class="edit-player-row" style="--player-color: ${color}">
-                    <span class="edit-player-name">${player.name || 'Unknown'}</span>
+                    <span class="edit-player-name">${escapeHtml(player.name || 'Unknown')}</span>
                     <span class="edit-player-team">${teamName}</span>
                     <div class="edit-player-actions">
                         ${moveOptions}
@@ -2747,7 +2769,7 @@ function buildAvailablePlayersDropdown(forSideIdx) {
     gameState.teams.forEach(team => {
         const teamPlayers = (team.players || [])
             .filter(p => !usedPlayerIds.has(p.id))
-            .map(p => `<option value="${p.id}" data-team="${team.id}">${p.name} (${team.name})</option>`)
+            .map(p => `<option value="${p.id}" data-team="${team.id}">${escapeHtml(p.name)} (${escapeHtml(team.name)})</option>`)
             .join('');
 
         if (teamPlayers) {
@@ -2989,8 +3011,8 @@ function build5v5Modal(result, gameName) {
         const color = p.originalTeamColor || getTeamColor(p.originalTeamId) || '#666';
         const splitBadge = p.isSplit ? '<span class="split-badge">SPLIT</span>' : '';
         return `<div class="auto-match-player" style="--player-color: ${color}">
-            <span class="player-name">${p.name}</span>
-            <span class="player-team">${p.originalTeamName}</span>
+            <span class="player-name">${escapeHtml(p.name)}</span>
+            <span class="player-team">${escapeHtml(p.originalTeamName)}</span>
             ${splitBadge}
         </div>`;
     }).join('');
@@ -2999,8 +3021,8 @@ function build5v5Modal(result, gameName) {
         const color = p.originalTeamColor || getTeamColor(p.originalTeamId) || '#666';
         const splitBadge = p.isSplit ? '<span class="split-badge">SPLIT</span>' : '';
         return `<div class="auto-match-player" style="--player-color: ${color}">
-            <span class="player-name">${p.name}</span>
-            <span class="player-team">${p.originalTeamName}</span>
+            <span class="player-name">${escapeHtml(p.name)}</span>
+            <span class="player-team">${escapeHtml(p.originalTeamName)}</span>
             ${splitBadge}
         </div>`;
     }).join('');
@@ -3059,7 +3081,7 @@ function buildSplitFormatModal(result, gameName) {
         const color = p.originalTeamColor || getTeamColor(p.originalTeamId) || '#666';
         const splitBadge = p.isSplit ? '<span class="split-badge">SPLIT</span>' : '';
         return `<div class="auto-match-player small" style="--player-color: ${color}">
-            <span class="player-name">${p.name}</span>
+            <span class="player-name">${escapeHtml(p.name)}</span>
             ${splitBadge}
         </div>`;
     }).join('');
@@ -3068,7 +3090,7 @@ function buildSplitFormatModal(result, gameName) {
         const color = p.originalTeamColor || getTeamColor(p.originalTeamId) || '#666';
         const splitBadge = p.isSplit ? '<span class="split-badge">SPLIT</span>' : '';
         return `<div class="auto-match-player small" style="--player-color: ${color}">
-            <span class="player-name">${p.name}</span>
+            <span class="player-name">${escapeHtml(p.name)}</span>
             ${splitBadge}
         </div>`;
     }).join('');
@@ -3077,14 +3099,14 @@ function buildSplitFormatModal(result, gameName) {
     const match2v2SideA = match2v2.teams[0].players.map(p => {
         const color = p.originalTeamColor || getTeamColor(p.originalTeamId) || '#666';
         return `<div class="auto-match-player small" style="--player-color: ${color}">
-            <span class="player-name">${p.name}</span>
+            <span class="player-name">${escapeHtml(p.name)}</span>
         </div>`;
     }).join('');
 
     const match2v2SideB = match2v2.teams[1].players.map(p => {
         const color = p.originalTeamColor || getTeamColor(p.originalTeamId) || '#666';
         return `<div class="auto-match-player small" style="--player-color: ${color}">
-            <span class="player-name">${p.name}</span>
+            <span class="player-name">${escapeHtml(p.name)}</span>
         </div>`;
     }).join('');
 

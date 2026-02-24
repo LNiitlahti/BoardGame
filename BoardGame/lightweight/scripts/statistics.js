@@ -669,6 +669,13 @@ function renderMatches() {
         } else if (currentFilters.result === 'lost') {
             filtered = filtered.filter(m => m.losingTeamIds?.includes(teamId));
         }
+    } else if (currentFilters.result) {
+        // Result filter without team filter: show all wins or all losses
+        if (currentFilters.result === 'won') {
+            filtered = filtered.filter(m => m.winningTeamIds?.length > 0);
+        } else if (currentFilters.result === 'lost') {
+            filtered = filtered.filter(m => m.losingTeamIds?.length > 0);
+        }
     }
 
     if (currentFilters.game) {
