@@ -227,6 +227,34 @@
 
         .status-msg.error { color: var(--danger); }
 
+        /* Break cards */
+        .match-card.break {
+            border-left: 3px solid var(--gold);
+            opacity: 0.75;
+        }
+
+        .break-label {
+            font-size: 0.95rem;
+            color: var(--gold-bright);
+            font-weight: 700;
+            flex: 1;
+        }
+
+        .break-label .break-emoji {
+            margin-right: 6px;
+            font-size: 1.1rem;
+        }
+
+        .break-badge {
+            font-size: 0.65rem;
+            padding: 1px 5px;
+            border-radius: 8px;
+            background: var(--gold-dim);
+            color: var(--gold);
+            font-weight: 700;
+            margin-right: 8px;
+        }
+
         /* Print-friendly */
         @media print {
             body { background: #fff; color: #222; padding: 10px; }
@@ -305,13 +333,32 @@
             const pending = queue.filter(g => g.status !== 'ongoing');
             const allMatches = [...ongoing, ...pending];
 
+            const breakCount = allMatches.filter(g => g.isBreak).length;
+            const matchCount = allMatches.length - breakCount;
             document.getElementById('pageSubtitle').innerHTML =
-                `<span class="match-count">${allMatches.length}</span> matches` +
+                `<span class="match-count">${matchCount}</span> matches` +
+                (breakCount > 0 ? ` + ${breakCount} breaks` : '') +
                 (ongoing.length > 0 ? ` (${ongoing.length} live)` : '');
 
             container.innerHTML = allMatches.map(game => {
-                const teams = game.teams || [];
                 const isOngoing = game.status === 'ongoing';
+
+                // Break entries get simplified rendering
+                if (game.isBreak) {
+                    const emoji = game.breakEmoji || '⏸';
+                    const label = game.breakLabel || 'Break';
+                    const liveBadge = isOngoing ? '<span class="badge-live">LIVE</span>' : '';
+                    return `
+                        <div class="match-card ${isOngoing ? 'ongoing' : ''} break">
+                            <span class="match-num"></span>
+                            <div class="break-label">
+                                ${liveBadge}<span class="break-badge">BREAK</span><span class="break-emoji">${emoji}</span>${label}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                const teams = game.teams || [];
                 const isChallenge = game.isChallenge === true;
                 const matchNum = game.matchNumber ? `#${game.matchNumber}` : '';
                 const gameName = getDisplayName(game.game || game.gameType || 'Unknown');

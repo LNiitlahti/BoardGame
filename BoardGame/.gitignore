@@ -198,6 +198,14 @@ dev-create-users.html
 dev-tools/
 setup-helpers/
 
+# Screenshot capture tool (dev-only, requires puppeteer)
+dev/capture-screenshots.js
+dev/node_modules/
+dev/package.json
+dev/package-lock.json
+package.json
+package-lock.json
+
 # ===========================
 # MISC
 # ===========================

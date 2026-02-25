@@ -936,6 +936,12 @@
         setupListener();
     });
 
+    // Clean up Firebase listeners on page unload
+    window.addEventListener('beforeunload', function() {
+        if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+        if (onboardingUnsubscribe) { onboardingUnsubscribe(); onboardingUnsubscribe = null; }
+    });
+
     // =================================================================
     // FIREBASE LISTENER
     // =================================================================

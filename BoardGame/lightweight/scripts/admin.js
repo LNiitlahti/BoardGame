@@ -44,6 +44,9 @@ let selectedHexCoord = null;
 // Pending hex wins - wins that haven't had a hex placed yet
 let pendingHexWins = [];
 
+// Async operation guard — prevents double-clicks on queue actions
+let _asyncBusy = false;
+
 // Game ID to display name mapping (fallback for built-in games)
 // Use GAMES_CONFIG from games-config.js for game name mapping
 // Backward compatibility: build GAME_NAME_MAP from GAMES_CONFIG
@@ -390,6 +393,65 @@ async function loadTournament(tournamentId) {
 }
 
 // =============================================================================
+// TOURNAMENT STATE MANAGEMENT
+// =============================================================================
+
+const TOURNAMENT_STATES = ['setup', 'playing', 'finished'];
+
+function updateTournamentStateButton() {
+    const btn = document.getElementById('tournamentStateBtn');
+    if (!btn) return;
+
+    if (!gameState) {
+        btn.style.display = 'none';
+        return;
+    }
+
+    const state = gameState.status || 'setup';
+    btn.textContent = state;
+    btn.style.display = 'inline-block';
+    btn.className = 'btn-small tournament-state-btn state-' + state;
+}
+
+function openStateChangeModal() {
+    if (!gameState || !currentTournamentId) {
+        showStatus('Load a tournament first', 'warning');
+        return;
+    }
+
+    const currentState = gameState.status || 'setup';
+    const options = document.querySelectorAll('#stateOptions .state-option');
+    options.forEach(opt => {
+        opt.classList.toggle('current', opt.dataset.state === currentState);
+    });
+
+    document.getElementById('stateChangeModal').classList.add('active');
+}
+
+function closeStateChangeModal() {
+    document.getElementById('stateChangeModal').classList.remove('active');
+}
+
+async function confirmStateChange(newState) {
+    if (!gameState || !currentTournamentId) return;
+
+    const currentState = gameState.status || 'setup';
+    if (newState === currentState) {
+        closeStateChangeModal();
+        return;
+    }
+
+    gameState.status = newState;
+    await saveGameState();
+    updateTournamentStateButton();
+    closeStateChangeModal();
+    showStatus(`Tournament state changed to ${newState}`, 'success');
+
+    // Refresh the tournament list to update the status label in dropdown
+    loadTournamentsList();
+}
+
+// =============================================================================
 // DISPLAY UPDATES
 // =============================================================================
 
@@ -403,6 +465,9 @@ function updateDisplay() {
 
     // Update navbar
     document.getElementById('navTournamentName').textContent = gameState.name || 'Tournament';
+
+    // Update tournament state button
+    updateTournamentStateButton();
 
     // Update round info
     document.getElementById('currentRound').textContent = gameState.currentRound || 0;
@@ -1851,25 +1916,29 @@ async function addBreakToQueue(breakType) {
 }
 
 async function completeBreak(breakId) {
-    const breakEntry = (gameState?.gameQueue || []).find(g => g.id === breakId && g.isBreak);
-    if (!breakEntry) {
-        showStatus('Break not found', 'error');
-        return;
-    }
+    if (_asyncBusy) return;
+    _asyncBusy = true;
+    try {
+        const breakEntry = (gameState?.gameQueue || []).find(g => g.id === breakId && g.isBreak);
+        if (!breakEntry) {
+            showStatus('Break not found', 'error');
+            return;
+        }
 
-    breakEntry.status = 'completed';
-    breakEntry.completedAt = new Date().toISOString();
+        breakEntry.status = 'completed';
+        breakEntry.completedAt = new Date().toISOString();
 
-    await saveGameState();
+        await saveGameState();
 
-    logEvent('break_completed', {
-        breakType: breakEntry.breakType,
-        breakLabel: breakEntry.breakLabel,
-        message: `${breakEntry.breakEmoji || ''} ${breakEntry.breakLabel} completed`
-    });
+        logEvent('break_completed', {
+            breakType: breakEntry.breakType,
+            breakLabel: breakEntry.breakLabel,
+            message: `${breakEntry.breakEmoji || ''} ${breakEntry.breakLabel} completed`
+        });
 
-    showStatus(`${breakEntry.breakEmoji || ''} ${breakEntry.breakLabel} completed!`, 'success');
-    closeResultConfirm();
+        showStatus(`${breakEntry.breakEmoji || ''} ${breakEntry.breakLabel} completed!`, 'success');
+        closeResultConfirm();
+    } finally { _asyncBusy = false; }
 }
 
 /**
@@ -2406,24 +2475,6 @@ async function confirmMassImport(triggerBtn) {
         closeMassImport();
         return;
     }
-
-    // DEBUG: Log tournament team structure to help diagnose player issues
-    console.log('=== IMPORT DEBUG ===');
-    console.log('Tournament teams:', gameState?.teams?.map(t => ({
-        id: t.id,
-        name: t.name,
-        playerIds: t.playerIds,
-        playersArray: t.players?.map(p => ({ id: p.id, name: p.name }))
-    })));
-    console.log('Players registry exists:', !!gameState?.players);
-    console.log('Players registry:', gameState?.players);
-
-    // Test getPlayersFromTeam for team IDs 1-5
-    console.log('getPlayersFromTeam results:');
-    for (let i = 1; i <= 5; i++) {
-        console.log(`  Team ${i}:`, getPlayersFromTeam(i));
-    }
-    console.log('=== END DEBUG ===');
 
     const matches = pendingImportData.matches;
     let imported = 0;
@@ -3212,6 +3263,9 @@ function buildSplitInfo(stats) {
  * Handles both single 5v5 matches and 3v3+2v2 simultaneous match pairs
  */
 async function confirmAutoMatch() {
+    if (_asyncBusy) return;
+    _asyncBusy = true;
+    try {
     if (!pendingAutoMatch) {
         showStatus('No pending match', 'error');
         closeAutoMatchModal();
@@ -3281,6 +3335,7 @@ async function confirmAutoMatch() {
 
     showStatus(statusMessage, 'success');
     closeAutoMatchModal();
+    } finally { _asyncBusy = false; }
 }
 
 /**
@@ -3505,20 +3560,24 @@ async function dropQueueItem(event, targetId) {
 }
 
 async function moveMatchToTop(gameId) {
-    const queue = gameState.gameQueue || [];
-    const ongoingGames = queue.filter(g => g.status === 'ongoing');
-    const pendingGames = queue.filter(g => g.status === 'pending' || g.status === undefined || g.status === 'queued');
-    const completedGames = queue.filter(g => g.status === 'completed');
+    if (_asyncBusy) return;
+    _asyncBusy = true;
+    try {
+        const queue = gameState.gameQueue || [];
+        const ongoingGames = queue.filter(g => g.status === 'ongoing');
+        const pendingGames = queue.filter(g => g.status === 'pending' || g.status === undefined || g.status === 'queued');
+        const completedGames = queue.filter(g => g.status === 'completed');
 
-    const idx = pendingGames.findIndex(g => g.id === gameId);
-    if (idx <= 0) return; // Already first or not found
+        const idx = pendingGames.findIndex(g => g.id === gameId);
+        if (idx <= 0) return; // Already first or not found
 
-    const [match] = pendingGames.splice(idx, 1);
-    pendingGames.unshift(match);
+        const [match] = pendingGames.splice(idx, 1);
+        pendingGames.unshift(match);
 
-    gameState.gameQueue = [...ongoingGames, ...pendingGames, ...completedGames];
-    await saveGameState();
-    showStatus('Match moved to play next', 'success');
+        gameState.gameQueue = [...ongoingGames, ...pendingGames, ...completedGames];
+        await saveGameState();
+        showStatus('Match moved to play next', 'success');
+    } finally { _asyncBusy = false; }
 }
 
 async function removeFromQueue(gameId) {
@@ -3604,6 +3663,9 @@ function renderOngoingMatches() {
  * Start a match (move from queue to ongoing)
  */
 async function startMatch(gameId) {
+    if (_asyncBusy) return;
+    _asyncBusy = true;
+    try {
     const game = (gameState?.gameQueue || []).find(g => g.id === gameId);
     if (!game) {
         showStatus('Match not found', 'error');
@@ -3627,6 +3689,7 @@ async function startMatch(gameId) {
     });
 
     showStatus('Match started!', 'success');
+    } finally { _asyncBusy = false; }
 }
 
 /**
@@ -3786,16 +3849,20 @@ function closeResultConfirm() {
  * @param {number} winnerIndex - Index of the winning team (0, 1, 2, etc.)
  */
 async function quickConfirmResult(gameId, winnerIndex) {
-    const game = (gameState?.gameQueue || []).find(g => g.id === gameId);
-    if (!game) {
-        showStatus('Match not found', 'error');
-        return;
-    }
+    if (_asyncBusy) return;
+    _asyncBusy = true;
+    try {
+        const game = (gameState?.gameQueue || []).find(g => g.id === gameId);
+        if (!game) {
+            showStatus('Match not found', 'error');
+            return;
+        }
 
-    // Use existing confirmResult logic but with specific game
-    selectedQueuedGame = game;
-    await confirmResult(winnerIndex);
-    closeResultConfirm();
+        // Use existing confirmResult logic but with specific game
+        selectedQueuedGame = game;
+        await confirmResult(winnerIndex);
+        closeResultConfirm();
+    } finally { _asyncBusy = false; }
 }
 
 /**

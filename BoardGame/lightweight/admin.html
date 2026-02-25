@@ -25,7 +25,7 @@
     - 3-column layout: Teams | Board+Create | Queue
 
     USAGE:
-    - URL parameter: lightweight/admin_v2.html?tournamentId=xxx
+    - URL parameter: lightweight/admin.html?tournamentId=xxx
     - Or select tournament from dropdown
     ============================================================================
 -->
@@ -93,6 +93,7 @@
                 <select id="tournamentSelect" onchange="onTournamentSelect(this.value)">
                     <option value="">Select a tournament...</option>
                 </select>
+                <button class="btn-small tournament-state-btn" id="tournamentStateBtn" onclick="openStateChangeModal()" title="Change tournament state">setup</button>
                 <button class="btn secondary" onclick="refreshTournaments()">Refresh</button>
             </div>
 
@@ -414,6 +415,31 @@
             <div class="edit-match-actions">
                 <button class="btn primary" onclick="saveMatchEdits(this)">Save Changes</button>
                 <button class="btn secondary" onclick="closeEditMatchModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tournament State Change Modal -->
+    <div class="modal-overlay" id="stateChangeModal">
+        <div class="modal-content state-change-modal">
+            <h4>Change Tournament State</h4>
+            <p class="modal-hint">Select the new state for this tournament.</p>
+            <div class="state-options" id="stateOptions">
+                <button class="state-option" data-state="setup" onclick="confirmStateChange('setup')">
+                    <span class="state-option-label">Setup</span>
+                    <span class="state-option-desc">Preparing teams and configuration</span>
+                </button>
+                <button class="state-option" data-state="playing" onclick="confirmStateChange('playing')">
+                    <span class="state-option-label">Playing</span>
+                    <span class="state-option-desc">Tournament is live and ongoing</span>
+                </button>
+                <button class="state-option" data-state="finished" onclick="confirmStateChange('finished')">
+                    <span class="state-option-label">Finished</span>
+                    <span class="state-option-desc">Tournament has concluded</span>
+                </button>
+            </div>
+            <div class="state-change-actions">
+                <button class="btn secondary" onclick="closeStateChangeModal()">Cancel</button>
             </div>
         </div>
     </div>

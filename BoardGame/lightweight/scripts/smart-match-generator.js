@@ -62,20 +62,14 @@ class SmartMatchGenerator {
     initializeGameRotation() {
         const selectedGames = this.gameState?.selectedGames || ['cs2'];
 
-        // Build rotation with smart repeat counts
-        // Split format games (3v3+2v2) create 2 matches per "rotation", so they get lower repeat
+        // Each game gets 3 full sets before rotating to the next game
+        // For 5v5: 3 matches. For 3v3+2v2: 3 pairs = 6 individual matches.
         this.gameRotation.games = selectedGames.map(gameId => {
             const format = this.getGameFormat(gameId);
-            const isSplitFormat = format === '3v3+2v2';
-
             return {
                 gameId,
                 format,
-                // Split format games repeat 1-2 times, regular games 2-3 times
-                // This balances the total match count per game
-                repeatMin: isSplitFormat ? 1 : 2,
-                repeatMax: isSplitFormat ? 2 : 3,
-                repeatCount: isSplitFormat ? 2 : 3  // Default to max
+                repeatCount: 3
             };
         });
     }
@@ -100,6 +94,10 @@ class SmartMatchGenerator {
             // Restore game rotation
             if (saved.gameRotation) {
                 this.gameRotation = saved.gameRotation;
+                // Normalize repeatCount to 3 for all games (may have old values)
+                for (const game of this.gameRotation.games) {
+                    game.repeatCount = 3;
+                }
             } else {
                 this.initializeGameRotation();
             }
@@ -151,9 +149,73 @@ class SmartMatchGenerator {
             this.optimizer.currentMatchNumber = completedMatches.length;
         }
 
-        // Also count pending/ongoing matches for rotation position
+        // Rebuild rotation position from ALL queue matches (not just completed)
+        this.rebuildRotationPosition(gameQueue);
+    }
+
+    /**
+     * Rebuild game rotation position by analyzing the existing queue.
+     * Collapses simultaneous 3v3+2v2 pairs into single "sets" and
+     * counts consecutive sets of the last game to determine currentIndex/currentRepeat.
+     */
+    rebuildRotationPosition(gameQueue) {
         const allNormalMatches = gameQueue.filter(m => !m.isChallenge && !m.isBreak);
-        this.gameRotation.totalMatchesGenerated = allNormalMatches.length;
+
+        if (allNormalMatches.length === 0 || this.gameRotation.games.length === 0) {
+            this.gameRotation.totalMatchesGenerated = 0;
+            return;
+        }
+
+        // Collapse simultaneous pairs into "sets" (each set = one rotation step)
+        const sets = [];
+        let i = 0;
+        while (i < allNormalMatches.length) {
+            const match = allNormalMatches[i];
+            sets.push(match.game);
+
+            // If simultaneous, skip its paired match
+            if (match.isSimultaneous && i + 1 < allNormalMatches.length) {
+                const next = allNormalMatches[i + 1];
+                if (next.game === match.game && next.isSimultaneous) {
+                    i++;
+                }
+            }
+            i++;
+        }
+
+        this.gameRotation.totalMatchesGenerated = sets.length;
+
+        // Count consecutive sets of the same game at the tail of the queue
+        const lastGame = sets[sets.length - 1];
+        let consecutiveCount = 0;
+        for (let j = sets.length - 1; j >= 0; j--) {
+            if (sets[j] === lastGame) {
+                consecutiveCount++;
+            } else {
+                break;
+            }
+        }
+
+        // Find this game in the rotation
+        const gameIdx = this.gameRotation.games.findIndex(g => g.gameId === lastGame);
+
+        if (gameIdx >= 0) {
+            const game = this.gameRotation.games[gameIdx];
+
+            if (consecutiveCount >= game.repeatCount) {
+                // Last game's rotation is complete → next game
+                this.gameRotation.currentIndex = gameIdx + 1;
+                this.gameRotation.currentRepeat = 0;
+            } else {
+                // Still in this game's rotation
+                this.gameRotation.currentIndex = gameIdx;
+                this.gameRotation.currentRepeat = consecutiveCount;
+            }
+        }
+
+        console.log(`SmartMatchGenerator: Rebuilt rotation from ${sets.length} sets. ` +
+            `Position: game[${this.gameRotation.currentIndex % this.gameRotation.games.length}] ` +
+            `(${this.getCurrentGame()?.gameId}), repeat ${this.gameRotation.currentRepeat}`);
     }
 
     /**
@@ -222,32 +284,11 @@ class SmartMatchGenerator {
 
         const currentGame = this.getCurrentGame();
 
-        // Check if we should move to next game
-        // Dynamically choose repeat count between min and max for variety
-        const targetRepeat = this.calculateTargetRepeat(currentGame);
-
-        if (this.gameRotation.currentRepeat >= targetRepeat) {
+        // Move to next game after repeatCount full sets
+        if (this.gameRotation.currentRepeat >= currentGame.repeatCount) {
             this.gameRotation.currentIndex++;
             this.gameRotation.currentRepeat = 0;
         }
-    }
-
-    /**
-     * Calculate target repeat count for current position
-     * Varies between min and max to create natural-feeling rotation
-     */
-    calculateTargetRepeat(game) {
-        const { repeatMin, repeatMax } = game;
-
-        // Use total matches to create a pattern: 3, 2, 3, 2, 2, 3...
-        // This prevents predictable repetition while staying in range
-        const totalGames = this.gameRotation.games.length;
-        const cyclePosition = Math.floor(this.gameRotation.totalMatchesGenerated / totalGames) % 3;
-
-        if (cyclePosition === 1) {
-            return repeatMin;
-        }
-        return repeatMax;
     }
 
     /**

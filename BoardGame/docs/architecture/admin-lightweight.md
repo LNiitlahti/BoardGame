@@ -220,3 +220,21 @@ flowchart TD
     O --> Q[saveGameState]
     Q --> R[No gameHistory entry — breaks excluded from stats]
 ```
+
+## 12. Tournament State Management
+
+```mermaid
+flowchart TD
+    A[openStateChangeModal] --> B{gameState loaded?}
+    B -->|No| C[WARN: Load a tournament first — RETURN]
+    B -->|Yes| D[Show modal with setup / playing / finished options]
+    D --> E[Highlight current state]
+    E --> F[User clicks a state option]
+    F --> G[confirmStateChange newState]
+    G --> H{newState === currentState?}
+    H -->|Yes| I[Close modal — no-op]
+    H -->|No| J[gameState.status = newState]
+    J --> K[saveGameState]
+    K --> L[updateTournamentStateButton — color-coded badge]
+    L --> M[Refresh tournament list dropdown]
+```

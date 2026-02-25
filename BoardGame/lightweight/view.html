@@ -303,7 +303,7 @@
         .a-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 5px currentColor; }
         .a-info { display: flex; flex-direction: column; gap: 0px; }
         .a-side.left .a-info { align-items: flex-end; }
-        .a-name { font-family: 'Quantico', sans-serif; font-size: 24px; font-weight: 800; letter-spacing: -0.3px; white-space: nowrap; }
+        .a-name { font-family: 'Quantico', sans-serif; font-size: 24px; font-weight: 800; letter-spacing: -0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
         .a-team { font-family: 'Quantico', sans-serif; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; opacity: 0.4; }
 
         /* Center column — LIVE badge, game name, VS, format, timer */
@@ -323,7 +323,7 @@
         }
         @keyframes bg { 0%,100% { box-shadow: 0 0 16px var(--live-glow); } 50% { box-shadow: 0 0 40px rgba(0,224,128,0.5); } }
 
-        .a-game-name { font-family: 'Quantico', sans-serif; font-size: 15px; font-weight: 700; color: var(--text-bright); text-align: center; }
+        .a-game-name { font-family: 'Quantico', sans-serif; font-size: 15px; font-weight: 700; color: var(--text-bright); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
         .a-vs { font-family: 'Russo One', sans-serif; font-size: 58px; color: var(--gold); line-height: 0.85; text-shadow: 0 0 24px var(--gold-glow); letter-spacing: 3px; }
         .a-format { font-family: 'Quantico', sans-serif; font-size: 14px; font-weight: 700; color: var(--gold); background: var(--gold-dim); padding: 3px 10px; border-radius: 3px; border: 1px solid var(--border-gold); }
         .a-timer { font-family: 'Quantico', sans-serif; font-size: 18px; font-weight: 700; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
@@ -2246,9 +2246,15 @@
     });
 
     document.addEventListener('firebase-ready', () => {
-        console.log('Firebase ready, connecting to tournament:', tournamentId);
         setupTournamentListener();
         setupOnboardingListener();
+    });
+
+    // Clean up Firebase listeners on page unload to prevent zombie callbacks
+    window.addEventListener('beforeunload', () => {
+        if (activeListener) { activeListener(); activeListener = null; }
+        if (resultLogListener) { resultLogListener(); resultLogListener = null; }
+        if (onboardingListener) { onboardingListener(); onboardingListener = null; }
     });
     </script>
 
@@ -2256,9 +2262,13 @@
     <script>
     (function() {
         const field = document.getElementById('emberField');
+        const MAX_EMBERS = 120; // Cap DOM nodes to prevent memory creep over hours
         let ct = 0;
 
         function spawnEmber() {
+            // Skip if at capacity — oldest embers auto-remove via setTimeout
+            if (field.childElementCount >= MAX_EMBERS) return;
+
             const e = document.createElement('div');
             ct++;
             const type = ct % 12 === 0 ? 'spark' : ct % 4 === 0 ? 'bright' : '';
@@ -2274,7 +2284,7 @@
             e.style.height = size + 'px';
 
             field.appendChild(e);
-            setTimeout(() => e.remove(), 26000);
+            setTimeout(() => { if (e.parentNode) e.remove(); }, 26000);
         }
 
         setInterval(spawnEmber, 150);
