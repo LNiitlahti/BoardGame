@@ -316,6 +316,11 @@ h1, h2, h3, h4, h5, h6 {
     color: #fff;
     border: 1px solid #6b7280;
 }
+.tournament-state-btn.state-archived {
+    background: #7c3aed;
+    color: #fff;
+    border: 1px solid #7c3aed;
+}
 
 /* State change modal */
 .state-change-modal {
@@ -346,6 +351,19 @@ h1, h2, h3, h4, h5, h6 {
 .state-option.current {
     border-color: var(--accent-primary);
     background: rgba(212, 175, 55, 0.1);
+}
+.state-option[data-state="archived"] {
+    border-color: var(--accent-danger);
+}
+.state-option[data-state="archived"]:hover {
+    border-color: var(--accent-danger);
+    background: rgba(239, 68, 68, 0.1);
+}
+.archived-warning {
+    color: var(--accent-danger);
+    font-size: 12px;
+    margin-top: 8px;
+    text-align: center;
 }
 .state-option-label {
     font-weight: 700;

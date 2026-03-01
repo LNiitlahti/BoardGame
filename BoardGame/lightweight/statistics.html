@@ -39,7 +39,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="../shared/css/brand-theme.css">
     <link rel="stylesheet" href="../shared/css/navbar.css">
@@ -68,7 +68,10 @@
 
             <div class="navbar-user">
                 <div class="navbar-connection-status" id="connectionStatus" title="Connecting..."></div>
-                <button class="btn secondary" onclick="exportStatistics()">Export</button>
+                <div class="action-buttons">
+                    <button class="btn secondary" onclick="exportStatistics()">Export JSON</button>
+                    <button class="btn primary" onclick="generatePDF()" id="pdfBtn">Generate PDF</button>
+                </div>
             </div>
         </div>
     </nav>
@@ -81,7 +84,7 @@
                 <select id="tournamentSelect" onchange="onTournamentSelect(this.value)">
                     <option value="">Select a tournament...</option>
                 </select>
-                <button class="btn secondary" onclick="refreshTournaments()">Refresh</button>
+                <button class="btn secondary" id="refreshBtn" onclick="refreshTournaments()">Refresh</button>
             </div>
 
             <div class="tournament-meta" id="tournamentMeta">
@@ -94,6 +97,7 @@
         <!-- Tab Navigation -->
         <div class="tab-nav">
             <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+            <button class="tab-btn" data-tab="leaderboards" onclick="switchTab('leaderboards')">Leaderboards</button>
             <button class="tab-btn" data-tab="players" onclick="switchTab('players')">Players</button>
             <button class="tab-btn" data-tab="matches" onclick="switchTab('matches')">Match History</button>
             <button class="tab-btn" data-tab="headtohead" onclick="switchTab('headtohead')">Head-to-Head</button>
@@ -154,9 +158,8 @@
                 </div>
             </div>
 
-            <!-- Players Tab -->
-            <div class="tab-pane" id="tab-players">
-                <!-- Player Leaderboards -->
+            <!-- Leaderboards Tab -->
+            <div class="tab-pane" id="tab-leaderboards">
                 <section class="stats-card player-leaderboards-card">
                     <h3>Player Leaderboards</h3>
                     <div class="leaderboard-tabs">
@@ -169,7 +172,10 @@
                         <p class="no-data">Select a tournament to view player leaderboards</p>
                     </div>
                 </section>
+            </div>
 
+            <!-- Players Tab -->
+            <div class="tab-pane" id="tab-players">
                 <div class="player-stats-grid">
                     <!-- Player Selector & Stats -->
                     <section class="stats-card player-detail-card">
@@ -287,12 +293,24 @@
         </div>
     </div>
 
+    <!-- PDF Generation Overlay -->
+    <div id="pdfOverlay" class="pdf-overlay hidden">
+        <div class="pdf-progress">
+            <div class="spinner"></div>
+            <div>Generating PDF...</div>
+            <div class="pdf-progress-text" id="pdfProgressText">Preparing tournament data</div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script>window.BOARDGAME_BASE = '..';</script>
     <script src="../shared/scripts/firebase-loader.js"></script>
     <script src="../shared/scripts/config.js"></script>
     <script src="../shared/scripts/player-utils.js"></script>
+    <script src="../shared/scripts/games-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
     <script src="../shared/scripts/toast.js"></script>
     <script src="scripts/statistics.js"></script>
 </body>

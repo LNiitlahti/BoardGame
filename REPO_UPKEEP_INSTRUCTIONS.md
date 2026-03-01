@@ -94,7 +94,7 @@ These are baked into multiple files. Changing them requires updates across the c
 |---|---|
 | 5 teams | `lightweight/scripts/smart-match-generator.js`, `lightweight/scripts/balance-optimizer.js`, `shared/scripts/match-suggester.js` |
 | 2 players per team | `lightweight/scripts/smart-match-generator.js`, `lightweight/scripts/balance-optimizer.js`, `shared/scripts/match-suggester.js` |
-| 10 players total | `lightweight/scripts/onboarding.js` (loops 1-10) |
+| 10 players total | ~~`lightweight/scripts/onboarding.js`~~ RESOLVED: now uses dynamic player IDs from team data |
 | 10-match rotation cycle | `shared/scripts/match-suggester.js` (ROTATION_PATTERN array) |
 | Win rate thresholds (60/40) | `lightweight/scripts/statistics.js` (used 8+ places, not extracted to function) |
 | Leaderboard min games (3) | `lightweight/scripts/statistics.js` (winrate leaderboard filter) |

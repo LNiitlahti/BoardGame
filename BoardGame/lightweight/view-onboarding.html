@@ -681,38 +681,32 @@
         // DATA HELPERS
         // =================================================================
 
+        function getAllPlayerIds() {
+            const ids = [];
+            const teams = gameState?.teams || [];
+            for (const team of teams) {
+                for (const player of (team.players || [])) {
+                    if (player.id) ids.push(player.id);
+                }
+            }
+            return ids;
+        }
+
         function getPlayerMapping() {
             const mapping = {};
             const teams = gameState?.teams || [];
-            let playerNum = 1;
 
             for (const team of teams) {
-                const players = team.players || [];
-                for (const player of players) {
-                    if (playerNum <= 10) {
-                        mapping[playerNum] = {
-                            id: player.id || 'player_' + playerNum,
-                            name: player.name || 'Player ' + playerNum,
-                            teamId: team.id,
-                            teamName: team.name || 'Team ' + team.id,
-                            teamColor: team.color || '#666666'
-                        };
-                        playerNum++;
-                    }
+                for (const player of (team.players || [])) {
+                    if (!player.id) continue;
+                    mapping[player.id] = {
+                        id: player.id,
+                        name: player.name || player.id,
+                        teamId: team.id,
+                        teamName: team.name || 'Team ' + team.id,
+                        teamColor: team.color || '#666666'
+                    };
                 }
-            }
-
-            while (playerNum <= 10) {
-                const teamIndex = Math.floor((playerNum - 1) / 2);
-                const team = teams[teamIndex] || {};
-                mapping[playerNum] = {
-                    id: 'player_' + playerNum,
-                    name: 'Player ' + playerNum,
-                    teamId: team.id || teamIndex + 1,
-                    teamName: team.name || 'Team ' + (teamIndex + 1),
-                    teamColor: team.color || '#666666'
-                };
-                playerNum++;
             }
 
             return mapping;
@@ -732,16 +726,18 @@
             });
         }
 
-        function getPlayerProgress(playerNum) {
-            const playerData = onboardingState?.players?.[String(playerNum)] || {};
+        function getPlayerProgress(playerId) {
+            const playerData = onboardingState?.players?.[playerId] || {};
             const games = getSelectedGames();
-            const totalFriends = 9;
+            const allIds = getAllPlayerIds();
+            const otherIds = allIds.filter(id => id !== playerId);
+            const totalFriends = otherIds.length;
             const totalGames = games.length;
             const totalTasks = totalFriends + totalGames;
 
             let friendsComplete = 0;
-            for (let i = 1; i <= 10; i++) {
-                if (i !== playerNum && playerData.friendsAdded?.[String(i)]) {
+            for (const otherId of otherIds) {
+                if (playerData.friendsAdded?.[otherId]) {
                     friendsComplete++;
                 }
             }
@@ -774,6 +770,8 @@
             const playerMapping = getPlayerMapping();
             const games = getSelectedGames();
             const teams = gameState?.teams || [];
+            const allIds = getAllPlayerIds();
+            const playerCount = allIds.length;
 
             // Header
             document.getElementById('tournamentName').textContent = gameState.name || 'Tournament';
@@ -788,16 +786,16 @@
             // Calculate overall stats
             let totalReady = 0;
             let totalPercent = 0;
-            for (let i = 1; i <= 10; i++) {
-                const progress = getPlayerProgress(i);
+            for (const playerId of allIds) {
+                const progress = getPlayerProgress(playerId);
                 if (progress.isComplete) totalReady++;
                 totalPercent += progress.percent;
             }
-            const avgPercent = Math.round(totalPercent / 10);
+            const avgPercent = playerCount > 0 ? Math.round(totalPercent / playerCount) : 0;
 
             const readyEl = document.getElementById('readyCount');
-            readyEl.textContent = totalReady + '/10';
-            readyEl.classList.toggle('all-ready', totalReady === 10);
+            readyEl.textContent = totalReady + '/' + playerCount;
+            readyEl.classList.toggle('all-ready', totalReady === playerCount);
 
             document.getElementById('overallPercent').textContent = avgPercent + '%';
 
@@ -810,12 +808,12 @@
 
             if (isFirstRender) {
                 buildTeamsGrid(playerMapping, teams);
-                buildGamesFooter(games);
+                buildGamesFooter(games, playerCount);
                 isFirstRender = false;
             }
 
             updateTeamsGrid(teams);
-            updateGamesFooter(games);
+            updateGamesFooter(games, playerCount);
         }
 
         // ----- Build DOM once (first render) -----
@@ -824,22 +822,22 @@
             const container = document.getElementById('teamsGrid');
             let html = '';
 
-            for (let t = 0; t < 5; t++) {
-                const team = teams[t] || {};
-                const teamColor = team.color || 'var(--t' + (t + 1) + ')';
-                const teamName = team.name || 'Team ' + (t + 1);
-                const p1 = t * 2 + 1;
-                const p2 = t * 2 + 2;
+            for (const team of teams) {
+                const teamColor = team.color || '#666666';
+                const teamName = team.name || 'Team ' + team.id;
 
                 html += '<div class="team-column">';
 
                 html += '<div class="team-header" style="border-left: 3px solid ' + teamColor + ';">';
                 html += '<div class="team-name" style="color: ' + teamColor + ';">' + escapeHtml(teamName) + '</div>';
-                html += '<div class="team-status" data-team-status="' + (t + 1) + '"></div>';
+                html += '<div class="team-status" data-team-status="' + team.id + '"></div>';
                 html += '</div>';
 
-                html += buildPlayerCardHTML(p1, playerMapping, teamColor);
-                html += buildPlayerCardHTML(p2, playerMapping, teamColor);
+                for (const player of (team.players || [])) {
+                    if (player.id) {
+                        html += buildPlayerCardHTML(player.id, playerMapping, teamColor);
+                    }
+                }
 
                 html += '</div>';
             }
@@ -847,26 +845,27 @@
             container.innerHTML = html;
         }
 
-        function buildPlayerCardHTML(playerNum, playerMapping, teamColor) {
-            const info = playerMapping[playerNum];
+        function buildPlayerCardHTML(playerId, playerMapping, teamColor) {
+            const info = playerMapping[playerId];
+            if (!info) return '';
 
-            let html = '<div class="player-card" data-player="' + playerNum + '">';
+            let html = '<div class="player-card" data-player="' + playerId + '">';
             html += '<div class="card-accent" style="background:' + teamColor + ';"></div>';
             html += '<div class="player-name">' + escapeHtml(info.name) + '</div>';
 
             html += '<div class="progress-container">';
-            html += '<div class="progress-bar-bg"><div class="progress-bar-fill" data-bar="' + playerNum + '" style="width:0%"></div></div>';
-            html += '<div class="progress-percent" data-percent="' + playerNum + '">0%</div>';
+            html += '<div class="progress-bar-bg"><div class="progress-bar-fill" data-bar="' + playerId + '" style="width:0%"></div></div>';
+            html += '<div class="progress-percent" data-percent="' + playerId + '">0%</div>';
             html += '</div>';
 
             html += '<div class="stat-rows">';
             html += '<div class="stat-row">';
             html += '<span class="stat-label"><span class="stat-label-icon">👥</span> Friends</span>';
-            html += '<span class="stat-value" data-friends="' + playerNum + '">0/9</span>';
+            html += '<span class="stat-value" data-friends="' + playerId + '">0/0</span>';
             html += '</div>';
             html += '<div class="stat-row">';
             html += '<span class="stat-label"><span class="stat-label-icon">🎮</span> Games</span>';
-            html += '<span class="stat-value" data-games="' + playerNum + '">0/0</span>';
+            html += '<span class="stat-value" data-games="' + playerId + '">0/0</span>';
             html += '</div>';
             html += '</div>';
 
@@ -875,7 +874,7 @@
             return html;
         }
 
-        function buildGamesFooter(games) {
+        function buildGamesFooter(games, playerCount) {
             const container = document.getElementById('gamesFooter');
 
             if (games.length === 0) {
@@ -897,7 +896,7 @@
 
                 html += '<div class="game-info">';
                 html += '<div class="game-name">' + escapeHtml(game.shortName || game.name) + '</div>';
-                html += '<div class="game-tested-count" data-game-count="' + game.id + '">0/10</div>';
+                html += '<div class="game-tested-count" data-game-count="' + game.id + '">0/' + playerCount + '</div>';
                 html += '</div>';
                 html += '</div>';
             }
@@ -908,32 +907,33 @@
         // ----- Surgical updates (every render after first) -----
 
         function updateTeamsGrid(teams) {
-            for (let t = 0; t < 5; t++) {
-                const p1 = t * 2 + 1;
-                const p2 = t * 2 + 2;
-                const prog1 = getPlayerProgress(p1);
-                const prog2 = getPlayerProgress(p2);
-                const teamReady = (prog1.isComplete && prog2.isComplete);
+            for (const team of teams) {
+                const teamPlayers = (team.players || []).filter(p => p.id);
+                const progresses = teamPlayers.map(p => getPlayerProgress(p.id));
+                const allReady = progresses.length > 0 && progresses.every(p => p.isComplete);
+                const someReady = progresses.some(p => p.isComplete);
+                const readyCount = progresses.filter(p => p.isComplete).length;
 
-                const statusEl = document.querySelector('[data-team-status="' + (t + 1) + '"]');
+                const statusEl = document.querySelector('[data-team-status="' + team.id + '"]');
                 if (statusEl) {
-                    statusEl.textContent = teamReady ? 'READY' : (prog1.isComplete || prog2.isComplete ? '1/2 READY' : 'IN PROGRESS');
-                    statusEl.classList.toggle('ready', teamReady);
+                    statusEl.textContent = allReady ? 'READY' : (someReady ? readyCount + '/' + teamPlayers.length + ' READY' : 'IN PROGRESS');
+                    statusEl.classList.toggle('ready', allReady);
                 }
 
-                updatePlayerCard(p1);
-                updatePlayerCard(p2);
+                for (const player of teamPlayers) {
+                    updatePlayerCard(player.id);
+                }
             }
         }
 
-        function updatePlayerCard(playerNum) {
-            const progress = getPlayerProgress(playerNum);
+        function updatePlayerCard(playerId) {
+            const progress = getPlayerProgress(playerId);
 
-            const card = document.querySelector('[data-player="' + playerNum + '"]');
+            const card = document.querySelector('[data-player="' + playerId + '"]');
             if (!card) return;
             card.classList.toggle('complete', progress.isComplete);
 
-            const bar = document.querySelector('[data-bar="' + playerNum + '"]');
+            const bar = document.querySelector('[data-bar="' + playerId + '"]');
             if (bar) {
                 const barClass = progress.percent === 100 ? 'done'
                     : progress.percent >= 70 ? 'high'
@@ -942,20 +942,20 @@
                 bar.style.width = progress.percent + '%';
             }
 
-            const pctEl = document.querySelector('[data-percent="' + playerNum + '"]');
+            const pctEl = document.querySelector('[data-percent="' + playerId + '"]');
             if (pctEl) {
                 pctEl.textContent = progress.percent + '%';
                 pctEl.classList.toggle('done', progress.isComplete);
             }
 
-            const friendsEl = document.querySelector('[data-friends="' + playerNum + '"]');
+            const friendsEl = document.querySelector('[data-friends="' + playerId + '"]');
             if (friendsEl) {
                 friendsEl.textContent = progress.friendsComplete + '/' + progress.friendsTotal;
                 friendsEl.className = 'stat-value ' + (progress.friendsComplete >= progress.friendsTotal ? 'complete'
                     : progress.friendsComplete > 0 ? 'partial' : 'empty');
             }
 
-            const gamesEl = document.querySelector('[data-games="' + playerNum + '"]');
+            const gamesEl = document.querySelector('[data-games="' + playerId + '"]');
             if (gamesEl) {
                 gamesEl.textContent = progress.gamesComplete + '/' + progress.gamesTotal;
                 gamesEl.className = 'stat-value ' + (progress.gamesComplete >= progress.gamesTotal ? 'complete'
@@ -963,17 +963,20 @@
             }
         }
 
-        function updateGamesFooter(games) {
+        function updateGamesFooter(games, playerCount) {
+            const allIds = getAllPlayerIds();
+            const count = playerCount || allIds.length;
+
             for (const game of games) {
                 let testedCount = 0;
-                for (let i = 1; i <= 10; i++) {
-                    const playerData = onboardingState?.players?.[String(i)] || {};
+                for (const playerId of allIds) {
+                    const playerData = onboardingState?.players?.[playerId] || {};
                     if (playerData.gamesTested?.[game.id]) {
                         testedCount++;
                     }
                 }
 
-                const allTested = testedCount === 10;
+                const allTested = testedCount === count;
                 const countClass = allTested ? 'all' : testedCount > 0 ? 'partial' : 'none';
 
                 const cardEl = document.querySelector('[data-game-card="' + game.id + '"]');
@@ -983,7 +986,7 @@
 
                 const countEl = document.querySelector('[data-game-count="' + game.id + '"]');
                 if (countEl) {
-                    countEl.textContent = testedCount + '/10';
+                    countEl.textContent = testedCount + '/' + count;
                     countEl.className = 'game-tested-count ' + countClass;
                 }
             }

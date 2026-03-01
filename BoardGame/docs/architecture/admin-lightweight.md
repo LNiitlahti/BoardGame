@@ -223,18 +223,37 @@ flowchart TD
 
 ## 12. Tournament State Management
 
+States: `setup` → `playing` → `finished` → `archived`
+
+- `currentUserRole` global stores `'god'` or `'admin'` from auth
+- Archive button only visible when state is `finished` (or already `archived`)
+- Archiving sets `archivedAt` timestamp, requires confirmation dialog
+- Unarchiving (from `archived` to any other state) requires God role
+- Firestore rules block non-God updates to archived tournaments
+
 ```mermaid
 flowchart TD
     A[openStateChangeModal] --> B{gameState loaded?}
     B -->|No| C[WARN: Load a tournament first — RETURN]
-    B -->|Yes| D[Show modal with setup / playing / finished options]
+    B -->|Yes| D[Show state options]
     D --> E[Highlight current state]
-    E --> F[User clicks a state option]
-    F --> G[confirmStateChange newState]
-    G --> H{newState === currentState?}
-    H -->|Yes| I[Close modal — no-op]
-    H -->|No| J[gameState.status = newState]
-    J --> K[saveGameState]
-    K --> L[updateTournamentStateButton — color-coded badge]
-    L --> M[Refresh tournament list dropdown]
+    D --> F{currentState === finished?}
+    F -->|Yes| G[Show archive button]
+    F -->|No| H{currentState === archived?}
+    H -->|Yes + God| I[Show all options to unarchive]
+    H -->|Yes + Admin| J[Show warning: only God can unarchive]
+    H -->|No| K[Hide archive button]
+    E --> L[User clicks option]
+    L --> M[confirmStateChange newState]
+    M --> N{newState === archived?}
+    N -->|Yes| O[confirm dialog + set archivedAt]
+    N -->|No| P{currentState === archived?}
+    P -->|Yes| Q{currentUserRole === god?}
+    Q -->|No| R[BLOCK: only God can unarchive]
+    Q -->|Yes| S[Clear archivedAt]
+    O --> T[saveGameState]
+    S --> T
+    P -->|No| T
+    T --> U[updateTournamentStateButton]
+    U --> V[Refresh tournament list dropdown]
 ```

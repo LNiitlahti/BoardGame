@@ -1267,8 +1267,25 @@
 
     function getMatchSignature(match) {
         if (!match) return null;
-        try { return JSON.stringify(match); }
-        catch { return String(Math.random()); }
+        // Use only stable structural fields — avoids false diffs from
+        // Firebase Timestamp object re-serialization on each snapshot
+        const parts = [
+            match.id,
+            match.matchNumber,
+            match.game,
+            match.playType,
+            match.status,
+            match.winningSide || '',
+            match.isBreak ? 'break' : '',
+            match.breakLabel || '',
+        ];
+        if (match.teams) {
+            match.teams.forEach(t => {
+                parts.push(t.id);
+                parts.push((t.playerIds || []).join(','));
+            });
+        }
+        return parts.join('|');
     }
 
     function updateMatchTimers() {
@@ -1408,11 +1425,11 @@
         const players = onboardingState?.players || {};
         const items = [];
 
-        // Build a playerNumber -> name mapping from teams
-        let playerNum = 1;
+        // Iterate teams and look up onboarding data by real player ID
         for (const team of teams) {
             for (const p of (team.players || [])) {
-                const pData = players[String(playerNum)] || {};
+                if (!p.id) continue;
+                const pData = players[p.id] || {};
                 const statuses = pData.statuses || {};
                 const activeEmojis = Object.entries(STATUS_EMOJIS)
                     .filter(([key]) => statuses[key])
@@ -1421,7 +1438,6 @@
                 if (activeEmojis) {
                     items.push(`<span class="ss-item"><span class="ss-emoji">${activeEmojis}</span><span class="ss-name">${p.name || 'Player'}</span></span>`);
                 }
-                playerNum++;
             }
         }
 

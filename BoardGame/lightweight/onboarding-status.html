@@ -2,7 +2,7 @@
 <html lang="en">
 <!--
     Mini status popup - opened from onboarding page.
-    Params: ?tournamentId=xxx&player=N&secret=yyy
+    Params: ?tournamentId=xxx&player=p_xxxxx&secret=yyy
 -->
 <head>
     <meta charset="UTF-8">
@@ -83,12 +83,12 @@
     const STATUS_KEYS = ['eating', 'smoking', 'wc', 'sleeping', 'alert', 'question'];
     const params = new URLSearchParams(window.location.search);
     const tournamentId = params.get('tournamentId') || params.get('tournament');
-    const playerNum = params.get('player');
+    const playerId = params.get('player');
     let onboardingRef = null;
     let currentStatuses = {};
 
     document.addEventListener('firebase-ready', () => {
-        if (!tournamentId || !playerNum) return;
+        if (!tournamentId || !playerId) return;
         const db = window.firebaseDB;
         onboardingRef = db.collection('tournaments').doc(tournamentId)
             .collection('onboarding').doc('state');
@@ -97,7 +97,7 @@
         window.firebaseOnSnapshot(onboardingRef, (snap) => {
             if (!snap.exists) return;
             const data = snap.data();
-            currentStatuses = data?.players?.[playerNum]?.statuses || {};
+            currentStatuses = data?.players?.[playerId]?.statuses || {};
             renderButtons();
         });
     });
@@ -117,12 +117,12 @@
         // Exclusive: clear all, then set if toggling on
         const updates = {};
         for (const k of STATUS_KEYS) {
-            updates[`players.${playerNum}.statuses.${k}`] = false;
+            updates[`players.${playerId}.statuses.${k}`] = false;
         }
         if (!wasActive) {
-            updates[`players.${playerNum}.statuses.${key}`] = true;
+            updates[`players.${playerId}.statuses.${key}`] = true;
         }
-        updates[`players.${playerNum}.lastUpdated`] = new Date().toISOString();
+        updates[`players.${playerId}.lastUpdated`] = new Date().toISOString();
 
         onboardingRef.update(updates).catch(err => console.error('Save failed:', err));
     });

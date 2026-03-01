@@ -17,6 +17,7 @@ let boardModule = null;
 let boardRenderer = null;
 let currentUser = null;
 let currentTournamentId = null;
+let currentUserRole = null; // 'god' or 'admin'
 
 // Match creation state - dynamic array of sides
 let manualGameSetup = {
@@ -170,6 +171,9 @@ document.addEventListener('firebase-ready', async function() {
                 }, 1500);
                 return;
             }
+
+            // Store user role
+            currentUserRole = userData.isGod ? 'god' : 'admin';
 
             // Update UI
             document.getElementById('userName').textContent = userData.displayName || user.email;
@@ -375,7 +379,11 @@ async function loadTournament(tournamentId) {
                 // Apply custom team colors from Firebase
                 applyTeamColors();
 
-                showStatus('Tournament loaded', 'success');
+                if (gameState.status === 'archived') {
+                    showStatus('This tournament is archived. Changes are blocked by the server.', 'warning');
+                } else {
+                    showStatus('Tournament loaded', 'success');
+                }
             } else {
                 showStatus('Tournament not found', 'error');
                 gameState = null;
@@ -396,7 +404,7 @@ async function loadTournament(tournamentId) {
 // TOURNAMENT STATE MANAGEMENT
 // =============================================================================
 
-const TOURNAMENT_STATES = ['setup', 'playing', 'finished'];
+const TOURNAMENT_STATES = ['setup', 'playing', 'finished', 'archived'];
 
 function updateTournamentStateButton() {
     const btn = document.getElementById('tournamentStateBtn');
@@ -422,8 +430,25 @@ function openStateChangeModal() {
     const currentState = gameState.status || 'setup';
     const options = document.querySelectorAll('#stateOptions .state-option');
     options.forEach(opt => {
-        opt.classList.toggle('current', opt.dataset.state === currentState);
+        const state = opt.dataset.state;
+        opt.classList.toggle('current', state === currentState);
+
+        // Archive button only visible when current state is 'finished' or already 'archived'
+        if (state === 'archived') {
+            opt.style.display = (currentState === 'finished' || currentState === 'archived') ? '' : 'none';
+        }
+
+        // When archived, only God can see other state options to unarchive
+        if (currentState === 'archived' && state !== 'archived') {
+            opt.style.display = (currentUserRole === 'god') ? '' : 'none';
+        }
     });
+
+    // Show warning for non-God users viewing archived tournament
+    const warningEl = document.getElementById('archivedWarning');
+    if (warningEl) {
+        warningEl.style.display = (currentState === 'archived' && currentUserRole !== 'god') ? 'block' : 'none';
+    }
 
     document.getElementById('stateChangeModal').classList.add('active');
 }
@@ -439,6 +464,23 @@ async function confirmStateChange(newState) {
     if (newState === currentState) {
         closeStateChangeModal();
         return;
+    }
+
+    // Archive requires confirmation
+    if (newState === 'archived') {
+        if (!confirm('Archive this tournament? Archived tournaments are protected from edits. Only God users can unarchive.')) {
+            return;
+        }
+        gameState.archivedAt = new Date().toISOString();
+    }
+
+    // Unarchiving requires God role
+    if (currentState === 'archived') {
+        if (currentUserRole !== 'god') {
+            showStatus('Only God users can unarchive tournaments', 'error');
+            return;
+        }
+        gameState.archivedAt = null;
     }
 
     gameState.status = newState;

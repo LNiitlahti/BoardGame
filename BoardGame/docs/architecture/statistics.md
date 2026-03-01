@@ -1,26 +1,35 @@
 # statistics.js — Logic Diagrams
 
 > Source: `BoardGame/lightweight/scripts/statistics.js`
-> Analytics engine: leaderboards, H2H matrix, streaks, charts, player detail.
+> Analytics engine: leaderboards, H2H matrix, streaks, charts, player detail, PDF report generation.
 > Note: `renderSummaryStats` filters out break entries (`.filter(m => !m.isBreak)`) so breaks don't inflate match counts.
 
 ## 1. Data Loading Pipeline
+
+Includes caching and cooldown to prevent Firebase read abuse:
+- `tournamentCache` — stores loaded tournament data with 5-min TTL
+- `lastListFetchAt` + `LIST_COOLDOWN_MS (30s)` — cooldown between list refreshes
+- Refresh button shows countdown timer when on cooldown
+- Initial page load bypasses cooldown (`loadTournamentsList(true)`)
 
 ```mermaid
 flowchart TD
     A[DOMContentLoaded] --> B[Log ready]
     B --> C[Wait for firebase-ready event]
     C --> D[updateConnectionStatus connected]
-    D --> E[loadTournamentsList]
+    D --> E["loadTournamentsList(bypassCooldown=true)"]
     E --> F{URL has tournamentId?}
     F -->|Yes| G["loadTournament(id)"]
     F -->|No| H[Show tournament selector only]
     G --> I[showLoadingOverlay]
-    I --> J[Firestore query]
+    I --> I2{Cached and TTL valid?}
+    I2 -->|Yes| M2[Use cached data]
+    I2 -->|No| J[Firestore query]
     J --> K{Document found?}
     K -->|No| L[Log error — return]
-    K -->|Yes| M["gameState = doc.data()"]
+    K -->|Yes| M["gameState = doc.data() + cache it"]
     M --> N[updateMetaInfo]
+    M2 --> N
     N --> O[populateFilters]
     O --> P[renderAllStatistics]
     P --> P1["playerStatsCache = calculateAllPlayerStats()"]
@@ -195,18 +204,21 @@ flowchart TD
 
 ## 7. Points Progression Chart
 
+Total points = hex territory points (`team.points`) + victory points (`team.gamesWon`).
+Matches view.html's `getTeamTotalPoints()` formula.
+
 ```mermaid
 flowchart TD
     A[renderPointsChart] --> B["Create dataset per team — start at 0"]
     B --> C{For each match in history}
     C --> D{For each team}
     D --> E{"match.teamStatsSnapshot[team] exists?"}
-    E -->|Yes| F[Push snapshot.points]
+    E -->|Yes| F["Push snapshot.points + snapshot.gamesWon"]
     E -->|No| G[Push last known value — carry forward]
     F --> C
     G --> C
     C -->|Done| H["Add 'Current' label"]
-    H --> I[Push current team.points as final point]
+    H --> I["Push team.points + team.gamesWon as final point"]
     I --> J[Render Chart.js line chart]
 ```
 
@@ -242,4 +254,45 @@ flowchart TD
     H --> K
     I --> K
     J --> K
+```
+
+## 10. PDF Report Generation
+
+Uses jsPDF + jsPDF-AutoTable (loaded from CDN).
+Generates a multi-page dark-themed PDF with all tournament data.
+
+```mermaid
+flowchart TD
+    A["generatePDF()"] --> B{gameState loaded?}
+    B -->|No| C["showToast warning — return"]
+    B -->|Yes| D[Show pdfOverlay]
+    D --> E[Init jsPDF A4 portrait]
+
+    E --> F[Page 1: Cover]
+    F --> F1["Tournament name, status, meta info"]
+
+    F1 --> G[Page 2: Team Standings]
+    G --> G1["autoTable: sorted teams with total/wins/hex/W-L/win%/hexes"]
+    G1 --> G2[Tournament Summary stats]
+    G2 --> G3["autoTable: H2H matrix (team vs team)"]
+
+    G3 --> H[Page 3+: Player Statistics]
+    H --> H1["autoTable: all players overview (games/wins/losses/win%/streak)"]
+    H1 --> H2{For each player with games > 0}
+    H2 --> H3["Sub-header: name + team"]
+    H3 --> H4[Core stats line]
+    H4 --> H5["autoTable: performance by game (W-L, win%)"]
+    H5 --> H6["autoTable: H2H vs opponents (W-L, win%)"]
+    H6 --> H2
+
+    H2 -->|Done| I[Match History page]
+    I --> I1["autoTable: all matches chronological (#/game/format/winner/loser/duration/time)"]
+
+    I1 --> J[Game Analysis]
+    J --> J1["autoTable: game breakdown (matches/% of total/avg duration)"]
+
+    J1 --> K[Add footer to all pages]
+    K --> L["doc.save() — download PDF"]
+    L --> M[Hide pdfOverlay]
+    M --> N["showToast success"]
 ```

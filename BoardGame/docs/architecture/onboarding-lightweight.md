@@ -17,9 +17,9 @@ flowchart TD
     C -->|No| D[FATAL ERROR — blocks all views]
     C -->|Yes| E{"view === 'admin'?"}
     E -->|Yes| F[isAdminView = true]
-    E -->|No| G{player param valid 1-10?}
-    G -->|No| H[FATAL ERROR — invalid player]
-    G -->|Yes| I[currentPlayerNumber = player]
+    E -->|No| G{player param exists?}
+    G -->|No| H[FATAL ERROR — invalid player link]
+    G -->|Yes| I[currentPlayerId = player param string]
     F --> J["Wait for firebase-ready<br/>(anonymous auth handled by firebase-loader.js)"]
     I --> J
     J --> K[setupTournamentListener]
@@ -28,8 +28,22 @@ flowchart TD
     L2 --> L3["setupOnboardingListener — subcollection"]
     L3 --> L4["onboardingState = subcollection data"]
     L4 --> M["renderCurrentView — waits for both listeners"]
-    M --> M2["validateSecretAccess"]
-    M2 --> N{isAdminView?}
+    M --> M1["migrateNumberKeysToPlayerIds (one-time, with backup)"]
+    M1 --> M1a{"_migrated_to_ids flag?"}
+    M1a -->|Yes| M2
+    M1a -->|No| M1b["Build numToId map from teams"]
+    M1b --> M1c{"All number keys mappable?"}
+    M1c -->|No| M1d["Abort migration, log warning"]
+    M1c -->|Yes| M1e["Backup original players to _pre_migration_backup"]
+    M1e --> M1f["Rewrite players + friendsAdded keys to player IDs"]
+    M1f --> M1g["Atomic set() to Firebase"]
+    M1g --> M2
+    M1d --> M2
+    M --> M1v{"Player ID in team data?"}
+    M1v -->|No| M1w[FATAL ERROR — player not found]
+    M1v -->|Yes| M2
+    M2 --> M2a["validateSecretAccess"]
+    M2a --> N{isAdminView?}
     N -->|Yes| O[renderAdminView]
     N -->|No| P{secretHash or legacy secret?}
     P -->|No| Q[renderPlayerView]
@@ -46,9 +60,9 @@ flowchart TD
     A[toggleFriendStatus or toggleGameStatus] --> B[Toggle local state]
     B --> C[Update lastUpdated timestamp]
     C --> D[checkPlayerCompletion]
-    D --> E["Count friendsComplete: loop 1-10, skip self"]
+    D --> E["Count friendsComplete: loop getAllPlayerIds(), skip self"]
     D --> F["Count gamesComplete: loop selectedGames"]
-    E --> G{"friendsComplete >= 9 AND gamesComplete >= totalGames?"}
+    E --> G{"friendsComplete >= otherIds.length AND gamesComplete >= totalGames?"}
     F --> G
     G -->|Yes| H["completedAt = now — mark DONE"]
     G -->|No| I["completedAt = null — mark incomplete"]
@@ -61,10 +75,10 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[renderSummaryGrid] --> B{"For each player (1-10)"}
-    B --> C["Count friends added (0-9)"]
+    A[renderSummaryGrid] --> B{"For each playerId in getAllPlayerIds()"}
+    B --> C["Count friends added (0-otherIds.length)"]
     B --> D["Count games tested (0-N)"]
-    C --> E["percent = (friends + games) / (9 + totalGames) x 100"]
+    C --> E["percent = (friends + games) / (otherIds.length + totalGames) x 100"]
     D --> E
     E --> F{percent === 100?}
     F -->|Yes| G["statusClass=complete text=DONE"]

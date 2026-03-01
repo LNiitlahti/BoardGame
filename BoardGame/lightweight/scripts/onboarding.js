@@ -6,6 +6,10 @@
  * Handles both player and admin views for tournament onboarding checklist.
  * Players confirm they've added friends and tested games.
  * Admins see overall progress and can edit player status.
+ *
+ * Player IDs: Uses real player IDs (e.g. "p_fml4z1tp") as keys everywhere —
+ * URL params, Firebase data keys, friend references. Legacy number-keyed data
+ * is auto-migrated on first load.
  */
 
 // =============================================================================
@@ -15,10 +19,10 @@
 let gameState = null;
 let onboardingState = null;  // Separate state from subcollection
 let tournamentId = null;
-let currentPlayerNumber = null;
+let currentPlayerId = null;
 let isAdminView = false;
 let isPlatformOnly = false;
-let editingPlayerNumber = null;
+let editingPlayerId = null;
 let unsubscribe = null;
 let onboardingUnsubscribe = null;
 let urlSecret = null;
@@ -40,7 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Determine mode
     isAdminView = viewParam === 'true';
     isPlatformOnly = urlParams.get('platform-only') === '1';
-    currentPlayerNumber = playerParam ? parseInt(playerParam, 10) : null;
+    currentPlayerId = playerParam || null;
 
     // Validate parameters
     if (!tournamentId) {
@@ -48,8 +52,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
-    if (!isAdminView && (!currentPlayerNumber || currentPlayerNumber < 1 || currentPlayerNumber > 10)) {
-        showError('Invalid player number. Use ?player=1 through ?player=10');
+    if (!isAdminView && !currentPlayerId) {
+        showError('Invalid player link. Check the URL sent to you.');
         return;
     }
 });
@@ -116,6 +120,28 @@ async function renderCurrentView() {
         onboardingState = createDefaultOnboardingData();
     }
 
+    // Migrate legacy number-keyed data to player ID keys
+    await migrateNumberKeysToPlayerIds();
+
+    // Ensure current player has an entry (handles new players added after initial creation)
+    if (!isAdminView && currentPlayerId && !onboardingState.players[currentPlayerId]) {
+        onboardingState.players[currentPlayerId] = {
+            friendsAdded: {},
+            gamesTested: {},
+            lastUpdated: null,
+            completedAt: null
+        };
+    }
+
+    // Validate player ID exists in team data (player view only)
+    if (!isAdminView && currentPlayerId) {
+        const allIds = getAllPlayerIds();
+        if (!allIds.includes(currentPlayerId)) {
+            showError('Player not found in this tournament. Check the link sent to you.');
+            return;
+        }
+    }
+
     // Validate secret before rendering (player view only)
     if (!secretValidated) {
         await validateSecretAccess();
@@ -154,13 +180,57 @@ async function validateSecretAccess() {
 }
 
 // =============================================================================
+// PLAYER ID HELPERS
+// =============================================================================
+
+/**
+ * Get ordered array of all real player IDs from team data.
+ * Order: teams in order, players within each team in order.
+ */
+function getAllPlayerIds() {
+    const ids = [];
+    const teams = gameState?.teams || [];
+    for (const team of teams) {
+        for (const player of (team.players || [])) {
+            if (player.id) ids.push(player.id);
+        }
+    }
+    return ids;
+}
+
+/**
+ * Build mapping keyed by real player ID.
+ * Returns: { "p_abc123": { id, name, teamId, teamName, teamColor }, ... }
+ */
+function getPlayerMapping() {
+    const mapping = {};
+    const teams = gameState?.teams || [];
+
+    for (const team of teams) {
+        for (const player of (team.players || [])) {
+            if (!player.id) continue;
+            mapping[player.id] = {
+                id: player.id,
+                name: player.name || player.id,
+                teamId: team.id,
+                teamName: team.name || `Team ${team.id}`,
+                teamColor: team.color || '#666666'
+            };
+        }
+    }
+
+    return mapping;
+}
+
+// =============================================================================
 // ONBOARDING DATA MANAGEMENT
 // =============================================================================
 
 function createDefaultOnboardingData() {
     const data = { players: {} };
-    for (let i = 1; i <= 10; i++) {
-        data.players[String(i)] = {
+    const allIds = getAllPlayerIds();
+    for (const playerId of allIds) {
+        data.players[playerId] = {
             friendsAdded: {},
             gamesTested: {},
             lastUpdated: null,
@@ -210,50 +280,106 @@ async function migrateOnboardingToSubcollection() {
     }
 }
 
-function getOnboardingRef() {
-    const db = window.firebaseDB;
-    return db.collection('tournaments').doc(tournamentId)
-        .collection('onboarding').doc('state');
-}
+/**
+ * Migrate onboarding data from number-keyed ("1"-"10") to player-ID-keyed ("p_xxx").
+ * Also migrates friendsAdded references. Stores backup of original data.
+ * Idempotent — guarded by _migrated_to_ids flag.
+ */
+async function migrateNumberKeysToPlayerIds() {
+    if (!onboardingState || onboardingState._migrated_to_ids) return;
 
-function getPlayerMapping() {
-    // Map player numbers 1-10 to player info
-    // Player 1-2 = Team 1, Player 3-4 = Team 2, etc.
-    const mapping = {};
-    const teams = gameState?.teams || [];
+    const allIds = getAllPlayerIds();
+    if (allIds.length === 0) return; // No team data yet, skip
+
+    // Check if data actually uses number keys
+    const playerKeys = Object.keys(onboardingState.players || {});
+    const hasNumberKeys = playerKeys.some(k => /^\d+$/.test(k));
+
+    if (!hasNumberKeys) {
+        // Already using ID keys or empty — just mark migrated
+        onboardingState._migrated_to_ids = true;
+        return;
+    }
+
+    // Build number-to-ID mapping: { "1": "p_abc", "2": "p_def", ... }
+    const numToId = {};
     let playerNum = 1;
-
+    const teams = gameState?.teams || [];
     for (const team of teams) {
-        const players = team.players || [];
-        for (const player of players) {
-            if (playerNum <= 10) {
-                mapping[playerNum] = {
-                    id: player.id || `player_${playerNum}`,
-                    name: player.name || `Player ${playerNum}`,
-                    teamId: team.id,
-                    teamName: team.name || `Team ${team.id}`,
-                    teamColor: team.color || '#666666'
-                };
+        for (const player of (team.players || [])) {
+            if (player.id) {
+                numToId[String(playerNum)] = player.id;
                 playerNum++;
             }
         }
     }
 
-    // Fill remaining slots if not enough players defined
-    while (playerNum <= 10) {
-        const teamIndex = Math.floor((playerNum - 1) / 2);
-        const team = teams[teamIndex] || {};
-        mapping[playerNum] = {
-            id: `player_${playerNum}`,
-            name: `Player ${playerNum}`,
-            teamId: team.id || teamIndex + 1,
-            teamName: team.name || `Team ${teamIndex + 1}`,
-            teamColor: team.color || '#666666'
-        };
-        playerNum++;
+    // Safety check: every existing number key must map to a player ID
+    const numberKeys = playerKeys.filter(k => /^\d+$/.test(k));
+    for (const numKey of numberKeys) {
+        if (!numToId[numKey]) {
+            console.warn(`Migration aborted: no player ID mapping for key "${numKey}". Team data may be incomplete.`);
+            return;
+        }
     }
 
-    return mapping;
+    // Back up original data before migration
+    const backup = JSON.parse(JSON.stringify(onboardingState.players));
+
+    // Build new players object with ID keys
+    const newPlayers = {};
+    for (const [numStr, playerId] of Object.entries(numToId)) {
+        const oldData = onboardingState.players[numStr];
+        if (!oldData) {
+            newPlayers[playerId] = {
+                friendsAdded: {},
+                gamesTested: {},
+                lastUpdated: null,
+                completedAt: null
+            };
+            continue;
+        }
+
+        // Migrate friendsAdded: convert number keys to player ID keys
+        const newFriendsAdded = {};
+        for (const [friendNum, value] of Object.entries(oldData.friendsAdded || {})) {
+            const friendId = numToId[friendNum];
+            if (friendId) {
+                newFriendsAdded[friendId] = value;
+            }
+        }
+
+        newPlayers[playerId] = {
+            ...oldData,
+            friendsAdded: newFriendsAdded
+        };
+    }
+
+    // Write migrated data to Firebase (atomic write with backup)
+    try {
+        const onboardingRef = getOnboardingRef();
+        await onboardingRef.set({
+            ...onboardingState,
+            players: newPlayers,
+            _migrated_to_ids: true,
+            _pre_migration_backup: backup
+        });
+
+        // Update local state
+        onboardingState.players = newPlayers;
+        onboardingState._migrated_to_ids = true;
+        onboardingState._pre_migration_backup = backup;
+
+        console.log('Migrated onboarding data from number keys to player ID keys');
+    } catch (error) {
+        console.error('Failed to migrate onboarding keys:', error);
+    }
+}
+
+function getOnboardingRef() {
+    const db = window.firebaseDB;
+    return db.collection('tournaments').doc(tournamentId)
+        .collection('onboarding').doc('state');
 }
 
 function getSelectedGames() {
@@ -279,25 +405,25 @@ function getSelectedGames() {
     });
 }
 
-async function toggleFriendStatus(otherPlayerNum, playerNum = currentPlayerNumber) {
-    const playerData = onboardingState.players[String(playerNum)];
+async function toggleFriendStatus(otherPlayerId, forPlayerId = currentPlayerId) {
+    const playerData = onboardingState.players[forPlayerId];
     if (!playerData) return;
 
-    const currentStatus = playerData.friendsAdded[String(otherPlayerNum)] || false;
-    playerData.friendsAdded[String(otherPlayerNum)] = !currentStatus;
+    const currentStatus = playerData.friendsAdded[otherPlayerId] || false;
+    playerData.friendsAdded[otherPlayerId] = !currentStatus;
     playerData.lastUpdated = new Date().toISOString();
 
     // Check completion
-    checkPlayerCompletion(playerNum);
+    checkPlayerCompletion(forPlayerId);
 
-    await savePlayerField(playerNum, {
-        [`friendsAdded.${otherPlayerNum}`]: !currentStatus,
+    await savePlayerField(forPlayerId, {
+        [`friendsAdded.${otherPlayerId}`]: !currentStatus,
         completedAt: playerData.completedAt || null
     });
 }
 
-async function toggleGameStatus(gameId, playerNum = currentPlayerNumber) {
-    const playerData = onboardingState.players[String(playerNum)];
+async function toggleGameStatus(gameId, forPlayerId = currentPlayerId) {
+    const playerData = onboardingState.players[forPlayerId];
     if (!playerData) return;
 
     const currentStatus = playerData.gamesTested[gameId] || false;
@@ -305,26 +431,28 @@ async function toggleGameStatus(gameId, playerNum = currentPlayerNumber) {
     playerData.lastUpdated = new Date().toISOString();
 
     // Check completion
-    checkPlayerCompletion(playerNum);
+    checkPlayerCompletion(forPlayerId);
 
-    await savePlayerField(playerNum, {
+    await savePlayerField(forPlayerId, {
         [`gamesTested.${gameId}`]: !currentStatus,
         completedAt: playerData.completedAt || null
     });
 }
 
-function checkPlayerCompletion(playerNum) {
-    const playerData = onboardingState.players[String(playerNum)];
+function checkPlayerCompletion(playerId) {
+    const playerData = onboardingState.players[playerId];
     if (!playerData) return;
 
     const games = getSelectedGames();
-    const totalFriends = 9; // All other players
+    const allIds = getAllPlayerIds();
+    const otherIds = allIds.filter(id => id !== playerId);
+    const totalFriends = otherIds.length;
     const totalGames = games.length;
 
     // Count completed
     let friendsComplete = 0;
-    for (let i = 1; i <= 10; i++) {
-        if (i !== playerNum && playerData.friendsAdded[String(i)]) {
+    for (const otherId of otherIds) {
+        if (playerData.friendsAdded[otherId]) {
             friendsComplete++;
         }
     }
@@ -351,21 +479,21 @@ const _pendingSaves = {};
 const _saveTimers = {};
 const SAVE_DEBOUNCE_MS = 500;
 
-async function savePlayerField(playerNum, fields) {
+async function savePlayerField(playerId, fields) {
     // Merge fields into pending batch for this player
-    if (!_pendingSaves[playerNum]) _pendingSaves[playerNum] = {};
+    if (!_pendingSaves[playerId]) _pendingSaves[playerId] = {};
     for (const [key, value] of Object.entries(fields)) {
-        _pendingSaves[playerNum][`players.${playerNum}.${key}`] = value;
+        _pendingSaves[playerId][`players.${playerId}.${key}`] = value;
     }
 
     // Reset the debounce timer
-    if (_saveTimers[playerNum]) clearTimeout(_saveTimers[playerNum]);
+    if (_saveTimers[playerId]) clearTimeout(_saveTimers[playerId]);
 
-    _saveTimers[playerNum] = setTimeout(async () => {
-        const update = { ..._pendingSaves[playerNum] };
-        update[`players.${playerNum}.lastUpdated`] = new Date().toISOString();
-        delete _pendingSaves[playerNum];
-        delete _saveTimers[playerNum];
+    _saveTimers[playerId] = setTimeout(async () => {
+        const update = { ..._pendingSaves[playerId] };
+        update[`players.${playerId}.lastUpdated`] = new Date().toISOString();
+        delete _pendingSaves[playerId];
+        delete _saveTimers[playerId];
 
         try {
             const onboardingRef = getOnboardingRef();
@@ -382,36 +510,36 @@ async function savePlayerField(playerNum, fields) {
 
 function renderPlayerView() {
     const playerMapping = getPlayerMapping();
-    const currentPlayer = playerMapping[currentPlayerNumber];
+    const currentPlayer = playerMapping[currentPlayerId];
 
     // Update header
     document.getElementById('tournamentName').textContent = gameState.name || 'Tournament';
     document.getElementById('playerInfo').textContent = `Welcome, ${currentPlayer.name}`;
 
     // Render status buttons
-    renderStatusButtons(currentPlayerNumber);
+    renderStatusButtons(currentPlayerId);
 
     // Render platform IDs form
-    renderPlatformIdsForm(currentPlayerNumber);
+    renderPlatformIdsForm(currentPlayerId);
 
     if (isPlatformOnly) {
         // Hide friends and games sections
         document.querySelectorAll('.checklist-section:not(.platform-section)').forEach(s => s.style.display = 'none');
     } else {
         // Render checklists
-        renderFriendsChecklist(playerMapping, currentPlayerNumber, 'friendsChecklist');
-        renderGamesChecklist(currentPlayerNumber, 'gamesChecklist');
+        renderFriendsChecklist(playerMapping, currentPlayerId, 'friendsChecklist');
+        renderGamesChecklist(currentPlayerId, 'gamesChecklist');
     }
 
     // Update progress
-    updateProgress(currentPlayerNumber);
+    updateProgress(currentPlayerId);
 }
 
-function renderPlatformIdsForm(forPlayerNum) {
+function renderPlatformIdsForm(forPlayerId) {
     const container = document.getElementById('platformIdsForm');
     if (!container) return;
 
-    const playerData = onboardingState?.players?.[String(forPlayerNum)] || {};
+    const playerData = onboardingState?.players?.[forPlayerId] || {};
     const platformIds = playerData.platformIds || {};
 
     const activePlatforms = PLATFORMS_CONFIG.getActivePlatforms();
@@ -446,19 +574,21 @@ function renderPlatformIdsForm(forPlayerNum) {
     container.innerHTML = html;
 }
 
-function renderFriendsChecklist(playerMapping, forPlayerNum, containerId) {
+function renderFriendsChecklist(playerMapping, forPlayerId, containerId) {
     const container = document.getElementById(containerId);
-    const playerData = onboardingState?.players?.[String(forPlayerNum)] || {};
+    const playerData = onboardingState?.players?.[forPlayerId] || {};
     const friendsAdded = playerData.friendsAdded || {};
     const isEditMode = containerId.includes('edit');
+    const allIds = getAllPlayerIds();
 
     let html = '';
-    for (let i = 1; i <= 10; i++) {
-        if (i === forPlayerNum) continue; // Skip self
+    for (const otherId of allIds) {
+        if (otherId === forPlayerId) continue; // Skip self
 
-        const info = playerMapping[i];
-        const isChecked = friendsAdded[String(i)] || false;
-        const friendData = onboardingState?.players?.[String(i)] || {};
+        const info = playerMapping[otherId];
+        if (!info) continue;
+        const isChecked = friendsAdded[otherId] || false;
+        const friendData = onboardingState?.players?.[otherId] || {};
         const friendPlatformIds = friendData.platformIds || {};
 
         // Build platform IDs display
@@ -490,7 +620,7 @@ function renderFriendsChecklist(playerMapping, forPlayerNum, containerId) {
                 <div class="friend-card-header">
                     <input type="checkbox"
                            ${isChecked ? 'checked' : ''}
-                           onchange="${isEditMode ? `toggleFriendStatusEdit(${i})` : `toggleFriendStatus(${i})`}">
+                           onchange="${isEditMode ? `toggleFriendStatusEdit('${otherId}')` : `toggleFriendStatus('${otherId}')`}">
                     <span class="team-dot" style="background: ${info.teamColor}"></span>
                     <span class="player-name">${info.name}</span>
                     <span class="team-name">${info.teamName}</span>
@@ -517,10 +647,10 @@ const GAME_TUTORIALS = {
     'beerdrinking': { url: 'https://www.youtube.com/watch?v=iyNmwu1R21c&si=URDInlLZG4vU4eVX', label: 'How to Drink' }
 };
 
-function renderGamesChecklist(forPlayerNum, containerId) {
+function renderGamesChecklist(forPlayerId, containerId) {
     const container = document.getElementById(containerId);
     const games = getSelectedGames();
-    const playerData = onboardingState?.players?.[String(forPlayerNum)] || {};
+    const playerData = onboardingState?.players?.[forPlayerId] || {};
     const gamesTested = playerData.gamesTested || {};
     const isEditMode = containerId.includes('edit');
 
@@ -562,8 +692,8 @@ function renderGamesChecklist(forPlayerNum, containerId) {
     container.innerHTML = html;
 }
 
-function updateProgress(playerNum) {
-    const playerData = onboardingState?.players?.[String(playerNum)] || {};
+function updateProgress(playerId) {
+    const playerData = onboardingState?.players?.[playerId] || {};
     const games = getSelectedGames();
 
     let totalTasks, completed;
@@ -578,12 +708,14 @@ function updateProgress(playerNum) {
             if (platformIds[platform.id]?.trim()) completed++;
         }
     } else {
-        totalTasks = 9 + games.length; // 9 friends + games
+        const allIds = getAllPlayerIds();
+        const otherIds = allIds.filter(id => id !== playerId);
+        totalTasks = otherIds.length + games.length;
         completed = 0;
 
         // Count friends
-        for (let i = 1; i <= 10; i++) {
-            if (i !== playerNum && playerData.friendsAdded?.[String(i)]) {
+        for (const otherId of otherIds) {
+            if (playerData.friendsAdded?.[otherId]) {
                 completed++;
             }
         }
@@ -662,16 +794,19 @@ function renderAdminView() {
 function renderSummaryGrid(playerMapping) {
     const container = document.getElementById('summaryGrid');
     const games = getSelectedGames();
+    const allIds = getAllPlayerIds();
 
     let html = '';
-    for (let i = 1; i <= 10; i++) {
-        const info = playerMapping[i];
-        const playerData = onboardingState?.players?.[String(i)] || {};
+    for (const playerId of allIds) {
+        const info = playerMapping[playerId];
+        if (!info) continue;
+        const playerData = onboardingState?.players?.[playerId] || {};
 
         // Calculate progress
+        const otherIds = allIds.filter(id => id !== playerId);
         let friendsComplete = 0;
-        for (let j = 1; j <= 10; j++) {
-            if (j !== i && playerData.friendsAdded?.[String(j)]) {
+        for (const otherId of otherIds) {
+            if (playerData.friendsAdded?.[otherId]) {
                 friendsComplete++;
             }
         }
@@ -683,7 +818,7 @@ function renderSummaryGrid(playerMapping) {
             }
         }
 
-        const totalTasks = 9 + games.length;
+        const totalTasks = otherIds.length + games.length;
         const completedTasks = friendsComplete + gamesComplete;
         const percent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
@@ -703,13 +838,13 @@ function renderSummaryGrid(playerMapping) {
                 <div class="team-indicator" style="background: ${info.teamColor}"></div>
                 <div class="player-name">${info.name}</div>
                 <div class="team-name">${info.teamName}</div>
-                <div class="player-status-icons">${getPlayerStatusIcons(i)}</div>
+                <div class="player-status-icons">${getPlayerStatusIcons(playerId)}</div>
                 <div class="progress-stats">
-                    <div>Friends: ${friendsComplete}/9</div>
+                    <div>Friends: ${friendsComplete}/${otherIds.length}</div>
                     <div>Games: ${gamesComplete}/${games.length}</div>
                 </div>
                 <div class="status-badge ${statusClass}">${statusText}</div>
-                <button class="btn secondary edit-btn" onclick="openEditModal(${i})">Edit</button>
+                <button class="btn secondary edit-btn" onclick="openEditModal('${playerId}')">Edit</button>
             </div>
         `;
     }
@@ -722,6 +857,7 @@ function renderLinksList(playerMapping) {
     const baseUrl = window.location.origin + window.location.pathname;
     const hasSecretHash = !!onboardingState?.secretHash;
     const plainSecret = onboardingState?._plainSecret || onboardingState?.secret || '';
+    const allIds = getAllPlayerIds();
 
     let html = '';
 
@@ -734,9 +870,10 @@ function renderLinksList(playerMapping) {
         `;
     }
 
-    for (let i = 1; i <= 10; i++) {
-        const info = playerMapping[i];
-        let playerUrl = `${baseUrl}?tournamentId=${tournamentId}&player=${i}`;
+    for (const playerId of allIds) {
+        const info = playerMapping[playerId];
+        if (!info) continue;
+        let playerUrl = `${baseUrl}?tournamentId=${encodeURIComponent(tournamentId)}&player=${encodeURIComponent(playerId)}`;
         if (plainSecret) {
             playerUrl += `&secret=${encodeURIComponent(plainSecret)}`;
         }
@@ -745,8 +882,8 @@ function renderLinksList(playerMapping) {
             <div class="link-row">
                 <span class="team-dot" style="background: ${info.teamColor}"></span>
                 <span class="player-label">${info.name}</span>
-                <input type="text" class="link-input" value="${playerUrl}" readonly id="link-${i}">
-                <button class="btn secondary copy-btn" onclick="copyLink(${i})">Copy</button>
+                <input type="text" class="link-input" value="${playerUrl}" readonly id="link-${playerId}">
+                <button class="btn secondary copy-btn" onclick="copyLink('${playerId}')">Copy</button>
             </div>
         `;
     }
@@ -758,44 +895,44 @@ function renderLinksList(playerMapping) {
 // ADMIN EDIT MODAL
 // =============================================================================
 
-function openEditModal(playerNum) {
-    editingPlayerNumber = playerNum;
+function openEditModal(playerId) {
+    editingPlayerId = playerId;
     const playerMapping = getPlayerMapping();
-    const info = playerMapping[playerNum];
+    const info = playerMapping[playerId];
 
     // Update modal title
     document.getElementById('editModalTitle').textContent = `Edit: ${info.name}`;
 
     // Render checklists
-    renderFriendsChecklist(playerMapping, playerNum, 'editFriendsChecklist');
-    renderGamesChecklist(playerNum, 'editGamesChecklist');
+    renderFriendsChecklist(playerMapping, playerId, 'editFriendsChecklist');
+    renderGamesChecklist(playerId, 'editGamesChecklist');
 
     // Show modal
     document.getElementById('editPlayerModal').classList.remove('hidden');
 }
 
 function closeEditModal() {
-    editingPlayerNumber = null;
+    editingPlayerId = null;
     document.getElementById('editPlayerModal').classList.add('hidden');
 }
 
 // Edit mode toggle functions
-function toggleFriendStatusEdit(otherPlayerNum) {
-    if (editingPlayerNumber) {
-        toggleFriendStatus(otherPlayerNum, editingPlayerNumber);
+function toggleFriendStatusEdit(otherPlayerId) {
+    if (editingPlayerId) {
+        toggleFriendStatus(otherPlayerId, editingPlayerId);
     }
 }
 
 function toggleGameStatusEdit(gameId) {
-    if (editingPlayerNumber) {
-        toggleGameStatus(gameId, editingPlayerNumber);
+    if (editingPlayerId) {
+        toggleGameStatus(gameId, editingPlayerId);
     }
 }
 
 // Close modals on escape key
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-        if (editingPlayerNumber) {
+        if (editingPlayerId) {
             closeEditModal();
         }
         if (!document.getElementById('secretModal').classList.contains('hidden')) {
@@ -808,8 +945,8 @@ document.addEventListener('keydown', (e) => {
 // LINK COPY FUNCTIONS
 // =============================================================================
 
-function copyLink(playerNum) {
-    const input = document.getElementById(`link-${playerNum}`);
+function copyLink(playerId) {
+    const input = document.getElementById(`link-${playerId}`);
     input.select();
     document.execCommand('copy');
 
@@ -834,10 +971,12 @@ function copyAllLinks() {
         return;
     }
 
+    const allIds = getAllPlayerIds();
     let allLinks = '';
-    for (let i = 1; i <= 10; i++) {
-        const info = playerMapping[i];
-        let playerUrl = `${baseUrl}?tournamentId=${tournamentId}&player=${i}`;
+    for (const playerId of allIds) {
+        const info = playerMapping[playerId];
+        if (!info) continue;
+        let playerUrl = `${baseUrl}?tournamentId=${encodeURIComponent(tournamentId)}&player=${encodeURIComponent(playerId)}`;
         if (plainSecret) {
             playerUrl += `&secret=${encodeURIComponent(plainSecret)}`;
         }
@@ -870,8 +1009,8 @@ const STATUS_EMOJIS = {
     question: '❓'
 };
 
-function renderStatusButtons(playerNum) {
-    const playerData = onboardingState?.players?.[String(playerNum)] || {};
+function renderStatusButtons(playerId) {
+    const playerData = onboardingState?.players?.[playerId] || {};
     const activeStatuses = playerData.statuses || {};
 
     document.querySelectorAll('#statusEmojis .status-btn').forEach(btn => {
@@ -881,7 +1020,7 @@ function renderStatusButtons(playerNum) {
 }
 
 async function togglePlayerStatus(statusKey) {
-    const playerData = onboardingState.players[String(currentPlayerNumber)];
+    const playerData = onboardingState.players[currentPlayerId];
     if (!playerData) return;
 
     if (!playerData.statuses) playerData.statuses = {};
@@ -903,19 +1042,19 @@ async function togglePlayerStatus(statusKey) {
         btn.classList.toggle('active', !!playerData.statuses[btn.dataset.status]);
     });
 
-    await savePlayerField(currentPlayerNumber, updates);
+    await savePlayerField(currentPlayerId, updates);
 }
 
 function openStatusPopup() {
     const baseUrl = window.location.pathname.replace('onboarding.html', 'onboarding-status.html');
-    let popupUrl = `${baseUrl}?tournamentId=${tournamentId}&player=${currentPlayerNumber}`;
+    let popupUrl = `${baseUrl}?tournamentId=${encodeURIComponent(tournamentId)}&player=${encodeURIComponent(currentPlayerId)}`;
     if (urlSecret) popupUrl += `&secret=${encodeURIComponent(urlSecret)}`;
     window.open(popupUrl, 'statusPopup',
         'width=240,height=200,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no');
 }
 
-function getPlayerStatusIcons(playerNum) {
-    const playerData = onboardingState?.players?.[String(playerNum)] || {};
+function getPlayerStatusIcons(playerId) {
+    const playerData = onboardingState?.players?.[playerId] || {};
     const statuses = playerData.statuses || {};
     let icons = '';
     for (const [key, emoji] of Object.entries(STATUS_EMOJIS)) {
@@ -932,7 +1071,7 @@ async function savePlatformId(platformKey, value) {
     const trimmedValue = value.trim();
 
     // Update local state
-    const playerData = onboardingState.players[String(currentPlayerNumber)];
+    const playerData = onboardingState.players[currentPlayerId];
     if (!playerData.platformIds) {
         playerData.platformIds = {};
     }
@@ -943,8 +1082,8 @@ async function savePlatformId(platformKey, value) {
     try {
         const onboardingRef = getOnboardingRef();
         await onboardingRef.update({
-            [`players.${currentPlayerNumber}.platformIds.${platformKey}`]: trimmedValue,
-            [`players.${currentPlayerNumber}.lastUpdated`]: playerData.lastUpdated
+            [`players.${currentPlayerId}.platformIds.${platformKey}`]: trimmedValue,
+            [`players.${currentPlayerId}.lastUpdated`]: playerData.lastUpdated
         });
 
         // Visual feedback - update the row styling
@@ -960,7 +1099,7 @@ async function savePlatformId(platformKey, value) {
 
 async function saveAllPlatformIds() {
     const activePlatforms = PLATFORMS_CONFIG.getActivePlatforms();
-    const playerData = onboardingState.players[String(currentPlayerNumber)];
+    const playerData = onboardingState.players[currentPlayerId];
     if (!playerData.platformIds) playerData.platformIds = {};
 
     const updates = {};
@@ -969,11 +1108,11 @@ async function saveAllPlatformIds() {
         if (!input) continue;
         const val = input.value.trim();
         playerData.platformIds[platform.id] = val;
-        updates[`players.${currentPlayerNumber}.platformIds.${platform.id}`] = val;
+        updates[`players.${currentPlayerId}.platformIds.${platform.id}`] = val;
     }
 
     playerData.lastUpdated = new Date().toISOString();
-    updates[`players.${currentPlayerNumber}.lastUpdated`] = playerData.lastUpdated;
+    updates[`players.${currentPlayerId}.lastUpdated`] = playerData.lastUpdated;
 
     try {
         await getOnboardingRef().update(updates);

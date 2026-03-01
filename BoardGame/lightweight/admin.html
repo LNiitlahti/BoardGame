@@ -437,7 +437,12 @@
                     <span class="state-option-label">Finished</span>
                     <span class="state-option-desc">Tournament has concluded</span>
                 </button>
+                <button class="state-option" data-state="archived" onclick="confirmStateChange('archived')" style="display: none;">
+                    <span class="state-option-label">Archived</span>
+                    <span class="state-option-desc">Lock tournament permanently (reversible by God)</span>
+                </button>
             </div>
+            <p class="archived-warning" id="archivedWarning" style="display: none;">This tournament is archived. Only God users can change its state.</p>
             <div class="state-change-actions">
                 <button class="btn secondary" onclick="closeStateChangeModal()">Cancel</button>
             </div>

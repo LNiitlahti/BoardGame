@@ -994,49 +994,42 @@
     // DATA HELPERS
     // =================================================================
 
+    function getAllPlayerIds() {
+        const ids = [];
+        const teams = gameState?.teams || [];
+        for (const team of teams) {
+            for (const player of (team.players || [])) {
+                if (player.id) ids.push(player.id);
+            }
+        }
+        return ids;
+    }
+
     function getPlayerMapping() {
         const teams = gameState?.teams || [];
 
         // Build logical player list (same iteration order as admin)
         const logicalPlayers = [];
-        let playerNum = 1;
         for (const team of teams) {
-            const players = team.players || [];
-            for (const player of players) {
-                if (playerNum <= 10) {
-                    logicalPlayers.push({
-                        logicalNum: playerNum,
-                        id: player.id || 'player_' + playerNum,
-                        name: player.name || 'Player ' + playerNum,
-                        teamId: team.id,
-                        teamName: team.name || 'Team ' + team.id,
-                        teamColor: team.color || '#666666'
-                    });
-                    playerNum++;
-                }
+            for (const player of (team.players || [])) {
+                if (!player.id) continue;
+                logicalPlayers.push({
+                    playerId: player.id,
+                    name: player.name || player.id,
+                    teamId: team.id,
+                    teamName: team.name || 'Team ' + team.id,
+                    teamColor: team.color || '#666666'
+                });
             }
-        }
-
-        while (playerNum <= 10) {
-            const teamIndex = Math.floor((playerNum - 1) / 2);
-            const team = teams[teamIndex] || {};
-            logicalPlayers.push({
-                logicalNum: playerNum,
-                id: 'player_' + playerNum,
-                name: 'Player ' + playerNum,
-                teamId: team.id || teamIndex + 1,
-                teamName: team.name || 'Team ' + (teamIndex + 1),
-                teamColor: team.color || '#666666'
-            });
-            playerNum++;
         }
 
         // Apply seating order
         const seatingOrder = gameState?.seatingOrder;
-        const hasCustomSeating = Array.isArray(seatingOrder) && seatingOrder.length === 10;
+        const playerCount = logicalPlayers.length;
+        const hasCustomSeating = Array.isArray(seatingOrder) && seatingOrder.length === playerCount;
 
         const mapping = {};
-        for (let seat = 1; seat <= 10; seat++) {
+        for (let seat = 1; seat <= playerCount; seat++) {
             const logicalIndex = hasCustomSeating
                 ? (seatingOrder[seat - 1] - 1)
                 : (seat - 1);
@@ -1060,16 +1053,18 @@
         });
     }
 
-    function getPlayerProgress(playerNum) {
-        const playerData = onboardingState?.players?.[String(playerNum)] || {};
+    function getPlayerProgress(playerId) {
+        const playerData = onboardingState?.players?.[playerId] || {};
         const games = getSelectedGames();
-        const totalFriends = 9;
+        const allIds = getAllPlayerIds();
+        const otherIds = allIds.filter(id => id !== playerId);
+        const totalFriends = otherIds.length;
         const totalGames = games.length;
         const totalTasks = totalFriends + totalGames;
 
         let friendsComplete = 0;
-        for (let i = 1; i <= 10; i++) {
-            if (i !== playerNum && playerData.friendsAdded?.[String(i)]) {
+        for (const otherId of otherIds) {
+            if (playerData.friendsAdded?.[otherId]) {
                 friendsComplete++;
             }
         }
@@ -1102,6 +1097,9 @@
         const playerMapping = getPlayerMapping();
         const games = getSelectedGames();
         const teams = gameState?.teams || [];
+        const allIds = getAllPlayerIds();
+        const playerCount = allIds.length;
+        const totalSeats = Object.keys(playerMapping).length;
 
         // Title
         document.getElementById('pageTitle').textContent = gameState.name || 'Tournament';
@@ -1116,24 +1114,24 @@
         // Calculate overall stats
         let totalReady = 0;
         let totalPercent = 0;
-        for (let i = 1; i <= 10; i++) {
-            const progress = getPlayerProgress(i);
+        for (const playerId of allIds) {
+            const progress = getPlayerProgress(playerId);
             if (progress.isComplete) totalReady++;
             totalPercent += progress.percent;
         }
-        const avgPercent = Math.round(totalPercent / 10);
+        const avgPercent = playerCount > 0 ? Math.round(totalPercent / playerCount) : 0;
 
         // Middle area stats
         const overallPctEl = document.getElementById('overallPercent');
         overallPctEl.textContent = avgPercent + '%';
-        overallPctEl.classList.toggle('all-done', totalReady === 10);
+        overallPctEl.classList.toggle('all-done', totalReady === playerCount);
 
         const readyEl = document.getElementById('readyCount');
-        readyEl.textContent = totalReady + '/10 Ready';
-        readyEl.classList.toggle('all-ready', totalReady === 10);
+        readyEl.textContent = totalReady + '/' + playerCount + ' Ready';
+        readyEl.classList.toggle('all-ready', totalReady === playerCount);
 
         // Trigger completion sequence when all players are done
-        if (totalReady === 10 && !completionTriggered) {
+        if (playerCount > 0 && totalReady === playerCount && !completionTriggered) {
             triggerCompletion();
         }
 
@@ -1153,15 +1151,15 @@
 
         if (isFirstRender) {
             buildWalls(playerMapping);
-            buildGamesGrid(games);
+            buildGamesGrid(games, playerCount);
             isFirstRender = false;
         }
 
         // Update all player cards
-        for (let i = 1; i <= 10; i++) {
+        for (let i = 1; i <= totalSeats; i++) {
             updatePlayerCard(i);
         }
-        updateGamesGrid(games);
+        updateGamesGrid(games, playerCount);
     }
 
     // ----- Build DOM once (first render) -----
@@ -1169,15 +1167,17 @@
     function buildWalls(playerMapping) {
         const leftWall = document.getElementById('wallLeft');
         const rightWall = document.getElementById('wallRight');
+        const totalSeats = Object.keys(playerMapping).length;
+        const halfPoint = Math.ceil(totalSeats / 2);
 
         let leftHtml = '';
-        for (let i = 1; i <= 5; i++) {
+        for (let i = 1; i <= halfPoint; i++) {
             leftHtml += buildPlayerHTML(i, playerMapping);
         }
         leftWall.innerHTML = leftHtml;
 
         let rightHtml = '';
-        for (let i = 6; i <= 10; i++) {
+        for (let i = halfPoint + 1; i <= totalSeats; i++) {
             rightHtml += buildPlayerHTML(i, playerMapping);
         }
         rightWall.innerHTML = rightHtml;
@@ -1185,11 +1185,14 @@
 
     function buildPlayerHTML(seatNum, playerMapping) {
         const info = playerMapping[seatNum];
-        const logicalNum = info.logicalNum || seatNum;
+        if (!info) return '';
+        const playerId = info.playerId;
         const teamClass = 'team-' + info.teamId;
         const games = getSelectedGames();
+        const allIds = getAllPlayerIds();
+        const otherCount = allIds.length - 1;
 
-        let html = '<div class="player ' + teamClass + '" data-player="' + seatNum + '" data-logical-player="' + logicalNum + '">';
+        let html = '<div class="player ' + teamClass + '" data-player="' + seatNum + '" data-player-id="' + playerId + '">';
         html += '<div class="player-top">';
         html += '<span class="seat-num">' + seatNum + '</span>';
         html += '<span class="player-name">' + escapeHtml(info.name) + '</span>';
@@ -1203,11 +1206,11 @@
         // Friends dots
         html += '<div class="player-stat-group">';
         html += '<div class="stat-dots" data-friends-dots="' + seatNum + '">';
-        for (let i = 0; i < 9; i++) {
+        for (let i = 0; i < otherCount; i++) {
             html += '<span class="stat-dot"></span>';
         }
         html += '</div>';
-        html += '<div class="stat-meta"><span class="stat-label">Friends</span><span class="stat-count" data-friends="' + seatNum + '">0/9</span></div>';
+        html += '<div class="stat-meta"><span class="stat-label">Friends</span><span class="stat-count" data-friends="' + seatNum + '">0/' + otherCount + '</span></div>';
         html += '</div>';
 
         // Games dots
@@ -1226,12 +1229,15 @@
         return html;
     }
 
-    function buildGamesGrid(games) {
+    function buildGamesGrid(games, playerCount) {
         const container = document.getElementById('gamesGrid');
         if (games.length === 0) {
             container.innerHTML = '';
             return;
         }
+
+        const allIds = getAllPlayerIds();
+        const count = playerCount || allIds.length;
 
         let html = '';
         for (const game of games) {
@@ -1246,35 +1252,40 @@
 
             html += '<div class="game-cell-name">' + escapeHtml(game.shortName || game.name) + '</div>';
             html += '<div class="game-cell-dots" data-game-dots="' + game.id + '">';
-            for (let i = 1; i <= 10; i++) {
+            for (let i = 0; i < count; i++) {
                 html += '<span class="game-cell-dot"></span>';
             }
             html += '</div>';
-            html += '<div class="game-cell-count" data-game-count="' + game.id + '">0/10</div>';
+            html += '<div class="game-cell-count" data-game-count="' + game.id + '">0/' + count + '</div>';
             html += '</div>';
         }
 
         container.innerHTML = html;
     }
 
-    function updateGamesGrid(games) {
+    function updateGamesGrid(games, playerCount) {
+        const allIds = getAllPlayerIds();
+        const count = playerCount || allIds.length;
+
         for (const game of games) {
             let testedCount = 0;
             const dotsContainer = document.querySelector('[data-game-dots="' + game.id + '"]');
 
             if (dotsContainer) {
                 const dots = dotsContainer.querySelectorAll('.game-cell-dot');
-                for (let i = 1; i <= 10; i++) {
-                    const playerData = onboardingState?.players?.[String(i)] || {};
+                let dotIdx = 0;
+                for (const playerId of allIds) {
+                    const playerData = onboardingState?.players?.[playerId] || {};
                     const isTested = !!playerData.gamesTested?.[game.id];
-                    if (i - 1 < dots.length) {
-                        dots[i - 1].classList.toggle('filled', isTested);
+                    if (dotIdx < dots.length) {
+                        dots[dotIdx].classList.toggle('filled', isTested);
                     }
                     if (isTested) testedCount++;
+                    dotIdx++;
                 }
             }
 
-            const allTested = testedCount === 10;
+            const allTested = testedCount === count;
 
             const cellEl = document.querySelector('[data-game-cell="' + game.id + '"]');
             if (cellEl) {
@@ -1283,7 +1294,7 @@
 
             const countEl = document.querySelector('[data-game-count="' + game.id + '"]');
             if (countEl) {
-                countEl.textContent = testedCount + '/10';
+                countEl.textContent = testedCount + '/' + count;
             }
         }
     }
@@ -1294,9 +1305,10 @@
         const card = document.querySelector('[data-player="' + seatNum + '"]');
         if (!card) return;
 
-        // Use logical player number for onboarding data lookup
-        const logicalPlayerNum = parseInt(card.dataset.logicalPlayer) || seatNum;
-        const progress = getPlayerProgress(logicalPlayerNum);
+        // Use real player ID for onboarding data lookup
+        const playerId = card.dataset.playerId;
+        if (!playerId) return;
+        const progress = getPlayerProgress(playerId);
 
         card.classList.toggle('complete', progress.isComplete);
 
@@ -1315,7 +1327,7 @@
             pctEl.classList.toggle('done', progress.isComplete);
         }
 
-        const playerData = onboardingState?.players?.[String(logicalPlayerNum)] || {};
+        const playerData = onboardingState?.players?.[playerId] || {};
 
         // Status emoji
         const statusEl = document.querySelector('[data-status="' + seatNum + '"]');
@@ -1332,11 +1344,12 @@
         const friendsDots = document.querySelector('[data-friends-dots="' + seatNum + '"]');
         if (friendsDots) {
             const dots = friendsDots.querySelectorAll('.stat-dot');
+            const allIds = getAllPlayerIds();
             let dotIndex = 0;
-            for (let i = 1; i <= 10; i++) {
-                if (i === logicalPlayerNum) continue;
+            for (const otherId of allIds) {
+                if (otherId === playerId) continue;
                 if (dotIndex < dots.length) {
-                    dots[dotIndex].classList.toggle('filled', !!playerData.friendsAdded?.[String(i)]);
+                    dots[dotIndex].classList.toggle('filled', !!playerData.friendsAdded?.[otherId]);
                     dotIndex++;
                 }
             }
