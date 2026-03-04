@@ -1,9 +1,40 @@
 /**
  * ====================================
- * UNIFIED NAVBAR STYLES
+ * UNIFIED NAVBAR — Gold/Void Theme
  * ====================================
- * Responsive navigation bar using Falcon design system
+ * Self-contained dark void + gold accent navbar.
+ * No external theme dependencies — all variables scoped here.
  */
+
+@import url('https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap');
+
+/* ==================== SCOPED VARIABLES ==================== */
+.unified-navbar {
+    /* Background */
+    --nav-bg: rgba(5, 7, 16, 0.92);
+    --nav-bg-hover: rgba(16, 20, 32, 0.8);
+    --nav-bg-active: rgba(24, 28, 44, 0.9);
+
+    /* Gold accent */
+    --nav-gold: #c8b37e;
+    --nav-gold-bright: #e8d8a8;
+    --nav-gold-glow: rgba(200, 179, 126, 0.3);
+    --nav-gold-dim: rgba(200, 179, 126, 0.1);
+
+    /* Borders */
+    --nav-border: rgba(200, 179, 126, 0.2);
+    --nav-border-faint: rgba(255, 255, 255, 0.05);
+
+    /* Text */
+    --nav-text: #c8ccd6;
+    --nav-text-bright: #f2f4f7;
+    --nav-text-muted: #6a7088;
+
+    /* Status */
+    --nav-live: #00e080;
+    --nav-live-glow: rgba(0, 224, 128, 0.25);
+    --nav-danger: #d84040;
+}
 
 /* ==================== NAVBAR BASE ==================== */
 .unified-navbar {
@@ -12,9 +43,9 @@
     left: 0;
     right: 0;
     z-index: 1000;
-    background: var(--slate-900, #0f172a);
-    border-bottom: 1px solid var(--slate-700, #334155);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    background: var(--nav-bg);
+    border-bottom: 1px solid var(--nav-border);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 1px var(--nav-gold-dim);
 }
 
 .navbar-container {
@@ -49,67 +80,32 @@
 }
 
 .navbar-brand-name {
-    font-family: var(--font-display, 'Poppins', sans-serif);
+    font-family: 'Russo One', sans-serif;
     font-size: 1.1rem;
-    font-weight: 600;
-    color: #ffffff;
+    font-weight: 400;
+    color: var(--nav-gold-bright);
     line-height: 1.2;
+    letter-spacing: 3px;
+    text-transform: uppercase;
 }
 
+/* Tournament name subtitle under brand */
 .navbar-tournament-name {
-    font-size: 0.7rem;
-    color: var(--yellow-400, #fbbf24);
+    font-size: 0.78rem;
+    font-family: 'Quantico', sans-serif;
     font-weight: 500;
-    max-width: 150px;
+    color: var(--nav-gold);
+    max-width: 180px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    line-height: 1.2;
 }
 
-/* ==================== TOURNAMENT SELECTOR ==================== */
-.navbar-tournament-selector {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 12px;
-    background: var(--slate-800, #1e293b);
-    border: 1px solid var(--slate-600, #475569);
-    border-radius: 8px;
-    flex-shrink: 0;
-}
-
-.navbar-tournament-label {
-    font-size: 1rem;
-    flex-shrink: 0;
-}
-
-.navbar-tournament-select {
-    background: transparent;
-    border: none;
-    color: var(--yellow-400, #fbbf24);
-    font-size: 0.875rem;
-    font-weight: 500;
-    font-family: inherit;
-    cursor: pointer;
-    padding: 4px 8px;
-    min-width: 140px;
-    max-width: 200px;
-}
-
-.navbar-tournament-select:focus {
-    outline: none;
-}
-
-.navbar-tournament-select option {
-    background: var(--slate-800, #1e293b);
-    color: var(--slate-100, #f1f5f9);
-    padding: 8px;
-}
-
-.navbar-no-tournament {
-    font-size: 0.8rem;
-    color: var(--slate-400, #94a3b8);
-    font-style: italic;
+.navbar-tournament-name.empty {
+    color: var(--nav-text-muted);
+    font-weight: 400;
+    opacity: 0.6;
 }
 
 /* ==================== NAVIGATION LINKS ==================== */
@@ -128,21 +124,22 @@
     padding: 8px 16px;
     border-radius: 8px;
     text-decoration: none;
-    color: var(--slate-400, #94a3b8);
+    color: var(--nav-text-muted);
     font-size: 0.9rem;
     font-weight: 500;
+    font-family: 'Quantico', sans-serif;
     transition: all 0.2s ease;
     white-space: nowrap;
 }
 
 .navbar-link:hover {
-    color: #ffffff;
-    background: var(--slate-800, #1e293b);
+    color: var(--nav-text-bright);
+    background: var(--nav-bg-hover);
 }
 
 .navbar-link.active {
-    color: #ffffff;
-    background: var(--slate-700, #334155);
+    color: var(--nav-gold-bright);
+    background: var(--nav-bg-active);
 }
 
 .navbar-link-icon {
@@ -166,55 +163,60 @@
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background: #fbbf24;
-    box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+    background: var(--nav-gold);
+    box-shadow: 0 0 8px var(--nav-gold-glow);
     transition: all 0.3s ease;
     cursor: help;
 }
 
 .navbar-connection-status.connected {
-    background: #22c55e;
-    box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+    background: var(--nav-live);
+    box-shadow: 0 0 8px var(--nav-live-glow);
 }
 
 .navbar-connection-status.disconnected {
-    background: #ef4444;
-    box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+    background: var(--nav-danger);
+    box-shadow: 0 0 8px rgba(216, 64, 64, 0.6);
 }
 
 .navbar-connection-status.warning {
-    background: #fbbf24;
-    box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+    background: var(--nav-gold);
+    box-shadow: 0 0 8px var(--nav-gold-glow);
 }
 
+/* Role Badges */
 .navbar-role-badge {
     padding: 4px 10px;
     border-radius: 20px;
     font-size: 0.7rem;
     font-weight: 600;
+    font-family: 'Quantico', sans-serif;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .navbar-role-badge.god {
-    background: linear-gradient(135deg, #ffd700, #ff8c00);
-    color: #1a1a1a;
-    box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
+    background: linear-gradient(135deg, var(--nav-gold-bright), var(--nav-gold));
+    color: #050710;
+    box-shadow: 0 0 12px var(--nav-gold-glow);
 }
 
 .navbar-role-badge.admin {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: white;
+    background: linear-gradient(135deg, rgba(200, 179, 126, 0.3), rgba(200, 179, 126, 0.15));
+    color: var(--nav-gold);
+    border: 1px solid var(--nav-border);
 }
 
 .navbar-role-badge.player {
-    background: linear-gradient(135deg, #10b981, #059669);
-    color: white;
+    background: linear-gradient(135deg, rgba(0, 224, 128, 0.25), rgba(0, 224, 128, 0.1));
+    color: var(--nav-live);
+    border: 1px solid rgba(0, 224, 128, 0.2);
 }
 
 .navbar-role-badge.user {
-    background: var(--slate-600, #475569);
-    color: white;
+    background: rgba(106, 112, 136, 0.2);
+    color: var(--nav-text-muted);
+    border: 1px solid var(--nav-border-faint);
 }
 
 .navbar-user-info {
@@ -225,7 +227,8 @@
 
 .navbar-user-name {
     font-size: 0.85rem;
-    color: var(--slate-300, #cbd5e1);
+    font-family: 'Quantico', sans-serif;
+    color: var(--nav-text);
     max-width: 120px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -234,11 +237,11 @@
 
 .navbar-logout-btn {
     background: transparent;
-    border: 1px solid var(--slate-600, #475569);
+    border: 1px solid var(--nav-border);
     border-radius: 6px;
     padding: 6px 10px;
     cursor: pointer;
-    color: var(--slate-400, #94a3b8);
+    color: var(--nav-text-muted);
     font-size: 0.9rem;
     transition: all 0.2s ease;
     display: flex;
@@ -247,8 +250,8 @@
 }
 
 .navbar-logout-btn:hover {
-    background: var(--red-500, #ef4444);
-    border-color: var(--red-500, #ef4444);
+    background: var(--nav-danger);
+    border-color: var(--nav-danger);
     color: white;
 }
 
@@ -259,7 +262,7 @@
     gap: 5px;
     padding: 8px;
     background: transparent;
-    border: 1px solid var(--slate-600, #475569);
+    border: 1px solid var(--nav-border);
     border-radius: 6px;
     cursor: pointer;
 }
@@ -268,7 +271,7 @@
     display: block;
     width: 20px;
     height: 2px;
-    background: var(--slate-400, #94a3b8);
+    background: var(--nav-text-muted);
     border-radius: 2px;
     transition: all 0.2s ease;
 }
@@ -280,8 +283,8 @@
         top: 60px;
         left: 0;
         right: 0;
-        background: var(--slate-900, #0f172a);
-        border-bottom: 1px solid var(--slate-700, #334155);
+        background: var(--nav-bg);
+        border-bottom: 1px solid var(--nav-border);
         padding: 12px;
         flex-direction: column;
         gap: 4px;
@@ -306,7 +309,7 @@
     }
 
     .navbar-tournament-name {
-        display: none;
+        max-width: 120px;
     }
 }
 
@@ -316,7 +319,8 @@
     }
 
     .navbar-brand-name {
-        font-size: 1rem;
+        font-size: 0.9rem;
+        letter-spacing: 2px;
     }
 
     .navbar-role-badge {

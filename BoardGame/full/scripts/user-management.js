@@ -616,7 +616,7 @@ function renderTeamAssignmentSlots() {
                                  ondrop="handleUserDrop(event, ${team.id}, ${playerIndex})"
                                  style="background: rgba(15, 23, 42, 0.5); padding: 10px; border-radius: 5px; border: 2px dashed ${pendingUser ? '#10b981' : '#475569'}; min-height: 50px; display: flex; justify-content: space-between; align-items: center;">
                                 <div>
-                                    <div style="font-size: 0.85rem; opacity: 0.6;">Slot ${playerIndex + 1}</div>
+                                    <div style="font-size: 0.85rem; opacity: 0.6;">${player.name ? player.name : `Slot ${playerIndex + 1}`}</div>
                                     ${pendingUser
                                         ? `<div style="font-weight: 600; color: #10b981;">✓ ${pendingUser.displayName}</div><div style="font-size: 0.8rem; opacity: 0.8;">${pendingUser.email}</div>`
                                         : `<div style="font-style: italic; opacity: 0.5;">Drop user here</div>`

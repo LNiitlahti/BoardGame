@@ -1,0 +1,255 @@
+/* ============================================================================
+   SCORING CEREMONY — Animation Styles (Phase 3E)
+   ============================================================================ */
+
+/* ── Ceremony Overlay (view.html full-screen) ────────────────── */
+
+.ceremony-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 10, 20, 0.95);
+    z-index: 200;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    text-align: center;
+    font-family: 'Orbitron', sans-serif;
+}
+
+.ceremony-overlay.active {
+    display: flex;
+}
+
+/* ── Ceremony Step Container ──────────────────────────────────── */
+
+.ceremony-step {
+    animation: ceremony-slide-in 0.5s ease-out;
+    max-width: 800px;
+    width: 100%;
+}
+
+.ceremony-step-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    margin-bottom: 16px;
+}
+
+.ceremony-step-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+
+.ceremony-step-title {
+    font-size: 28px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 20px;
+    line-height: 1.3;
+}
+
+.ceremony-step-detail {
+    font-size: 20px;
+    font-weight: 600;
+    color: #94a3b8;
+    margin-bottom: 10px;
+}
+
+/* ── Points Animation ─────────────────────────────────────────── */
+
+.ceremony-points {
+    animation: ceremony-points-pop 0.6s ease-out;
+    display: inline-block;
+}
+
+.ceremony-points-value {
+    font-size: 56px;
+    font-weight: 800;
+    color: #10b981;
+}
+
+.ceremony-points-delta {
+    font-size: 28px;
+    font-weight: 700;
+    color: #10b981;
+    margin-left: 8px;
+}
+
+.ceremony-points-delta.negative {
+    color: #ef4444;
+}
+
+/* ── Team Highlight ───────────────────────────────────────────── */
+
+.ceremony-team-name {
+    font-size: 36px;
+    font-weight: 800;
+    animation: ceremony-glow 1.5s ease-in-out infinite;
+}
+
+/* ── Hex Board Highlight ──────────────────────────────────────── */
+
+.ceremony-hex-info {
+    font-size: 18px;
+    color: #94a3b8;
+    margin-top: 12px;
+}
+
+/* ── Progress Bar ─────────────────────────────────────────────── */
+
+.ceremony-progress {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.ceremony-progress-bar {
+    width: 200px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.ceremony-progress-fill {
+    height: 100%;
+    background: #00d4ff;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.ceremony-progress-text {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 600;
+}
+
+/* ── Admin Controls (god.html compact) ────────────────────────── */
+
+.ceremony-admin-panel {
+    display: none;
+    background: rgba(168, 85, 247, 0.08);
+    border: 1px solid rgba(168, 85, 247, 0.2);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    align-items: center;
+    gap: 10px;
+}
+
+.ceremony-admin-panel.active {
+    display: flex;
+}
+
+.ceremony-admin-step {
+    flex: 1;
+    font-size: 0.85rem;
+    color: #e2e8f0;
+    font-weight: 500;
+}
+
+.ceremony-admin-step .step-type {
+    font-size: 0.7rem;
+    color: #a855f7;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.ceremony-admin-progress {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 600;
+}
+
+/* ── Keyframe Animations ──────────────────────────────────────── */
+
+@keyframes ceremony-slide-in {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes ceremony-points-pop {
+    0% {
+        transform: scale(0.5);
+        opacity: 0;
+    }
+    60% {
+        transform: scale(1.15);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes ceremony-glow {
+    0%, 100% {
+        text-shadow: 0 0 10px currentColor;
+    }
+    50% {
+        text-shadow: 0 0 30px currentColor, 0 0 60px currentColor;
+    }
+}
+
+/* ── Round Summary ────────────────────────────────────────────── */
+
+.ceremony-summary {
+    width: 100%;
+    max-width: 600px;
+}
+
+.ceremony-summary-title {
+    font-size: 24px;
+    font-weight: 800;
+    color: #00d4ff;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 24px;
+}
+
+.ceremony-summary-row {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    margin-bottom: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    border-left: 4px solid;
+    gap: 14px;
+}
+
+.ceremony-summary-rank {
+    font-size: 24px;
+    font-weight: 800;
+    color: #555;
+    width: 36px;
+    text-align: center;
+}
+
+.ceremony-summary-name {
+    font-size: 20px;
+    font-weight: 700;
+    flex: 1;
+}
+
+.ceremony-summary-pts {
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+}

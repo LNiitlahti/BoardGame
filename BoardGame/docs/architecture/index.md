@@ -13,6 +13,7 @@ graph TB
         ONBOARD[lightweight/onboarding.html]
         VIEW[lightweight/view.html]
         STATS[lightweight/statistics.html]
+        GOD[full/god.html]
     end
 
     subgraph Core_JS
@@ -26,6 +27,33 @@ graph TB
         PC[platforms-config.js]
         OB[onboarding-lightweight.js]
         TOAST[toast.js]
+    end
+
+    subgraph God_Modules
+        GA[god-app.js]
+        AL[action-logger.js]
+        UIM[ui-manager.js]
+        TMM[team-manager.js]
+        PMM[phase-manager.js]
+        BMM[board-manager.js]
+        QMM[match-queue-manager.js]
+        CMM[match-creation-manager.js]
+        RMM[result-manager.js]
+        SMM[stats-manager.js]
+        BKM[backup-manager.js]
+        UDM[undo-manager.js]
+        SEM[spell-engine.js]
+        SCM[scoring-ceremony.js]
+    end
+
+    subgraph View_Modules
+        DM[display-manager.js]
+    end
+
+    subgraph Replay_Modules
+        REM[replay-engine.js]
+        SGM[summary-generator.js]
+        AEM[action-export.js]
     end
 
     subgraph Firebase
@@ -61,6 +89,26 @@ graph TB
     OB -->|secret validation| FB
     RULES -->|enforces access| FB
 
+    GOD --> GA
+    GA --> SCM
+    VIEW --> DM
+    DM --> SCM
+    GA --> AL
+    GA --> UIM
+    GA --> TMM
+    GA --> PMM
+    GA --> BMM
+    GA --> QMM
+    GA --> CMM
+    GA --> RMM
+    GA --> SMM
+    GA --> SEM
+    AL -->|write actionLog| FB
+    GA -->|read/write| FB
+    GA -->|auth gate| AUTH
+    BMM -->|renders board| BR
+    CMM -->|creates matches via| SMG
+
     %% firebase-loader.js provides anonymous auth fallback for all pages.
     %% Admin/setup override with real login; public pages (view, stats,
     %% onboarding) use the anonymous session to satisfy isAuthenticated rules.
@@ -81,6 +129,8 @@ graph TB
 | [board-renderer.md](board-renderer.md) | `scripts/board-renderer.js` | 3 | Render pipeline, responsive scaling, incremental updates |
 | [toast.md](toast.md) | `shared/scripts/toast.js` | 3 | Toast lifecycle, connection banner state machine, button loading |
 | [firestore-rules.md](firestore-rules.md) | `firestore.rules` | 6 | Role hierarchy, per-collection permissions, permission matrix, billing costs |
+| [god-modules.md](god-modules.md) | `full/scripts/*.js` (15 modules) | 10 | OOP module architecture, DI graph, data flow, window globals, script loading order, action logger, phase manager, spell engine, backup/undo, voting, scoring ceremony, display manager |
+| [replay-analytics.md](replay-analytics.md) | `full/scripts/replay-engine.js`, `summary-generator.js`, `action-export.js` | 9 | Replay engine architecture, state reconstruction, playback, summary generator, action export, god.html integration |
 | [cross-system.md](cross-system.md) | All files | 1 | End-to-end data flow sequence diagram |
 
 ## How to Update

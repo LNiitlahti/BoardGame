@@ -2,1348 +2,1881 @@
 <html lang="en">
 <!--
     ============================================================================
-    VIEW.HTML - DIGITAL SIGNAGE DISPLAY PAGE
+    "War of the Mountain" Tournament Infoscreen — FULL VERSION
+    ============================================================================
+    Version:  2.0 — Full version with Phase 3 display modes + ceremony
+    Based on: Lightweight view.html (battle-tested at event 1)
+    Display:  1920×1080, scaled to fit any screen via applyScale()
+    Fonts:    Russo One (titles) + Quantico (body/data)
+
+    LAYOUT (top to bottom):
+    ┌──────────────────────────────────────────────────────┐
+    │  HEADER (56px) — Title, round/games/queue stats, clock │
+    ├──────────────────┬───────────────────────────────────┤
+    │  ARENA LEFT      │  ARENA RIGHT                      │
+    │  Match 1 (312px) │  Match 2 (312px)                  │
+    ├────────┬─────────┴──────────┬────────────────────────┤
+    │ RECENT │  TERRITORY MAP     │ UPCOMING               │
+    │ RESULTS│  Score bars + Hex  │ QUEUE                  │
+    │ (420px)│  board (center)    │ (420px)                │
+    ├────────┴────────────────────┴────────────────────────┤
+    │  SCORE STRIP (56px) — All 5 teams                    │
+    └─────────────────────────────────────────────────────-┘
+
+    ============================================================================
+    FIRESTORE INTEGRATION
     ============================================================================
 
-    PURPOSE:
-    This page is designed for PUBLIC DISPLAY on external digital signage screens,
-    TVs, or projectors at gaming events. It shows real-time game state for spectators.
+    Data is loaded from Firestore via firebase-loader.js.
+    Search for "TODO:FIREBASE" comments for remaining integration points.
 
-    CHARACTERISTICS:
-    ✓ Read-only (no user inputs or buttons)
-    ✓ Public information only (no sensitive data)
-    ✓ No authentication required (meant to be publicly viewable)
-    ✓ Real-time Firebase updates
-    ✓ Optimized for large screens
+    MATCH LIFECYCLE — How transitions work:
+    ────────────────────────────────────────
+    Content updates (matches, queue, results, scores) happen automatically
+    via Firestore listeners. When data changes, renderMatches(),
+    renderQueue(), renderResults(), and renderScoreStrip() rebuild the UI.
+    Results use incremental DOM prepending for new entries.
 
-    USAGE:
-    Open with tournament/match IDs: view.html?tournamentId=xxx&matchId=yyy
-    Or just tournament: view.html?tournamentId=xxx (will show first match)
+    endMatch(matchId, winningSide, onComplete) is available for manual
+    match-end animations:
+      - Shows "MATCH COMPLETE" overlay text (3.5s)
+      - Flashes the winning side bright
+      - Fades out the match block over 5s
+      - Calls onComplete callback after 6s
 
-    SECURITY:
-    This page requires NO security features - all data displayed is public.
-    It only reads from Firebase (no writes) and shows no sensitive information.
+    CSS CLASSES REFERENCE:
+    ────────────────────────────────────────
+    Used by JS:
+      .finishing       → Match block fade-out animation (5s)
+      .win-flash       → Add to winning .a-side for bright flash (4s)
 
-    See VIEW_PAGE_DOCUMENTATION.md for full details.
+    Defined in CSS but not yet triggered by JS:
+      .promoting       → Match block entrance from below (4s)
+      .new-live        → LIVE badge pop-in with bounce (2s, 1.5s delay)
+      .new-result      → Result card slide-in from top (2.5s)
+      .promoting-out   → Queue NEXT card flies upward and shrinks (2s)
+      .shuffle-up      → Queue cards slide up into position (2s)
+
+    MATCH COMPLETE OVERLAY:
+    ────────────────────────────────────────
+    Each match block must contain this overlay div:
+      <div class="match-complete-overlay">
+          <span class="match-complete-text">Match Complete</span>
+      </div>
+    Add class .active to trigger the animation.
+
     ============================================================================
 -->
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Board Game Viewer</title>
-
-    <!-- Favicons -->
-    <link rel="apple-touch-icon" sizes="180x180" href="../shared/images/favicon/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="../shared/images/favicon/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="../shared/images/favicon/favicon-16x16.png">
-    <link rel="manifest" href="../shared/images/favicon/site.webmanifest">
-    <link rel="shortcut icon" href="../shared/images/favicon/favicon.ico">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>Tournament — Infoscreen</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../shared/css/brand-theme.css">
-    <link rel="stylesheet" href="../shared/css/dark-theme.css">
-    <link rel="stylesheet" href="../shared/css/theme-toggle-button.css">
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../shared/css/fantasy-mountain-theme.css">
+    <link rel="stylesheet" href="css/ceremony.css">
+
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        /* ============================================================
+           RESET & CSS VARIABLES
+           ============================================================
+           Team colors (--t1 through --t5) map to the 5 tournament teams.
+           These are referenced throughout via inline styles on player
+           elements, so changing them here updates everything.
+        */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { background: #000; }
+
+        :root {
+            /* Background layers */
+            --bg-void:      #050710;
+            --bg-deep:      #080b14;
+            --bg-panel:     rgba(10, 13, 22, 0.94);
+            --bg-glass:     rgba(16, 20, 32, 0.8);
+
+            /* Text hierarchy */
+            --text-bright:  #f2f4f7;
+            --text-primary: #c8ccd6;
+            --text-muted:   #6a7088;
+            --text-dim:     #3a3f52;
+
+            /* Accent: Gold (headers, borders, highlights) */
+            --gold:         #c8b37e;
+            --gold-bright:  #e8d8a8;
+            --gold-glow:    rgba(200,179,126,0.3);
+            --gold-dim:     rgba(200,179,126,0.1);
+
+            /* Status colors */
+            --live:         #00e080;
+            --live-glow:    rgba(0,224,128,0.25);
+            --next:         #5898cc;
+            --danger:       #d84040;
+            --win:          #00d880;
+            --loss:         #c03840;
+
+            /* Borders */
+            --border-faint: rgba(255,255,255,0.05);
+            --border-gold:  rgba(200,179,126,0.2);
+
+            /* Team colors — TODO:FIREBASE load from tournament config */
+            --t1: #de392c; --t1-hex: rgba(222,57,44,0.5);   /* Karhu  */
+            --t2: #2278a3; --t2-hex: rgba(34,120,163,0.5);  /* Susi   */
+            --t3: #2e9158; --t3-hex: rgba(46,145,88,0.5);   /* Ilves  */
+            --t4: #f7ba32; --t4-hex: rgba(247,186,50,0.5);  /* Kotka  */
+            --t5: #7a4fbf; --t5-hex: rgba(122,79,191,0.5);  /* Ahma   */
+
+            /* Layout dimensions (fixed for 1920×1080) */
+            --header-h: 56px;
+            --arena-h: 312px;
+            --match-1-w: 960px;
+            --match-2-w: 960px;
+            --side-panel-w: 420px;
+            --score-strip-h: 56px;
         }
 
         body {
-            font-family: 'Orbitron', sans-serif;
-            background: #1a1a1a;
-            color: #ffffff;
-            height: 100vh;
+            font-family: 'Quantico', sans-serif;
+            background: var(--bg-void);
+            color: var(--text-primary);
+            width: 1920px;
+            height: 1080px;
             overflow: hidden;
+            position: relative;
+            transform-origin: top left;
         }
 
-        .container {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
+        /* ============================================================
+           ATMOSPHERE — Background gradients and noise texture
+           ============================================================ */
+        .atmo { position: fixed; inset: 0; pointer-events: none; }
+        .atmo-grad {
+            background:
+                radial-gradient(ellipse 100% 60% at 50% 25%, rgba(200,179,126,0.025), transparent 60%),
+                linear-gradient(180deg, var(--bg-deep), var(--bg-void));
+        }
+        .atmo-noise {
+            opacity: 0.014;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
         }
 
+        /* ============================================================
+           HEADER — Tournament title, stats, clock
+           ============================================================ */
         .header {
-            background: #2a2a2a;
-            padding: 15px 30px;
-            border-bottom: 3px solid #333;
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: var(--header-h);
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            justify-content: space-between;
+            padding: 0 28px;
+            background: rgba(5,7,16,0.92);
+            border-bottom: 1px solid var(--border-gold);
+            z-index: 40;
         }
 
-        .game-title {
-            font-size: 28px;
-            font-weight: 700;
-            text-align: center;
-            color: #00d4ff;
-            flex: 1;
+        .h-left { display: flex; align-items: center; gap: 12px; }
+        .h-icon {
+            width: 28px; height: 28px; border-radius: 5px;
+            background: linear-gradient(135deg, var(--gold), #8a7a52);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; box-shadow: 0 0 8px var(--gold-glow);
+        }
+        .h-title {
+            font-family: 'Russo One', sans-serif;
+            font-size: 34px; color: var(--gold-bright); letter-spacing: 5px;
         }
 
-        .status-indicator {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            box-shadow: 0 0 10px currentColor;
-            transition: all 0.3s ease;
-        }
+        .h-stats { display: flex; gap: 24px; align-items: center; }
+        .h-stat { display: flex; align-items: baseline; gap: 6px; }
+        .h-stat-lbl { font-size: 12px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 2px; }
+        .h-stat-val { font-family: 'Quantico', sans-serif; font-size: 24px; font-weight: 700; color: var(--gold); }
+        .h-sep { width: 1px; height: 18px; background: var(--border-faint); }
+        .h-right { display: flex; align-items: center; gap: 10px; }
 
-        .status-indicator.status-green {
-            background: #10b981;
-            box-shadow: 0 0 15px #10b981;
+        .h-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: var(--live); box-shadow: 0 0 6px var(--live);
+            animation: pulse 6s ease-in-out infinite;
         }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .h-clock { font-family: 'Quantico', sans-serif; font-size: 24px; font-weight: 600; color: var(--text-muted); }
 
-        .status-indicator.status-yellow {
-            background: #f59e0b;
-            box-shadow: 0 0 15px #f59e0b;
-        }
-
-        .status-indicator.status-red {
-            background: #ef4444;
-            box-shadow: 0 0 15px #ef4444;
-        }
-
-        .main-content {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-            gap: 20px;
-            padding: 20px;
-        }
-
-        .events-panel {
-            background: #2a2a2a;
-            border-radius: 12px;
-            padding: 20px;
-            width: 280px;
-            display: flex;
-            flex-direction: column;
-            max-height: 100%;
-            overflow: hidden;
-        }
-
-        .events-panel h2 {
-            font-size: 18px;
-            margin-bottom: 15px;
-            color: #00d4ff;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            flex-shrink: 0;
-        }
-
-        .events-list {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            overflow: hidden;
-            flex: 1;
-        }
-
-        .event {
-            background: #1a1a1a;
-            padding: 10px 12px;
-            border-radius: 6px;
-            border-left: 3px solid #555;
-            font-size: 12px;
-            line-height: 1.4;
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-        }
-
-        .event-time {
-            font-size: 10px;
-            color: #666;
-            font-weight: 400;
-        }
-
-        .event-text {
-            color: #ccc;
-        }
-
-        .event.recent {
-            background: #2d3748;
-            border-left-color: #00d4ff;
-        }
-
-        .event.recent .event-text {
-            font-weight: 600;
-            color: #fff;
-        }
-
-        .board-container {
-            flex: 1;
-            display: flex;
-            gap: 20px;
-        }
-
-        .board-section {
-            flex: 1;
-            background: #2a2a2a;
-            border-radius: 12px;
+        /* ============================================================
+           STATUS STRIP — Player status emojis (from onboarding)
+           ============================================================ */
+        .status-strip {
+            position: absolute;
+            top: var(--header-h);
+            left: 0; right: 0;
+            height: 26px;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .matches-section {
-            width: 350px;
-            background: #2a2a2a;
-            border-radius: 12px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            max-height: 100%;
-            overflow: hidden;
-        }
-
-        .matches-section h2 {
-            font-size: 18px;
-            margin-bottom: 15px;
-            color: #00d4ff;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            flex-shrink: 0;
-        }
-
-        .matches-container {
-            display: flex;
-            flex-direction: column;
             gap: 20px;
-            flex: 1;
-            overflow: hidden;
-        }
-
-        .match-category {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .match-category h3 {
-            font-size: 14px;
-            color: #aaa;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 5px;
-        }
-
-        .match-item {
-            background: #1a1a1a;
-            padding: 12px;
-            border-radius: 8px;
-            border-left: 3px solid #555;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .match-item.active {
-            border-left-color: #00d4ff;
-            background: #2d3748;
-        }
-
-        .match-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .match-game {
+            background: rgba(5,7,16,0.85);
+            border-bottom: 1px solid var(--border-faint);
+            z-index: 35;
             font-size: 13px;
-            font-weight: 700;
-            color: #fff;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+        .status-strip.visible {
+            opacity: 1;
+        }
+        .ss-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .ss-emoji { font-size: 14px; }
+        .ss-name { color: var(--text-muted); font-weight: 700; font-size: 12px; }
+
+        /* ============================================================
+           DUAL ARENA — Two side-by-side match blocks
+           ============================================================
+           Each .match-block is a 3-column grid: left side | center | right side
+           Player cards slide in from their respective sides on load.
+        */
+        .dual-arena {
+            position: absolute;
+            top: var(--header-h);
+            left: 0; right: 0;
+            height: var(--arena-h);
+            display: grid;
+            grid-template-columns: var(--match-1-w) var(--match-2-w);
+            overflow: hidden;
+            z-index: 25;
         }
 
-        .match-format {
-            font-size: 11px;
-            color: #aaa;
-            background: #2a2a2a;
-            padding: 3px 8px;
-            border-radius: 4px;
+        .match-block {
+            position: relative;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            overflow: hidden;
+            border-bottom: 1px solid var(--border-faint);
+        }
+        .match-block:first-child { border-right: 1px solid var(--border-gold); }
+
+        /* Player sides — left & right with angled edge overlays */
+        .a-side {
+            position: relative;
+            display: flex; flex-direction: column;
+            justify-content: center;
+            padding: 14px 0; overflow: hidden;
+        }
+        .a-side::before { content: ''; position: absolute; inset: 0; opacity: 0.05; z-index: 0; }
+        .a-side.left::before { background: linear-gradient(135deg, var(--side-color, #888), transparent 70%); }
+        .a-side.right::before { background: linear-gradient(225deg, var(--side-color, #888), transparent 70%); }
+        .a-side.left::after { content: ''; position: absolute; top: 0; right: -30px; bottom: 0; width: 60px; background: linear-gradient(105deg, transparent 40%, var(--bg-void) 40.5%); z-index: 2; }
+        .a-side.right::after { content: ''; position: absolute; top: 0; left: -30px; bottom: 0; width: 60px; background: linear-gradient(255deg, transparent 40%, var(--bg-void) 40.5%); z-index: 2; }
+
+        /* Player cards */
+        .a-players { display: flex; flex-direction: column; gap: 4px; position: relative; z-index: 3; }
+        .a-side.left .a-players { align-items: flex-end; padding-right: 40px; }
+        .a-side.right .a-players { align-items: flex-start; padding-left: 40px; }
+
+        .a-player {
+            display: flex; align-items: center; gap: 8px;
+            padding: 5px 14px; border-radius: 5px;
+            background: rgba(255,255,255,0.02);
+            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+            min-width: 220px;
+            animation: p-enter 1.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        .a-side.left .a-player { flex-direction: row-reverse; border-right: 3px solid var(--pc); }
+        .a-side.right .a-player { border-left: 3px solid var(--pc); }
+
+        /* Staggered entrance delays for player cards */
+        .a-player:nth-child(1) { animation-delay: 0.1s; }
+        .a-player:nth-child(2) { animation-delay: 0.25s; }
+        .a-player:nth-child(3) { animation-delay: 0.4s; }
+        .a-player:nth-child(4) { animation-delay: 0.55s; }
+        .a-player:nth-child(5) { animation-delay: 0.7s; }
+        .a-side.left .a-player { animation-name: ent-l; }
+        .a-side.right .a-player { animation-name: ent-r; }
+        @keyframes ent-l { from { opacity: 0; transform: translateX(60px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes ent-r { from { opacity: 0; transform: translateX(-60px); } to { opacity: 1; transform: translateX(0); } }
+
+        .a-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 5px currentColor; }
+        .a-info { display: flex; flex-direction: column; gap: 0px; }
+        .a-side.left .a-info { align-items: flex-end; }
+        .a-name { font-family: 'Quantico', sans-serif; font-size: 24px; font-weight: 800; letter-spacing: -0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+        .a-team { font-family: 'Quantico', sans-serif; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; opacity: 0.4; }
+
+        /* Center column — LIVE badge, game name, VS, format, timer */
+        .a-center {
+            width: 130px; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 5px;
+            position: relative; z-index: 10;
+        }
+        .a-center::before { content: ''; position: absolute; top: 0; bottom: 0; width: 1px; background: linear-gradient(to bottom, transparent, var(--gold), transparent); opacity: 0.2; }
+
+        .a-live-badge {
+            font-family: 'Quantico', sans-serif; font-size: 13px; font-weight: 900;
+            color: #fff; background: linear-gradient(135deg, var(--live), #00b870);
+            padding: 4px 16px; border-radius: 4px; letter-spacing: 2px;
+            box-shadow: 0 0 16px var(--live-glow);
+            animation: bg 4s ease-in-out infinite;
+        }
+        @keyframes bg { 0%,100% { box-shadow: 0 0 16px var(--live-glow); } 50% { box-shadow: 0 0 40px rgba(0,224,128,0.5); } }
+
+        .a-game-name { font-family: 'Quantico', sans-serif; font-size: 15px; font-weight: 700; color: var(--text-bright); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
+        .a-vs { font-family: 'Russo One', sans-serif; font-size: 58px; color: var(--gold); line-height: 0.85; text-shadow: 0 0 24px var(--gold-glow); letter-spacing: 3px; }
+        .a-format { font-family: 'Quantico', sans-serif; font-size: 14px; font-weight: 700; color: var(--gold); background: var(--gold-dim); padding: 3px 10px; border-radius: 3px; border: 1px solid var(--border-gold); }
+        .a-timer { font-family: 'Quantico', sans-serif; font-size: 18px; font-weight: 700; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+
+        /* 3-team match layout (2v2v2) */
+        .match-block.three-team {
+            grid-template-columns: 1fr auto 1fr auto 1fr;
+        }
+        .match-block.three-team .a-side.center {
+            padding: 14px 10px;
+        }
+        .match-block.three-team .a-side.center::before {
+            background: radial-gradient(ellipse at center, var(--side-color, #888), transparent 70%);
+        }
+        .match-block.three-team .a-side.center::after { display: none; }
+        .match-block.three-team .a-side.center .a-players {
+            align-items: center;
+            padding: 0;
+        }
+        .match-block.three-team .a-side.center .a-player {
+            flex-direction: row;
+            border-left: 3px solid var(--pc);
+            border-right: none;
+        }
+        .match-block.three-team .a-side.center .a-info {
+            align-items: flex-start;
+        }
+        .match-block.three-team .a-player {
+            min-width: 160px;
+            padding: 4px 10px;
+        }
+        .match-block.three-team .a-name {
+            font-size: 18px;
+        }
+        .a-vs-divider {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 0 4px; position: relative; z-index: 10;
+        }
+        .a-vs-divider::before {
+            content: ''; position: absolute; top: 0; bottom: 0; width: 1px;
+            background: linear-gradient(to bottom, transparent, var(--gold), transparent); opacity: 0.15;
+        }
+        .a-vs-small {
+            font-family: 'Russo One', sans-serif; font-size: 28px;
+            color: var(--gold); line-height: 1; text-shadow: 0 0 12px var(--gold-glow);
+        }
+        .match-block.three-team .a-center {
+            width: auto; padding: 0 8px;
+        }
+        .match-block.three-team .a-vs { font-size: 32px; }
+
+        /* ============================================================
+           BOTTOM ZONE — 3 columns: Results | Board+Scores | Queue
+           ============================================================ */
+        .bottom-zone {
+            position: absolute;
+            top: calc(var(--header-h) + var(--arena-h) - 1px);
+            left: 0; right: 0; bottom: 0;
+            display: grid;
+            grid-template-columns: var(--side-panel-w) 1fr var(--side-panel-w);
+            grid-template-rows: 1fr var(--score-strip-h);
+            z-index: 15;
         }
 
-        .match-teams {
+        /* Shared side panel styles (Results & Queue) */
+        .side-panel {
+            grid-row: 1;
             display: flex;
             flex-direction: column;
-            gap: 6px;
-            font-size: 12px;
+            padding: 12px 14px;
+            overflow: hidden;
+            position: relative;
+        }
+        .side-panel::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0; height: 40px;
+            background: linear-gradient(to bottom, transparent, rgba(6,8,14,0.96));
+            pointer-events: none; z-index: 3;
         }
 
-        .match-team {
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-            align-items: center;
+        .panel-title {
+            font-family: 'Russo One', sans-serif;
+            font-size: 24px; color: var(--gold);
+            letter-spacing: 5px; margin-bottom: 10px;
+            padding-bottom: 8px; border-bottom: 1px solid var(--border-gold);
+            flex-shrink: 0;
         }
 
-        .match-player {
-            padding: 3px 8px;
-            border-radius: 4px;
-            background: #2a2a2a;
-            border: 2px solid;
-            font-size: 11px;
-            font-weight: 500;
+        .panel-list {
+            display: flex; flex-direction: column;
+            gap: 8px; flex: 1; overflow: hidden;
         }
 
-        .match-player.blue {
-            border-color: #3b82f6;
-            color: #3b82f6;
+        .results-panel {
+            grid-column: 1;
+            background: linear-gradient(90deg, rgb(6,8,14), rgb(8,10,17));
+            border-right: 1px solid var(--border-faint);
         }
 
-        .match-player.red {
-            border-color: #ef4444;
-            color: #ef4444;
+        .queue-panel {
+            grid-column: 3;
+            background: linear-gradient(270deg, rgb(6,8,14), rgb(8,10,17));
+            border: none;
+            border-left: 1px solid var(--border-faint);
+            box-shadow: none;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
         }
 
-        .match-player.green {
-            border-color: #10b981;
-            color: #10b981;
+        /* ============================================================
+           RESULT CARDS
+           ============================================================
+           Structure per card:
+             .r-card
+               .r-top (.r-game + .r-time)
+               .r-matchup
+                 .r-side.a.winner|loser  → [WIN badge] + .r-names
+                 .r-vs                   → scores
+                 .r-side.b.winner|loser  → .r-names + [WIN badge]
+           
+           WIN badge sits OUTSIDE .r-names, on the outer edge of the
+           winning side. LOSS badge is hidden via display:none.
+           
+           For side A winners: badge comes before .r-names (left edge)
+           For side B winners: badge comes after .r-names (right edge)
+        */
+        .r-card {
+            border-radius: 6px; flex-shrink: 0;
+            background: rgba(255,255,255,0.015);
+            border: 1px solid var(--border-faint);
+            padding: 8px 12px;
+            animation: r-in 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        .r-card:nth-child(1) { animation-delay: 0s; }
+        .r-card:nth-child(2) { animation-delay: 0.15s; }
+        .r-card:nth-child(3) { animation-delay: 0.3s; }
+        .r-card:nth-child(4) { animation-delay: 0.45s; }
+        .r-card:nth-child(5) { animation-delay: 0.6s; }
+        .r-card:nth-child(6) { animation-delay: 0.75s; }
+        .r-card:nth-child(7) { animation-delay: 0.9s; }
+
+        @keyframes r-in {
+            from { opacity: 0; transform: translateX(-30px); }
+            to { opacity: 1; transform: translateX(0); }
         }
 
-        .match-player.yellow {
-            border-color: #f59e0b;
-            color: #f59e0b;
+        .r-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .r-game { font-family: 'Quantico', sans-serif; font-size: 13px; font-weight: 700; color: var(--gold); text-transform: uppercase; }
+        .r-time { font-family: 'Quantico', sans-serif; font-size: 11px; font-weight: 600; color: var(--text-dim); }
+
+        .r-matchup { display: flex; align-items: center; gap: 0; }
+
+        .r-side { flex: 1; display: flex; align-items: center; gap: 20px; }
+        .r-side.a { justify-content: flex-end; }
+        .r-side.b { justify-content: flex-start; }
+
+        .r-names { display: flex; flex-direction: column; gap: 2px; }
+        .r-side.a .r-names { align-items: flex-end; }
+        .r-side.b .r-names { align-items: flex-start; }
+
+        .r-badge {
+            font-family: 'Quantico', sans-serif; font-size: 10px; font-weight: 800;
+            padding: 2px 6px; border-radius: 2px;
+            letter-spacing: 1px; flex-shrink: 0;
+        }
+        .r-badge.win {
+            background: rgba(0, 216, 128, 0.15); color: var(--win);
+            border: 1px solid rgba(0, 216, 128, 0.2);
+        }
+        .r-badge.loss { display: none; }
+
+        .r-player {
+            font-size: 14px; font-weight: 600;
+            padding: 2px 6px; border-radius: 2px;
+            white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; max-width: 140px;
+        }
+        .r-side.winner .r-player { background: rgba(0, 216, 128, 0.08); }
+        .r-side.loser .r-player { opacity: 0.45; }
+
+        .r-vs {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 1px; flex-shrink: 0; min-width: 36px; padding: 0 6px;
+        }
+        .r-score { font-family: 'Quantico', sans-serif; font-size: 20px; font-weight: 800; }
+        .r-score.w { color: var(--win); }
+        .r-score.l { color: var(--loss); }
+        .r-score-sep { font-size: 10px; color: var(--text-dim); letter-spacing: 1px; }
+
+        /* ============================================================
+           QUEUE CARDS
+           ============================================================
+           Two card types:
+             .q-next    — Expanded "NEXT" card with full player names
+             .q-compact — Smaller queued cards
+           
+           Challenge matches get .challenge class (red left border).
+        */
+        .q-card {
+            border-radius: 6px; flex-shrink: 0;
+            animation: q-in 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        .q-card:nth-child(1) { animation-delay: 0s; }
+        .q-card:nth-child(2) { animation-delay: 0.15s; }
+        .q-card:nth-child(3) { animation-delay: 0.3s; }
+        .q-card:nth-child(4) { animation-delay: 0.45s; }
+        .q-card:nth-child(5) { animation-delay: 0.6s; }
+
+        @keyframes q-in {
+            from { opacity: 0; transform: translateX(30px); }
+            to { opacity: 1; transform: translateX(0); }
         }
 
-        .match-player.purple {
-            border-color: #a855f7;
-            color: #a855f7;
+        /* NEXT card (expanded) */
+        .q-card.q-next { background: var(--bg-glass); border: 1px solid rgba(88,152,204,0.2); padding: 10px 12px; }
+        .q-next-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .q-next-game { font-family: 'Quantico', sans-serif; font-size: 14px; font-weight: 700; color: var(--text-bright); }
+        .q-next-badge { font-family: 'Quantico', sans-serif; font-size: 11px; font-weight: 800; background: var(--next); color: var(--bg-void); padding: 3px 9px; border-radius: 3px; letter-spacing: 1.5px; }
+        .q-next-matchup { display: flex; align-items: center; gap: 5px; justify-content: center; }
+        .q-next-side { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+        .q-next-side.a { align-items: flex-end; }
+        .q-next-name { font-size: 14px; font-weight: 700; padding: 3px 6px; border-radius: 3px; background: rgba(255,255,255,0.03); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
+        .q-next-side.a .q-next-name { border-right: 3px solid; text-align: right; }
+        .q-next-side.b .q-next-name { border-left: 3px solid; }
+        .q-next-vs { font-family: 'Quantico', sans-serif; font-size: 12px; font-weight: 700; color: var(--text-dim); }
+
+        /* Compact queued cards */
+        .q-card.q-compact { background: rgba(255,255,255,0.015); border: 1px solid var(--border-faint); padding: 6px 10px; opacity: 0.75; }
+        .q-card.q-compact.challenge { border-left: 3px solid var(--danger); background: rgba(216,64,64,0.03); }
+        .q-card.q-next.break { border-left: 3px solid #f7ba32; background: rgba(247,186,50,0.05); }
+        .q-card.q-compact.break { border-left: 3px solid #f7ba32; background: rgba(247,186,50,0.03); }
+        .qc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .qc-game { font-family: 'Quantico', sans-serif; font-size: 13px; font-weight: 700; color: var(--gold); text-transform: uppercase; white-space: nowrap; }
+        .qc-format { font-family: 'Quantico', sans-serif; font-size: 10px; font-weight: 600; color: var(--text-dim); letter-spacing: 1px; background: rgba(255,255,255,0.04); padding: 1px 6px; border-radius: 3px; }
+        .qc-matchup { display: flex; align-items: center; gap: 5px; justify-content: center; }
+        .qc-side { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+        .qc-side.a { align-items: flex-end; }
+        .qc-side.b { align-items: flex-start; }
+        .qc-name { font-size: 14px; font-weight: 600; padding: 2px 6px; border-radius: 2px; background: rgba(255,255,255,0.03); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+        .qc-side.a .qc-name { border-right: 3px solid; text-align: right; }
+        .qc-side.b .qc-name { border-left: 3px solid; }
+        .qc-vs { font-family: 'Quantico', sans-serif; font-size: 10px; font-weight: 700; color: var(--text-dim); }
+
+        /* ============================================================
+           BOARD AREA — Center column (score bars + hex territory map)
+           ============================================================ */
+        .board-area {
+            grid-row: 1; grid-column: 2;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: flex-start;
+            position: relative; padding: 8px 30px 10px;
+            overflow: hidden;
+        }
+        .board-area::before {
+            content: ''; position: absolute; top: 0; left: 10px; right: 10px; height: 1px;
+            background: linear-gradient(to right, transparent, var(--border-gold), transparent);
+        }
+        /* Territory map score bars */
+        .territory-map { width: 100%; display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; align-self: stretch; }
+
+        .tm-header-row { display: grid; grid-template-columns: 100px 1fr 32px; gap: 8px; height: 14px; align-items: flex-end; }
+        .tm-scale { display: flex; justify-content: space-between; align-items: flex-end; }
+        .tm-scale-num { font-family: 'Quantico', sans-serif; font-size: 8px; font-weight: 600; color: var(--text-dim); line-height: 1; }
+
+        .tm-row { display: grid; grid-template-columns: 100px 1fr 32px; gap: 8px; height: 22px; }
+        .tm-name { font-family: 'Russo One', sans-serif; font-size: 18px; letter-spacing: 1px; text-align: right; line-height: 22px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tm-pts { font-family: 'Quantico', sans-serif; font-size: 15px; font-weight: 700; color: var(--text-bright); line-height: 22px; text-align: left; }
+
+        .tm-track { position: relative; height: 16px; align-self: center; overflow: visible; }
+        .tm-track::after { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: rgba(255,255,255,0.05); z-index: 0; }
+
+        .tm-ticks { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+        .tm-tick { position: absolute; top: 0; width: 1px; height: 100%; background: rgba(255,255,255,0.05); }
+
+        .tm-fill { position: absolute; top: 0; left: 0; height: 100%; display: flex; overflow: visible; z-index: 1; transition: width 3s cubic-bezier(0.22, 1, 0.36, 1); }
+        .tm-fill::after { content: ''; position: absolute; right: 0; top: -1px; width: 2px; height: calc(100% + 2px); background: var(--text-bright); box-shadow: 0 0 5px var(--text-bright), 0 0 10px rgba(255,255,255,0.25); z-index: 5; }
+
+        .tm-seg { height: 100%; position: relative; border-radius: 1px; }
+        .tm-seg.w {
+            background: linear-gradient(180deg, color-mix(in srgb, var(--c) 88%, #fff) 0%, var(--c) 30%, color-mix(in srgb, var(--c) 92%, #000) 100%);
+            border-top: 1px solid color-mix(in srgb, var(--c) 60%, #fff);
+            box-shadow: 0 0 6px var(--c), 0 0 12px color-mix(in srgb, var(--c) 35%, transparent);
+        }
+        .tm-seg.h {
+            background: repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(200,179,126,0.22) 2px, rgba(200,179,126,0.22) 3px), linear-gradient(180deg, color-mix(in srgb, var(--c) 80%, #fff) 0%, color-mix(in srgb, var(--c) 90%, #000) 40%, color-mix(in srgb, var(--c) 70%, #000) 100%);
+            background-size: 7.07px 7.07px, 100% 100%;
+            border-top: 1px solid color-mix(in srgb, var(--c) 50%, #fff);
+            border-left: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 0 4px color-mix(in srgb, var(--c) 30%, transparent), 0 0 8px color-mix(in srgb, var(--c) 15%, transparent);
         }
 
-        .match-player.orange {
-            border-color: #f97316;
-            color: #f97316;
-        }
+        /* Glow pulse — shadows breathe */
+        @keyframes tmGlowPulse { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.2); } }
+        .territory-map .tm-row:nth-child(2) .tm-fill { animation: tmGlowPulse 6s ease-in-out infinite 0s; }
+        .territory-map .tm-row:nth-child(3) .tm-fill { animation: tmGlowPulse 6s ease-in-out infinite 1.2s; }
+        .territory-map .tm-row:nth-child(4) .tm-fill { animation: tmGlowPulse 6s ease-in-out infinite 2.4s; }
+        .territory-map .tm-row:nth-child(5) .tm-fill { animation: tmGlowPulse 6s ease-in-out infinite 3.6s; }
+        .territory-map .tm-row:nth-child(6) .tm-fill { animation: tmGlowPulse 6s ease-in-out infinite 4.8s; }
 
-        .match-vs {
-            font-size: 10px;
-            color: #666;
-            text-align: center;
-            font-weight: 600;
-        }
+        /* End-cap beacon — stopper pulses */
+        @keyframes tmBeacon { 0%, 100% { opacity: 0.5; box-shadow: 0 0 3px var(--text-bright); } 50% { opacity: 1; box-shadow: 0 0 8px var(--text-bright), 0 0 18px rgba(255,255,255,0.3); } }
+        .territory-map .tm-row:nth-child(2) .tm-fill::after { animation: tmBeacon 4s ease-in-out infinite 0.3s; }
+        .territory-map .tm-row:nth-child(3) .tm-fill::after { animation: tmBeacon 4s ease-in-out infinite 0.8s; }
+        .territory-map .tm-row:nth-child(4) .tm-fill::after { animation: tmBeacon 4s ease-in-out infinite 1.3s; }
+        .territory-map .tm-row:nth-child(5) .tm-fill::after { animation: tmBeacon 4s ease-in-out infinite 1.8s; }
+        .territory-map .tm-row:nth-child(6) .tm-fill::after { animation: tmBeacon 4s ease-in-out infinite 2.3s; }
 
-        #game-board {
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #2a1810 0%, #1a1008 100%);
-            border-radius: 8px;
+        /* Stripe drift — hex stripes scroll */
+        @keyframes tmStripeDrift { 0% { background-position: 0 0, 0 0; } 100% { background-position: 7.07px 7.07px, 0 0; } }
+        .territory-map .tm-seg.h { animation: tmStripeDrift 8s linear infinite; }
+
+        /* Hex territory board - using BoardRenderer */
+        .board-wrap {
+            flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
-            color: #6b5d52;
-            border: 8px solid;
-            border-image: linear-gradient(135deg, #8b6f47 0%, #5d4a33 50%, #3d2f20 100%) 1;
-            box-shadow: 
-                inset 0 2px 4px rgba(0,0,0,0.5),
-                inset 0 -2px 4px rgba(139,111,71,0.2),
-                0 4px 8px rgba(0,0,0,0.3);
+            width: 100%;
             position: relative;
+            border-radius: 8px;
+            background: var(--bg-panel);
+            overflow: hidden;
         }
 
-        #game-board::before {
+        /* Glass overlay on top of the gameboard */
+        .board-wrap::after {
             content: '';
             position: absolute;
             inset: 0;
-            background: 
-                repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(139,111,71,0.03) 2px, rgba(139,111,71,0.03) 4px),
-                repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(139,111,71,0.03) 2px, rgba(139,111,71,0.03) 4px);
+            border-radius: 8px;
             pointer-events: none;
-            border-radius: 4px;
+            z-index: 100;
+            background: linear-gradient(
+                135deg,
+                rgba(255, 255, 255, 0.08),
+                rgba(255, 255, 255, 0.01)
+            );
+            mix-blend-mode: soft-light;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.04);
         }
 
         #hexBoard {
+            position: relative;
+            filter: brightness(0.8) saturate(0.9);
+        }
+
+        /* Board hex team colors - transparent overlay using ::after */
+        .board-hex.occupied::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            right: 3px;
+            bottom: 3px;
+            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+            pointer-events: none;
+            z-index: 6;
+        }
+        .board-hex.team-1::after { background: var(--t1-hex); }
+        .board-hex.team-2::after { background: var(--t2-hex); }
+        .board-hex.team-3::after { background: var(--t3-hex); }
+        .board-hex.team-4::after { background: var(--t4-hex); }
+        .board-hex.team-5::after { background: var(--t5-hex); }
+
+        /* ===========================================
+           VISUAL EFFECTS - Always enabled for display
+           =========================================== */
+
+        /* Effect: Heart Glow */
+        body.effect-heart-glow .board-hex.side-heart::before,
+        body.effect-heart-glow .board-hex.mountain-heart::before {
+            box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.6);
+        }
+
+        /* Effect: Pulse Animation on Hearts */
+        body.effect-pulse-hearts .board-hex.side-heart,
+        body.effect-pulse-hearts .board-hex.mountain-heart {
+            animation: pulse-heart 7.2s ease-in-out infinite;
+            z-index: 20;
+        }
+
+        @keyframes pulse-heart {
+            0%, 100% {
+                filter: brightness(1) drop-shadow(0 0 0px transparent);
+                transform: translate(-50%, -50%) scale(1);
+            }
+            50% {
+                filter: brightness(1.5) drop-shadow(0 0 8px rgba(255, 100, 150, 0.8));
+                transform: translate(-50%, -50%) scale(1.08);
+            }
+        }
+
+        /* Pulse animation for heart overlay images */
+        body.effect-pulse-hearts .heart-overlay-image {
+            animation: pulse-heart-image 7.2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-heart-image {
+            0%, 100% {
+                filter: brightness(1) drop-shadow(0 0 0px transparent);
+                transform: translate(-50%, -50%) rotate(-30deg) scale(1);
+            }
+            50% {
+                filter: brightness(1.5) drop-shadow(0 0 8px rgba(255, 100, 150, 0.8));
+                transform: translate(-50%, -50%) rotate(-30deg) scale(1.08);
+            }
+        }
+
+        /* Effect: Rooms */
+        body.effect-rooms .board-hex.room .room-border {
+            display: block;
+        }
+        .room-border {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
             width: 100%;
             height: 100%;
-            position: relative;
+            transform: translate(-50%, -50%);
+            z-index: 8;
+            pointer-events: none;
+            background: radial-gradient(ellipse 70% 70% at center, transparent 40%, rgba(0, 0, 0, 0.7) 100%);
+            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z' fill='white'/%3E%3C/svg%3E");
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z' fill='white'/%3E%3C/svg%3E");
+            -webkit-mask-size: 100% 100%;
+            mask-size: 100% 100%;
         }
 
-        .teams-footer {
-            display: flex;
-            gap: 15px;
-            padding: 20px;
-            background: #2a2a2a;
-            border-top: 3px solid #333;
-            overflow-x: auto;
+        .room-border::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath fill-rule='evenodd' d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z M21.5,8.8 L44.5,8.8 L56,29 L44.5,49.2 L21.5,49.2 L10,29 Z' fill='white'/%3E%3C/svg%3E");
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath fill-rule='evenodd' d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z M21.5,8.8 L44.5,8.8 L56,29 L44.5,49.2 L21.5,49.2 L10,29 Z' fill='white'/%3E%3C/svg%3E");
+            -webkit-mask-size: 100% 100%;
+            mask-size: 100% 100%;
         }
 
-        .team {
-            background: #1a1a1a;
-            border-radius: 10px;
-            padding: 15px;
-            min-width: 200px;
+        /* Effect: Hex Images - terrain/map images on each hex */
+        body.effect-hex-images .board-hex::before {
+            background-size: cover;
+            background-position: center;
+            z-index: 5;
+        }
+
+        /* Labels go behind images when hex-images is enabled */
+        body.effect-hex-images .hex-label {
+            z-index: 1;
+        }
+
+        /* ============================================================
+           SCORE STRIP — Bottom bar showing all 5 teams
+           ============================================================ */
+        .score-strip {
+            grid-row: 2; grid-column: 1 / -1;
+            display: flex; gap: 2px;
+            background: var(--bg-void);
+            z-index: 25;
+        }
+        .sc {
             flex: 1;
-            border: 3px solid transparent;
-            transition: all 0.3s ease;
-            display: grid;
-            grid-template-rows: auto auto auto;
-            gap: 12px;
+            display: grid; grid-template-columns: 1fr auto; grid-template-rows: 1fr 1fr;
+            position: relative; overflow: hidden;
+            background: linear-gradient(180deg, color-mix(in srgb, var(--c) 35%, var(--bg-deep)) 0%, color-mix(in srgb, var(--c) 18%, var(--bg-deep)) 100%);
+            border-bottom: 3px solid var(--c);
+            box-shadow: inset 0 0 40px color-mix(in srgb, var(--c) 10%, transparent), inset 0 1px 0 color-mix(in srgb, var(--c) 15%, transparent);
+        }
+        .sc::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c); box-shadow: 0 0 12px color-mix(in srgb, var(--c) 60%, transparent); }
+
+        .sc-tname-area { grid-column: 1; grid-row: 1; display: flex; align-items: flex-end; padding: 0 0 1px 10px; }
+        .sc-tname { font-family: 'Russo One', sans-serif; font-size: 20px; color: #fff; letter-spacing: 1px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1; text-shadow: 0 0 20px color-mix(in srgb, var(--c) 50%, transparent), 0 1px 2px rgba(0,0,0,0.6); }
+
+        .sc-players-area { grid-column: 1; grid-row: 2; display: flex; align-items: flex-start; gap: 8px; padding: 2px 0 0 10px; }
+        .sc-player { display: flex; align-items: center; gap: 4px; }
+        .sc-pname { font-family: 'Quantico', sans-serif; font-weight: 700; font-size: 17px; color: color-mix(in srgb, var(--c) 70%, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75px; line-height: 1; }
+        .sc-pstar { font-family: 'Quantico', sans-serif; display: flex; align-items: center; gap: 1px; flex-shrink: 0; }
+        .sc-pstar .star { font-size: 14px; color: var(--gold); text-shadow: 0 0 5px var(--gold-glow); }
+        .sc-pstar .pcount { font-weight: 700; font-size: 16px; color: var(--gold-bright); text-shadow: 0 0 5px var(--gold-glow); }
+        .sc-psep { color: rgba(255,255,255,0.12); font-size: 11px; user-select: none; }
+
+        .sc-score-area { grid-column: 2; grid-row: 1 / 3; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 0 10px 0 12px; border-left: 1px solid rgba(255,255,255,0.06); }
+        .sc-score-num { font-family: 'Russo One', sans-serif; line-height: 1; min-width: 30px; text-align: center; }
+        .sc-score-num.w { font-size: 26px; color: var(--win); text-shadow: 0 0 10px rgba(0, 216, 128, 0.35); }
+        .sc-score-num.pts { font-size: 26px; color: color-mix(in srgb, var(--c) 80%, #fff); text-shadow: 0 0 10px color-mix(in srgb, var(--c) 50%, transparent); }
+        .sc-score-num.total { font-size: 34px; color: var(--text-bright); text-shadow: 0 0 16px rgba(242, 244, 247, 0.25), 0 0 4px rgba(242, 244, 247, 0.1); }
+
+        /* ============================================================
+           TRANSITION ANIMATIONS — Match lifecycle
+           ============================================================
+           These CSS classes are applied/removed by JS to animate
+           match endings, new match promotions, and list updates.
+           See the FIREBASE INTEGRATION GUIDE in the HTML comment
+           at the top for the full lifecycle sequence.
+        */
+
+        /* Phase 1: Match ending — block fades out with brightness flash */
+        .match-block.finishing {
+            animation: match-finish 5s ease-in-out forwards;
+        }
+        @keyframes match-finish {
+            0%   { opacity: 1; filter: brightness(1); }
+            10%  { filter: brightness(1.6); }
+            25%  { filter: brightness(1); }
+            50%  { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(0.95) translateY(-15px); filter: brightness(0.4); }
         }
 
-        .team-players {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            padding-bottom: 12px;
-            border-bottom: 2px solid #2a2a2a;
+        /* "MATCH COMPLETE" overlay — flashes over the match block */
+        .match-complete-overlay {
+            position: absolute; inset: 0; z-index: 50;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0);
+            pointer-events: none; opacity: 0;
+        }
+        .match-complete-overlay.active {
+            animation: overlay-flash 5s ease-in-out forwards;
+        }
+        @keyframes overlay-flash {
+            0%   { opacity: 0; background: rgba(0,0,0,0); }
+            8%   { opacity: 1; background: rgba(200,179,126,0.1); }
+            25%  { opacity: 1; background: rgba(0,0,0,0); }
+            100% { opacity: 0; }
+        }
+        .match-complete-text {
+            font-family: 'Russo One', sans-serif;
+            font-size: 36px; color: var(--gold-bright);
+            letter-spacing: 8px; text-transform: uppercase;
+            text-shadow: 0 0 40px var(--gold-glow), 0 0 80px var(--gold-glow);
+            opacity: 0;
+        }
+        .match-complete-overlay.active .match-complete-text {
+            animation: complete-text 5s ease-in-out forwards;
+        }
+        @keyframes complete-text {
+            0%   { opacity: 0; transform: scale(0.8); }
+            8%   { opacity: 1; transform: scale(1.05); }
+            20%  { opacity: 1; transform: scale(1); }
+            40%  { opacity: 0; transform: scale(1) translateY(-15px); }
+            100% { opacity: 0; }
         }
 
-        .player-box {
-            background: #2a2a2a;
-            padding: 8px;
-            border-radius: 6px;
-            font-size: 11px;
-            font-weight: 500;
-            border: 2px solid;
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
+        /* Winner side flash — brighter gradient on the winning side */
+        .a-side.win-flash::before {
+            animation: side-win-flash 4s ease-out forwards !important;
+            opacity: 0.3 !important;
+        }
+        @keyframes side-win-flash {
+            0%   { opacity: 0; }
+            10%  { opacity: 0.5; }
+            40%  { opacity: 0.2; }
+            100% { opacity: 0; }
         }
 
-        .player-name {
-            font-weight: 600;
-            font-size: 12px;
+        /* Phase 2: New match rising into the arena */
+        .match-block.promoting {
+            animation: match-promote 4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @keyframes match-promote {
+            0%   { opacity: 0; transform: translateY(80px) scale(0.85); filter: brightness(0.2); }
+            35%  { opacity: 0.6; transform: translateY(15px) scale(0.97); }
+            65%  { opacity: 1; transform: translateY(-5px) scale(1.02); filter: brightness(1.15); }
+            85%  { transform: translateY(2px) scale(1); }
+            100% { opacity: 1; transform: translateY(0) scale(1); filter: brightness(1); }
         }
 
-        .player-points {
-            font-size: 14px;
-            opacity: 0.9;
-            font-weight: 700;
+        /* LIVE badge pop-in (used on newly promoted matches) */
+        .a-live-badge.new-live {
+            animation: live-badge-entrance 2s ease-out 1.5s forwards;
+            opacity: 0;
+        }
+        @keyframes live-badge-entrance {
+            0%   { opacity: 0; transform: scale(0.4); }
+            40%  { opacity: 1; transform: scale(1.2); }
+            70%  { transform: scale(0.95); }
+            100% { opacity: 1; transform: scale(1); }
         }
 
-        .team[data-color="blue"] .player-box {
-            border-color: #3b82f6;
-            color: #3b82f6;
+        /* New result card sliding in from top */
+        .r-card.new-result {
+            animation: result-slide-in 2.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @keyframes result-slide-in {
+            0%   { opacity: 0; transform: translateY(-60px) scale(0.85); max-height: 0; padding-top: 0; padding-bottom: 0; margin-bottom: 0; }
+            25%  { max-height: 200px; padding-top: 8px; padding-bottom: 8px; }
+            100% { opacity: 1; transform: translateY(0) scale(1); max-height: 200px; }
         }
 
-        .team[data-color="red"] .player-box {
-            border-color: #ef4444;
-            color: #ef4444;
+        /* Queue card sliding up into new position */
+        .q-card.shuffle-up {
+            animation: queue-shuffle 2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @keyframes queue-shuffle {
+            0%   { opacity: 0.4; transform: translateY(30px); }
+            100% { opacity: 1; transform: translateY(0); }
         }
 
-        .team[data-color="green"] .player-box {
-            border-color: #10b981;
-            color: #10b981;
+        /* NEXT queue card promoting out (flies up and shrinks) */
+        .q-card.promoting-out {
+            animation: queue-promote-out 2s ease-in-out forwards;
+        }
+        @keyframes queue-promote-out {
+            0%   { opacity: 1; transform: translateY(0) scale(1); max-height: 200px; }
+            35%  { opacity: 0.8; transform: translateY(-15px) scale(1.03); filter: brightness(1.2); }
+            100% { opacity: 0; transform: translateY(-80px) scale(0.75); max-height: 0; padding: 0; margin: 0; overflow: hidden; }
         }
 
-        .team[data-color="yellow"] .player-box {
-            border-color: #f59e0b;
-            color: #f59e0b;
-        }
-
-        .team[data-color="purple"] .player-box {
-            border-color: #a855f7;
-            color: #a855f7;
-        }
-
-        .team[data-color="orange"] .player-box {
-            border-color: #f97316;
-            color: #f97316;
-        }
-
-        .team.active {
-            border-width: 5px;
-        }
-
-        .team[data-color="blue"] {
-            border-color: #3b82f6;
-        }
-
-        .team[data-color="blue"].active {
-            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
-        }
-
-        .team[data-color="red"] {
-            border-color: #ef4444;
-        }
-
-        .team[data-color="red"].active {
-            box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
-        }
-
-        .team[data-color="green"] {
-            border-color: #10b981;
-        }
-
-        .team[data-color="green"].active {
-            box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
-        }
-
-        .team[data-color="yellow"] {
-            border-color: #f59e0b;
-        }
-
-        .team[data-color="yellow"].active {
-            box-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
-        }
-
-        .team[data-color="purple"] {
-            border-color: #a855f7;
-        }
-
-        .team[data-color="purple"].active {
-            box-shadow: 0 0 20px rgba(168, 85, 247, 0.5);
-        }
-
-        .team[data-color="orange"] {
-            border-color: #f97316;
-        }
-
-        .team[data-color="orange"].active {
-            box-shadow: 0 0 20px rgba(249, 115, 22, 0.5);
-        }
-
-        .team-info {
-            padding-bottom: 12px;
-            border-bottom: 2px solid #2a2a2a;
-            text-align: center;
-        }
-
-        .team-name {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
-
-        .team[data-color="blue"] .team-name {
-            color: #3b82f6;
-        }
-
-        .team[data-color="red"] .team-name {
-            color: #ef4444;
-        }
-
-        .team[data-color="green"] .team-name {
-            color: #10b981;
-        }
-
-        .team[data-color="yellow"] .team-name {
-            color: #f59e0b;
-        }
-
-        .team[data-color="purple"] .team-name {
-            color: #a855f7;
-        }
-
-        .team[data-color="orange"] .team-name {
-            color: #f97316;
-        }
-
-        .team-score {
-            font-size: 18px;
-            color: #fff;
-            font-weight: 700;
-        }
-
-        .team-cards {
-            display: flex;
-            gap: 15px;
-        }
-
-        .card-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .card-label {
-            font-size: 11px;
+        /* ============================================================
+           GLOBAL STYLES
+           ============================================================ */
+        .a-name, .r-player, .q-next-name, .qc-name, .sc-player {
             text-transform: uppercase;
-            color: #777;
-            letter-spacing: 0.5px;
         }
 
-        .cards {
+        ::-webkit-scrollbar { display: none; }
+        * { scrollbar-width: none; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        /* ============================================================
+           EMBER PARTICLES
+           ============================================================ */
+        .ember-field {
+            position: absolute; inset: 0;
+            pointer-events: none; overflow: hidden;
+            z-index: 200;
+        }
+
+        .ember {
+            position: absolute; border-radius: 50%;
+            background: #a04020;
+            box-shadow: 0 0 5px #a04020, 0 0 12px rgba(200,80,40,0.25);
+            animation: ember-rise linear infinite; opacity: 0;
+        }
+        .ember.bright {
+            background: #d05828;
+            box-shadow: 0 0 6px #d05828, 0 0 16px rgba(200,80,40,0.25);
+        }
+        .ember.spark {
+            background: #c8a858;
+            box-shadow: 0 0 6px #c8a858, 0 0 14px rgba(200,168,88,0.3);
+            animation-name: spark-rise;
+        }
+
+        @keyframes ember-rise {
+            0%   { transform: translateY(0) translateX(0) scale(1); opacity: 0; }
+            5%   { opacity: 0.5; }
+            30%  { opacity: 0.3; }
+            70%  { opacity: 0.08; }
+            100% { transform: translateY(-1200px) translateX(50px) scale(0.1); opacity: 0; }
+        }
+        @keyframes spark-rise {
+            0%   { transform: translateY(0) translateX(0) scale(1); opacity: 0; }
+            4%   { opacity: 0.7; }
+            15%  { opacity: 0.4; }
+            50%  { opacity: 0.1; }
+            100% { transform: translateY(-800px) translateX(-30px) scale(0.08); opacity: 0; }
+        }
+
+        /* ============================================================
+           DISPLAY MODE OVERLAY SYSTEM (Phase 3)
+           ============================================================
+           Full-screen overlays for phase-specific content (standings,
+           readiness, live matches, winner celebration, etc.)
+           Managed by DisplayManager — slides rotate with indicator dots.
+        */
+        .display-primary {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 50;
+            background: var(--bg-void, #050710);
+            padding: 30px;
+            overflow-y: auto;
+            animation: dm-fade-in 0.4s ease;
+        }
+        .display-primary.active {
             display: flex;
-            gap: 4px;
+            flex-direction: column;
             align-items: center;
+            justify-content: center;
+            transition: opacity 0.3s ease;
+        }
+        @keyframes dm-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+        .slide-indicators {
+            display: none;
+            justify-content: center;
+            gap: 8px; padding: 8px 0;
+            position: absolute;
+            bottom: 8px; left: 0; right: 0;
+            z-index: 60;
+        }
+        .slide-indicators.active { display: flex; }
+        .slide-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: rgba(255,255,255,0.25);
+            transition: all 0.3s ease;
+        }
+        .slide-dot.active {
+            background: var(--gold-bright, #e8d8a8);
+            box-shadow: 0 0 8px var(--gold-glow, rgba(200,179,126,0.3));
         }
 
-        .card {
-            width: 22px;
-            height: 32px;
-            background: #2a2a2a;
-            border: 2px solid;
-            border-radius: 3px;
-            position: relative;
+        /* Board focus mode: hide side panels */
+        body[data-display-mode="board_focus"] .results-panel,
+        body[data-display-mode="board_focus"] .queue-panel { display: none; }
+        body[data-display-mode="board_focus"] .board-area { grid-column: 1 / -1; }
+
+        /* ── Standings Large ─────────────────────────── */
+        .dm-standings-large { width: 100%; max-width: 700px; }
+        .dm-standings-large .dm-standings-title {
+            font-family: 'Russo One', sans-serif;
+            font-size: 28px; font-weight: 800; color: var(--gold-bright);
+            text-transform: uppercase; letter-spacing: 4px;
+            text-align: center; margin-bottom: 20px;
+            text-shadow: 0 0 20px var(--gold-glow);
+        }
+        .dm-standings-large .dm-standings-row {
+            display: flex; align-items: center;
+            padding: 14px 20px; margin-bottom: 8px;
+            background: var(--bg-glass); border-radius: 8px;
+            border-left: 4px solid; gap: 16px;
+        }
+        .dm-standings-large .dm-rank {
+            font-family: 'Russo One', sans-serif;
+            font-size: 28px; font-weight: 800; color: var(--text-dim);
+            width: 40px; text-align: center;
+        }
+        .dm-standings-large .dm-team-name {
+            font-family: 'Russo One', sans-serif;
+            font-size: 22px; font-weight: 700; flex: 1;
+            letter-spacing: 1px; text-transform: uppercase;
+        }
+        .dm-standings-large .dm-team-points {
+            font-family: 'Quantico', sans-serif;
+            font-size: 24px; font-weight: 800; color: var(--text-bright);
+        }
+        .dm-standings-large .dm-team-record {
+            font-family: 'Quantico', sans-serif;
+            font-size: 14px; color: var(--text-muted);
         }
 
-        .team[data-color="blue"] .card {
-            border-color: #3b82f6;
+        /* ── Winner Celebration ──────────────────────── */
+        .dm-winner-celebration { width: 100%; max-width: 700px; text-align: center; position: relative; }
+        .dm-confetti-container {
+            position: absolute; top: -40px; left: -40px; right: -40px; bottom: -40px;
+            overflow: hidden; pointer-events: none; z-index: 0;
+        }
+        .dm-confetti-piece {
+            position: absolute; top: -20px; width: 10px; height: 10px;
+            border-radius: 2px; opacity: 0.8;
+            animation: confetti-fall linear infinite;
+        }
+        @keyframes confetti-fall {
+            0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(600px) rotate(720deg); opacity: 0; }
+        }
+        .dm-winner-trophy {
+            font-size: 72px; margin-bottom: 8px;
+            position: relative; z-index: 1;
+        }
+        .dm-winner-name {
+            font-family: 'Russo One', sans-serif;
+            font-size: 52px; font-weight: 900; letter-spacing: 2px;
+            margin-bottom: 4px; position: relative; z-index: 1;
+            text-transform: uppercase;
+        }
+        .dm-winner-subtitle {
+            font-family: 'Quantico', sans-serif;
+            font-size: 18px; font-weight: 600; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 3px;
+            margin-bottom: 4px; position: relative; z-index: 1;
+        }
+        .dm-winner-points {
+            font-family: 'Quantico', sans-serif;
+            font-size: 28px; font-weight: 800; color: var(--gold-bright);
+            margin-bottom: 24px; position: relative; z-index: 1;
+        }
+        .dm-celebration-standings { position: relative; z-index: 1; }
+        .dm-celebration-row {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 16px; border-left: 4px solid var(--text-dim);
+            background: var(--bg-glass); border-radius: 6px; margin-bottom: 6px;
+        }
+        .dm-celebration-winner-row {
+            background: rgba(200,179,126,0.08);
+            border-left-width: 6px;
+        }
+        .dm-celebration-medal { font-size: 24px; width: 36px; text-align: center; }
+        .dm-celebration-name {
+            font-family: 'Russo One', sans-serif;
+            font-size: 20px; font-weight: 700; flex: 1; text-align: left;
+            text-transform: uppercase;
+        }
+        .dm-celebration-pts {
+            font-family: 'Quantico', sans-serif;
+            font-size: 20px; font-weight: 800; color: var(--gold-bright);
         }
 
-        .team[data-color="red"] .card {
-            border-color: #ef4444;
+        /* ── Next Match Large ────────────────────────── */
+        .dm-next-match-large { width: 100%; max-width: 800px; text-align: center; }
+        .dm-next-match-large .dm-label {
+            font-family: 'Quantico', sans-serif;
+            font-size: 18px; font-weight: 600; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px;
+        }
+        .dm-next-match-large .dm-game-name {
+            font-family: 'Quantico', sans-serif;
+            font-size: 32px; font-weight: 800; color: var(--gold-bright);
+            margin-bottom: 24px;
+        }
+        .dm-next-match-large .dm-sides {
+            display: flex; justify-content: center; align-items: center;
+            gap: 30px; flex-wrap: wrap;
+        }
+        .dm-next-match-large .dm-side {
+            display: flex; flex-direction: column; gap: 8px; align-items: center;
+        }
+        .dm-next-match-large .dm-player-name {
+            font-family: 'Quantico', sans-serif;
+            font-size: 22px; font-weight: 700;
+            padding: 8px 18px; border: 2px solid; border-radius: 6px;
+            background: var(--bg-glass); text-transform: uppercase;
+        }
+        .dm-next-match-large .dm-vs {
+            font-family: 'Russo One', sans-serif;
+            font-size: 28px; font-weight: 800; color: var(--gold);
+            text-shadow: 0 0 12px var(--gold-glow);
         }
 
-        .team[data-color="green"] .card {
-            border-color: #10b981;
+        /* ── Readiness Large ─────────────────────────── */
+        .dm-readiness-large { width: 100%; max-width: 700px; }
+        .dm-readiness-large .dm-readiness-title {
+            font-family: 'Russo One', sans-serif;
+            font-size: 24px; font-weight: 800; color: var(--live);
+            text-transform: uppercase; letter-spacing: 2px;
+            text-align: center; margin-bottom: 20px;
+        }
+        .dm-readiness-large .dm-team-ready-row {
+            display: flex; align-items: center;
+            padding: 14px 20px; margin-bottom: 8px;
+            background: var(--bg-glass); border-radius: 8px;
+            border-left: 4px solid; gap: 16px;
+        }
+        .dm-readiness-large .dm-ready-status {
+            font-family: 'Quantico', sans-serif;
+            font-size: 22px; font-weight: 700;
+        }
+        .dm-readiness-large .dm-ready-check { font-size: 28px; }
+
+        /* ── Live Match Large ────────────────────────── */
+        .dm-live-match-large { width: 100%; max-width: 800px; text-align: center; }
+        .dm-live-match-large .dm-live-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--live), #00b870);
+            color: #fff; padding: 4px 16px; border-radius: 4px;
+            font-family: 'Quantico', sans-serif;
+            font-size: 14px; font-weight: 900; letter-spacing: 2px;
+            text-transform: uppercase; margin-bottom: 16px;
+            box-shadow: 0 0 16px var(--live-glow);
+            animation: dm-pulse 2s infinite;
+        }
+        @keyframes dm-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .dm-live-match-large .dm-game-name {
+            font-family: 'Quantico', sans-serif;
+            font-size: 28px; font-weight: 800; color: var(--live);
+            margin-bottom: 20px;
+        }
+        .dm-live-match-large .dm-sides {
+            display: flex; justify-content: center; align-items: center;
+            gap: 30px; flex-wrap: wrap;
+        }
+        .dm-live-match-large .dm-side {
+            display: flex; flex-direction: column; gap: 10px; align-items: center;
+        }
+        .dm-live-match-large .dm-player-name {
+            font-family: 'Quantico', sans-serif;
+            font-size: 26px; font-weight: 700;
+            padding: 10px 20px; border: 2px solid; border-radius: 6px;
+            background: var(--bg-glass); text-transform: uppercase;
+        }
+        .dm-live-match-large .dm-vs {
+            font-family: 'Russo One', sans-serif;
+            font-size: 32px; font-weight: 800; color: var(--gold);
+            text-shadow: 0 0 12px var(--gold-glow);
         }
 
-        .team[data-color="yellow"] .card {
-            border-color: #f59e0b;
+        /* ── Results Large ───────────────────────────── */
+        .dm-results-large { width: 100%; max-width: 800px; }
+        .dm-results-large .dm-results-title {
+            font-family: 'Russo One', sans-serif;
+            font-size: 24px; font-weight: 800; color: var(--gold-bright);
+            text-transform: uppercase; letter-spacing: 2px;
+            text-align: center; margin-bottom: 20px;
         }
-
-        .team[data-color="purple"] .card {
-            border-color: #a855f7;
+        .dm-results-large .dm-result-card {
+            display: flex; align-items: center;
+            padding: 16px 20px; margin-bottom: 10px;
+            background: var(--bg-glass); border-radius: 8px;
+            border-left: 4px solid var(--live); gap: 16px;
         }
-
-        .team[data-color="orange"] .card {
-            border-color: #f97316;
+        .dm-results-large .dm-result-game {
+            font-family: 'Quantico', sans-serif;
+            font-size: 16px; font-weight: 700; color: var(--text-muted); width: 100px;
         }
-
-        .card.deck {
-            background: #1a1a1a;
+        .dm-results-large .dm-result-winner {
+            font-family: 'Quantico', sans-serif;
+            font-size: 20px; font-weight: 700; flex: 1; text-transform: uppercase;
         }
-
-        .card-count {
-            font-size: 14px;
-            font-weight: 600;
-            color: #fff;
-            margin-left: 4px;
+        .dm-results-large .dm-result-badge {
+            font-family: 'Quantico', sans-serif;
+            font-size: 14px; font-weight: 600;
+            padding: 4px 12px; border-radius: 4px;
+            background: rgba(0, 216, 128, 0.15); color: var(--live);
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <h1 class="game-title">Game Board</h1>
-            <div id="firebase-status" class="status-indicator status-yellow" title="Connecting to Firebase..."></div>
-        </header>
 
-        <main class="main-content">
-            <aside class="events-panel">
-                <h2>Recent Events</h2>
-                <ul class="events-list">
-                    <li class="event recent">
-                        <span class="event-time">14:23:45</span>
-                        <span class="event-text">Team Blue moved 5 spaces</span>
-                    </li>
-                    <li class="event">
-                        <span class="event-time">14:23:12</span>
-                        <span class="event-text">Team Red drew 2 cards</span>
-                    </li>
-                    <li class="event">
-                        <span class="event-time">14:22:58</span>
-                        <span class="event-text">Team Green played action card</span>
-                    </li>
-                    <li class="event">
-                        <span class="event-time">14:22:34</span>
-                        <span class="event-text">Team Blue scored 10 points</span>
-                    </li>
-                    <li class="event">
-                        <span class="event-time">14:22:15</span>
-                        <span class="event-text">Team Red moved 3 spaces</span>
-                    </li>
-                    <li class="event">
-                        <span class="event-time">14:21:52</span>
-                        <span class="event-text">Team Green drew 1 card</span>
-                    </li>
-                    <li class="event">
-                        <span class="event-time">14:21:28</span>
-                        <span class="event-text">Team Blue played action card</span>
-                    </li>
-                    <li class="event">
-                        <span class="event-time">14:21:03</span>
-                        <span class="event-text">Team Red scored 5 points</span>
-                    </li>
-                    <li class="event">
-                        <span class="event-time">14:20:41</span>
-                        <span class="event-text">Team Green moved 4 spaces</span>
-                    </li>
-                    <li class="event">
-                        <span class="event-time">14:20:18</span>
-                        <span class="event-text">Team Blue drew 3 cards</span>
-                    </li>
-                </ul>
-            </aside>
+    <!-- Phase 3: Scoring Ceremony Overlay (read-only — driven by god.html) -->
+    <div class="ceremony-overlay" id="ceremonyOverlay" style="display: none;">
+        <div class="ceremony-container">
+            <div id="ceremonyContent" class="ceremony-step"></div>
+            <div class="ceremony-progress">
+                <div class="ceremony-progress-bar" id="ceremonyProgressBar" style="width: 0%;"></div>
+            </div>
+        </div>
+    </div>
 
-            <section class="board-container">
-                <div class="board-section">
-                    <div id="game-board">
-                        <div id="hexBoard"></div>
-                    </div>
-                </div>
-                
-                <aside class="matches-section">
-                    <h2>Matches</h2>
-                    <div class="matches-container">
-                        <div class="match-category">
-                            <h3>Current Match</h3>
-                            <div class="match-item active">
-                                <div class="match-teams">
-                                    <span class="match-team">Team Blue vs Team Red</span>
-                                    <span class="match-vs">Round 3</span>
-                                </div>
-                                <span class="match-status">Playing</span>
-                            </div>
-                        </div>
-                        
-                        <div class="match-category">
-                            <h3>Upcoming Matches</h3>
-                            <div class="match-item">
-                                <div class="match-teams">
-                                    <span class="match-team">Team Green vs Team Yellow</span>
-                                    <span class="match-vs">Round 4</span>
-                                </div>
-                                <span class="match-status">Next</span>
-                            </div>
-                            <div class="match-item">
-                                <div class="match-teams">
-                                    <span class="match-team">Team Purple vs Team Orange</span>
-                                    <span class="match-vs">Round 5</span>
-                                </div>
-                                <span class="match-status">Waiting</span>
-                            </div>
-                            <div class="match-item">
-                                <div class="match-teams">
-                                    <span class="match-team">Team Blue vs Team Green</span>
-                                    <span class="match-vs">Round 6</span>
-                                </div>
-                                <span class="match-status">Waiting</span>
-                            </div>
-                        </div>
-                    </div>
-                </aside>
-            </section>
-        </main>
+    <!-- Phase 3: Display Mode Full-Screen Overlay -->
+    <div id="displayPrimary" class="display-primary"></div>
+    <div id="slideIndicators" class="slide-indicators"></div>
 
-        <footer class="teams-footer">
-            <div class="team active" data-color="blue">
-                <div class="team-players">
-                    <div class="player-box">
-                        <span class="player-name">Player 1</span>
-                        <span class="player-points">23 pts</span>
+    <div class="atmo atmo-grad"></div>
+    <div class="atmo atmo-noise"></div>
+    <div class="ember-field" id="emberField"></div>
+
+    <!-- ====== HEADER ====== -->
+    <!-- TODO:FIREBASE — Bind round number, total games, and queue count -->
+    <div class="header">
+        <div class="h-left">
+            <div class="h-icon" id="hIcon"><img src="../shared/images/favicon/android-chrome-192x192.png" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:3px;"></div>
+            <span class="h-title" id="hTitle">Loading...</span>
+        </div>
+        <div class="h-stats">
+            <div class="h-stat"><span class="h-stat-lbl">Round</span><span class="h-stat-val" id="hRound">-</span></div>
+            <div class="h-sep"></div>
+            <div class="h-stat"><span class="h-stat-lbl">Games</span><span class="h-stat-val" id="hGames">0</span></div>
+            <div class="h-sep"></div>
+            <div class="h-stat"><span class="h-stat-lbl">Queue</span><span class="h-stat-val" id="hQueue">0</span></div>
+        </div>
+        <div class="h-right">
+            <div class="h-dot"></div>
+            <span class="h-clock" id="clock">15:42</span>
+        </div>
+    </div>
+
+    <!-- ====== STATUS STRIP (player mood from onboarding) ====== -->
+    <div class="status-strip" id="statusStrip"></div>
+
+    <!-- ====== DUAL ARENA ====== -->
+    <!-- TODO:FIREBASE — Populate match blocks from active matches collection -->
+    <div class="dual-arena">
+
+        <!-- MATCH 1 — Each match-block MUST include the overlay div for transitions -->
+        <div class="match-block" id="match1">
+            <div class="match-complete-overlay">
+                <span class="match-complete-text">Match Complete</span>
+            </div>
+            <div class="a-side left">
+                <div class="a-players"></div>
+            </div>
+            <div class="a-center">
+                <span class="a-live-badge">● LIVE</span>
+                <span class="a-game-name"></span>
+                <span class="a-vs">VS</span>
+                <span class="a-format"></span>
+                <span class="a-timer">⏱ <span id="elapsed1">--:--</span></span>
+            </div>
+            <div class="a-side right">
+                <div class="a-players"></div>
+            </div>
+        </div>
+
+        <!-- MATCH 2 -->
+        <div class="match-block" id="match2">
+            <div class="match-complete-overlay">
+                <span class="match-complete-text">Match Complete</span>
+            </div>
+            <div class="a-side left">
+                <div class="a-players"></div>
+            </div>
+            <div class="a-center">
+                <span class="a-live-badge">● LIVE</span>
+                <span class="a-game-name"></span>
+                <span class="a-vs">VS</span>
+                <span class="a-format"></span>
+                <span class="a-timer">⏱ <span id="elapsed2">--:--</span></span>
+            </div>
+            <div class="a-side right">
+                <div class="a-players"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ====== BOTTOM ZONE ====== -->
+    <div class="bottom-zone">
+
+        <!-- RECENT RESULTS — Left panel -->
+        <!-- TODO:FIREBASE — Listen to results collection, render with buildResultCardHTML() -->
+        <div class="side-panel results-panel">
+            <div class="panel-title">Recent Results</div>
+            <div class="panel-list" id="resultsList">
+            </div>
+        </div>
+
+        <!-- TERRITORY MAP — Center column -->
+        <!-- TODO:FIREBASE — Bind score bar widths and hex ownership from game state -->
+        <div class="board-area">
+            <div class="territory-map" id="territoryMap">
+                <div class="tm-header-row">
+                    <div></div>
+                    <div class="tm-scale">
+                        <span class="tm-scale-num">0</span><span class="tm-scale-num">10</span><span class="tm-scale-num">20</span><span class="tm-scale-num">30</span><span class="tm-scale-num">40</span><span class="tm-scale-num">50</span>
                     </div>
-                    <div class="player-box">
-                        <span class="player-name">Player 2</span>
-                        <span class="player-points">22 pts</span>
-                    </div>
-                </div>
-                <div class="team-info">
-                    <div class="team-score">45 pts</div>
-                </div>
-                <div class="team-cards">
-                    <div class="card-group">
-                        <span class="card-label">Hand:</span>
-                        <div class="cards">
-                            <div class="card"></div>
-                            <div class="card"></div>
-                            <div class="card"></div>
-                        </div>
-                    </div>
-                    <div class="card-group">
-                        <span class="card-label">Deck:</span>
-                        <div class="cards">
-                            <div class="card deck"></div>
-                            <span class="card-count">12</span>
-                        </div>
-                    </div>
+                    <div></div>
                 </div>
             </div>
+            <div class="board-wrap"><div id="hexBoard"></div></div>
+        </div>
 
-            <div class="team" data-color="red">
-                <div class="team-players">
-                    <div class="player-box">
-                        <span class="player-name">Player 3</span>
-                        <span class="player-points">19 pts</span>
-                    </div>
-                    <div class="player-box">
-                        <span class="player-name">Player 4</span>
-                        <span class="player-points">19 pts</span>
-                    </div>
-                </div>
-                <div class="team-info">
-                    <div class="team-score">38 pts</div>
-                </div>
-                <div class="team-cards">
-                    <div class="card-group">
-                        <span class="card-label">Hand:</span>
-                        <div class="cards">
-                            <div class="card"></div>
-                            <div class="card"></div>
-                            <div class="card"></div>
-                            <div class="card"></div>
-                            <div class="card"></div>
-                        </div>
-                    </div>
-                    <div class="card-group">
-                        <span class="card-label">Deck:</span>
-                        <div class="cards">
-                            <div class="card deck"></div>
-                            <span class="card-count">8</span>
-                        </div>
-                    </div>
-                </div>
+        <!-- UPCOMING QUEUE — Right panel -->
+        <!-- TODO:FIREBASE — Listen to queue collection, render cards dynamically -->
+        <div class="side-panel queue-panel">
+            <div class="panel-title">Upcoming</div>
+            <div class="panel-list" id="queueList">
             </div>
+        </div>
 
-            <div class="team" data-color="green">
-                <div class="team-players">
-                    <div class="player-box">
-                        <span class="player-name">Player 5</span>
-                        <span class="player-points">27 pts</span>
-                    </div>
-                    <div class="player-box">
-                        <span class="player-name">Player 6</span>
-                        <span class="player-points">25 pts</span>
-                    </div>
-                </div>
-                <div class="team-info">
-                    <div class="team-score">52 pts</div>
-                </div>
-                <div class="team-cards">
-                    <div class="card-group">
-                        <span class="card-label">Hand:</span>
-                        <div class="cards">
-                            <div class="card"></div>
-                            <div class="card"></div>
-                        </div>
-                    </div>
-                    <div class="card-group">
-                        <span class="card-label">Deck:</span>
-                        <div class="cards">
-                            <div class="card deck"></div>
-                            <span class="card-count">15</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <!-- SCORE STRIP — Bottom -->
+        <!-- TODO:FIREBASE — Bind team points and wins from tournament state -->
+        <div class="score-strip" id="scoreStrip"></div>
 
-            <div class="team" data-color="yellow">
-                <div class="team-players">
-                    <div class="player-box">
-                        <span class="player-name">Player 7</span>
-                        <span class="player-points">20 pts</span>
-                    </div>
-                    <div class="player-box">
-                        <span class="player-name">Player 8</span>
-                        <span class="player-points">21 pts</span>
-                    </div>
-                </div>
-                <div class="team-info">
-                    <div class="team-score">41 pts</div>
-                </div>
-                <div class="team-cards">
-                    <div class="card-group">
-                        <span class="card-label">Hand:</span>
-                        <div class="cards">
-                            <div class="card"></div>
-                            <div class="card"></div>
-                            <div class="card"></div>
-                            <div class="card"></div>
-                        </div>
-                    </div>
-                    <div class="card-group">
-                        <span class="card-label">Deck:</span>
-                        <div class="cards">
-                            <div class="card deck"></div>
-                            <span class="card-count">10</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="team" data-color="purple">
-                <div class="team-players">
-                    <div class="player-box">
-                        <span class="player-name">Player 9</span>
-                        <span class="player-points">15 pts</span>
-                    </div>
-                    <div class="player-box">
-                        <span class="player-name">Player 10</span>
-                        <span class="player-points">14 pts</span>
-                    </div>
-                </div>
-                <div class="team-info">
-                    <div class="team-score">29 pts</div>
-                </div>
-                <div class="team-cards">
-                    <div class="card-group">
-                        <span class="card-label">Hand:</span>
-                        <div class="cards">
-                            <div class="card"></div>
-                            <div class="card"></div>
-                            <div class="card"></div>
-                        </div>
-                    </div>
-                    <div class="card-group">
-                        <span class="card-label">Deck:</span>
-                        <div class="cards">
-                            <div class="card deck"></div>
-                            <span class="card-count">14</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="team" data-color="orange">
-                <div class="team-players">
-                    <div class="player-box">
-                        <span class="player-name">Player 11</span>
-                        <span class="player-points">18 pts</span>
-                    </div>
-                    <div class="player-box">
-                        <span class="player-name">Player 12</span>
-                        <span class="player-points">17 pts</span>
-                    </div>
-                </div>
-                <div class="team-info">
-                    <div class="team-score">35 pts</div>
-                </div>
-                <div class="team-cards">
-                    <div class="card-group">
-                        <span class="card-label">Hand:</span>
-                        <div class="cards">
-                            <div class="card"></div>
-                            <div class="card"></div>
-                            <div class="card"></div>
-                            <div class="card"></div>
-                            <div class="card"></div>
-                            <div class="card"></div>
-                        </div>
-                    </div>
-                    <div class="card-group">
-                        <span class="card-label">Deck:</span>
-                        <div class="cards">
-                            <div class="card deck"></div>
-                            <span class="card-count">6</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </footer>
     </div>
 
     <!-- Firebase Scripts -->
     <script>window.BOARDGAME_BASE = '..';</script>
+    <script>
+    function applyScale() {
+        const sx = window.innerWidth / 1920;
+        const sy = window.innerHeight / 1080;
+        const scale = Math.min(sx, sy);
+        document.body.style.transform = `scale(${scale})`;
+    }
+    window.addEventListener('resize', applyScale);
+    window.addEventListener('load', applyScale);
+    applyScale();
+    </script>
     <script src="../shared/scripts/firebase-loader.js"></script>
-    
-    <!-- Board Module Scripts -->
+    <script src="../shared/scripts/games-config.js"></script>
     <script src="../shared/scripts/board-module.js"></script>
     <script src="../shared/scripts/board-renderer.js"></script>
-    
+    <script src="../shared/scripts/player-utils.js"></script>
+    <script src="scripts/scoring-ceremony.js"></script>
+    <script src="scripts/display-manager.js"></script>
+
     <script>
-        let renderer;
-        let boardModule;
-        const urlParams = new URLSearchParams(window.location.search);
-        let tournamentId = urlParams.get('tournament') || urlParams.get('tournamentId') || urlParams.get('gameId') || 'default-tournament';
-        let matchId = urlParams.get('matchId') || null;
-        let firebaseReady = false;
-        
-        // Initialize the board when page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            const hexBoardContainer = document.getElementById('hexBoard');
-            
-            // Create board module and renderer
-            boardModule = new BoardModule();
-            renderer = new BoardRenderer(hexBoardContainer, boardModule, {
-                responsive: true
-            });
-            
-            // Render the initial empty board
-            renderer.render();
-            
-            // Update status - waiting for Firebase
-            updateFirebaseStatus('yellow', 'Connecting to Firebase...');
-            
-            // Set timeout to show error if Firebase doesn't connect
-            setTimeout(() => {
-                if (!firebaseReady) {
-                    updateFirebaseStatus('red', 'Firebase connection timeout. Check console for errors.');
-                    console.error('Firebase failed to initialize within 10 seconds');
-                }
-            }, 10000);
+    // ====================================================================
+    // VIEW-FULL V2 — Firebase Integration + DisplayManager
+    // ====================================================================
+
+    let gameState = null;
+    let boardModule = null;
+    let boardRenderer = null;
+    let activeListener = null;
+    let resultLogListener = null;
+    let onboardingListener = null;
+    let onboardingState = null;
+    let resultLogCache = [];
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const tournamentId = urlParams.get('tournamentId') || urlParams.get('tournament') || urlParams.get('gameId');
+
+    // Team color defaults (maps to CSS variables --t1 through --t5)
+    const TEAM_COLORS = {
+        1: '#de392c',
+        2: '#2278a3',
+        3: '#2e9158',
+        4: '#f7ba32',
+        5: '#7a4fbf'
+    };
+
+    // ====================================================================
+    // HEX BOARD RENDERER
+    // ====================================================================
+
+    function initBoard() {
+        const hexBoardContainer = document.getElementById('hexBoard');
+        if (!hexBoardContainer) return;
+
+        // Initialize board at 1.5x resolution for better quality when scaled down
+        boardModule = new BoardModule(1.5);
+        boardRenderer = new BoardRenderer(hexBoardContainer, boardModule, {
+            responsive: true,
+            showHeartImages: true,
+            hexScale: 1.5
         });
-        
-        // Wait for Firebase to be ready, then set up listeners
-        document.addEventListener('firebase-ready', () => {
-            console.log('Firebase is ready, setting up game listener...');
-            firebaseReady = true;
-            updateFirebaseStatus('green', 'Connected to Firebase');
-            setupGameListener();
+        boardRenderer.render({});
+
+        // Apply visual effects
+        applyInitialEffects();
+    }
+
+    function renderBoard() {
+        if (!boardRenderer || !boardModule) return;
+
+        // Load room hexes into board module if available
+        if (gameState?.rooms && boardModule) {
+            boardModule.setRoomHexes(gameState.rooms);
+        }
+
+        boardRenderer.render(gameState || {});
+
+        // Add team colors to hexes based on board state
+        const hexes = document.querySelectorAll('.board-hex');
+        hexes.forEach(hex => {
+            const coord = hex.dataset.coord;
+
+            // Remove old team classes
+            hex.classList.remove('team-1', 'team-2', 'team-3', 'team-4', 'team-5');
+
+            // Add team color class if hex is controlled
+            if (gameState?.board && gameState.board[coord]) {
+                const teamId = gameState.board[coord];
+                hex.classList.add(`team-${teamId}`);
+            }
         });
-        
-        function updateFirebaseStatus(color, message) {
-            const statusIndicator = document.getElementById('firebase-status');
-            if (statusIndicator) {
-                statusIndicator.className = `status-indicator status-${color}`;
-                statusIndicator.title = message;
-            }
+    }
+
+    /**
+     * Apply hex terrain images dynamically via CSS
+     */
+    function applyHexImages(enabled) {
+        let styleEl = document.getElementById('hex-images-dynamic-css');
+
+        if (!enabled) {
+            if (styleEl) styleEl.remove();
+            return;
         }
-        
-        async function setupGameListener() {
-            const db = window.firebaseDB;
 
-            if (!db) {
-                console.error('Firebase database not available');
-                updateFirebaseStatus('red', 'Firebase database not available');
-                return;
-            }
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = 'hex-images-dynamic-css';
+            document.head.appendChild(styleEl);
+        }
 
-            // Listen to the tournament document directly (tournament = match in simplified structure)
-            console.log('[View] Setting up listener for tournament:', tournamentId);
-            const tournamentRef = db.collection('tournaments').doc(tournamentId);
+        // Generate CSS rules for each hex coordinate
+        const hexCoords = boardModule.generateHexCoordinates();
+        let css = '';
 
-            window.firebaseOnSnapshot(tournamentRef, (docSnapshot) => {
-                if (docSnapshot.exists) {
-                    const gameData = docSnapshot.data();
-                    console.log('[View] Match data received:', gameData);
+        hexCoords.forEach(([q, r]) => {
+            const coord = `q${q}r${r}`;
+            css += `body.effect-hex-images .board-hex[data-coord="${coord}"]::before {
+                background-image: url('../shared/images/hexes/coords/${coord}.png');
+            }\n`;
+        });
 
-                    // Update the board (will reflect undo/redo instantly)
-                    if (renderer && gameData.board) {
-                        renderer.render(gameData);
-                    }
+        styleEl.textContent = css;
+    }
 
-                    // Update teams display
-                    if (gameData.teams) {
-                        updateTeamsDisplay(gameData.teams);
-                    }
+    /**
+     * Apply all visual effects (always enabled for display view)
+     */
+    function applyInitialEffects() {
+        // Enable all visual effects for display view
+        document.body.classList.add('effect-hex-images');
+        document.body.classList.add('effect-heart-glow');
+        document.body.classList.add('effect-pulse-hearts');
+        document.body.classList.add('effect-rooms');
 
-                    // Update game title
-                    if (gameData.name || gameData.gameId) {
-                        document.querySelector('.game-title').textContent = gameData.name || `Tournament ${tournamentId}`;
-                    }
+        // Apply hex terrain images
+        applyHexImages(true);
+    }
 
-                    // Update status indicator based on game status
-                    updateStatusIndicator(gameData.gamePhase || gameData.status || 'active');
+    // ====================================================================
+    // CLOCK & MATCH TIMERS
+    // ====================================================================
 
-                    // Update events - check both events and gameHistory
-                    const eventsData = gameData.events || gameData.gameHistory || [];
-                    console.log('[View] Events data:', eventsData.length, 'events found');
-                    updateEventsDisplay(eventsData);
+    function updateClock() {
+        document.getElementById('clock').textContent =
+            new Date().toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' });
+    }
 
-                    // Update matches - use gameQueue (matches are planned there)
-                    const matchesData = gameData.gameQueue || gameData.upcomingMatches || gameData.matches || gameData.selectedGames || [];
-                    console.log('[View] Matches data:', matchesData.length, 'matches found');
-                    console.log('[View] Available game data fields:', Object.keys(gameData));
-                    updateMatchesDisplay(matchesData, gameData);
-                } else {
-                    console.warn('[View] Tournament not found:', tournamentId);
-                    document.querySelector('.game-title').textContent = `Tournament Not Found`;
-                    updateFirebaseStatus('red', `Tournament not found: ${tournamentId}`);
-                }
-            }, (error) => {
-                console.error('Error listening to tournament:', error);
-                updateFirebaseStatus('red', 'Error loading tournament data');
+    // Track match start times for elapsed timers
+    let matchStartTimes = { match1: null, match2: null };
+
+    // Cache for diff-based rendering (avoid unnecessary innerHTML rebuilds)
+    let prevArenaSignatures = { match1: null, match2: null };
+    let prevQueueSignature = null;
+    let prevResultIds = [];
+
+    function getMatchSignature(match) {
+        if (!match) return null;
+        // Use only stable structural fields — avoids false diffs from
+        // Firebase Timestamp object re-serialization on each snapshot
+        const parts = [
+            match.id,
+            match.matchNumber,
+            match.game,
+            match.playType,
+            match.status,
+            match.winningSide || '',
+            match.isBreak ? 'break' : '',
+            match.breakLabel || '',
+        ];
+        if (match.teams) {
+            match.teams.forEach(t => {
+                parts.push(t.id);
+                parts.push((t.playerIds || []).join(','));
             });
         }
-        
-        /**
-         * Helper function to convert color names to hex codes
-         * Supports both hex codes and legacy color names
-         */
-        function getHexColor(color) {
-            // If already a hex code, return it
-            if (color && color.startsWith('#')) {
-                return color;
+        return parts.join('|');
+    }
+
+    function updateMatchTimers() {
+        const fmt = s => {
+            const secs = Math.floor(s);
+            return `${String(Math.floor(secs/60)).padStart(2,'0')}:${String(secs%60).padStart(2,'0')}`;
+        };
+
+        const now = Date.now();
+
+        ['match1', 'match2'].forEach((matchId, idx) => {
+            const el = document.getElementById(`elapsed${idx + 1}`);
+            if (el && matchStartTimes[matchId]) {
+                const elapsed = (now - matchStartTimes[matchId]) / 1000;
+                el.textContent = fmt(elapsed);
             }
+        });
+    }
 
-            // Map legacy color names to hex codes
-            const colorMap = {
-                'blue': '#3b82f6',
-                'red': '#ef4444',
-                'green': '#10b981',
-                'yellow': '#f59e0b',
-                'amber': '#f59e0b',
-                'purple': '#a855f7',
-                'pink': '#ec4899',
-                'teal': '#14b8a6',
-                'orange': '#f97316'
-            };
+    // ====================================================================
+    // FIREBASE LISTENER
+    // ====================================================================
 
-            return colorMap[color?.toLowerCase()] || '#3b82f6'; // Default to blue
+    // Diff guard: skip re-renders when only irrelevant fields changed
+    let prevViewSignature = null;
+    const VIEW_EXCLUDED_KEYS = ['onboarding', 'smartMatchState'];
+
+    function getViewRelevantSignature(data) {
+        const parts = [];
+        for (const key of Object.keys(data).sort()) {
+            if (VIEW_EXCLUDED_KEYS.includes(key)) continue;
+            try { parts.push(key + ':' + JSON.stringify(data[key])); }
+            catch { parts.push(key + ':' + String(data[key])); }
+        }
+        return parts.join('|');
+    }
+
+    function setupTournamentListener() {
+        if (!tournamentId) {
+            console.warn('No tournament ID provided');
+            return;
         }
 
-        function updateTeamsDisplay(teams) {
-            const teamsFooter = document.querySelector('.teams-footer');
-            if (!teams) return;
+        const db = window.firebaseDB;
+        if (!db) {
+            console.error('Firebase database not available');
+            return;
+        }
 
-            // Clear existing teams
-            teamsFooter.innerHTML = '';
+        const tournamentRef = db.collection('tournaments').doc(tournamentId);
 
-            // Handle both object and array formats
-            const teamsArray = Array.isArray(teams) ? teams : Object.values(teams);
+        activeListener = window.firebaseOnSnapshot(tournamentRef, (docSnapshot) => {
+            if (docSnapshot.exists) {
+                const newData = docSnapshot.data();
+                const newSig = getViewRelevantSignature(newData);
 
-            // Create team elements
-            teamsArray.forEach((teamData) => {
-                const teamElement = document.createElement('div');
-                teamElement.className = 'team';
+                gameState = newData;
+                gameState.tournamentId = tournamentId;
 
-                // Get hex color from team data
-                const teamColor = getHexColor(teamData.color);
-
-                // Set border color using inline style
-                teamElement.style.borderColor = teamColor;
-
-                if (teamData.isActive) {
-                    teamElement.classList.add('active');
-                    teamElement.style.boxShadow = `0 0 20px ${teamColor}80`; // Add transparency
+                if (newSig !== prevViewSignature) {
+                    prevViewSignature = newSig;
+                    updateDisplay();
                 }
+            } else {
+                console.warn('Tournament not found:', tournamentId);
+            }
+        }, (error) => {
+            console.error('Listener error:', error);
+        });
 
-                // Players section
-                let playersHTML = '<div class="team-players">';
-                if (teamData.players && Array.isArray(teamData.players)) {
-                    teamData.players.forEach(player => {
-                        playersHTML += `
-                            <div class="player-box" style="border-color: ${teamColor}; color: ${teamColor};">
-                                <span class="player-name">${player.name || 'Player'}</span>
-                                <span class="player-points">${player.points || 0} pts</span>
-                            </div>
-                        `;
-                    });
+        // Set up result log listener
+        setupResultLogListener();
+    }
+
+    function setupResultLogListener() {
+        if (!tournamentId) return;
+
+        const db = window.firebaseDB;
+        if (!db) return;
+
+        if (resultLogListener) {
+            resultLogListener();
+            resultLogListener = null;
+        }
+
+        const resultLogRef = db.collection('tournaments')
+            .doc(tournamentId)
+            .collection('eventLog')
+            .orderBy('timestamp', 'desc')
+            .limit(30);
+
+        resultLogListener = window.firebaseOnSnapshot(resultLogRef, (snapshot) => {
+            resultLogCache = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                data.id = doc.id;
+                if (data.timestamp?.toDate) {
+                    data.timestamp = data.timestamp.toDate();
                 }
-                playersHTML += '</div>';
-
-                // Team info section
-                const teamScore = teamData.points || teamData.score || 0;
-                const teamInfoHTML = `
-                    <div class="team-info">
-                        <div class="team-name" style="color: ${teamColor};">${teamData.name || 'Team'}</div>
-                        <div class="team-score">${teamScore} pts</div>
-                    </div>
-                `;
-
-                // Cards section
-                const handCount = teamData.hand?.length || 0;
-                const deckCount = teamData.deck?.length || 0;
-
-                let cardsHTML = '<div class="team-cards">';
-                cardsHTML += '<div class="card-group"><span class="card-label">Hand:</span><div class="cards">';
-                for (let i = 0; i < handCount; i++) {
-                    cardsHTML += `<div class="card" style="border-color: ${teamColor};"></div>`;
+                if (data.type === 'game_win' || data.type === 'match_complete') {
+                    resultLogCache.push(data);
                 }
-                cardsHTML += '</div></div>';
-
-                cardsHTML += '<div class="card-group"><span class="card-label">Deck:</span><div class="cards">';
-                cardsHTML += `<div class="card deck" style="border-color: ${teamColor};"></div>`;
-                cardsHTML += `<span class="card-count">${deckCount}</span>`;
-                cardsHTML += '</div></div></div>';
-
-                teamElement.innerHTML = playersHTML + teamInfoHTML + cardsHTML;
-                teamsFooter.appendChild(teamElement);
             });
-        }
-        
-        function updateStatusIndicator(status) {
-            // Don't override Firebase connection status
-            const indicator = document.getElementById('firebase-status');
-            if (!firebaseReady || !indicator) return;
-            
-            let color = 'green';
-            let message = 'Game active';
-            
-            switch(status) {
-                case 'active':
-                case 'playing':
-                case 'inProgress':
-                    color = 'green';
-                    message = 'Game in progress';
-                    break;
-                case 'paused':
-                case 'waiting':
-                case 'setup':
-                    color = 'yellow';
-                    message = 'Game paused';
-                    break;
-                case 'ended':
-                case 'completed':
-                case 'error':
-                    color = 'red';
-                    message = 'Game ended';
-                    break;
-            }
-            
-            updateFirebaseStatus(color, message);
-        }
-        
-        function updateEventsDisplay(events) {
-            const eventsList = document.querySelector('.events-list');
-            if (!events || !Array.isArray(events) || events.length === 0) {
-                // Show placeholder if no events
-                eventsList.innerHTML = '<li class="event"><span class="event-text" style="opacity: 0.5; font-style: italic;">No events yet. Start playing to see game history here.</span></li>';
-                return;
-            }
+            updateDisplay();
+        }, (error) => {
+            console.error('Result log listener error:', error);
+        });
+    }
 
-            eventsList.innerHTML = '';
+    // ====================================================================
+    // ONBOARDING STATUS LISTENER
+    // ====================================================================
 
-            // Show last 10 events
-            const recentEvents = events.slice(-10).reverse();
+    const STATUS_EMOJIS = { eating: '🍔', smoking: '🚬', wc: '🚽', sleeping: '😴', alert: '❗', question: '❓' };
 
-            recentEvents.forEach((event, index) => {
-                const eventElement = document.createElement('li');
-                eventElement.className = 'event';
+    function setupOnboardingListener() {
+        if (!tournamentId) return;
+        const db = window.firebaseDB;
+        if (!db) return;
 
-                if (index === 0) {
-                    eventElement.classList.add('recent');
+        const onboardingRef = db.collection('tournaments').doc(tournamentId)
+            .collection('onboarding').doc('state');
+
+        onboardingListener = window.firebaseOnSnapshot(onboardingRef, (docSnapshot) => {
+            onboardingState = docSnapshot.exists ? docSnapshot.data() : null;
+            renderStatusStrip();
+        }, (error) => {
+            console.error('Onboarding listener error:', error);
+        });
+    }
+
+    function renderStatusStrip() {
+        const strip = document.getElementById('statusStrip');
+        if (!strip) return;
+
+        const teams = gameState?.teams || [];
+        const players = onboardingState?.players || {};
+        const items = [];
+
+        // Iterate teams and look up onboarding data by real player ID
+        for (const team of teams) {
+            for (const p of (team.players || [])) {
+                if (!p.id) continue;
+                const pData = players[p.id] || {};
+                const statuses = pData.statuses || {};
+                const activeEmojis = Object.entries(STATUS_EMOJIS)
+                    .filter(([key]) => statuses[key])
+                    .map(([, emoji]) => emoji)
+                    .join('');
+                if (activeEmojis) {
+                    items.push(`<span class="ss-item"><span class="ss-emoji">${activeEmojis}</span><span class="ss-name">${p.name || 'Player'}</span></span>`);
                 }
-
-                // Handle different timestamp formats
-                let timestamp = '';
-                if (event.timestamp) {
-                    timestamp = new Date(event.timestamp).toLocaleTimeString();
-                } else if (event.date) {
-                    timestamp = new Date(event.date).toLocaleTimeString();
-                } else if (event.time) {
-                    timestamp = event.time;
-                }
-
-                // Handle different message formats
-                let message = event.text || event.message || event.description || event.action || 'Event occurred';
-
-                // If event is a game result from gameHistory
-                if (event.gameNumber || event.game) {
-                    const gameNum = event.gameNumber || event.game;
-                    const winner = event.winner || event.winners || 'Unknown';
-                    const loser = event.loser || event.losers || 'Unknown';
-                    message = `Game ${gameNum}: ${Array.isArray(winner) ? winner.join(', ') : winner} defeated ${Array.isArray(loser) ? loser.join(', ') : loser}`;
-                }
-
-                eventElement.innerHTML = `
-                    <span class="event-time">${timestamp}</span>
-                    <span class="event-text">${message}</span>
-                `;
-
-                eventsList.appendChild(eventElement);
-            });
-        }
-        
-        function updateMatchesDisplay(matches, gameData) {
-            const matchesContainer = document.querySelector('.matches-container');
-
-            if (!matches || !Array.isArray(matches) || matches.length === 0) {
-                // Show placeholder
-                matchesContainer.innerHTML = '<div class="match-category"><p style="opacity: 0.5; font-style: italic; text-align: center;">No matches scheduled yet. Use God Mode to plan matches.</p></div>';
-                return;
-            }
-
-            matchesContainer.innerHTML = '';
-
-            // Categorize matches by status
-            // Current match (being played right now - if any)
-            const currentMatch = matches.find(m => m.status === 'playing' || m.status === 'active' || m.status === 'inProgress');
-
-            // Completed matches (confirmed results)
-            const completedMatches = matches.filter(m => m.status === 'completed');
-
-            // Pending matches (not played yet)
-            const upcomingMatches = matches.filter(m =>
-                m.status === 'pending' || m.status === 'waiting' || m.status === 'upcoming' || m.status === 'scheduled'
-            );
-            
-            // Helper function to create match HTML
-            function createMatchHTML(match, isActive = false) {
-                const matchDiv = document.createElement('div');
-                matchDiv.className = isActive ? 'match-item active' : 'match-item';
-
-                // Determine format from sides/teams structure
-                let format = '';
-                if (match.sides && Array.isArray(match.sides)) {
-                    const sideSizes = match.sides.map(side =>
-                        side.players ? side.players.length : 0
-                    );
-                    format = sideSizes.join('v');
-                } else if (match.teams && Array.isArray(match.teams)) {
-                    const teamSizes = match.teams.map(team =>
-                        team.players ? team.players.length : 0
-                    );
-                    format = teamSizes.join('v');
-                }
-
-                // Build header - use game number or match ID
-                const gameLabel = match.game || match.gameNumber || match.id || 'Match';
-                const headerHTML = `
-                    <div class="match-header">
-                        <span class="match-game">Game ${gameLabel}</span>
-                        <span class="match-format">${format || 'TBD'}</span>
-                    </div>
-                `;
-
-                // Build teams/sides display
-                let teamsHTML = '<div class="match-teams">';
-
-                const sidesData = match.sides || match.teams || [];
-
-                if (sidesData.length === 0) {
-                    // No sides defined yet
-                    teamsHTML += '<span class="match-team" style="opacity: 0.5;">No teams assigned</span>';
-                } else {
-                    sidesData.forEach((side, sideIndex) => {
-                        if (sideIndex > 0) {
-                            teamsHTML += '<span class="match-vs">VS</span>';
-                        }
-
-                        teamsHTML += '<div class="match-team">';
-
-                        if (side.players && Array.isArray(side.players) && side.players.length > 0) {
-                            side.players.forEach((player, playerIndex) => {
-                                if (playerIndex > 0) teamsHTML += ' ';
-
-                                const playerColor = getHexColor(player.color || player.teamColor || player.originalTeamColor);
-                                const playerName = player.name || player.displayName || `Player ${player.id || '?'}`;
-
-                                teamsHTML += `<span class="match-player" style="border-color: ${playerColor}; color: ${playerColor};">${playerName}</span>`;
-                            });
-                        } else {
-                            // Side has no players
-                            teamsHTML += '<span style="opacity: 0.5; font-size: 11px;">Empty side</span>';
-                        }
-
-                        teamsHTML += '</div>';
-                    });
-                }
-
-                teamsHTML += '</div>';
-
-                matchDiv.innerHTML = headerHTML + teamsHTML;
-                return matchDiv;
-            }
-            
-            // Current Match Section
-            if (currentMatch) {
-                const currentSection = document.createElement('div');
-                currentSection.className = 'match-category';
-                currentSection.innerHTML = '<h3>Current Match</h3>';
-                currentSection.appendChild(createMatchHTML(currentMatch, true));
-                matchesContainer.appendChild(currentSection);
-            }
-            
-            // Finished Matches Section (show first since they're completed)
-            if (completedMatches.length > 0) {
-                const finishedSection = document.createElement('div');
-                finishedSection.className = 'match-category';
-                finishedSection.innerHTML = '<h3>Finished Matches</h3>';
-
-                // Show last 3 completed matches
-                completedMatches.slice(-3).reverse().forEach(match => {
-                    finishedSection.appendChild(createMatchHTML(match, false));
-                });
-
-                matchesContainer.appendChild(finishedSection);
-            }
-
-            // Upcoming Matches Section
-            if (upcomingMatches.length > 0) {
-                const upcomingSection = document.createElement('div');
-                upcomingSection.className = 'match-category';
-                upcomingSection.innerHTML = '<h3>Upcoming Matches</h3>';
-
-                // Show up to 5 upcoming matches
-                upcomingMatches.slice(0, 5).forEach(match => {
-                    upcomingSection.appendChild(createMatchHTML(match, false));
-                });
-
-                matchesContainer.appendChild(upcomingSection);
             }
         }
+
+        if (items.length > 0) {
+            strip.innerHTML = items.join('');
+            strip.classList.add('visible');
+        } else {
+            strip.classList.remove('visible');
+            strip.innerHTML = '';
+        }
+    }
+
+    // ====================================================================
+    // DISPLAY UPDATES — Delegated to DisplayManager
+    // ====================================================================
+
+    let displayManager = null;
+
+    function initDisplayManager() {
+        displayManager = new DisplayManager({
+            container: document.body,
+            boardModule: boardModule,
+            boardRenderer: boardRenderer,
+            // Provide board render callback for hex team coloring
+            renderBoard: renderBoard,
+            // Provide result log cache access
+            getResultLogCache: () => resultLogCache,
+            getOnboardingState: () => onboardingState,
+            // Provide match start times ref for elapsed timer tracking
+            matchStartTimes: matchStartTimes,
+            // Provide diff state
+            prevArenaSignatures: prevArenaSignatures,
+            prevQueueSignature: { value: null },
+            prevResultIds: { value: [] }
+        });
+        displayManager.setTournamentId(tournamentId);
+    }
+
+    function updateDisplay() {
+        if (!gameState) return;
+        if (!displayManager) initDisplayManager();
+        displayManager.onFirebaseSnapshot(gameState);
+    }
+
+    // Note: applyTeamColors, renderScoreBars, renderMatches, renderArenaMatch,
+    // renderQueue, buildResultCardHTML, renderResults, renderScoreStrip,
+    // and all utility functions (getGameDisplayName, getTeamColor, etc.)
+    // have been moved into DisplayManager for the full version.
+    // The lightweight version keeps them inline.
+
+    // formatTimeAgo is still needed by result log rendering in DM
+    function formatTimeAgo(date) {
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        if (diffMins < 1) return 'Just now';
+        if (diffMins === 1) return '1 min ago';
+        if (diffMins < 60) return `${diffMins} min ago`;
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours === 1) return '1h ago';
+        if (diffHours < 24) return `${diffHours}h ago`;
+        return date.toLocaleDateString('fi-FI');
+    }
+
+    // getMatchSignature is still needed for diff-based rendering
+    // (already defined above in the CLOCK section)
+
+    // Expose for DisplayManager
+    window.formatTimeAgo = formatTimeAgo;
+    window.TEAM_COLORS = TEAM_COLORS;
+
+    // ====================================================================
+    // MATCH TRANSITION API (keep for future use)
+    // ====================================================================
+
+    const TIMING = {
+        OVERLAY_DURATION: 3500,      // Match the slower overlay animation
+        MATCH_FADE_COMPLETE: 6000,   // Match the 5s match-finish animation
+        QUEUE_REMOVE_DELAY: 2000,    // Match the 2s queue-promote-out animation
+        PROMOTE_SETTLE: 5000,        // Match the 4s match-promote animation
+    };
+
+    function endMatch(matchId, winningSide, onComplete) {
+        const matchEl = document.getElementById(matchId);
+        if (!matchEl) return;
+
+        const overlay = matchEl.querySelector('.match-complete-overlay');
+        const winSide = matchEl.querySelector(`.a-side.${winningSide}`);
+
+        if (winSide) winSide.classList.add('win-flash');
+        if (overlay) overlay.classList.add('active');
+
+        setTimeout(() => {
+            matchEl.classList.add('finishing');
+        }, TIMING.OVERLAY_DURATION);
+
+        setTimeout(() => {
+            if (onComplete) onComplete();
+        }, TIMING.MATCH_FADE_COMPLETE);
+    }
+
+    // ====================================================================
+    // INIT
+    // ====================================================================
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initBoard();
+        updateClock();
+        setInterval(updateClock, 1000);
+        setInterval(updateMatchTimers, 1000);
+
+        if (!tournamentId) {
+            sessionStorage.setItem('homeNotice', 'No tournament selected. Pick a tournament below to spectate.');
+            window.location.href = 'home.html';
+            return;
+        }
+    });
+
+    document.addEventListener('firebase-ready', () => {
+        setupTournamentListener();
+        setupOnboardingListener();
+    });
+
+    // Clean up Firebase listeners on page unload to prevent zombie callbacks
+    window.addEventListener('beforeunload', () => {
+        if (activeListener) { activeListener(); activeListener = null; }
+        if (resultLogListener) { resultLogListener(); resultLogListener = null; }
+        if (onboardingListener) { onboardingListener(); onboardingListener = null; }
+    });
+    </script>
+
+    <!-- Ember particle system -->
+    <script>
+    (function() {
+        const field = document.getElementById('emberField');
+        const MAX_EMBERS = 120; // Cap DOM nodes to prevent memory creep over hours
+        let ct = 0;
+
+        function spawnEmber() {
+            // Skip if at capacity — oldest embers auto-remove via setTimeout
+            if (field.childElementCount >= MAX_EMBERS) return;
+
+            const e = document.createElement('div');
+            ct++;
+            const type = ct % 12 === 0 ? 'spark' : ct % 4 === 0 ? 'bright' : '';
+            e.className = 'ember' + (type ? ' ' + type : '');
+
+            e.style.left = (960 + (Math.random() - 0.5) * 1400) + 'px';
+            e.style.bottom = (-10 + Math.random() * 80) + 'px';
+            const dur = type === 'spark' ? 6 + Math.random() * 6 : 10 + Math.random() * 12;
+            e.style.animationDuration = dur + 's';
+            e.style.animationDelay = (Math.random() * 1.5) + 's';
+            const size = type === 'spark' ? 1.5 + Math.random() * 2 : 2 + Math.random() * 3;
+            e.style.width = size + 'px';
+            e.style.height = size + 'px';
+
+            field.appendChild(e);
+            setTimeout(() => { if (e.parentNode) e.remove(); }, 26000);
+        }
+
+        setInterval(spawnEmber, 150);
+        for (let i = 0; i < 25; i++) setTimeout(spawnEmber, i * 60);
+    })();
     </script>
 </body>
 </html>

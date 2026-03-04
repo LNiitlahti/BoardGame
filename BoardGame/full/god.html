@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="../shared/css/brand-theme.css">
     <link rel="stylesheet" href="../shared/css/navbar.css">
     <link rel="stylesheet" href="css/god-modern.css">
+    <link rel="stylesheet" href="css/ceremony.css">
     <link rel="stylesheet" href="../shared/css/theme-toggle-button.css">
 </head>
 <body>
@@ -50,10 +51,92 @@
             <button class="god-nav-tab" data-tab="stats" onclick="switchGodTab('stats')">
                 📊 Stats
             </button>
+            <button class="god-nav-tab" data-tab="activityLog" onclick="switchGodTab('activityLog')">
+                📋 Activity Log
+            </button>
             <button class="god-nav-tab" data-tab="history" onclick="switchGodTab('history')">
                 📜 History
             </button>
         </nav>
+
+        <!-- Phase Indicator Bar (visible when tournament has an active phase) -->
+        <div id="phaseIndicatorBar" class="phase-indicator-bar" style="display: none;">
+            <div class="phase-indicator-content">
+                <div class="phase-indicator-left">
+                    <span class="phase-indicator-label">CURRENT PHASE</span>
+                    <span id="phaseIndicatorIcon" class="phase-indicator-icon"></span>
+                    <span id="phaseIndicatorName" class="phase-indicator-name">---</span>
+                    <span id="phaseIndicatorRound" class="phase-indicator-round" style="display: none;"></span>
+                </div>
+                <div class="phase-indicator-center" id="phaseRequirementsList">
+                    <!-- Dynamically populated requirement pills -->
+                </div>
+                <div class="phase-indicator-right">
+                    <button class="btn primary" id="advancePhaseBtn"
+                            onclick="advancePhase()" disabled>
+                        Next Phase &#x25B6;
+                    </button>
+                    <button class="btn-small secondary" id="forceAdvanceBtn"
+                            onclick="forceAdvancePhase()"
+                            title="Force advance (skip requirements)">
+                        &#x26A0;
+                    </button>
+                    <button class="btn-small secondary" id="insertBreakBtn"
+                            onclick="insertBreak()"
+                            title="Insert break">
+                        &#x23F8;
+                    </button>
+                    <span id="breakIntervalBadge" class="break-interval-badge"
+                          onclick="openBreakSettings()"
+                          title="Break interval settings (click to configure)"
+                          style="display: none;"></span>
+                    <span id="lobbyAdminControls" style="display: none;"></span>
+                    <span id="spellPhaseAdminControls" style="display: none; align-items: center; gap: 8px;"></span>
+                </div>
+            </div>
+            <!-- Broadcast Message Bar (inline with phase indicator) -->
+            <div class="broadcast-bar" id="broadcastBar" style="display: none;">
+                <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;">Broadcast</span>
+                <input type="text" id="broadcastInput" placeholder="Message shown on view page..."
+                       maxlength="200"
+                       style="flex: 1; padding: 6px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color, #334155); border-radius: 6px; color: white; font-size: 0.85rem;">
+                <button class="btn-small primary" onclick="setBroadcastMessage()">Send</button>
+                <button class="btn-small secondary" onclick="clearBroadcastMessage()">Clear</button>
+            </div>
+            <!-- Display Controls Bar (Phase 3) -->
+            <div class="broadcast-bar" id="displayControlBar" style="display: none;">
+                <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;">Display</span>
+                <select id="displayModeOverride"
+                        onchange="setDisplayOverride(this.value)"
+                        style="padding: 6px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color, #334155); border-radius: 6px; color: white; font-size: 0.85rem;">
+                    <option value="">Auto (phase-based)</option>
+                    <option value="break">Break</option>
+                    <option value="matches_in_progress">Live Matches</option>
+                    <option value="round_end">Results</option>
+                    <option value="lobby_ready">Readiness</option>
+                    <option value="tournament_end">Standings</option>
+                </select>
+                <span style="font-size: 0.75rem; color: var(--text-tertiary);">Rotate:</span>
+                <select id="displayRotationInterval"
+                        onchange="setRotationInterval(this.value)"
+                        style="padding: 6px 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color, #334155); border-radius: 6px; color: white; font-size: 0.85rem; width: 70px;">
+                    <option value="5">5s</option>
+                    <option value="10">10s</option>
+                    <option value="15" selected>15s</option>
+                    <option value="20">20s</option>
+                    <option value="30">30s</option>
+                </select>
+                <button class="btn-small secondary" onclick="clearDisplayOverride()">Reset</button>
+            </div>
+            <!-- Ceremony Admin Panel (Phase 3) -->
+            <div class="ceremony-admin-panel" id="ceremonyAdminPanel" style="display: none;">
+                <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;">Ceremony</span>
+                <span id="ceremonyStepContent" style="flex: 1; font-size: 0.85rem;"></span>
+                <span id="ceremonyProgressText" style="font-size: 0.75rem; color: var(--text-tertiary);"></span>
+                <button class="btn-small secondary" id="ceremonyPauseBtn" onclick="pauseCeremony()">&#x23F8; Pause</button>
+                <button class="btn-small danger" onclick="skipCeremony()">Skip &#x23ED;</button>
+            </div>
+        </div>
 
         <!-- Tab 1: Tournaments Panel -->
         <div id="tournamentsPanel" class="god-tab-panel active">
@@ -241,11 +324,46 @@
                     </div>
                 </div>
 
+                <!-- Disputed Matches (auto-hides when empty) -->
+                <div class="panel" style="margin-top: 20px; display: none;">
+                    <h3>🗳️ Disputed Matches</h3>
+                    <div id="disputedMatchesPanel">
+                        <p class="queue-empty">No matches with pending votes</p>
+                    </div>
+                </div>
+
                 <!-- Game Queue Display -->
                 <div class="panel" style="margin-top: 20px;">
                     <h3>📋 Game Queue (<span id="queueCount">0</span>)</h3>
                     <div class="queue-container" id="gameQueue">
                         <p style="text-align: center; opacity: 0.7; font-style: italic;">No games in queue</p>
+                    </div>
+                </div>
+
+                <!-- Replay & Export -->
+                <div class="panel" style="margin-top: 20px;">
+                    <h3>Replay & Export</h3>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn primary" onclick="openReplayWindow()">View Tournament Replay</button>
+                        <button class="btn secondary" onclick="exportGameState()">Export Game State</button>
+                    </div>
+                </div>
+
+                <!-- All Matches History -->
+                <div class="panel" style="margin-top: 20px;">
+                    <h3>📜 All Matches</h3>
+                    <div class="history-filter-bar">
+                        <select id="allMatchesStatusFilter" onchange="filterAllMatches()">
+                            <option value="all">All Statuses</option>
+                            <option value="completed">Completed</option>
+                            <option value="ongoing">In Progress</option>
+                            <option value="pending">Queued</option>
+                        </select>
+                        <input type="text" id="allMatchesSearch" placeholder="Search matches..."
+                               oninput="filterAllMatches()">
+                    </div>
+                    <div class="history-list" id="allMatchesList">
+                        <p class="queue-empty">No matches yet</p>
                     </div>
                 </div>
             </div>
@@ -401,12 +519,33 @@
         </div>
 
         <div class="panel" style="margin-top: 20px;">
+            <h3>⚖️ Points Correction</h3>
+            <p style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 12px;">
+                Adjust team points manually. Changes are logged.
+            </p>
+            <div id="pointsCorrectionPanel">
+                <p class="queue-empty">Load a tournament to see teams</p>
+            </div>
+        </div>
+
+        <div class="panel" style="margin-top: 20px;">
+            <h3>🗂️ Backups</h3>
+            <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                <button class="btn primary" onclick="createManualBackup()">Create Backup</button>
+                <button class="btn secondary" onclick="refreshBackups()">Refresh</button>
+            </div>
+            <div id="backupPanel">
+                <p class="queue-empty">No backups yet</p>
+            </div>
+        </div>
+
+        <div class="panel" style="margin-top: 20px;">
             <h3>💾 Data Management</h3>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <button class="btn" onclick="exportGameState()">📥 Export Game State</button>
                 <button class="btn" onclick="saveGameState()">💾 Save to Firebase</button>
                 <button class="btn" onclick="clearLog()">🗑️ Clear Game Log</button>
-                <button class="btn secondary" onclick="loadBackup()">📂 Load Backup</button>
+                <button class="btn secondary" onclick="recalculateTeamStats()">🔄 Recalculate Stats</button>
             </div>
         </div>
     </div>
@@ -436,9 +575,13 @@
                         data-tooltip="Load all 15 spell cards from Firebase">
                     📥 Load Spell Definitions
                 </button>
-                <button class="btn secondary" onclick="window.open('tools/upload-spells.html', '_blank')" style="flex: 1;"
+                <button class="btn secondary" onclick="window.open('../tools/upload-spells.html', '_blank')" style="flex: 1;"
                         data-tooltip="Open spell upload utility in new tab">
                     ⬆️ Upload Spells
+                </button>
+                <button class="btn secondary" onclick="initializeSpellPiles(3)" style="flex: 1;"
+                        data-tooltip="Create shuffled draw piles with 3 cards per team">
+                    🃏 Initialize Draw Piles
                 </button>
             </div>
         </div>
@@ -525,6 +668,59 @@
             <h3>📜 Spell Cast History</h3>
             <div id="spellHistory" style="max-height: 400px; overflow-y: auto; background: rgba(15, 23, 42, 0.5); padding: 15px; border-radius: 10px;">
                 <p style="text-align: center; opacity: 0.7;">No spells cast yet</p>
+            </div>
+        </div>
+
+        <!-- Active Effects Admin -->
+        <div class="panel" style="margin-top: 20px;">
+            <h3>⚡ Active Effects</h3>
+            <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 10px;">
+                Currently active spell conditions and buffs
+            </p>
+            <div id="activeEffectsAdmin" style="max-height: 400px; overflow-y: auto;">
+                <p style="text-align: center; opacity: 0.7;">No active effects</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Log Panel -->
+    <div id="activityLogPanel" class="god-tab-panel">
+        <div class="panel">
+            <h3>Activity Log</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">
+                    Real-time log of all game-state-changing actions in this tournament
+                </p>
+                <div style="display: flex; gap: 6px;">
+                    <button class="btn-small secondary" onclick="exportActionLogJSON()">Export JSON</button>
+                    <button class="btn-small secondary" onclick="exportActionLogCSV()">Export CSV</button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="activity-log-filters">
+                <select id="activityLogCategoryFilter" onchange="filterActivityLogDisplay()"
+                        style="padding: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary);">
+                    <option value="all">All Categories</option>
+                    <option value="match">Match</option>
+                    <option value="board">Board</option>
+                    <option value="points">Points</option>
+                    <option value="phase">Phase</option>
+                    <option value="admin">Admin</option>
+                    <option value="spell">Spell</option>
+                </select>
+                <select id="activityLogTeamFilter" onchange="filterActivityLogDisplay()"
+                        style="padding: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary);">
+                    <option value="all">All Teams</option>
+                </select>
+                <input type="text" id="activityLogSearch" placeholder="Search actions..."
+                       oninput="filterActivityLogDisplay()"
+                       style="flex: 1; padding: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary);">
+            </div>
+
+            <!-- Log entries container -->
+            <div id="activityLogEntries" class="activity-log-container">
+                <p class="activity-log-empty">No actions recorded yet. Load a tournament to see the activity log.</p>
             </div>
         </div>
     </div>
@@ -730,6 +926,128 @@
         </div>
     </div>
 
+    <!-- Force Advance Phase Modal -->
+    <div id="forceAdvanceModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2 style="color: var(--accent-danger, #ef4444);">&#x26A0; Force Advance Phase</h2>
+                <button onclick="closeForceAdvanceModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); margin-bottom: 15px;">
+                    Not all requirements are met. Force advancing may lead to inconsistent state.
+                </p>
+                <p style="color: var(--text-secondary); margin-bottom: 10px; font-size: 0.9rem;">
+                    Advancing to: <strong id="forceAdvanceNextPhase" style="color: var(--accent-primary);">---</strong>
+                </p>
+                <div id="forceAdvanceRequirements" style="margin-bottom: 20px;">
+                    <!-- Populated dynamically -->
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn secondary" onclick="closeForceAdvanceModal()">Cancel</button>
+                    <button class="btn danger" onclick="confirmForceAdvance()">Force Advance</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Next Round / Award Points Modal -->
+    <div id="nextRoundModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Award Round Points</h2>
+                <button onclick="closeNextRoundModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
+                    Points from controlled heart hexes will be awarded to teams.
+                </p>
+                <div id="nextRoundPreview">
+                    <!-- Populated dynamically by StatsManager.advanceRound() -->
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 15px;">
+                    <button class="btn secondary" onclick="closeNextRoundModal()">Cancel</button>
+                    <button class="btn primary" onclick="confirmAdvanceRound(this)">Award Points</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Correct Result Modal -->
+    <div id="correctResultModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 520px;">
+            <div class="modal-header">
+                <h2>Correct Match Result</h2>
+                <button onclick="closeCorrectResultModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="correctResultMatchInfo" style="margin-bottom: 12px; display: flex; gap: 8px; align-items: center;"></div>
+                <p style="color: var(--text-secondary); margin-bottom: 12px; font-size: 0.85rem;">
+                    Select the correct winner. Stats will be reversed and reapplied.
+                </p>
+                <div id="correctResultTeams" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+                    <!-- Populated dynamically -->
+                </div>
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="font-size: 0.8rem; color: var(--text-secondary);">Reason for correction (optional)</label>
+                    <input type="text" id="correctResultReason" placeholder="e.g., Wrong team selected" style="margin-top: 4px;">
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn secondary" onclick="closeCorrectResultModal()">Cancel</button>
+                    <button class="btn danger" id="confirmCorrectResultBtn" onclick="confirmCorrectResult()" disabled>Apply Correction</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Undo Confirmation Modal -->
+    <div id="undoConfirmModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 480px;">
+            <div class="modal-header">
+                <h2>Undo Action</h2>
+                <button onclick="closeUndoConfirmModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); margin-bottom: 8px; font-size: 0.85rem;">This action will be reversed:</p>
+                <div id="undoActionDesc" style="font-weight: 600; color: var(--text-primary); margin-bottom: 16px; font-size: 0.9rem;"></div>
+                <div id="undoChangesPreview" style="margin-bottom: 12px;"></div>
+                <div id="undoWarnings" style="display: none; margin-bottom: 12px;"></div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn secondary" onclick="closeUndoConfirmModal()">Cancel</button>
+                    <button class="btn danger" onclick="confirmUndoAction()">Undo</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Break Settings Modal -->
+    <div id="breakSettingsModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2>Break Settings</h2>
+                <button onclick="closeBreakSettings()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label style="color: var(--text-secondary); font-size: 0.9rem;">Break every N rounds (0 = disabled):</label>
+                    <input type="number" id="breakIntervalInput" min="0" max="20" value="2"
+                           style="width: 80px; padding: 8px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color, #334155); border-radius: 8px; color: white; font-size: 1rem; margin-top: 6px;">
+                </div>
+                <p style="color: var(--text-tertiary); font-size: 0.85rem; margin: 12px 0;">
+                    Rounds since last break: <strong id="roundsSinceBreak" style="color: var(--accent-primary);">0</strong>
+                </p>
+                <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+                    <button class="btn-small secondary" onclick="resetBreakCounter()">Reset Counter</button>
+                    <button class="btn-small secondary" onclick="skipNextBreak()">Skip Next Break</button>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn secondary" onclick="closeBreakSettings()">Cancel</button>
+                    <button class="btn primary" onclick="saveBreakSettings(this)">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Edit Tournament Modal -->
     <div id="editTournamentModal" class="modal" style="display: none;">
         <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
@@ -816,166 +1134,48 @@
     <script>window.BOARDGAME_BASE = '..';</script>
     <script src="../shared/scripts/theme-toggle.js"></script>
 
-    <!-- Load infrastructure first -->
-    <script type="module" src="scripts/errorHandler.js"></script>
-    <script type="module" src="scripts/stateManager.js"></script>
-    <script type="module" src="scripts/utils.js"></script>
-
-    <!-- Load board modules -->
+    <!-- Shared dependencies -->
+    <script src="../shared/scripts/firebase-loader.js"></script>
+    <script src="../shared/scripts/config.js"></script>
     <script src="../shared/scripts/board-module.js"></script>
     <script src="../shared/scripts/board-renderer.js"></script>
-
-    <!-- Firebase SDK - Using the loader pattern -->
-    <script src="../shared/scripts/firebase-loader.js"></script>
-    <script src="scripts/navbar.js"></script>
-
-    <!-- Load action history system -->
-    <script src="scripts/action-history.js"></script>
-
-    <!-- Load tournament management module -->
-    <script src="scripts/tournament-manager.js"></script>
-
-    <!-- Load match suggester -->
     <script src="../shared/scripts/match-suggester.js"></script>
-
-    <!-- Load player utilities for normalized data structure -->
+    <script src="../shared/scripts/games-config.js"></script>
     <script src="../shared/scripts/player-utils.js"></script>
+    <script src="../shared/scripts/toast.js"></script>
 
-    <!-- Load all god mode functionality -->
-    <script src="scripts/spell-manager.js"></script>
-    <script src="scripts/god-scripts.js"></script>
-    <script src="scripts/spells-god.js"></script>
+    <!-- Full-version shared deps -->
+    <script src="scripts/balance-optimizer.js"></script>
+    <script src="scripts/smart-match-generator.js"></script>
+    <script src="../shared/scripts/navbar.js"></script>
 
-    <!-- Load user management -->
+    <!-- OOP modules (leaf → complex → orchestrator) -->
+    <script src="scripts/action-logger.js"></script>
+    <script src="scripts/ui-manager.js"></script>
+    <script src="scripts/team-manager.js"></script>
+    <script src="scripts/phase-manager.js"></script>
+    <script src="scripts/board-manager.js"></script>
+    <script src="scripts/match-queue-manager.js"></script>
+    <script src="scripts/match-creation-manager.js"></script>
+    <script src="scripts/result-manager.js"></script>
+    <script src="scripts/stats-manager.js"></script>
+    <script src="scripts/backup-manager.js"></script>
+    <script src="scripts/undo-manager.js"></script>
+    <script src="scripts/spell-engine.js"></script>
+    <script src="scripts/scoring-ceremony.js"></script>
+    <script src="scripts/action-export.js"></script>
+    <script src="scripts/god-app.js"></script>
+
+    <!-- User management (standalone, reads window.gameState) -->
     <script src="scripts/user-management.js"></script>
 
-    <!-- Authentication & Navigation Integration -->
+    <!-- Inline UI helpers (tab switching, history display, etc.) -->
     <script>
-        // =============================================================================
-        // APPLICATION CONFIGURATION
-        // =============================================================================
-        /**
-         * Application Configuration
-         * Change BRAND_NAME to customize the branding across the application
-         */
-        const BRAND_NAME = 'BoardGame';  // ← Change this to your brand name
-
-        // Apply brand name on page load
-        window.addEventListener('DOMContentLoaded', () => {
-            const brandElement = document.getElementById('brandName');
-            if (brandElement) {
-                brandElement.textContent = BRAND_NAME;
-            }
-        });
-
-        // =============================================================================
-        // AUTHENTICATION & SECURITY
-        // =============================================================================
-        /**
-         * Check authentication and role before allowing access
-         * GOD/ADMIN only page
-         *
-         * NOTE: This is a CLIENT-SIDE check only for UX purposes.
-         * Real security is enforced by Firestore Security Rules server-side.
-         * If users bypass this check, they still won't be able to read/write data.
-         */
-        document.addEventListener('firebase-ready', function() {
-            const auth = firebase.auth();
-
-            auth.onAuthStateChanged(async (user) => {
-                if (!user) {
-                    // Not logged in → redirect to login
-                    console.log('[God Mode] Not authenticated, redirecting to login...');
-                    alert('You must be logged in to access this page');
-                    window.location.href = '../login.html';
-                    return;
-                }
-
-                console.log('[God Mode] User authenticated:', user.uid);
-
-                // Try to get role from session storage first (set by index.html router)
-                const userRole = sessionStorage.getItem('userRole');
-
-                if (userRole === 'god' || userRole === 'admin') {
-                    console.log('[God Mode] Access granted via session role:', userRole);
-                    return; // Allow access
-                }
-
-                // If no session role, try Firestore as backup
-                // This is just for UX - real security is in Firestore rules
-                try {
-                    const db = firebase.firestore();
-
-                    // Try to read user document - if rules block it, user isn't admin
-                    const userDoc = await db.collection('users').doc(user.uid).get();
-
-                    if (!userDoc.exists()) {
-                        console.log('[God Mode] No user profile found');
-                        // Let them try - if they're not admin, Firestore rules will block operations
-                        console.log('[God Mode] Allowing access - Firestore rules will enforce permissions');
-                        return;
-                    }
-
-                    const userData = userDoc.data();
-                    const isAuthorized = userData.isGod === true ||
-                                       userData.isAdmin === true;
-
-                    if (isAuthorized) {
-                        console.log('[God Mode] Access granted via Firestore document');
-                        // Update session storage for next time
-                        sessionStorage.setItem('userRole', 'god');
-                    } else {
-                        console.log('[God Mode] User not in admin list, but allowing access');
-                        console.log('[God Mode] Firestore rules will block unauthorized operations');
-                        // Don't redirect - let Firestore rules handle security
-                        // If they try to do something unauthorized, they'll get permission errors
-                    }
-                } catch (error) {
-                    console.error('[God Mode] Error checking permissions:', error);
-                    // Don't redirect on error - Firestore rules will handle security
-                    console.log('[God Mode] Allowing access despite error - Firestore rules will enforce permissions');
-
-                    // Show a warning to user
-                    const statusEl = document.getElementById('statusMessage');
-                    if (statusEl) {
-                        statusEl.textContent = 'Note: Could not verify admin status. Some features may be restricted by server permissions.';
-                        statusEl.style.background = 'rgba(234, 179, 8, 0.2)';
-                        statusEl.style.borderColor = '#eab308';
-                        statusEl.style.display = 'block';
-                    }
-                }
-            });
-        });
-
         /**
          * Navigate back to home dashboard
          */
         function goBackToHome() {
             window.location.href = 'home.html';
-        }
-
-        /**
-         * Update the current tournament indicator in the header
-         */
-        function updateTournamentIndicator(tournamentId, tournamentName) {
-            const indicator = document.getElementById('currentTournamentIndicator');
-            const nameSpan = document.getElementById('currentTournamentName');
-
-            // Elements may not exist if using navbar tournament selector instead
-            if (!indicator || !nameSpan) {
-                console.log('[God Mode] Tournament indicator elements not found (using navbar selector)');
-                return;
-            }
-
-            if (tournamentId && tournamentName) {
-                nameSpan.textContent = tournamentName;
-                indicator.style.display = 'block';
-            } else if (tournamentId) {
-                nameSpan.textContent = tournamentId;
-                indicator.style.display = 'block';
-            } else {
-                indicator.style.display = 'none';
-            }
         }
 
         /**
@@ -1042,11 +1242,10 @@
                 syncStat('statHearts', 'statHeartsBig');
 
                 // Sync Team Rankings (since they were removed from Matches)
-                // The teamsList is populated by updateTeamsList() function
                 const teamsListStats = document.getElementById('teamsListStats');
-                if (typeof updateTeamsList === 'function' && teamsListStats) {
-                    // Call updateTeamsList which will populate teamsList
-                    // Then copy that to Stats page
+                if (window.godApp?.teams && teamsListStats) {
+                    // Re-render teams to populate hidden teamsList, then copy to Stats
+                    window.godApp.teams.renderTeamsList();
                     setTimeout(() => {
                         const teamsList = document.getElementById('teamsList');
                         if (teamsList && teamsListStats) {
@@ -1065,14 +1264,14 @@
 
             if (tabName === 'teams') {
                 // Initialize Teams tab components if gameState is loaded
-                if (window.gameState && window.gameState.gameId) {
+                if (window.gameState?.teams) {
+                    // These functions come from user-management.js (kept standalone)
                     if (typeof renderTeamAssignmentSlots === 'function') {
                         renderTeamAssignmentSlots();
                     }
                     if (typeof renderTournamentRoster === 'function') {
                         renderTournamentRoster();
                     }
-                    // Refresh unassigned users list
                     if (typeof renderUnassignedUsers === 'function') {
                         renderUnassignedUsers();
                     }
@@ -1108,23 +1307,23 @@
                 targetTab.classList.add('active');
             }
 
-            // Initialize board renderer if switching to Board tab
-            if (tabName === 'board') {
-                // Initialize board modules if not already done
-                if (typeof initializeBoardModules === 'function' && !window.boardRenderer) {
-                    setTimeout(() => {
-                        console.log('[Board] Initializing board modules for Board tab');
-                        initializeBoardModules();
-                        // Render the board if we have game state
-                        if (typeof renderBoard === 'function' && window.gameState) {
-                            renderBoard();
-                        }
-                    }, 100);
-                }
+            // Re-render board when switching to Board tab
+            if (tabName === 'board' && window.godApp?.board) {
+                setTimeout(() => {
+                    window.godApp.board.renderBoard();
+                }, 100);
             }
 
             // Sync data for the target tab
             syncTabData(tabName);
+
+            // If switching to Activity Log tab, start listener
+            if (tabName === 'activityLog') {
+                populateActivityLogTeamFilter();
+                if (typeof startActivityLogListener === 'function') {
+                    startActivityLogListener();
+                }
+            }
 
             // If switching to History tab, load history data
             if (tabName === 'history') {
@@ -1133,21 +1332,6 @@
                         refreshHistoryDisplay();
                     }
                 }, 100);
-            }
-
-            // If switching to Matches tab and gameId is already filled, auto-load
-            if (tabName === 'matches') {
-                const gameIdInput = document.getElementById('gameId');
-                if (gameIdInput && gameIdInput.value.trim() && typeof loadGame === 'function') {
-                    // Check if we haven't already loaded this tournament
-                    const currentTournamentId = window.gameState?.tournamentId;
-                    const inputTournamentId = gameIdInput.value.trim().split('/')[0]; // Extract tournament ID
-
-                    if (currentTournamentId !== inputTournamentId) {
-                        console.log('[God Mode] Auto-loading tournament from filled gameId field');
-                        setTimeout(() => loadGame(), 500);
-                    }
-                }
             }
 
             // Save to sessionStorage
@@ -1160,54 +1344,118 @@
         }
 
         /**
-         * Initialize from URL parameters and sessionStorage
+         * Restore active tab from URL or session storage
+         * (Tournament loading is handled by GodApp bootstrap)
          */
-        function initializeFromURL() {
+        function restoreActiveTab() {
             const params = new URLSearchParams(window.location.search);
-            const urlTournamentId = params.get('tournament') || params.get('game'); // Support both for backward compatibility
             const tabName = params.get('tab');
-
-            // Check sessionStorage for persisted tournament
-            const persistedTournamentId = sessionStorage.getItem('godSelectedTournament');
-
-            // Priority: URL parameter > sessionStorage
-            const tournamentId = urlTournamentId || persistedTournamentId;
-
-            if (tournamentId) {
-                console.log('[God Mode] Auto-loading tournament:', tournamentId);
-
-                // Update tournament indicator in header
-                updateTournamentIndicator(tournamentId);
-
-                // Set gameId input on all relevant pages
-                const gameIdInput = document.getElementById('gameId');
-                if (gameIdInput) {
-                    gameIdInput.value = tournamentId;
-                }
-
-                // Auto-load game state for ALL tabs (not just Matches)
-                // Note: Team appointment components are initialized after loadGame() completes
-                if (typeof loadGame === 'function') {
-                    setTimeout(() => {
-                        console.log('[God Mode] Auto-loading game state for tournament:', tournamentId);
-                        loadGame();
-                    }, 1200);
-                }
-
-                // Update URL without reload
-                const url = new URL(window.location);
-                url.searchParams.set('tournament', tournamentId);
-                if (tabName) {
-                    url.searchParams.set('tab', tabName);
-                }
-                window.history.replaceState({}, '', url);
-            }
-
-            // Show last active tab or Tournaments tab by default
             const lastTab = sessionStorage.getItem('godActiveTab');
             setTimeout(() => {
                 switchGodTab(tabName || lastTab || 'tournaments');
             }, 500);
+        }
+
+        // ===========================
+        // ACTIVITY LOG FUNCTIONS
+        // ===========================
+
+        let _activityLogAllEntries = [];
+
+        function populateActivityLogTeamFilter() {
+            const select = document.getElementById('activityLogTeamFilter');
+            if (!select || !window.gameState?.teams) return;
+
+            const currentVal = select.value;
+            select.innerHTML = '<option value="all">All Teams</option>';
+            (window.gameState.teams || []).forEach(team => {
+                const opt = document.createElement('option');
+                opt.value = team.id;
+                opt.textContent = team.name || 'Team ' + team.id;
+                select.appendChild(opt);
+            });
+            select.value = currentVal || 'all';
+        }
+
+        function renderActivityLogEntries(entries) {
+            _activityLogAllEntries = entries || [];
+            filterActivityLogDisplay();
+        }
+
+        function filterActivityLogDisplay() {
+            const container = document.getElementById('activityLogEntries');
+            if (!container) return;
+
+            const categoryFilter = document.getElementById('activityLogCategoryFilter')?.value || 'all';
+            const teamFilter = document.getElementById('activityLogTeamFilter')?.value || 'all';
+            const searchTerm = (document.getElementById('activityLogSearch')?.value || '').toLowerCase();
+
+            let filtered = _activityLogAllEntries;
+
+            if (categoryFilter !== 'all') {
+                filtered = filtered.filter(e => e.category === categoryFilter);
+            }
+
+            if (teamFilter !== 'all') {
+                filtered = filtered.filter(e => {
+                    const p = e.payload || {};
+                    const tid = String(teamFilter);
+                    return String(p.teamId) === tid ||
+                           String(p.newOwnerTeamId) === tid ||
+                           (Array.isArray(p.winningTeamIds) && p.winningTeamIds.some(id => String(id) === tid)) ||
+                           (Array.isArray(p.teamsWithFullCredit) && p.teamsWithFullCredit.some(id => String(id) === tid));
+                });
+            }
+
+            if (searchTerm) {
+                filtered = filtered.filter(e => {
+                    const desc = ActionLogger.describeAction(e, window.gameState).toLowerCase();
+                    return desc.includes(searchTerm) || (e.actionType || '').includes(searchTerm);
+                });
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<p class="activity-log-empty">No matching actions found.</p>';
+                return;
+            }
+
+            container.innerHTML = filtered.map(entry => {
+                const desc = ActionLogger.describeAction(entry, window.gameState);
+                const badgeClass = ActionLogger.categoryBadgeClass(entry.category);
+                const ts = entry.timestamp?.toDate ? entry.timestamp.toDate() : (entry.timestamp ? new Date(entry.timestamp) : null);
+                const timeStr = ts ? ts.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+                const actorName = entry.actor?.displayName || 'System';
+                const isUndone = entry.undone;
+
+                // Team color dot
+                let teamDotHtml = '';
+                const teamId = entry.payload?.teamId || entry.payload?.newOwnerTeamId;
+                if (teamId && window.godApp?.teams) {
+                    const color = window.godApp.teams.getTeamColor(teamId);
+                    teamDotHtml = `<span class="activity-log-team-dot" style="background: ${color}"></span>`;
+                }
+
+                // Undo button (only for undoable, non-undone entries)
+                let undoBtnHtml = '';
+                if (!isUndone && window.godApp?.undo) {
+                    const { canUndo } = window.godApp.undo.canUndo(entry);
+                    if (canUndo) {
+                        // Store entry reference for onclick
+                        const entryIdx = _activityLogAllEntries.indexOf(entry);
+                        undoBtnHtml = `<button class="activity-log-undo-btn" onclick="event.stopPropagation(); openUndoConfirmModal(_activityLogAllEntries[${entryIdx}])" title="Undo">↩</button>`;
+                    }
+                }
+
+                return `<div class="activity-log-entry${isUndone ? ' undone' : ''}">
+                    <span class="activity-log-seq">#${entry.sequenceNumber || '?'}</span>
+                    <span class="activity-log-timestamp">${timeStr}</span>
+                    <span class="activity-log-badge ${badgeClass}">${entry.category || '?'}</span>
+                    ${teamDotHtml}
+                    <span class="activity-log-desc">${desc}</span>
+                    <span class="activity-log-actor">${actorName}</span>
+                    ${undoBtnHtml}
+                </div>`;
+            }).join('');
         }
 
         // ===========================
@@ -1688,7 +1936,7 @@
                 a.click();
                 URL.revokeObjectURL(url);
 
-                window.errorHandler?.showSuccess('Tournament data exported as JSON');
+                if (typeof showToast === 'function') showToast('Tournament data exported as JSON', 'success');
             } else if (format === 'csv') {
                 // Export match history as CSV
                 const matches = window.gameState.gameHistory || [];
@@ -1711,13 +1959,13 @@
                 a.click();
                 URL.revokeObjectURL(url);
 
-                window.errorHandler?.showSuccess('Match history exported as CSV');
+                if (typeof showToast === 'function') showToast('Match history exported as CSV', 'success');
             }
         }
 
-        // Initialize on Firebase ready
+        // Restore active tab (tournament loading is handled by god-app.js bootstrap)
         document.addEventListener('firebase-ready', () => {
-            initializeFromURL();
+            restoreActiveTab();
         });
     </script>
 </body>

@@ -186,25 +186,9 @@
     </style>
 </head>
 <body class="has-navbar">
-    <!-- Navbar -->
-    <nav class="unified-navbar">
-        <div class="navbar-container">
-            <a href="development-landing-page.html" class="navbar-brand">
-                <img src="shared/images/favicon/android-chrome-192x192.png" alt="Logo" class="navbar-logo">
-                <div class="navbar-brand-text">
-                    <span class="navbar-brand-name">Board Game</span>
-                    <span class="navbar-tournament-name" id="navTournamentName">Development</span>
-                </div>
-            </a>
-
-            <div class="navbar-user">
-                <div class="navbar-connection-status connected" id="connectionStatus" title="Connected"></div>
-                <span class="navbar-role-badge user" id="roleBadge">USER</span>
-                <span class="navbar-user-name" id="userName">Loading...</span>
-                <button class="navbar-logout-btn" onclick="logout()" title="Logout">Exit</button>
-            </div>
-        </div>
-    </nav>
+    <!-- Navbar (populated by shared navbar.js) -->
+    <div id="navbar-container"></div>
+    <script src="shared/scripts/navbar.js"></script>
 
     <div class="development-container">
         <div class="development-card">

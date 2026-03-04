@@ -175,10 +175,14 @@ document.addEventListener('firebase-ready', async function() {
             // Store user role
             currentUserRole = userData.isGod ? 'god' : 'admin';
 
-            // Update UI
-            document.getElementById('userName').textContent = userData.displayName || user.email;
-            document.getElementById('roleBadge').textContent = userData.isGod ? 'GOD' : 'ADMIN';
-            document.getElementById('roleBadge').className = `navbar-role-badge ${userData.isGod ? 'god' : 'admin'}`;
+            // Update UI (navbar elements may be rendered async by navbar.js)
+            const userNameEl = document.getElementById('userName');
+            const roleBadgeEl = document.getElementById('roleBadge');
+            if (userNameEl) userNameEl.textContent = userData.displayName || user.email;
+            if (roleBadgeEl) {
+                roleBadgeEl.textContent = userData.isGod ? 'GOD' : 'ADMIN';
+                roleBadgeEl.className = `navbar-role-badge ${userData.isGod ? 'god' : 'admin'}`;
+            }
 
             // Initialize modules
             initializeBoardModules();
@@ -505,8 +509,9 @@ function updateDisplay() {
         boardModule.setRoomHexes(gameState.rooms);
     }
 
-    // Update navbar
-    document.getElementById('navTournamentName').textContent = gameState.name || 'Tournament';
+    // Update navbar (element may not exist if navbar.js hasn't rendered yet)
+    const navTournament = document.getElementById('navTournamentName');
+    if (navTournament) navTournament.textContent = gameState.name || 'Tournament';
 
     // Update tournament state button
     updateTournamentStateButton();
@@ -561,6 +566,7 @@ function updateGameTypeDropdown() {
 
 function updateConnectionStatus(status) {
     const indicator = document.getElementById('connectionStatus');
+    if (!indicator) return;
     indicator.classList.remove('connected', 'disconnected', 'warning');
     indicator.classList.add(status);
     indicator.title = `Firebase: ${status}`;
@@ -894,11 +900,45 @@ async function updateTeamName(teamId, newName) {
     const team = gameState.teams.find(t => t.id === teamId);
     if (!team) return;
 
-    team.name = newName.trim();
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === team.name) return;
+
+    const oldName = team.name;
+
+    // Name history
+    if (!team.nameHistory) team.nameHistory = [];
+    team.nameHistory.push({
+        oldName,
+        newName: trimmed,
+        changedAt: new Date().toISOString(),
+        changedBy: firebase.auth().currentUser?.uid || 'unknown'
+    });
+
+    team.name = trimmed;
 
     await saveGameState();
     renderTeamsList();
     renderPlayerManager();
+
+    // Update user docs with new team name
+    try {
+        const db = window.firebaseDB;
+        if (db && team.players) {
+            const batch = db.batch();
+            let hasBatchOps = false;
+            for (const player of team.players) {
+                if (player.uid) {
+                    batch.update(db.collection('users').doc(player.uid), {
+                        assignedTeamName: trimmed
+                    });
+                    hasBatchOps = true;
+                }
+            }
+            if (hasBatchOps) await batch.commit();
+        }
+    } catch (e) {
+        console.warn('[Admin] Failed to update user docs with new team name:', e);
+    }
 }
 
 /**

@@ -12,8 +12,10 @@
   <link rel="manifest" href="shared/images/favicon/site.webmanifest">
   <link rel="shortcut icon" href="shared/images/favicon/favicon.ico">
 
-  <!-- Unified Falcon Design System -->
-  <link rel="stylesheet" href="shared/css/slate-theme.css">
+  <!-- Fonts & Theme -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="shared/css/auth-modern.css">
 
   <script>window.BOARDGAME_BASE = '.';</script>
@@ -23,7 +25,7 @@
   <div class="auth-container">
     <!-- Logo Section -->
     <div class="auth-logo-section">
-      <div class="auth-logo">🎮</div>
+      <img class="auth-logo" src="shared/images/favicon/android-chrome-512x512.png" alt="Board Game logo">
       <h1 class="auth-logo-title">Board Game</h1>
       <p class="auth-logo-subtitle">Tournament Management System</p>
     </div>
@@ -160,9 +162,9 @@
       auth = firebase.auth();
       db = firebase.firestore();
 
-      // Monitor auth state
+      // Monitor auth state — ignore anonymous users (firebase-loader signs in anonymously)
       auth.onAuthStateChanged(user => {
-        if (user) {
+        if (user && !user.isAnonymous) {
           console.log("User logged in:", user.uid);
           showStatus('Login successful! Redirecting...', 'success');
           setTimeout(() => {

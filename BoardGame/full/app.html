@@ -12,8 +12,9 @@
   <link rel="manifest" href="../shared/images/favicon/site.webmanifest">
   <link rel="shortcut icon" href="../shared/images/favicon/favicon.ico">
 
-  <!-- Unified Falcon Design System -->
+  <!-- Styles -->
   <link rel="stylesheet" href="../shared/css/slate-theme.css">
+  <link rel="stylesheet" href="../shared/css/navbar.css">
   <link rel="stylesheet" href="css/god-modern.css">
   <link rel="stylesheet" href="css/team-modern.css">
   <link rel="stylesheet" href="../shared/css/theme-toggle-button.css">
@@ -633,79 +634,12 @@
 
   <script>window.BOARDGAME_BASE = '..';</script>
   <script src="../shared/scripts/firebase-loader.js"></script>
+  <script src="../shared/scripts/navbar.js"></script>
 </head>
 <body>
   <div class="app-shell">
-    <!-- Top Navigation Bar -->
-    <nav class="app-navbar">
-      <div class="app-navbar-left">
-        <button id="sidebarToggle" class="btn btn-sm">
-          ☰
-        </button>
-        <img src="../shared/images/favicon/android-chrome-512x512.png" alt="Logo" class="app-logo">
-        <div class="app-brand">
-          <h1 class="app-brand-title">Board Game</h1>
-          <div class="app-brand-subtitle">Tournament Manager</div>
-        </div>
-      </div>
-
-      <!-- Context Controls (Center) -->
-      <div class="app-navbar-center">
-        <!-- Tournament Selector -->
-        <div class="tournament-selector">
-          <button class="tournament-selector-btn" id="tournamentSelectorBtn" onclick="toggleTournamentDropdown()">
-            <span class="tournament-icon">📌</span>
-            <span class="tournament-label" id="activeTournamentName">Select Tournament</span>
-            <span class="tournament-chevron">▼</span>
-          </button>
-          <div class="tournament-dropdown" id="tournamentDropdown">
-            <!-- Populated by JavaScript -->
-          </div>
-        </div>
-
-        <!-- Role Switcher -->
-        <div class="role-switcher" id="roleSwitcher">
-          <button class="role-option" data-role="admin" onclick="switchRole('admin')">
-            <span class="role-icon">👑</span>
-            <span class="role-label">Admin</span>
-          </button>
-          <button class="role-option" data-role="player" onclick="switchRole('player')">
-            <span class="role-icon">🎮</span>
-            <span class="role-label">Player</span>
-          </button>
-        </div>
-      </div>
-
-      <div class="app-navbar-right">
-        <button id="themeToggleNavbar" class="btn btn-sm" onclick="toggleTheme()" title="Toggle dark/light mode">
-          🌙
-        </button>
-
-        <!-- User Menu Dropdown -->
-        <div class="user-menu-container">
-          <button class="user-menu-btn" id="userMenuBtn" onclick="toggleUserMenu()">
-            <span class="user-name" id="userName">Loading...</span>
-            <span class="user-role-badge" id="userRole">USER</span>
-            <span class="user-chevron">▼</span>
-          </button>
-          <div class="user-menu-dropdown" id="userMenuDropdown">
-            <a href="#" class="user-menu-item" onclick="navigateTo('profile'); return false;">
-              <span class="menu-icon">👤</span> My Profile
-            </a>
-            <a href="#" class="user-menu-item" onclick="navigateTo('settings'); return false;">
-              <span class="menu-icon">⚙️</span> Settings
-            </a>
-            <a href="#" class="user-menu-item" onclick="navigateTo('help'); return false;">
-              <span class="menu-icon">❓</span> Help
-            </a>
-            <hr class="user-menu-divider">
-            <a href="#" class="user-menu-item" onclick="logout(); return false;">
-              <span class="menu-icon">🚪</span> Logout
-            </a>
-          </div>
-        </div>
-      </div>
-    </nav>
+    <!-- Unified Navbar (populated by shared navbar.js) -->
+    <div id="navbar-container"></div>
 
     <!-- Connection Status Indicator -->
     <div id="connectionStatus" class="connection-status disconnected" title="Firebase: Connecting..."></div>

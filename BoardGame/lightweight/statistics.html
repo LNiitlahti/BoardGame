@@ -55,26 +55,9 @@
         </div>
     </div>
 
-    <!-- Navbar -->
-    <nav class="unified-navbar">
-        <div class="navbar-container">
-            <a href="../full/home.html" class="navbar-brand">
-                <img src="../shared/images/favicon/android-chrome-192x192.png" alt="Logo" class="navbar-logo">
-                <div class="navbar-brand-text">
-                    <span class="navbar-brand-name">Tournament Statistics</span>
-                    <span class="navbar-tournament-name" id="navTournamentName">No Tournament</span>
-                </div>
-            </a>
-
-            <div class="navbar-user">
-                <div class="navbar-connection-status" id="connectionStatus" title="Connecting..."></div>
-                <div class="action-buttons">
-                    <button class="btn secondary" onclick="exportStatistics()">Export JSON</button>
-                    <button class="btn primary" onclick="generatePDF()" id="pdfBtn">Generate PDF</button>
-                </div>
-            </div>
-        </div>
-    </nav>
+    <!-- Navbar (populated by shared navbar.js) -->
+    <div id="navbar-container"></div>
+    <script src="../shared/scripts/navbar.js"></script>
 
     <div class="stats-container">
         <!-- Top Bar -->

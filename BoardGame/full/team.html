@@ -12,11 +12,47 @@
     <link rel="manifest" href="../shared/images/favicon/site.webmanifest">
     <link rel="shortcut icon" href="../shared/images/favicon/favicon.ico">
 
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <!-- Preload Firebase SDK scripts so they start downloading immediately -->
+    <link rel="preload" href="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js" as="script">
+    <link rel="preload" href="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js" as="script">
+    <link rel="preload" href="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js" as="script">
+
     <!-- Unified Falcon Design System -->
     <link rel="stylesheet" href="../shared/css/slate-theme.css">
     <link rel="stylesheet" href="../shared/css/navbar.css">
     <link rel="stylesheet" href="css/team-modern.css">
     <link rel="stylesheet" href="../shared/css/theme-toggle-button.css">
+    <style>
+      /* ── Loading shimmer for team page ── */
+      @keyframes teamShimmer {
+        0% { background-position: -400px 0; }
+        100% { background-position: 400px 0; }
+      }
+      @keyframes teamPulse {
+        0%, 100% { opacity: 0.5; }
+        50% { opacity: 1; }
+      }
+      .team-loading-pulse {
+        animation: teamPulse 1.5s ease-in-out infinite;
+        color: var(--text-muted, #6a7088) !important;
+      }
+      .team-skeleton {
+        background: linear-gradient(90deg, rgba(30,32,42,0.5) 25%, rgba(50,54,68,0.5) 50%, rgba(30,32,42,0.5) 75%);
+        background-size: 800px 100%;
+        animation: teamShimmer 1.8s infinite ease-in-out;
+        border-radius: 8px;
+      }
+      .team-skeleton-block { height: 100px; border-radius: 12px; margin-bottom: 12px; }
+      .team-fade-in {
+        opacity: 0;
+        animation: teamFadeIn 0.3s ease-out forwards;
+      }
+      @keyframes teamFadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    </style>
 </head>
 <body class="team-page">
     <!-- Navbar container - populated by navbar.js -->
@@ -26,7 +62,7 @@
         <!-- Header with Team Name and Points -->
         <div class="team-header">
             <div class="team-header-left">
-                <h1 class="team-name-display" id="teamNameDisplay">Loading...</h1>
+                <h1 class="team-name-display team-loading-pulse" id="teamNameDisplay">Loading...</h1>
                 <div class="team-quick-stats">
                     <div class="team-quick-stat">
                         <div class="team-quick-stat-value" id="teamWins">0</div>
@@ -53,6 +89,64 @@
 
         <div class="team-status-message" id="statusMessage" style="display: none;"></div>
 
+        <!-- Pre-Game Instructions Overlay -->
+        <div class="lobby-overlay" id="preGameInstructionsOverlay" style="display: none;">
+            <div class="lobby-overlay-content">
+                <div class="lobby-overlay-header">
+                    <h2>Your Match Assignments</h2>
+                    <p>Review your upcoming matches for this round</p>
+                </div>
+                <div id="matchAssignmentCards" class="match-assignment-grid">
+                    <!-- Dynamically populated -->
+                </div>
+                <div class="lobby-overlay-footer">
+                    Waiting for admin to advance to lobby...
+                </div>
+            </div>
+        </div>
+
+        <!-- Lobby Ready Overlay -->
+        <div class="lobby-overlay" id="lobbyReadyOverlay" style="display: none;">
+            <div class="lobby-overlay-content">
+                <div class="lobby-overlay-header">
+                    <h2>Lobby Ready Check</h2>
+                    <p>Confirm you are ready to start matches</p>
+                </div>
+                <div id="matchAssignmentCardsLobby" class="match-assignment-grid">
+                    <!-- Dynamically populated -->
+                </div>
+                <div class="lobby-ready-controls">
+                    <button class="btn primary lobby-ready-btn" id="readyUpBtn" onclick="toggleReady()">
+                        READY UP
+                    </button>
+                    <div id="readyStatus" class="ready-status">
+                        <!-- Dynamically populated: per-team readiness -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Spell Phase Overlay -->
+        <div class="lobby-overlay" id="spellPhaseOverlay" style="display: none;">
+            <div class="lobby-overlay-content">
+                <div class="lobby-overlay-header">
+                    <h2>Spell Phase</h2>
+                    <p id="spellPhaseTurnStatus">Waiting for your turn...</p>
+                </div>
+                <div id="spellHandCards" class="spell-hand-grid">
+                    <!-- Dynamically populated: large spell cards -->
+                </div>
+                <div id="spellPhaseActions" style="display: none; margin-top: 15px; text-align: center;">
+                    <button class="btn primary" id="endSpellTurnBtn" onclick="endSpellTurn()">
+                        Pass (No Spell)
+                    </button>
+                </div>
+                <div id="spellTurnCompletedMsg" style="display: none; text-align: center; margin-top: 15px;">
+                    <p style="color: var(--accent-primary); font-size: 1.1rem;">Your turn is complete. Waiting for other teams...</p>
+                </div>
+            </div>
+        </div>
+
         <!-- Main Grid: Team Info | Board | Match Info -->
         <div class="team-main-layout">
             <!-- Left Sidebar: Team Info -->
@@ -69,6 +163,11 @@
                     <div class="spell-cards-grid" id="spellCardsList">
                         <p class="empty-state-inline">No spell cards available</p>
                     </div>
+                </div>
+
+                <div class="team-section" id="activeConditionsSection" style="display: none;">
+                    <div class="team-section-header">Active Conditions</div>
+                    <div id="activeConditionsList"></div>
                 </div>
             </div>
 
@@ -173,10 +272,10 @@
 
     <!-- Firebase SDK -->
     <script src="../shared/scripts/firebase-loader.js"></script>
-    <script src="scripts/navbar.js"></script>
+    <script src="../shared/scripts/navbar.js"></script>
 
-    <!-- Spell Manager -->
-    <script src="scripts/spell-manager.js"></script>
+    <!-- Games config (for match assignment display) -->
+    <script src="../shared/scripts/games-config.js"></script>
 
     <!-- Team Controls Script -->
     <script src="scripts/team-controls.js"></script>

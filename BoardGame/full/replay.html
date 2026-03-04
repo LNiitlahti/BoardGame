@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+    ============================================================================
+    REPLAY.HTML - POST-TOURNAMENT REPLAY VIEWER
+    ============================================================================
+
+    PURPOSE:
+    Replays a completed tournament step-by-step using the action log and backup
+    snapshots. Shows board state, standings, and action descriptions at any point
+    in the tournament timeline.
+
+    CHARACTERISTICS:
+    - Read-only (no writes to Firestore)
+    - Uses backup snapshots as keyframes + forward-applies action log entries
+    - Timeline slider, play/pause, speed controls, round jumping
+    - Summary modal with post-tournament analytics
+    - JSON/CSV export of action log
+
+    USAGE:
+    replay.html?tournamentId=xxx
+
+    ============================================================================
+-->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tournament Replay</title>
+
+    <!-- Favicons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="../shared/images/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../shared/images/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../shared/images/favicon/favicon-16x16.png">
+    <link rel="manifest" href="../shared/images/favicon/site.webmanifest">
+    <link rel="shortcut icon" href="../shared/images/favicon/favicon.ico">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../shared/css/brand-theme.css">
+    <link rel="stylesheet" href="../shared/css/dark-theme.css">
+    <link rel="stylesheet" href="css/replay.css">
+</head>
+<body>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-title">Loading Tournament Replay</div>
+    <div class="loading-phase" id="loadingPhase">Connecting...</div>
+    <div class="loading-bar">
+        <div class="loading-bar-fill" id="loadingBarFill"></div>
+    </div>
+</div>
+
+<!-- Error Overlay -->
+<div class="error-overlay hidden" id="errorOverlay">
+    <div class="error-icon">!</div>
+    <div class="error-title" id="errorTitle">Error</div>
+    <div class="error-message" id="errorMessage"></div>
+    <button class="btn secondary" onclick="window.history.back()">Go Back</button>
+</div>
+
+<!-- Main Page -->
+<div class="replay-container">
+
+    <!-- Header -->
+    <div class="replay-header">
+        <div class="tournament-name" id="tournamentName">Loading...</div>
+        <div class="header-info">
+            <span id="headerRound">Round --</span>
+            <span class="replay-badge">Replay</span>
+        </div>
+    </div>
+
+    <!-- No-Backup Warning (shown if needed) -->
+    <div class="no-backup-warning hidden" id="noBackupWarning">
+        Limited replay: no round-boundary backups available. Board reconstruction may be approximate.
+    </div>
+
+    <!-- Timeline Bar -->
+    <div class="replay-timeline">
+        <div class="timeline-markers" id="timelineMarkers"></div>
+        <input type="range" class="timeline-slider" id="timelineSlider"
+               min="0" max="0" value="0"
+               oninput="onTimelineScrub(this.value)"
+               onchange="onTimelineSeek(this.value)">
+        <div class="timeline-info">
+            <span id="timelinePosition">0 / 0</span>
+            <span id="timelineTimestamp"></span>
+        </div>
+    </div>
+
+    <!-- Controls Bar -->
+    <div class="replay-controls">
+        <div class="transport-btns">
+            <button class="transport-btn" onclick="seekStart()" title="Go to start">|&lt;</button>
+            <button class="transport-btn" onclick="stepBack()" title="Previous action">&lt;</button>
+            <button class="transport-btn play-btn" id="playPauseBtn" onclick="togglePlay()">Play</button>
+            <button class="transport-btn" onclick="stepFwd()" title="Next action">&gt;</button>
+            <button class="transport-btn" onclick="seekEnd()" title="Go to end">&gt;|</button>
+        </div>
+
+        <div class="speed-controls">
+            <button class="speed-btn active" data-speed="1" onclick="setSpeed(1)">1x</button>
+            <button class="speed-btn" data-speed="2" onclick="setSpeed(2)">2x</button>
+            <button class="speed-btn" data-speed="5" onclick="setSpeed(5)">5x</button>
+            <button class="speed-btn" data-speed="10" onclick="setSpeed(10)">10x</button>
+        </div>
+
+        <div class="controls-separator"></div>
+
+        <select class="round-jump-select" id="roundJump" onchange="jumpToRound(this.value)">
+            <option value="">Jump to round...</option>
+        </select>
+
+        <div class="controls-right">
+            <button class="btn secondary" onclick="openSummary()">Summary</button>
+            <button class="btn secondary" onclick="exportJSON()">Export JSON</button>
+            <button class="btn secondary" onclick="exportCSV()">Export CSV</button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="replay-main">
+
+        <!-- Board Panel (left) -->
+        <div class="board-panel">
+            <div class="board-section">
+                <div id="hexBoard" class="hex-board-container"></div>
+            </div>
+            <div class="standings-section" id="standingsPanel"></div>
+        </div>
+
+        <!-- Sidebar (right) -->
+        <div class="replay-sidebar">
+            <div class="action-feed-header">Action Log</div>
+            <div class="action-feed" id="actionFeed"></div>
+            <div class="info-panel" id="infoPanel">
+                <div class="info-row">
+                    <span class="info-label">Phase</span>
+                    <span class="info-value" id="infoPhase">--</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Round</span>
+                    <span class="info-value" id="infoRound">--</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Games Played</span>
+                    <span class="info-value" id="infoGamesPlayed">0</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Summary Modal -->
+<div class="modal" id="summaryModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Tournament Summary</h3>
+            <button class="modal-close" onclick="closeSummary()">&times;</button>
+        </div>
+        <div class="modal-body" id="summaryContent">
+            <p style="color: var(--text-secondary)">Generating summary...</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn secondary" onclick="exportSummaryJSON()">Export JSON</button>
+            <button class="btn secondary" onclick="exportSummaryMarkdown()">Export Markdown</button>
+            <button class="btn primary" onclick="closeSummary()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Scripts ===== -->
+<script>window.BOARDGAME_BASE = '..';</script>
+
+<!-- Shared deps -->
+<script src="../shared/scripts/firebase-loader.js"></script>
+<script src="../shared/scripts/firebase.js"></script>
+<script src="../shared/scripts/board-module.js"></script>
+<script src="../shared/scripts/board-renderer.js"></script>
+<script src="../shared/scripts/games-config.js"></script>
+
+<!-- Reused modules (static methods only) -->
+<script src="scripts/action-logger.js"></script>
+
+<!-- Phase 4 modules -->
+<script src="scripts/replay-engine.js"></script>
+<script src="scripts/summary-generator.js"></script>
+<script src="scripts/action-export.js"></script>
+
+<script>
+    // ===== State =====
+    let replayEngine = null;
+    let summaryGen = null;
+    let actionExport = null;
+    let boardModule = null;
+    let boardRenderer = null;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const tournamentId = urlParams.get('tournamentId') || urlParams.get('tournament');
+
+    // ===== Initialization =====
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!tournamentId) {
+            showError('No Tournament', 'No tournament ID provided. Use ?tournamentId=xxx in the URL.');
+            return;
+        }
+
+        boardModule = new BoardModule();
+        boardRenderer = new BoardRenderer(
+            document.getElementById('hexBoard'),
+            boardModule,
+            { responsive: true, showHeartImages: true }
+        );
+    });
+
+    document.addEventListener('firebase-ready', async () => {
+        if (!tournamentId) return;
+
+        try {
+            replayEngine = new ReplayEngine({
+                getFirebaseDB: () => window.firebaseDB,
+                tournamentId,
+                onStateChanged: onReplayStateChanged,
+                onLoadProgress: onLoadProgress
+            });
+
+            await replayEngine.loadTournamentData();
+
+            // Create export utility
+            actionExport = new ActionExport({
+                getFirebaseDB: () => window.firebaseDB,
+                tournamentId,
+                actions: replayEngine.actions
+            });
+
+            // Setup UI
+            setupUI();
+
+            // Seek to beginning
+            if (replayEngine.totalActions > 0) {
+                replayEngine.seekToAction(replayEngine.minSequenceNumber);
+            }
+
+            // Hide loading
+            document.getElementById('loadingOverlay').classList.add('hidden');
+
+        } catch (err) {
+            console.error('Replay load error:', err);
+            showError('Load Error', err.message || 'Failed to load tournament data.');
+        }
+    });
+
+    // ===== Loading Progress =====
+    function onLoadProgress(phase, percent) {
+        const phaseLabels = {
+            tournament: 'Loading tournament...',
+            backups: 'Loading backups...',
+            actions: 'Loading action log...',
+            timeline: 'Building timeline...'
+        };
+        document.getElementById('loadingPhase').textContent = phaseLabels[phase] || phase;
+        document.getElementById('loadingBarFill').style.width = percent + '%';
+    }
+
+    // ===== UI Setup =====
+    function setupUI() {
+        // Header
+        document.getElementById('tournamentName').textContent = replayEngine.tournamentName;
+        document.title = `Replay: ${replayEngine.tournamentName}`;
+
+        // Timeline slider
+        const slider = document.getElementById('timelineSlider');
+        slider.min = 0;
+        slider.max = replayEngine.totalActions - 1;
+        slider.value = 0;
+
+        // Round markers
+        renderTimelineMarkers();
+
+        // Round jump dropdown
+        populateRoundJump();
+
+        // No-backup warning
+        if (replayEngine.backups.length === 0) {
+            document.getElementById('noBackupWarning').classList.remove('hidden');
+        }
+
+        // Pre-render action feed
+        renderFullActionFeed();
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', onKeyDown);
+    }
+
+    function renderTimelineMarkers() {
+        const container = document.getElementById('timelineMarkers');
+        const total = replayEngine.totalActions;
+        if (total === 0) return;
+
+        const boundaries = replayEngine.roundBoundaries;
+        container.innerHTML = boundaries.map(b => {
+            const index = replayEngine._seqToIndex(b.startSeq);
+            const percent = (index / (total - 1)) * 100;
+            return `<div class="round-marker" style="left:${percent}%"
+                         onclick="jumpToRound(${b.roundNumber})"
+                         title="Round ${b.roundNumber}">R${b.roundNumber}</div>`;
+        }).join('');
+    }
+
+    function populateRoundJump() {
+        const select = document.getElementById('roundJump');
+        const boundaries = replayEngine.roundBoundaries;
+        select.innerHTML = '<option value="">Jump to round...</option>' +
+            boundaries.map(b =>
+                `<option value="${b.roundNumber}">Round ${b.roundNumber}</option>`
+            ).join('');
+    }
+
+    // ===== Action Feed =====
+    function renderFullActionFeed() {
+        const feed = document.getElementById('actionFeed');
+        const actions = replayEngine.actions;
+
+        // Reconstruct a minimal gameState for describeAction name resolution
+        const nameState = replayEngine.tournamentDoc;
+
+        feed.innerHTML = actions.map((action, i) => {
+            const badge = ActionLogger.categoryBadgeClass(action.category);
+            const desc = ActionLogger.describeAction(action, nameState);
+            const ts = formatTimestamp(action.timestamp);
+            const undoneClass = action.undone ? ' undone' : '';
+
+            return `<div class="action-entry${undoneClass}" id="action-${i}" onclick="seekToIndex(${i})">
+                <span class="action-seq">#${action.sequenceNumber}</span>
+                <span class="action-badge ${badge}">${action.category || ''}</span>
+                <span class="action-desc">${escapeHtml(desc)}</span>
+                <span class="action-time">${ts}</span>
+            </div>`;
+        }).join('');
+    }
+
+    function highlightCurrentAction(index) {
+        // Remove old highlight
+        const old = document.querySelector('.action-entry.current');
+        if (old) old.classList.remove('current');
+
+        // Add new highlight
+        const el = document.getElementById(`action-${index}`);
+        if (el) {
+            el.classList.add('current');
+            // Scroll into view
+            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    }
+
+    // ===== State Changed Callback =====
+    function onReplayStateChanged(state, action, progress) {
+        // Update board
+        if (boardRenderer && state) {
+            boardRenderer.render({
+                board: state.board || {},
+                rooms: state.rooms || [],
+                teams: state.teams || [],
+                heartHexControl: state.heartHexControl || {}
+            });
+        }
+
+        // Update standings
+        renderStandings(state);
+
+        // Highlight action in feed
+        highlightCurrentAction(progress.index);
+
+        // Update timeline slider
+        const slider = document.getElementById('timelineSlider');
+        slider.value = progress.index;
+
+        // Update timeline info
+        document.getElementById('timelinePosition').textContent =
+            `${progress.index + 1} / ${progress.total}`;
+        document.getElementById('timelineTimestamp').textContent =
+            action ? formatTimestamp(action.timestamp) : '';
+
+        // Update header round
+        document.getElementById('headerRound').textContent =
+            `Round ${progress.roundNumber || state?.currentPhase?.roundNumber || '--'}`;
+
+        // Update info panel
+        updateInfoPanel(state, action);
+
+        // Update play button state
+        updatePlayButton();
+    }
+
+    function renderStandings(state) {
+        const panel = document.getElementById('standingsPanel');
+        if (!state?.teams?.length) {
+            panel.innerHTML = '';
+            return;
+        }
+
+        const sorted = [...state.teams].sort((a, b) => (b.points || 0) - (a.points || 0));
+        panel.innerHTML = sorted.map((team, i) => `
+            <div class="standings-row">
+                <span class="standings-rank">#${i + 1}</span>
+                <span class="standings-color" style="background:${team.color || '#888'}"></span>
+                <span class="standings-name">${escapeHtml(team.name || 'Team ' + team.id)}</span>
+                <span class="standings-points">${team.points || 0}pts</span>
+                <span class="standings-record">${team.gamesWon || 0}W ${team.gamesLost || 0}L</span>
+            </div>
+        `).join('');
+    }
+
+    function updateInfoPanel(state, action) {
+        const phaseName = state?.currentPhase?.name || action?.phaseAtTime || '--';
+        document.getElementById('infoPhase').innerHTML =
+            `<span class="info-phase-badge">${phaseName.replace(/_/g, ' ')}</span>`;
+        document.getElementById('infoRound').textContent =
+            state?.currentPhase?.roundNumber || state?.currentRound || '--';
+        document.getElementById('infoGamesPlayed').textContent =
+            state?.gamesPlayed || 0;
+    }
+
+    // ===== Transport Controls =====
+    function togglePlay() {
+        if (!replayEngine) return;
+        replayEngine.togglePlayback();
+        updatePlayButton();
+    }
+
+    function updatePlayButton() {
+        const btn = document.getElementById('playPauseBtn');
+        if (replayEngine?.isPlaying) {
+            btn.textContent = 'Pause';
+            btn.classList.remove('paused');
+        } else {
+            btn.textContent = 'Play';
+            btn.classList.add('paused');
+        }
+    }
+
+    function stepFwd() { replayEngine?.stepForward(); }
+    function stepBack() { replayEngine?.stepBackward(); }
+
+    function seekStart() {
+        if (replayEngine?.totalActions > 0) {
+            replayEngine.seekToAction(replayEngine.minSequenceNumber);
+        }
+    }
+
+    function seekEnd() {
+        if (replayEngine?.totalActions > 0) {
+            replayEngine.seekToAction(replayEngine.maxSequenceNumber);
+        }
+    }
+
+    function seekToIndex(index) {
+        if (!replayEngine) return;
+        const action = replayEngine.getActionAtIndex(index);
+        if (action) {
+            replayEngine.seekToAction(action.sequenceNumber);
+        }
+    }
+
+    function setSpeed(multiplier) {
+        if (!replayEngine) return;
+        replayEngine.setSpeed(multiplier);
+
+        // Update button states
+        document.querySelectorAll('.speed-btn').forEach(btn => {
+            btn.classList.toggle('active', parseInt(btn.dataset.speed) === multiplier);
+        });
+    }
+
+    function jumpToRound(roundNumber) {
+        if (!replayEngine || !roundNumber) return;
+        replayEngine.seekToRound(parseInt(roundNumber));
+        document.getElementById('roundJump').value = '';
+    }
+
+    // ===== Timeline Scrubbing =====
+    function onTimelineScrub(value) {
+        // Lightweight preview during drag — just update position text
+        const total = replayEngine?.totalActions || 0;
+        document.getElementById('timelinePosition').textContent =
+            `${parseInt(value) + 1} / ${total}`;
+    }
+
+    function onTimelineSeek(value) {
+        // Full state reconstruction on release
+        const index = parseInt(value);
+        const action = replayEngine?.getActionAtIndex(index);
+        if (action) {
+            replayEngine.seekToAction(action.sequenceNumber);
+        }
+    }
+
+    // ===== Keyboard Shortcuts =====
+    function onKeyDown(e) {
+        // Don't capture when typing in inputs
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+        switch (e.code) {
+            case 'Space':
+                e.preventDefault();
+                togglePlay();
+                break;
+            case 'ArrowLeft':
+                e.preventDefault();
+                stepBack();
+                break;
+            case 'ArrowRight':
+                e.preventDefault();
+                stepFwd();
+                break;
+            case 'Home':
+                e.preventDefault();
+                seekStart();
+                break;
+            case 'End':
+                e.preventDefault();
+                seekEnd();
+                break;
+        }
+    }
+
+    // ===== Summary =====
+    function openSummary() {
+        if (!replayEngine) return;
+
+        // Lazy-create SummaryGenerator
+        if (!summaryGen) {
+            summaryGen = new SummaryGenerator({
+                actions: replayEngine.actions,
+                backups: replayEngine.backups,
+                finalState: replayEngine.tournamentDoc,
+                boardModule: boardModule
+            });
+        }
+
+        const modal = document.getElementById('summaryModal');
+        const content = document.getElementById('summaryContent');
+
+        summaryGen.renderHTML(content);
+        modal.style.display = 'flex';
+    }
+
+    function closeSummary() {
+        document.getElementById('summaryModal').style.display = 'none';
+    }
+
+    function exportSummaryJSON() {
+        if (!summaryGen) return;
+        const data = summaryGen.toJSON();
+        downloadFile(JSON.stringify(data, null, 2),
+            `summary-${tournamentId}-${Date.now()}.json`, 'application/json');
+    }
+
+    function exportSummaryMarkdown() {
+        if (!summaryGen) return;
+        const md = summaryGen.toMarkdown();
+        downloadFile(md, `summary-${tournamentId}-${Date.now()}.md`, 'text/markdown');
+    }
+
+    // ===== Export =====
+    function exportJSON() {
+        if (actionExport) actionExport.exportJSON();
+    }
+
+    function exportCSV() {
+        if (actionExport) actionExport.exportCSV();
+    }
+
+    // ===== Utilities =====
+    function formatTimestamp(ts) {
+        if (!ts) return '';
+        const date = ts.toDate ? ts.toDate() : new Date(ts);
+        if (isNaN(date.getTime())) return '';
+        return date.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function showError(title, message) {
+        document.getElementById('loadingOverlay').classList.add('hidden');
+        document.getElementById('errorTitle').textContent = title;
+        document.getElementById('errorMessage').textContent = message;
+        document.getElementById('errorOverlay').classList.remove('hidden');
+    }
+
+    function downloadFile(content, filename, mimeType) {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+</script>
+
+</body>
+</html>

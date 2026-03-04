@@ -141,69 +141,10 @@ h1, h2, h3, h4, h5, h6 {
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* ============================================================
-   4. NAVBAR OVERRIDES (void/gold theme)
-   ============================================================ */
-.unified-navbar {
-    background: rgba(5, 7, 16, 0.92) !important;
-    border-bottom: 1px solid var(--border-gold) !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5), 0 0 1px var(--gold-dim) !important;
-}
-
-.navbar-brand-name {
-    font-family: 'Russo One', sans-serif !important;
-    letter-spacing: 3px !important;
-    color: var(--gold-bright) !important;
-}
-
-.navbar-tournament-name {
-    color: var(--gold) !important;
-}
-
-.navbar-role-badge.god {
-    background: linear-gradient(135deg, var(--gold-bright), var(--gold)) !important;
-    color: var(--bg-void) !important;
-    box-shadow: 0 0 12px var(--gold-glow) !important;
-}
-
-.navbar-role-badge.admin {
-    background: linear-gradient(135deg, rgba(200,179,126,0.3), rgba(200,179,126,0.15)) !important;
-    color: var(--gold) !important;
-    border: 1px solid var(--border-gold) !important;
-}
-
-.navbar-logout-btn {
-    border-color: var(--border-gold) !important;
-    color: var(--text-muted) !important;
-}
-
-.navbar-logout-btn:hover {
-    background: var(--danger) !important;
-    border-color: var(--danger) !important;
-    color: white !important;
-}
-
-.navbar-user-name {
-    color: var(--text-primary) !important;
-}
-
-.navbar-connection-status {
-    background: var(--gold) !important;
-    box-shadow: 0 0 8px var(--gold-glow) !important;
-}
-
-.navbar-connection-status.connected {
-    background: var(--live) !important;
-    box-shadow: 0 0 8px var(--live-glow) !important;
-}
-
-.navbar-connection-status.disconnected {
-    background: var(--danger) !important;
-    box-shadow: 0 0 8px rgba(216,64,64,0.6) !important;
-}
+/* (Navbar overrides removed — gold/void theme is now baked into shared/css/navbar.css) */
 
 /* ============================================================
-   5. LOADING OVERLAY
+   4. LOADING OVERLAY
    ============================================================ */
 .loading-overlay {
     position: fixed;

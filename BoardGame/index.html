@@ -12,7 +12,9 @@
   <link rel="manifest" href="shared/images/favicon/site.webmanifest">
   <link rel="shortcut icon" href="shared/images/favicon/favicon.ico">
 
-  <link rel="stylesheet" href="shared/css/slate-theme.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="shared/css/auth-modern.css">
   <script>window.BOARDGAME_BASE = '.';</script>
   <script src="shared/scripts/firebase-loader.js"></script>
@@ -20,7 +22,7 @@
 <body class="auth-page">
   <div class="auth-container">
     <div class="auth-logo-section">
-      <div class="auth-logo">🎮</div>
+      <img class="auth-logo" src="shared/images/favicon/android-chrome-512x512.png" alt="Board Game logo">
       <h1 class="auth-logo-title">Board Game</h1>
       <div class="loading-spinner" style="margin: 2rem auto; width: 3rem; height: 3rem; border-width: 4px;"></div>
       <p class="auth-logo-subtitle" id="status-text">Authenticating...</p>
@@ -57,9 +59,9 @@
 
       // Monitor auth state
       auth.onAuthStateChanged(async (user) => {
-        if (!user) {
-          // Not logged in → redirect to login
-          console.log('[Router] No user logged in, redirecting to login...');
+        if (!user || user.isAnonymous) {
+          // Not logged in (or only anonymous) → redirect to login
+          console.log('[Router] No real user logged in, redirecting to login...');
           updateStatus('Redirecting to login...');
           setTimeout(() => {
             window.location.href = 'login.html';
@@ -75,11 +77,11 @@
           const userDoc = await db.collection('users').doc(user.uid).get();
 
           if (!userDoc.exists) {
-            // No profile yet → redirect to setup
-            console.log('[Router] No profile found, redirecting to setup...');
-            updateStatus('Setting up your profile...');
+            // No profile yet → send to landing page (setup is for tournaments, not users)
+            console.log('[Router] No profile found, redirecting to landing page...');
+            updateStatus('Loading...');
             setTimeout(() => {
-              window.location.href = 'full/setup.html';
+              window.location.href = 'development-landing-page.html';
             }, 500);
             return;
           }

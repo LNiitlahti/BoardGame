@@ -20,6 +20,8 @@ Full logic maps live in `BoardGame/docs/architecture/`. **These must stay in syn
 | Change `lightweight/scripts/statistics.js` | `docs/architecture/statistics.md` |
 | Change `lightweight/scripts/onboarding.js` | `docs/architecture/onboarding-lightweight.md` |
 | Change `shared/scripts/board-renderer.js` | `docs/architecture/board-renderer.md` |
+| Change `full/scripts/god-app.js` or any God module | `docs/architecture/god-modules.md` |
+| Change `full/scripts/replay-engine.js`, `summary-generator.js`, or `action-export.js` | `docs/architecture/replay-analytics.md` |
 | Change how files interact with each other | `docs/architecture/cross-system.md` |
 | Add a new JS file | Create a new `.md` in `docs/architecture/` and add it to `index.md` |
 
