@@ -12,79 +12,34 @@
     <link rel="manifest" href="../shared/images/favicon/site.webmanifest">
     <link rel="shortcut icon" href="../shared/images/favicon/favicon.ico">
 
+    <!-- Fonts: Russo One (titles) + Quantico (body) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
+
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
     <!-- Preload Firebase SDK scripts so they start downloading immediately -->
     <link rel="preload" href="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js" as="script">
     <link rel="preload" href="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js" as="script">
     <link rel="preload" href="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js" as="script">
 
-    <!-- Unified Falcon Design System -->
-    <link rel="stylesheet" href="../shared/css/slate-theme.css">
+    <!-- CSS: navbar + fantasy theme + team styles -->
     <link rel="stylesheet" href="../shared/css/navbar.css">
+    <link rel="stylesheet" href="../shared/css/fantasy-mountain-theme.css">
     <link rel="stylesheet" href="css/team-modern.css">
-    <link rel="stylesheet" href="../shared/css/theme-toggle-button.css">
-    <style>
-      /* ── Loading shimmer for team page ── */
-      @keyframes teamShimmer {
-        0% { background-position: -400px 0; }
-        100% { background-position: 400px 0; }
-      }
-      @keyframes teamPulse {
-        0%, 100% { opacity: 0.5; }
-        50% { opacity: 1; }
-      }
-      .team-loading-pulse {
-        animation: teamPulse 1.5s ease-in-out infinite;
-        color: var(--text-muted, #6a7088) !important;
-      }
-      .team-skeleton {
-        background: linear-gradient(90deg, rgba(30,32,42,0.5) 25%, rgba(50,54,68,0.5) 50%, rgba(30,32,42,0.5) 75%);
-        background-size: 800px 100%;
-        animation: teamShimmer 1.8s infinite ease-in-out;
-        border-radius: 8px;
-      }
-      .team-skeleton-block { height: 100px; border-radius: 12px; margin-bottom: 12px; }
-      .team-fade-in {
-        opacity: 0;
-        animation: teamFadeIn 0.3s ease-out forwards;
-      }
-      @keyframes teamFadeIn {
-        from { opacity: 0; transform: translateY(6px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-    </style>
 </head>
 <body class="team-page">
+    <!-- Atmosphere Layers -->
+    <div class="atmo atmo-grad"></div>
+    <div class="atmo atmo-noise"></div>
+
     <!-- Navbar container - populated by navbar.js -->
     <div id="navbar-container"></div>
 
     <div class="team-container">
-        <!-- Header with Team Name and Points -->
-        <div class="team-header">
-            <div class="team-header-left">
-                <h1 class="team-name-display team-loading-pulse" id="teamNameDisplay">Loading...</h1>
-                <div class="team-quick-stats">
-                    <div class="team-quick-stat">
-                        <div class="team-quick-stat-value" id="teamWins">0</div>
-                        <div class="team-quick-stat-label">Wins</div>
-                    </div>
-                    <div class="team-quick-stat">
-                        <div class="team-quick-stat-value" id="teamLosses">0</div>
-                        <div class="team-quick-stat-label">Losses</div>
-                    </div>
-                    <div class="team-quick-stat">
-                        <div class="team-quick-stat-value" id="teamGamesPlayed">0</div>
-                        <div class="team-quick-stat-label">Games</div>
-                    </div>
-                    <div class="team-quick-stat">
-                        <div class="team-quick-stat-value" id="teamHeartsControlled">0</div>
-                        <div class="team-quick-stat-label">Hearts</div>
-                    </div>
-                </div>
-            </div>
-            <div class="team-points">
-                <span id="teamPointsDisplay">0</span> pts
-            </div>
+        <!-- Score Strip — All teams, matching view.html style -->
+        <div class="score-strip" id="scoreStrip">
+            <!-- Populated by renderScoreStrip() -->
         </div>
 
         <div class="team-status-message" id="statusMessage" style="display: none;"></div>
@@ -110,17 +65,25 @@
             <div class="lobby-overlay-content">
                 <div class="lobby-overlay-header">
                     <h2>Lobby Ready Check</h2>
-                    <p>Confirm you are ready to start matches</p>
+                    <p>Join your game lobby and Discord channel, then confirm ready</p>
+                </div>
+                <div id="lobbyCreatorRole" style="display: none;">
+                    <!-- Shows lobby creator banner if applicable -->
                 </div>
                 <div id="matchAssignmentCardsLobby" class="match-assignment-grid">
-                    <!-- Dynamically populated -->
+                    <!-- Dynamically populated with Discord channel + lobby creator info -->
                 </div>
                 <div class="lobby-ready-controls">
-                    <button class="btn primary lobby-ready-btn" id="readyUpBtn" onclick="toggleReady()">
-                        READY UP
-                    </button>
+                    <div class="lobby-ready-buttons">
+                        <button class="btn primary lobby-ready-btn" id="readyGameLobbyBtn" onclick="setReadyStatus('gameLobby')">
+                            &#x1F3AE; Game Lobby
+                        </button>
+                        <button class="btn primary lobby-ready-btn" id="readyDiscordBtn" onclick="setReadyStatus('discord')">
+                            &#x1F3A7; Discord
+                        </button>
+                    </div>
                     <div id="readyStatus" class="ready-status">
-                        <!-- Dynamically populated: per-team readiness -->
+                        <!-- Dynamically populated: per-team two-status readiness -->
                     </div>
                 </div>
             </div>
@@ -142,7 +105,7 @@
                     </button>
                 </div>
                 <div id="spellTurnCompletedMsg" style="display: none; text-align: center; margin-top: 15px;">
-                    <p style="color: var(--accent-primary); font-size: 1.1rem;">Your turn is complete. Waiting for other teams...</p>
+                    <p style="color: #c8b37e; font-size: 1.1rem;">Your turn is complete. Waiting for other teams...</p>
                 </div>
             </div>
         </div>
@@ -172,14 +135,16 @@
             </div>
 
             <!-- Center: Game Board -->
-            <div class="team-board-section">
+            <div class="team-board-wrapper">
                 <div class="team-board-header">
                     <div class="team-board-title">Game Board</div>
                     <div class="turn-indicator" id="turnIndicator" style="display: none;">
                         <span class="turn-indicator-label">Your Turn</span>
                     </div>
                 </div>
-                <div id="hexBoard"></div>
+                <div class="team-board-section">
+                    <div id="hexBoard"></div>
+                </div>
                 <div class="team-board-note">
                     Board updates in real-time during matches
                 </div>
@@ -214,8 +179,8 @@
 
         <!-- Match Result Voting Section -->
         <div class="voting-section" id="votingSection" style="display: none;">
-            <h3>🗳️ Match Result Voting</h3>
-            <div id="votingMatchInfo" style="margin-bottom: 15px; color: var(--cream-alpha-7);">
+            <h3>Match Result Voting</h3>
+            <div id="votingMatchInfo" style="margin-bottom: 15px;">
                 <!-- Match info will be inserted here -->
             </div>
 
@@ -228,7 +193,7 @@
             </button>
 
             <div class="vote-progress" id="voteProgress" style="display: none;">
-                <h4 style="color: var(--accent-primary); margin-bottom: 10px;">Voting Progress</h4>
+                <h4>Voting Progress</h4>
                 <div id="voteProgressList">
                     <!-- Vote progress will be inserted here -->
                 </div>
@@ -240,18 +205,17 @@
     <div id="editTeamNameModal" class="modal" style="display: none;">
         <div class="modal-content" style="max-width: 500px;">
             <div class="modal-header">
-                <h2>✏️ Edit Team Name</h2>
-                <button onclick="closeEditTeamNameModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">×</button>
+                <h2>Edit Team Name</h2>
+                <button onclick="closeEditTeamNameModal()" class="modal-close-btn">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label>Team Name</label>
-                    <input type="text" id="newTeamNameInput" placeholder="Enter new team name..."
-                           style="width: 100%; padding: 12px; background: var(--cream-alpha-05); border: 1px solid var(--cream-alpha-2); border-radius: var(--radius-md); color: var(--text-primary); font-size: 1rem;">
+                    <label class="form-label">Team Name</label>
+                    <input type="text" id="newTeamNameInput" placeholder="Enter new team name..." class="form-input">
                 </div>
-                <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button class="btn secondary" onclick="closeEditTeamNameModal()" style="flex: 1;">Cancel</button>
-                    <button class="btn primary" onclick="saveTeamName()" style="flex: 1;">Save</button>
+                <div class="modal-actions">
+                    <button class="btn secondary" onclick="closeEditTeamNameModal()">Cancel</button>
+                    <button class="btn primary" onclick="saveTeamName()">Save</button>
                 </div>
             </div>
         </div>
@@ -259,7 +223,6 @@
 
     <!-- Theme toggle (loads first for no flash) -->
     <script>window.BOARDGAME_BASE = '..';</script>
-    <script src="../shared/scripts/theme-toggle.js"></script>
 
     <!-- Load infrastructure first -->
     <script type="module" src="scripts/errorHandler.js"></script>
@@ -276,6 +239,7 @@
 
     <!-- Games config (for match assignment display) -->
     <script src="../shared/scripts/games-config.js"></script>
+    <script src="../shared/scripts/player-utils.js"></script>
 
     <!-- Team Controls Script -->
     <script src="scripts/team-controls.js"></script>

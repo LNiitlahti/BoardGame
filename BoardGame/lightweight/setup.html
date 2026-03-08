@@ -161,7 +161,7 @@
 
                     <div class="form-group">
                         <label>Turnaus ID (automaattinen)</label>
-                        <input type="text" id="gameId" placeholder="esim. lan-2025-talvi" pattern="[a-z0-9\-]+" oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9\-]/g, '')">
+                        <input type="text" id="tournamentId" placeholder="esim. lan-2025-talvi" pattern="[a-z0-9\-]+" oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9\-]/g, '')">
                     </div>
 
                     <div class="form-group">
@@ -469,10 +469,10 @@
         // Auto-generate tournament ID from name
         function autoGenerateId() {
             const name = document.getElementById('tournamentName').value;
-            const gameIdInput = document.getElementById('gameId');
+            const tournamentIdInput = document.getElementById('tournamentId');
 
             // Only auto-generate if user hasn't manually edited the ID
-            if (!gameIdInput.dataset.manualEdit) {
+            if (!tournamentIdInput.dataset.manualEdit) {
                 const id = name
                     .toLowerCase()
                     .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents
@@ -480,13 +480,13 @@
                     .replace(/\s+/g, '-') // Spaces to hyphens
                     .replace(/-+/g, '-') // Multiple hyphens to single
                     .replace(/^-|-$/g, ''); // Trim hyphens
-                gameIdInput.value = id;
+                tournamentIdInput.value = id;
             }
         }
 
         async function uploadTournament(triggerBtn) {
             const tournamentName = document.getElementById('tournamentName').value.trim();
-            const gameId = document.getElementById('gameId').value.trim();
+            const tournamentId = document.getElementById('tournamentId').value.trim();
             const winCondition = parseInt(document.getElementById('winCondition').value);
 
             if (!tournamentName) {
@@ -494,13 +494,13 @@
                 return;
             }
 
-            if (!gameId) {
+            if (!tournamentId) {
                 showToast('Turnaus ID vaaditaan', 'warning');
                 return;
             }
 
-            // Validate gameId format
-            if (!/^[a-z0-9\-]+$/.test(gameId)) {
+            // Validate tournamentId format
+            if (!/^[a-z0-9\-]+$/.test(tournamentId)) {
                 showToast('Turnaus ID saa sisältää vain pieniä kirjaimia, numeroita ja viivoja', 'warning');
                 return;
             }
@@ -519,7 +519,7 @@
             });
 
             const tournamentData = {
-                gameId,
+                tournamentId,
                 name: tournamentName,
                 teams,
                 matches: [],
@@ -544,11 +544,11 @@
             const stopLoading = (typeof btnLoading === 'function' && triggerBtn) ? btnLoading(triggerBtn) : null;
 
             try {
-                await db.collection('tournaments').doc(gameId).set(tournamentData);
+                await db.collection('tournaments').doc(tournamentId).set(tournamentData);
 
                 showToast('Turnaus luotu onnistuneesti!', 'success');
                 setTimeout(() => {
-                    window.location.href = `admin.html?tournamentId=${gameId}`;
+                    window.location.href = `admin.html?tournamentId=${tournamentId}`;
                 }, 1000);
             } catch (error) {
                 showToast('Virhe turnauksen luomisessa: ' + error.message, 'error');

@@ -88,7 +88,7 @@ class ResultManager {
                 </div>
             `;
 
-            modal.classList.add('active');
+            modal.style.display = 'flex';
             return;
         }
 
@@ -198,14 +198,14 @@ class ResultManager {
             </div>
         `;
 
-        modal.classList.add('active');
+        modal.style.display = 'flex';
     }
 
     /**
      * Close result confirm popup.
      */
     closeResultConfirm() {
-        document.getElementById('resultConfirmModal').classList.remove('active');
+        document.getElementById('resultConfirmModal').style.display = 'none';
         this._selectedQueuedGame = null;
     }
 
@@ -321,6 +321,8 @@ class ResultManager {
                 if (team) {
                     team.gamesWon = (team.gamesWon || 0) + 1;
                     team.gamesPlayed = (team.gamesPlayed || 0) + 1;
+                    // Award victory point immediately on match win
+                    team.points = (team.points || 0) + 1;
                 }
             });
 
@@ -929,7 +931,7 @@ class ResultManager {
         gs.teams.forEach(t => {
             prevTeamStats[t.id] = {
                 gamesWon: t.gamesWon || 0, gamesLost: t.gamesLost || 0,
-                gamesPlayed: t.gamesPlayed || 0
+                gamesPlayed: t.gamesPlayed || 0, points: t.points || 0
             };
         });
 
@@ -958,12 +960,13 @@ class ResultManager {
             const oldFullLossTeams = Object.entries(oldLoseCounts)
                 .filter(([_, c]) => c >= 2).map(([tid]) => parseInt(tid) || tid);
 
-            // Reverse old wins
+            // Reverse old wins (and VP)
             oldFullCreditTeams.forEach(teamId => {
                 const team = gs.teams.find(t => String(t.id) === String(teamId));
                 if (team) {
                     team.gamesWon = Math.max(0, (team.gamesWon || 0) - 1);
                     team.gamesPlayed = Math.max(0, (team.gamesPlayed || 0) - 1);
+                    team.points = Math.max(0, (team.points || 0) - 1);
                 }
             });
 
@@ -998,12 +1001,13 @@ class ResultManager {
             const newFullLossTeams = Object.entries(newLoseCounts)
                 .filter(([_, c]) => c >= 2).map(([tid]) => parseInt(tid) || tid);
 
-            // Apply new wins
+            // Apply new wins (and VP)
             newFullCreditTeams.forEach(teamId => {
                 const team = gs.teams.find(t => String(t.id) === String(teamId));
                 if (team) {
                     team.gamesWon = (team.gamesWon || 0) + 1;
                     team.gamesPlayed = (team.gamesPlayed || 0) + 1;
+                    team.points = (team.points || 0) + 1;
                 }
             });
 

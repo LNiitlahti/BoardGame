@@ -185,6 +185,5 @@ GodApp._wireGlobalFunctions():
   window.exportActionLogCSV   → ActionExport.exportCSV()
 
 god.html UI:
-  History tab → "View Tournament Replay" button
-  Activity Log tab → "Export JSON" / "Export CSV" buttons
+  Activity Log tab → "Replay" / "Action Log JSON/CSV" / "Tournament JSON/CSV" buttons
 ```

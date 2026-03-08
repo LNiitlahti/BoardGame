@@ -109,7 +109,14 @@ class ReplayEngine {
         let lastDoc = null;
         const batchSize = 500;
         let loaded = 0;
-        const total = this._tournamentDoc.actionLogSequence || 0;
+        // Counter may be on tournament doc (legacy) or in meta/actionLogCounter subcollection
+        let total = this._tournamentDoc.actionLogSequence || 0;
+        if (!total) {
+            try {
+                const counterDoc = await tournamentRef.collection('meta').doc('actionLogCounter').get();
+                total = counterDoc.exists ? (counterDoc.data()?.seq || 0) : 0;
+            } catch (e) { /* fallback to 0 */ }
+        }
 
         while (true) {
             let query = tournamentRef.collection('actionLog')
@@ -156,7 +163,7 @@ class ReplayEngine {
 
         for (let i = 0; i < this._actions.length; i++) {
             const action = this._actions[i];
-            if (action.actionType === 'phase_advanced' && action.payload?.toPhase === 'round_start') {
+            if (action.actionType === 'phase_advanced' && action.payload?.toPhase === 'scoring_vp') {
                 // Close previous round
                 if (currentRound > 0) {
                     const lastBoundary = this._roundBoundaries[this._roundBoundaries.length - 1];
@@ -199,14 +206,14 @@ class ReplayEngine {
         const backupTime = new Date(backup.createdAt).getTime();
 
         // Find the action with timestamp closest to (but not after) backup creation
-        // Also consider round_start actions matching the backup's round number
+        // Also consider scoring_vp actions matching the backup's round number
         let bestMatch = 0;
         let bestTimeDiff = Infinity;
 
         for (const action of this._actions) {
-            // Prefer exact round match with round_start phase
+            // Prefer exact round match with scoring_vp phase (start of round)
             if (action.actionType === 'phase_advanced' &&
-                action.payload?.toPhase === 'round_start' &&
+                action.payload?.toPhase === 'scoring_vp' &&
                 (action.payload?.roundNumber === backup.roundNumber ||
                  action.roundNumber === backup.roundNumber)) {
                 return action.sequenceNumber;
@@ -896,13 +903,13 @@ class ReplayEngine {
             if (state.status !== 'playing') state.status = 'playing';
         }
 
-        // Reset lobby on entry
-        if (p.toPhase === 'lobby_ready') {
+        // Reset lobby on entry to lobby phases
+        if (p.toPhase === 'match_1_lobby' || p.toPhase === 'match_2_lobby') {
             state.lobbyReady = {};
         }
 
-        // Increment break counter on round_end → round_start
-        if (p.fromPhase === 'round_end' && state.breakSettings) {
+        // Increment break counter on round_advance
+        if (p.fromPhase === 'round_advance' && state.breakSettings) {
             state.breakSettings.roundsSinceLastBreak =
                 (state.breakSettings.roundsSinceLastBreak || 0) + 1;
         }

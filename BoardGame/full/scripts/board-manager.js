@@ -95,7 +95,7 @@ class BoardManager {
         if (matches) {
             const [, q, r] = matches;
             hexType = this._boardModule.getHexType(parseInt(q), parseInt(r));
-            if (hexType === 'mountain-heart' || hexType === 'side-heart' || hexType === 'starting-location') {
+            if (hexType === 'mountain-heart' || hexType === 'side-heart') {
                 canBeRoom = false;
             }
         }
@@ -146,12 +146,22 @@ class BoardManager {
         }
 
         optionsContainer.innerHTML = optionsHtml;
-        modal.classList.add('active');
+        // Support both modal patterns: .active class (lightweight) and display (full)
+        if (modal.classList.contains('modal-overlay')) {
+            modal.classList.add('active');
+        } else {
+            modal.style.display = 'flex';
+        }
     }
 
     closeTeamPicker() {
         const modal = document.getElementById('teamPickerModal');
-        if (modal) modal.classList.remove('active');
+        if (!modal) return;
+        if (modal.classList.contains('modal-overlay')) {
+            modal.classList.remove('active');
+        } else {
+            modal.style.display = 'none';
+        }
         this._selectedHexCoord = null;
     }
 
@@ -267,6 +277,44 @@ class BoardManager {
         await this._save();
         this.renderBoard();
         this._onPhaseChanged();
+    }
+
+    // ------------------------------------------------------------------
+    // Default rooms (save/load from Firebase config)
+    // ------------------------------------------------------------------
+
+    async saveDefaultRooms() {
+        const rooms = this._gameState.rooms || [];
+        try {
+            await window.firebaseDB.collection('config').doc('defaultRooms').set({
+                rooms: [...rooms],
+                updatedAt: new Date().toISOString()
+            });
+            this._ui.showStatus(`Saved ${rooms.length} default rooms`, 'success');
+        } catch (error) {
+            console.error('Error saving default rooms:', error);
+            this._ui.showStatus('Error saving default rooms', 'error');
+        }
+    }
+
+    async loadDefaultRooms() {
+        try {
+            const doc = await window.firebaseDB.collection('config').doc('defaultRooms').get();
+            if (!doc.exists || !doc.data().rooms?.length) {
+                this._ui.showStatus('No default rooms found', 'error');
+                return;
+            }
+            const rooms = doc.data().rooms;
+            this._gameState.rooms = [...rooms];
+            this._boardModule.setRoomHexes(this._gameState.rooms);
+            await this._save();
+            this.renderBoard();
+            this._onPhaseChanged();
+            this._ui.showStatus(`Loaded ${rooms.length} default rooms`, 'success');
+        } catch (error) {
+            console.error('Error loading default rooms:', error);
+            this._ui.showStatus('Error loading default rooms', 'error');
+        }
     }
 
     // ------------------------------------------------------------------

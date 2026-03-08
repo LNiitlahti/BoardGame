@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Default Rooms Editor</title>
+
+    <!-- Favicons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="../shared/images/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../shared/images/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../shared/images/favicon/favicon-16x16.png">
+    <link rel="shortcut icon" href="../shared/images/favicon/favicon.ico">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0a0c14;
+            color: #e2e8f0;
+            font-family: 'Quantico', sans-serif;
+            min-height: 100vh;
+        }
+
+        h1 {
+            font-family: 'Russo One', sans-serif;
+            text-align: center;
+            padding: 24px;
+            font-size: 1.4rem;
+            color: #c8b37e;
+            letter-spacing: 1px;
+        }
+
+        .layout {
+            display: flex;
+            gap: 20px;
+            padding: 0 24px 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Board area */
+        .board-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .board-section {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 500px;
+            border-radius: 12px;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        #hexBoard { position: relative; }
+
+        .board-hex {
+            cursor: pointer;
+            transition: filter 0.15s ease;
+        }
+        .board-hex:hover { filter: brightness(1.3); }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .panel {
+            background: rgba(15, 17, 25, 0.9);
+            border: 1px solid rgba(200, 179, 126, 0.25);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .panel h3 {
+            font-family: 'Russo One', sans-serif;
+            color: #c8b37e;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .hint {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+
+        .room-count {
+            font-size: 2rem;
+            font-family: 'Russo One', sans-serif;
+            color: #c8b37e;
+            text-align: center;
+            margin: 8px 0;
+        }
+
+        .room-list {
+            max-height: 260px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .room-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 10px;
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-family: monospace;
+        }
+
+        .room-item button {
+            background: none;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 0 4px;
+            opacity: 0.6;
+            transition: opacity 0.15s;
+        }
+        .room-item button:hover { opacity: 1; }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 10px 16px;
+            border: 1px solid rgba(200, 179, 126, 0.4);
+            border-radius: 8px;
+            font-family: 'Quantico', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #c8b37e, #a0915e);
+            color: #0a0c14;
+        }
+        .btn-primary:hover {
+            box-shadow: 0 0 12px rgba(200, 179, 126, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.04);
+            color: #e2e8f0;
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(200, 179, 126, 0.6);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        .btn + .btn { margin-top: 8px; }
+
+        .status {
+            text-align: center;
+            font-size: 0.8rem;
+            padding: 8px;
+            border-radius: 6px;
+            display: none;
+        }
+        .status.success { display: block; background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); }
+        .status.error { display: block; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .status.info { display: block; background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); }
+
+        /* Effects panel (top-left of board, matching admin.html) */
+        .effects-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(5, 7, 16, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(200, 179, 126, 0.25);
+            border-radius: 8px;
+            padding: 6px;
+            z-index: 50;
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            max-width: 250px;
+        }
+
+        .effect-btn {
+            padding: 4px 8px;
+            font-family: 'Quantico', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 4px;
+            color: #64748b;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .effect-btn:hover {
+            background: rgba(255, 255, 255, 0.06);
+            color: #e2e8f0;
+        }
+        .effect-btn.active {
+            background: linear-gradient(135deg, #c8b37e, #a0915e);
+            color: #0a0c14;
+            border-color: #c8b37e;
+            box-shadow: 0 0 8px rgba(200, 179, 126, 0.3);
+        }
+
+        /* Board effects */
+        body.effect-heart-glow .board-hex.side-heart::before,
+        body.effect-heart-glow .board-hex.mountain-heart::before {
+            box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.6);
+        }
+
+        body.effect-pulse-hearts .board-hex.side-heart,
+        body.effect-pulse-hearts .board-hex.mountain-heart {
+            animation: pulse-heart 7.2s ease-in-out infinite;
+            z-index: 20;
+        }
+        @keyframes pulse-heart {
+            0%, 100% { filter: brightness(1) drop-shadow(0 0 0px transparent); transform: translate(-50%, -50%) scale(1); }
+            50% { filter: brightness(1.5) drop-shadow(0 0 8px rgba(255, 100, 150, 0.8)); transform: translate(-50%, -50%) scale(1.08); }
+        }
+
+        body.effect-pulse-hearts .heart-overlay-image {
+            animation: pulse-heart-image 7.2s ease-in-out infinite;
+        }
+        @keyframes pulse-heart-image {
+            0%, 100% { filter: brightness(1) drop-shadow(0 0 0px transparent); transform: translate(-50%, -50%) rotate(-30deg) scale(1); }
+            50% { filter: brightness(1.5) drop-shadow(0 0 8px rgba(255, 100, 150, 0.8)); transform: translate(-50%, -50%) rotate(-30deg) scale(1.08); }
+        }
+
+        body.effect-rooms .board-hex.room .room-border { display: block; }
+        .room-border {
+            display: none;
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 100%; height: 100%;
+            transform: translate(-50%, -50%);
+            z-index: 8;
+            pointer-events: none;
+            background: radial-gradient(ellipse 70% 70% at center, transparent 40%, rgba(0, 0, 0, 0.7) 100%);
+            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z' fill='white'/%3E%3C/svg%3E");
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z' fill='white'/%3E%3C/svg%3E");
+            -webkit-mask-size: 100% 100%;
+            mask-size: 100% 100%;
+        }
+        .room-border::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath fill-rule='evenodd' d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z M21.5,8.8 L44.5,8.8 L56,29 L44.5,49.2 L21.5,49.2 L10,29 Z' fill='white'/%3E%3C/svg%3E");
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath fill-rule='evenodd' d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z M21.5,8.8 L44.5,8.8 L56,29 L44.5,49.2 L21.5,49.2 L10,29 Z' fill='white'/%3E%3C/svg%3E");
+            -webkit-mask-size: 100% 100%;
+            mask-size: 100% 100%;
+        }
+
+        body.effect-hex-images .board-hex::before {
+            background-size: cover;
+            background-position: center;
+            z-index: 5;
+        }
+        body.effect-hex-images .hex-label { z-index: 1; }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            font-size: 0.8rem;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .legend-swatch {
+            width: 16px;
+            height: 14px;
+            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+        }
+
+        /* Firebase loading state */
+        .loading { opacity: 0.5; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <h1>Default Rooms Editor</h1>
+
+    <div class="layout">
+        <!-- Board -->
+        <div class="board-area">
+            <section class="board-section">
+                <div class="effects-panel">
+                    <button class="effect-btn active" data-effect="hex-images">Map</button>
+                    <button class="effect-btn active" data-effect="heart-glow">Glow</button>
+                    <button class="effect-btn active" data-effect="pulse-hearts">Pulse</button>
+                    <button class="effect-btn active" data-effect="rooms">Rooms</button>
+                    <button class="effect-btn active" data-effect="heart-images">Hearts</button>
+                </div>
+                <div id="hexBoard"></div>
+            </section>
+
+            <div class="panel" style="margin-top: 12px; width: 100%;">
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-swatch" style="background: #ddd;"></div> Normal</div>
+                    <div class="legend-item"><div class="legend-swatch" style="background: #aaa;"></div> Starting</div>
+                    <div class="legend-item"><div class="legend-swatch" style="background: #ff6b9d;"></div> Heart (+1)</div>
+                    <div class="legend-item"><div class="legend-swatch" style="background: #ff1744;"></div> Mountain (+2)</div>
+                    <div class="legend-item"><div class="legend-swatch" style="background: #8b5cf6; opacity: 0.6;"></div> Room (click to toggle)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="panel">
+                <h3>Rooms</h3>
+                <p class="hint">Click any normal hex on the board to toggle it as a room. Hearts and starting locations cannot be rooms.</p>
+                <div class="room-count" id="roomCount">0</div>
+                <div class="room-list" id="roomList">
+                    <p class="hint" style="text-align: center;">No rooms selected</p>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Firebase</h3>
+                <div id="statusMessage" class="status"></div>
+                <button class="btn btn-primary" onclick="saveToFirebase()">Save as Default Rooms</button>
+                <button class="btn btn-secondary" onclick="loadFromFirebase()">Load Saved Defaults</button>
+                <button class="btn btn-danger" onclick="clearAll()">Clear All Rooms</button>
+            </div>
+
+            <div class="panel">
+                <h3>Quick Info</h3>
+                <p class="hint">
+                    Saved defaults are stored in <code style="color: #c8b37e;">config/defaultRooms</code> in Firestore.
+                    When a new tournament is created, these rooms are automatically loaded.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>window.BOARDGAME_BASE = '..';</script>
+    <script src="../shared/scripts/firebase-loader.js"></script>
+    <script src="../shared/scripts/config.js"></script>
+    <script src="../shared/scripts/board-module.js"></script>
+    <script src="../shared/scripts/board-renderer.js"></script>
+
+    <script>
+        let boardModule, boardRenderer;
+        let rooms = [];
+
+        // ── Board init ──────────────────────────────────────────────
+        function initBoard() {
+            boardModule = new BoardModule(1);
+            const container = document.getElementById('hexBoard');
+            boardRenderer = new BoardRenderer(container, boardModule, {
+                responsive: true,
+                showHeartImages: true
+            });
+            renderBoard();
+            initEffects();
+        }
+
+        function renderBoard() {
+            boardRenderer.render({ rooms });
+
+            document.querySelectorAll('.board-hex').forEach(hex => {
+                const coord = hex.dataset.coord;
+                hex.onclick = () => toggleRoom(coord);
+
+                // Highlight rooms with a purple tint
+                if (rooms.includes(coord)) {
+                    hex.style.outline = '2px solid #8b5cf6';
+                    hex.style.outlineOffset = '-2px';
+                }
+            });
+        }
+
+        // ── Room toggle ─────────────────────────────────────────────
+        function toggleRoom(coord) {
+            const m = coord.match(/q(-?\d+)r(-?\d+)/);
+            if (!m) return;
+
+            const hexType = boardModule.getHexType(parseInt(m[1]), parseInt(m[2]));
+            if (hexType === 'mountain-heart' || hexType === 'side-heart') {
+                showStatus('Cannot place room on ' + hexType.replace(/-/g, ' '), 'error');
+                return;
+            }
+
+            const idx = rooms.indexOf(coord);
+            if (idx >= 0) {
+                rooms.splice(idx, 1);
+            } else {
+                rooms.push(coord);
+            }
+
+            boardModule.setRoomHexes(rooms);
+            renderBoard();
+            renderRoomList();
+        }
+
+        function removeRoom(coord) {
+            const idx = rooms.indexOf(coord);
+            if (idx >= 0) rooms.splice(idx, 1);
+            boardModule.setRoomHexes(rooms);
+            renderBoard();
+            renderRoomList();
+        }
+
+        function clearAll() {
+            rooms = [];
+            boardModule.setRoomHexes(rooms);
+            renderBoard();
+            renderRoomList();
+            showStatus('All rooms cleared', 'info');
+        }
+
+        function renderRoomList() {
+            const countEl = document.getElementById('roomCount');
+            const listEl = document.getElementById('roomList');
+            countEl.textContent = rooms.length;
+
+            if (rooms.length === 0) {
+                listEl.innerHTML = '<p class="hint" style="text-align: center;">No rooms selected</p>';
+                return;
+            }
+
+            const sorted = [...rooms].sort();
+            listEl.innerHTML = sorted.map(coord =>
+                `<div class="room-item">
+                    <span>${coord}</span>
+                    <button onclick="removeRoom('${coord}')" title="Remove">&times;</button>
+                </div>`
+            ).join('');
+        }
+
+        // ── Effects panel ───────────────────────────────────────────
+        function initEffects() {
+            document.querySelectorAll('.effect-btn').forEach(btn => {
+                const effect = btn.dataset.effect;
+
+                // Apply initial active state
+                if (btn.classList.contains('active')) {
+                    document.body.classList.add('effect-' + effect);
+                    if (effect === 'hex-images') applyHexImages(true);
+                    if (effect === 'heart-images') boardRenderer.toggleHeartImages(true);
+                }
+
+                btn.addEventListener('click', () => {
+                    btn.classList.toggle('active');
+                    const on = btn.classList.contains('active');
+                    document.body.classList.toggle('effect-' + effect, on);
+                    if (effect === 'hex-images') applyHexImages(on);
+                    if (effect === 'heart-images') boardRenderer.toggleHeartImages(on);
+                });
+            });
+        }
+
+        function applyHexImages(enabled) {
+            let styleEl = document.getElementById('hex-images-dynamic-css');
+            if (!enabled) { if (styleEl) styleEl.remove(); return; }
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = 'hex-images-dynamic-css';
+                document.head.appendChild(styleEl);
+            }
+            const coords = boardModule.generateHexCoordinates();
+            let css = '';
+            coords.forEach(([q, r]) => {
+                const c = `q${q}r${r}`;
+                css += `body.effect-hex-images .board-hex[data-coord="${c}"]::before { background-image: url('../shared/images/hexes/coords/${c}.png'); }\n`;
+            });
+            styleEl.textContent = css;
+        }
+
+        // ── Firebase ────────────────────────────────────────────────
+        function showStatus(msg, type) {
+            const el = document.getElementById('statusMessage');
+            el.textContent = msg;
+            el.className = 'status ' + type;
+            if (type === 'success' || type === 'info') {
+                setTimeout(() => { el.className = 'status'; }, 3000);
+            }
+        }
+
+        async function saveToFirebase() {
+            try {
+                await window.firebaseDB.collection('config').doc('defaultRooms').set({
+                    rooms: [...rooms],
+                    updatedAt: new Date().toISOString()
+                });
+                showStatus('Saved ' + rooms.length + ' rooms to Firebase', 'success');
+            } catch (e) {
+                console.error(e);
+                showStatus('Save failed: ' + e.message, 'error');
+            }
+        }
+
+        async function loadFromFirebase() {
+            try {
+                const doc = await window.firebaseDB.collection('config').doc('defaultRooms').get();
+                if (!doc.exists || !doc.data().rooms?.length) {
+                    showStatus('No saved defaults found', 'error');
+                    return;
+                }
+                rooms = [...doc.data().rooms];
+                boardModule.setRoomHexes(rooms);
+                renderBoard();
+                renderRoomList();
+                showStatus('Loaded ' + rooms.length + ' rooms from Firebase', 'success');
+            } catch (e) {
+                console.error(e);
+                showStatus('Load failed: ' + e.message, 'error');
+            }
+        }
+
+        // ── Bootstrap ───────────────────────────────────────────────
+        initBoard();
+
+        document.addEventListener('firebase-ready', () => {
+            // Auto-load saved defaults on page load
+            loadFromFirebase();
+        });
+    </script>
+</body>
+</html>

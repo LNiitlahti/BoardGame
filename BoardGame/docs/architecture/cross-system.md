@@ -1,6 +1,6 @@
 # Cross-System Data Flow
 
-> How all 8 JS files interact end-to-end.
+> How all JS modules interact end-to-end.
 
 ## 1. Match Generation Sequence
 
@@ -48,6 +48,7 @@ sequenceDiagram
     Admin->>Admin: Count players per team per side
     Admin->>Admin: Teams with >= 2 players get credit
     Admin->>Admin: Update gamesWon/gamesLost/gamesPlayed
+    Admin->>Admin: Award +1 VP per win (team.points++) for full-credit teams
     Admin->>Admin: Move match to gameHistory
     Admin->>Admin: Push to pendingHexWins
     Admin->>FB: saveGameState() merge

@@ -76,9 +76,11 @@ flowchart TD
     K --> L[isChallenge = true]
     K --> M[disputingSideA = sideATeams]
     K --> N[disputingSideB = sideBTeams]
+    K --> N2[challengeHexCoord = selected hex or null]
     L --> O[Insert into gameQueue after ongoing + first pending]
     M --> O
     N --> O
+    N2 --> O
     O --> P[saveGameState]
 ```
 
@@ -257,3 +259,43 @@ flowchart TD
     T --> U[updateTournamentStateButton]
     U --> V[Refresh tournament list dropdown]
 ```
+
+## 13. Heart Hex Points Award
+
+`awardRoundPoints()` is called by the phase system when leaving the `scoring_hex` phase (via `_onAwardPoints` hook). It awards hex territory points based on heart hex control. Victory points for match wins are awarded separately — instantly in `confirmResult()` (+1 VP per win for teams with full credit).
+
+```mermaid
+flowchart TD
+    A[awardRoundPoints] --> B[Collect contestedHexes from gameQueue]
+    B --> B2["For each challenge match pending/ongoing:<br/>add challengeHexCoord to Set"]
+    B2 --> C[For each team]
+    C --> D[For each heartHexControl entry]
+    D --> E{coord in contestedHexes?}
+    E -->|Yes| F[SKIP — points frozen until challenge resolved]
+    E -->|No| G{ownerId === team.id?}
+    G -->|No| D
+    G -->|Yes| H{hexType?}
+    H -->|mountain-heart| I[+2 points]
+    H -->|side-heart| J[+1 point]
+    I --> K[team.points += roundPoints]
+    J --> K
+    F --> D
+```
+
+### Challenge Hex Picker
+
+When creating a challenge match, the admin can select which heart hex is being contested via `updateChallengeHexPicker()`. The dropdown shows heart hexes controlled by the involved teams. The selected coord is stored as `challengeHexCoord` on the queue entry. While the challenge is pending or ongoing, that hex yields no points to anyone.
+
+## 14. Discord Channel Auto-Assignment
+
+```mermaid
+flowchart TD
+    A[assignDiscordAndLobby entries] --> B[Find already-used channels from queue]
+    B --> C[Available channels = 1-5 minus used]
+    C --> D{For each match entry}
+    D --> E[Assign channel per side from available pool]
+    E --> F[Designate lobby creator = first player of each side]
+    F --> G[Store discordChannels + lobbyCreators on match doc]
+```
+
+Called from all 4 match creation paths (manual, mass import, auto-match, challenge). Discord channels #1-#5 assigned consecutively; simultaneous matches get consecutive pairs (#1/#2 + #3/#4). Lobby creator is first player per side (resolved from `team.players[]` or `team.playerIds[]` via player registry).

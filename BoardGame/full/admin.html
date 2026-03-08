@@ -2,12 +2,12 @@
 <html lang="en">
 <!--
     ============================================================================
-    ADMIN V2 (lightweight) — MODERN TOURNAMENT MANAGEMENT
+    ADMIN V2 (full) — MODERN TOURNAMENT MANAGEMENT
     ============================================================================
 
     PURPOSE:
-    Redesigned admin interface with dark void / gold accent theme matching
-    the view infoscreen. 3-column layout for better workflow.
+    Full-version copy of lightweight/admin.html.
+    Reuses the same scripts and styles from lightweight/ with adjusted paths.
 
     LAYOUT:
     ┌──────────────────────────────────────────────────────┐
@@ -20,12 +20,12 @@
     ├──────────┴──────────────────────┴────────────────────┤
 
     FEATURES:
-    - Same as admin.html (reuses scripts/admin.js)
+    - Same as lightweight/admin.html (reuses lightweight scripts/admin.js)
     - Modern dark void / gold accent visual theme
     - 3-column layout: Teams | Board+Create | Queue
 
     USAGE:
-    - URL parameter: lightweight/admin.html?tournamentId=xxx
+    - URL parameter: full/admin.html?tournamentId=xxx
     - Or select tournament from dropdown
     ============================================================================
 -->
@@ -49,7 +49,8 @@
     <link rel="stylesheet" href="../shared/css/navbar.css">
     <link rel="stylesheet" href="../shared/css/toast.css">
     <link rel="stylesheet" href="../shared/css/fantasy-mountain-theme.css">
-    <link rel="stylesheet" href="css/admin.css">
+    <link rel="stylesheet" href="../lightweight/css/admin.css">
+    <link rel="stylesheet" href="css/phase-indicator.css">
 </head>
 <body>
     <!-- Atmosphere Layers -->
@@ -67,6 +68,52 @@
     <!-- Navbar (populated by shared navbar.js) -->
     <div id="navbar-container"></div>
     <script src="../shared/scripts/navbar.js"></script>
+
+    <!-- Flow Panel (driven by admin-phase-adapter.js) -->
+    <div id="flowPanel" class="flow-panel" style="display: none;">
+        <!-- Phase Timeline Track -->
+        <div class="flow-timeline" id="flowTimeline"></div>
+
+        <!-- Main Flow Content -->
+        <div class="flow-body">
+            <!-- Left: Current phase + guidance -->
+            <div class="flow-current">
+                <div class="flow-phase-header">
+                    <span id="flowPhaseIcon" class="flow-phase-icon"></span>
+                    <div class="flow-phase-info">
+                        <span class="flow-phase-label">CURRENT PHASE</span>
+                        <span id="flowPhaseName" class="flow-phase-name">---</span>
+                    </div>
+                    <span id="flowRoundBadge" class="flow-round-badge" style="display: none;"></span>
+                </div>
+                <p id="flowGuidance" class="flow-guidance"></p>
+            </div>
+
+            <!-- Center: Action items (requirements + pending tasks) -->
+            <div class="flow-actions" id="flowActions"></div>
+
+            <!-- Right: Controls -->
+            <div class="flow-controls">
+                <button class="btn primary" id="advancePhaseBtn" onclick="advancePhase()" disabled>Next Phase &#x25B6;</button>
+                <div class="flow-controls-secondary">
+                    <button class="btn-small secondary" id="forceAdvanceBtn" onclick="forceAdvancePhase()" title="Force advance (skip requirements)">&#x26A0; Force</button>
+                    <button class="btn-small secondary" id="insertBreakBtn" onclick="insertBreak()" title="Insert break">&#x23F8; Break</button>
+                    <span id="breakIntervalBadge" class="break-interval-badge" onclick="openBreakSettings()" title="Break interval settings" style="display: none;"></span>
+                </div>
+                <span id="lobbyAdminControls" style="display: none;"></span>
+            </div>
+        </div>
+
+        <!-- Broadcast Message Bar -->
+        <div class="broadcast-bar" id="broadcastBar" style="display: none;">
+            <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;">Broadcast</span>
+            <input type="text" id="broadcastInput" placeholder="Message shown on view page..."
+                   maxlength="200"
+                   style="flex: 1; padding: 6px 12px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 6px; color: white; font-size: 0.85rem;">
+            <button class="btn-small primary" onclick="setBroadcastMessage()">Send</button>
+            <button class="btn-small secondary" onclick="clearBroadcastMessage()">Clear</button>
+        </div>
+    </div>
 
     <div class="admin-container">
         <!-- Top Bar -->
@@ -146,10 +193,6 @@
                         <button class="effect-btn active" data-effect="heart-images" title="Heart Images">Hearts</button>
                     </div>
                     <div id="hexBoard"></div>
-                    <div style="text-align: center; margin-top: 8px;">
-                        <button class="btn-small secondary" onclick="saveDefaultRooms()" title="Save current rooms as default for new tournaments">💾 Save Default Rooms</button>
-                        <button class="btn-small secondary" onclick="loadDefaultRooms()" title="Load default room hexes">📥 Load Default Rooms</button>
-                    </div>
                 </section>
 
                 <!-- Match Creation Panel -->
@@ -202,6 +245,9 @@
 
                 <!-- Ongoing Matches -->
                 <div id="ongoingMatchesList"></div>
+
+                <!-- Player Vote Results (shown when teams have voted) -->
+                <div id="votedMatchesPanel" style="display: none;"></div>
 
                 <!-- Queued Matches -->
                 <div class="queue-list" id="matchQueue">
@@ -369,6 +415,15 @@
                 </div>
             </div>
 
+            <!-- Contested Hex Picker -->
+            <div class="challenge-hex-field" id="challengeHexField" style="display: none;">
+                <label>Contested hex:</label>
+                <select id="challengeHexSelect" class="team-color-select">
+                    <option value="">— No specific hex —</option>
+                </select>
+                <p class="modal-hint" style="margin-top: 4px;">Points for this hex are frozen until the challenge is resolved.</p>
+            </div>
+
             <div class="challenge-setup-actions">
                 <button class="btn primary" onclick="confirmChallengeSetup(this)">Create Challenge</button>
                 <button class="btn secondary" onclick="closeChallengeSetupModal()">Cancel</button>
@@ -510,6 +565,57 @@
         </div>
     </div>
 
+    <!-- Force Advance Modal (phase-modal pattern to avoid conflict with lightweight .modal-overlay) -->
+    <div id="forceAdvanceModal" class="phase-modal" style="display: none;">
+        <div class="phase-modal-content" style="max-width: 500px;">
+            <div class="phase-modal-header">
+                <h2 style="color: var(--accent-danger, #ef4444);">&#x26A0; Force Advance Phase</h2>
+                <button onclick="closeForceAdvanceModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div class="phase-modal-body">
+                <p style="color: var(--text-secondary); margin-bottom: 15px;">
+                    Not all requirements are met. Force advancing may lead to inconsistent state.
+                </p>
+                <p style="color: var(--text-secondary); margin-bottom: 10px; font-size: 0.9rem;">
+                    Advancing to: <strong id="forceAdvanceNextPhase" style="color: var(--accent-primary);">---</strong>
+                </p>
+                <div id="forceAdvanceRequirements" style="margin-bottom: 20px;"></div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn secondary" onclick="closeForceAdvanceModal()">Cancel</button>
+                    <button class="btn danger" onclick="confirmForceAdvance()">Force Advance</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Break Settings Modal -->
+    <div id="breakSettingsModal" class="phase-modal" style="display: none;">
+        <div class="phase-modal-content" style="max-width: 400px;">
+            <div class="phase-modal-header">
+                <h2>Break Settings</h2>
+                <button onclick="closeBreakSettings()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div class="phase-modal-body">
+                <div class="form-group">
+                    <label style="color: var(--text-secondary); font-size: 0.9rem;">Break every N rounds (0 = disabled):</label>
+                    <input type="number" id="breakIntervalInput" min="0" max="20" value="2"
+                           style="width: 80px; padding: 8px 12px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 8px; color: white; font-size: 1rem; margin-top: 6px;">
+                </div>
+                <p style="color: var(--text-tertiary); font-size: 0.85rem; margin: 12px 0;">
+                    Rounds since last break: <strong id="roundsSinceBreak" style="color: var(--accent-primary);">0</strong>
+                </p>
+                <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+                    <button class="btn-small secondary" onclick="resetBreakCounter()">Reset Counter</button>
+                    <button class="btn-small secondary" onclick="skipNextBreak()">Skip Next Break</button>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn secondary" onclick="closeBreakSettings()">Cancel</button>
+                    <button class="btn primary" onclick="saveBreakSettings(this)">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script>window.BOARDGAME_BASE = '..';</script>
     <script src="../shared/scripts/firebase-loader.js"></script>
@@ -518,10 +624,14 @@
     <script src="../shared/scripts/board-renderer.js"></script>
     <script src="../shared/scripts/match-suggester.js"></script>
     <script src="../shared/scripts/games-config.js"></script>
-    <script src="scripts/balance-optimizer.js"></script>
-    <script src="scripts/smart-match-generator.js"></script>
+    <script src="../lightweight/scripts/balance-optimizer.js"></script>
+    <script src="../lightweight/scripts/smart-match-generator.js"></script>
     <script src="../shared/scripts/player-utils.js"></script>
     <script src="../shared/scripts/toast.js"></script>
-    <script src="scripts/admin.js"></script>
+    <script src="../lightweight/scripts/admin.js"></script>
+    <!-- Phase system (OOP modules + adapter) -->
+    <script src="scripts/action-logger.js"></script>
+    <script src="scripts/phase-manager.js"></script>
+    <script src="scripts/admin-phase-adapter.js"></script>
 </body>
 </html>

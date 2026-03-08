@@ -12,12 +12,16 @@
     <link rel="manifest" href="../shared/images/favicon/site.webmanifest">
     <link rel="shortcut icon" href="../shared/images/favicon/favicon.ico">
 
-    <!-- Unified Falcon Design System -->
-    <link rel="stylesheet" href="../shared/css/slate-theme.css">
+    <!-- Fonts (same as admin.html, view.html, etc.) -->
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- Unified Theme System -->
     <link rel="stylesheet" href="../shared/css/brand-theme.css">
+    <link rel="stylesheet" href="../shared/css/fantasy-mountain-theme.css">
     <link rel="stylesheet" href="../shared/css/navbar.css">
     <link rel="stylesheet" href="css/god-modern.css">
     <link rel="stylesheet" href="css/ceremony.css">
+    <link rel="stylesheet" href="../shared/css/toast.css">
     <link rel="stylesheet" href="../shared/css/theme-toggle-button.css">
 </head>
 <body>
@@ -36,26 +40,26 @@
             <button class="god-nav-tab" data-tab="matches" onclick="switchGodTab('matches')">
                 🎮 Matches
             </button>
-            <button class="god-nav-tab" data-tab="board" onclick="switchGodTab('board')">
+            <button class="god-nav-tab" data-tab="board" data-role="god" onclick="switchGodTab('board')">
                 🎯 Board
             </button>
             <button class="god-nav-tab" data-tab="teams" onclick="switchGodTab('teams')">
                 👥 Teams
             </button>
-            <button class="god-nav-tab" data-tab="users" onclick="switchGodTab('users')">
+            <button class="god-nav-tab" data-tab="users" data-role="god" onclick="switchGodTab('users')">
                 👤 Users
             </button>
-            <button class="god-nav-tab" data-tab="spells" onclick="switchGodTab('spells')">
+            <button class="god-nav-tab" data-tab="spells" data-role="god" onclick="switchGodTab('spells')">
                 🔮 Spells
             </button>
             <button class="god-nav-tab" data-tab="stats" onclick="switchGodTab('stats')">
                 📊 Stats
             </button>
-            <button class="god-nav-tab" data-tab="activityLog" onclick="switchGodTab('activityLog')">
+            <button class="god-nav-tab" data-tab="activityLog" data-role="god" onclick="switchGodTab('activityLog')">
                 📋 Activity Log
             </button>
-            <button class="god-nav-tab" data-tab="history" onclick="switchGodTab('history')">
-                📜 History
+            <button class="god-nav-tab" data-tab="seasons" data-role="god" onclick="switchGodTab('seasons')">
+                📅 Seasons
             </button>
         </nav>
 
@@ -99,7 +103,7 @@
                 <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;">Broadcast</span>
                 <input type="text" id="broadcastInput" placeholder="Message shown on view page..."
                        maxlength="200"
-                       style="flex: 1; padding: 6px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color, #334155); border-radius: 6px; color: white; font-size: 0.85rem;">
+                       style="flex: 1; padding: 6px 12px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 6px; color: white; font-size: 0.85rem;">
                 <button class="btn-small primary" onclick="setBroadcastMessage()">Send</button>
                 <button class="btn-small secondary" onclick="clearBroadcastMessage()">Clear</button>
             </div>
@@ -108,18 +112,19 @@
                 <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;">Display</span>
                 <select id="displayModeOverride"
                         onchange="setDisplayOverride(this.value)"
-                        style="padding: 6px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color, #334155); border-radius: 6px; color: white; font-size: 0.85rem;">
+                        style="padding: 6px 12px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 6px; color: white; font-size: 0.85rem;">
                     <option value="">Auto (phase-based)</option>
                     <option value="break">Break</option>
-                    <option value="matches_in_progress">Live Matches</option>
-                    <option value="round_end">Results</option>
-                    <option value="lobby_ready">Readiness</option>
+                    <option value="match_1_playing">Live Matches</option>
+                    <option value="scoring_vp">Results</option>
+                    <option value="match_1_lobby">Readiness</option>
+                    <option value="board_resolved">Board Focus</option>
                     <option value="tournament_end">Standings</option>
                 </select>
                 <span style="font-size: 0.75rem; color: var(--text-tertiary);">Rotate:</span>
                 <select id="displayRotationInterval"
                         onchange="setRotationInterval(this.value)"
-                        style="padding: 6px 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color, #334155); border-radius: 6px; color: white; font-size: 0.85rem; width: 70px;">
+                        style="padding: 6px 8px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 6px; color: white; font-size: 0.85rem; width: 70px;">
                     <option value="5">5s</option>
                     <option value="10">10s</option>
                     <option value="15" selected>15s</option>
@@ -145,18 +150,18 @@
                 <h3>🏆 Tournament Management</h3>
 
                 <!-- Statistics -->
-                <div class="tournament-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
-                    <div style="background: rgba(6, 182, 212, 0.1); padding: 15px; border-radius: 8px; text-align: center;">
-                        <div style="font-size: 2rem; font-weight: bold; color: #06b6d4;" id="totalTournaments">0</div>
-                        <div style="font-size: 0.85rem; color: #94a3b8;">Total Tournaments</div>
+                <div class="stat-cards stat-cards--3">
+                    <div class="stat-card stat-card--cyan">
+                        <div class="stat-card__value" id="totalTournaments">0</div>
+                        <div class="stat-card__label">Total Tournaments</div>
                     </div>
-                    <div style="background: rgba(16, 185, 129, 0.1); padding: 15px; border-radius: 8px; text-align: center;">
-                        <div style="font-size: 2rem; font-weight: bold; color: #10b981;" id="activeTournaments">0</div>
-                        <div style="font-size: 0.85rem; color: #94a3b8;">Active</div>
+                    <div class="stat-card stat-card--green">
+                        <div class="stat-card__value" id="activeTournaments">0</div>
+                        <div class="stat-card__label">Active</div>
                     </div>
-                    <div style="background: rgba(168, 85, 247, 0.1); padding: 15px; border-radius: 8px; text-align: center;">
-                        <div style="font-size: 2rem; font-weight: bold; color: #a855f7;" id="finishedTournaments">0</div>
-                        <div style="font-size: 0.85rem; color: #94a3b8;">Finished</div>
+                    <div class="stat-card stat-card--purple">
+                        <div class="stat-card__value" id="finishedTournaments">0</div>
+                        <div class="stat-card__label">Finished</div>
                     </div>
                 </div>
 
@@ -164,12 +169,12 @@
                 <div class="form-group" style="margin-bottom: 10px;">
                     <input type="text" id="tournamentSearch" placeholder="🔍 Search tournaments..."
                            oninput="filterTournaments()"
-                           style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white; font-size: 1rem;">
+                           style="width: 100%; padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white; font-size: 1rem;">
                 </div>
 
                 <!-- Filter & Create -->
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <select id="statusFilter" onchange="filterTournaments()" style="flex: 1; padding: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
+                    <select id="statusFilter" onchange="filterTournaments()" style="flex: 1; padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white;">
                         <option value="all">All Status</option>
                         <option value="setup">Setup</option>
                         <option value="playing">Playing</option>
@@ -186,6 +191,40 @@
                     <p style="text-align: center; opacity: 0.7;">Loading tournaments...</p>
                 </div>
             </div>
+
+            <!-- Points Correction -->
+            <div class="panel" style="margin-top: 20px;">
+                <h3>Points Correction</h3>
+                <p style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 12px;">
+                    Adjust team points manually. Changes are logged.
+                </p>
+                <div id="pointsCorrectionPanel">
+                    <p class="queue-empty">Load a tournament to see teams</p>
+                </div>
+            </div>
+
+            <!-- Backups -->
+            <div class="panel" style="margin-top: 20px;">
+                <h3>Backups</h3>
+                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                    <button class="btn primary" onclick="createManualBackup()">Create Backup</button>
+                    <button class="btn secondary" onclick="refreshBackups()">Refresh</button>
+                </div>
+                <div id="backupPanel">
+                    <p class="queue-empty">No backups yet</p>
+                </div>
+            </div>
+
+            <!-- Data Management -->
+            <div class="panel" style="margin-top: 20px;">
+                <h3>Data Management</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <button class="btn" onclick="exportGameState()">Export Game State</button>
+                    <button class="btn" onclick="saveGameState()">Save to Firebase</button>
+                    <button class="btn" onclick="clearLog()">Clear Game Log</button>
+                    <button class="btn secondary" onclick="recalculateTeamStats()">Recalculate Stats</button>
+                </div>
+            </div>
         </div>
 
         <!-- Tab 2: Matches Panel -->
@@ -197,8 +236,8 @@
                 <div class="panel">
                     <h3>📋 Match Queue Manager</h3>
                     <div class="form-group">
-                        <label>Game ID</label>
-                        <input type="text" id="gameId" placeholder="tournament-id">
+                        <label>Tournament ID</label>
+                        <input type="text" id="tournamentIdInput" placeholder="tournament-id">
                         <button class="btn" onclick="loadGame()" style="margin-top: 5px;" data-tooltip="Load tournament data to manage matches">📂 Load Game</button>
                     </div>
 
@@ -264,7 +303,7 @@
                                      ondrop="dropPlayer(event, 'teamA')" 
                                      ondragover="allowDrop(event)" 
                                      ondragleave="dragLeave(event)">
-                                    <h5 style="color: #3b82f6; margin-bottom: 8px;">TEAM A</h5>
+                                    <h5 style="color: #c8b37e; margin-bottom: 8px;">TEAM A</h5>
                                     <div id="teamAPlayers" style="min-height: 60px;">
                                         <span style="opacity: 0.6; font-size: 0.85rem;">Drop players here...</span>
                                     </div>
@@ -340,32 +379,6 @@
                     </div>
                 </div>
 
-                <!-- Replay & Export -->
-                <div class="panel" style="margin-top: 20px;">
-                    <h3>Replay & Export</h3>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button class="btn primary" onclick="openReplayWindow()">View Tournament Replay</button>
-                        <button class="btn secondary" onclick="exportGameState()">Export Game State</button>
-                    </div>
-                </div>
-
-                <!-- All Matches History -->
-                <div class="panel" style="margin-top: 20px;">
-                    <h3>📜 All Matches</h3>
-                    <div class="history-filter-bar">
-                        <select id="allMatchesStatusFilter" onchange="filterAllMatches()">
-                            <option value="all">All Statuses</option>
-                            <option value="completed">Completed</option>
-                            <option value="ongoing">In Progress</option>
-                            <option value="pending">Queued</option>
-                        </select>
-                        <input type="text" id="allMatchesSearch" placeholder="Search matches..."
-                               oninput="filterAllMatches()">
-                    </div>
-                    <div class="history-list" id="allMatchesList">
-                        <p class="queue-empty">No matches yet</p>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -373,35 +386,39 @@
     <!-- Tab 3: Board Panel -->
     <div id="boardPanel" class="god-tab-panel">
         <div class="board-layout">
-            <div class="panel" style="width: 100%;">
-                <h3 style="text-align: center;">🎯 Game Board</h3>
-                <div id="currentTurnInfoBoard" style="text-align: center; padding: 15px; background: rgba(255, 215, 0, 0.2); border-radius: 10px; margin: 15px 0;">
+            <!-- Board Section (matching admin.html) -->
+            <section class="board-section">
+                <!-- Effects Panel -->
+                <div class="effects-panel" id="effectsPanel">
+                    <button class="effect-btn active" data-effect="hex-images" title="Hex Terrain Images">Map</button>
+                    <button class="effect-btn active" data-effect="heart-glow" title="Heart Glow">Glow</button>
+                    <button class="effect-btn active" data-effect="pulse-hearts" title="Pulse Hearts">Pulse</button>
+                    <button class="effect-btn active" data-effect="rooms" title="Show Rooms">Rooms</button>
+                    <button class="effect-btn active" data-effect="heart-images" title="Heart Images">Hearts</button>
+                </div>
+                <div id="hexBoard"></div>
+                <div style="text-align: center; margin-top: 8px;">
+                    <button class="btn-small secondary" onclick="saveDefaultRooms()" title="Save current rooms as default for new tournaments">💾 Save Default Rooms</button>
+                    <button class="btn-small secondary" onclick="loadDefaultRooms()" title="Load default room hexes">📥 Load Default Rooms</button>
+                </div>
+            </section>
+
+            <!-- Board Controls -->
+            <div class="panel" style="width: 100%; margin-top: 15px;">
+                <div id="currentTurnInfoBoard" style="text-align: center; padding: 15px; background: rgba(255, 215, 0, 0.2); border-radius: 10px; margin-bottom: 15px;">
                     <strong>⏳ No active turn</strong>
                 </div>
-                <div style="text-align: center; margin-bottom: 15px;">
-                    <button class="btn" id="undoBtn" onclick="undoAction()" disabled style="width: auto; display: inline-block; margin: 5px;" data-tooltip="Undo the last action (tile placement, spell cast, etc.)">
-                        ⬅️ Undo
-                    </button>
-                    <button class="btn" id="redoBtn" onclick="redoAction()" disabled style="width: auto; display: inline-block; margin: 5px;" data-tooltip="Redo the previously undone action">
-                        ➡️ Redo
-                    </button>
-                    <span id="actionHistoryStatus" style="margin-left: 10px; opacity: 0.7; font-size: 0.9rem;">No actions yet</span>
-                </div>
-                <div style="text-align: center; margin-bottom: 15px;">
-                    <button class="btn" onclick="highlightValidPlacements()" style="width: auto; display: inline-block; margin: 5px;" data-tooltip="Highlight all hexes where the current team can place tiles">
-                        🔍 Show Valid Placements
-                    </button>
-                    <button class="btn" onclick="clearHighlights()" style="width: auto; display: inline-block; margin: 5px;" data-tooltip="Remove all highlights from the board">
-                        🧹 Clear Highlights
-                    </button>
+                <div style="text-align: center; margin-bottom: 10px;">
+                    <button class="btn-small" id="undoBtn" onclick="undoAction()" disabled>⬅️ Undo</button>
+                    <button class="btn-small" id="redoBtn" onclick="redoAction()" disabled>➡️ Redo</button>
+                    <button class="btn-small" onclick="highlightValidPlacements()">🔍 Valid Placements</button>
+                    <button class="btn-small" onclick="clearHighlights()">🧹 Clear</button>
+                    <span id="actionHistoryStatus" style="margin-left: 10px; opacity: 0.7; font-size: 0.85rem;">No actions yet</span>
                 </div>
             </div>
 
-            <div class="hex-board-wrapper" style="margin: 20px 0;">
-                <div id="hexBoardAlt"></div>
-            </div>
-
-            <div class="panel" style="width: 100%; margin-top: 20px;">
+            <!-- Action History -->
+            <div class="panel" style="width: 100%; margin-top: 10px;">
                 <h4 style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleActionHistory()">
                     📜 Action History
                     <span id="actionHistoryToggle">▼</span>
@@ -410,69 +427,44 @@
                     <p style="text-align: center; opacity: 0.7; padding: 20px;">No actions yet</p>
                 </div>
             </div>
-
-            <div class="panel" style="width: 100%;">
-                <h4 style="margin-bottom: 15px;">Board Legend</h4>
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; font-size: 0.85rem;">
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <div style="width: 20px; height: 18px; background: rgba(255, 215, 0, 0.5); clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);"></div>
-                        Starting Corner
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <div style="width: 20px; height: 18px; background: rgba(255, 20, 147, 0.5); clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);"></div>
-                        Heart Hex (+1/turn)
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <div style="width: 20px; height: 18px; background: rgba(138, 43, 226, 0.5); clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);"></div>
-                        Mountain Heart (+2/turn)
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <div style="width: 20px; height: 18px; background: rgba(0, 255, 0, 0.4); clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);"></div>
-                        Can Place Here
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 
     <!-- Tab 4: Teams Panel -->
     <div id="teamsPanel" class="god-tab-panel">
-        <!-- User Appointment Section -->
+        <!-- Player Assignment Section -->
         <div class="panel" style="margin-bottom: 20px;">
-            <h3>👤 User Appointment</h3>
-            <p style="opacity: 0.7; margin-bottom: 15px;">Assign registered users to teams in the loaded tournament</p>
+            <h3>Player Assignment</h3>
+            <p style="opacity: 0.7; margin-bottom: 15px;">Select a user, then click "Link" on a placeholder to replace it, or "Assign" to add to a team with empty slots</p>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <!-- Unassigned Users -->
+                <!-- Available Users -->
                 <div>
-                    <h4 style="color: #06b6d4; margin-bottom: 10px;">📋 Unassigned Users</h4>
-                    <input type="text" id="unassignedUsersSearch" placeholder="🔍 Search users by name or email..."
+                    <h4 style="color: #06b6d4; margin-bottom: 10px;">Available Users</h4>
+                    <input type="text" id="unassignedUsersSearch" placeholder="Search users by name or email..."
                            oninput="filterUnassignedUsers()"
-                           style="width: 100%; padding: 10px; margin-bottom: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white; font-size: 0.95rem;">
+                           style="width: 100%; padding: 10px; margin-bottom: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white; font-size: 0.95rem;">
                     <div id="unassignedUsersList" style="max-height: 450px; overflow-y: auto; background: rgba(15, 23, 42, 0.3); padding: 10px; border-radius: 8px;">
                         <p style="text-align: center; opacity: 0.5;">Load a tournament first</p>
                     </div>
-                    <button class="btn" onclick="loadUnassignedUsers()" style="width: 100%; margin-top: 10px;" data-tooltip="Reload the list of registered users who aren't assigned to teams">
-                        🔄 Refresh Users List
+                    <button class="btn" onclick="loadUnassignedUsers()" style="width: 100%; margin-top: 10px;">
+                        Refresh Users List
                     </button>
                 </div>
 
-                <!-- Team Assignment Slots -->
+                <!-- Team Rosters -->
                 <div>
-                    <h4 style="color: #10b981; margin-bottom: 10px;">🎯 Assign to Teams</h4>
+                    <h4 style="color: #10b981; margin-bottom: 10px;">Team Rosters</h4>
                     <div id="teamAssignmentSlots" style="max-height: 500px; overflow-y: auto;">
                         <p style="text-align: center; opacity: 0.5;">Load a tournament to see teams</p>
                     </div>
-                    <button class="btn primary" onclick="saveUserAppointments()" style="width: 100%; margin-top: 10px;" data-tooltip="Save all user-to-team assignments to the tournament">
-                        💾 Save All Appointments
-                    </button>
                 </div>
             </div>
         </div>
 
         <!-- Tournament Roster Overview -->
         <div class="panel">
-            <h3>📋 Tournament Roster</h3>
+            <h3>Full Roster</h3>
             <p style="opacity: 0.7; margin-bottom: 15px;">All teams and their assigned players</p>
             <div id="tournamentRosterDisplay" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">
                 <p style="text-align: center; opacity: 0.5; grid-column: 1 / -1;">Load a tournament to see roster</p>
@@ -482,72 +474,124 @@
 
     <!-- Tab 5: Stats Panel -->
     <div id="statsPanel" class="god-tab-panel">
-        <div class="panel">
-            <h3>📊 Game Statistics</h3>
-            <div class="stats-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px;">
-                <div style="background: rgba(6, 182, 212, 0.1); padding: 20px; border-radius: 10px; text-align: center;">
-                    <div style="font-size: 2.5rem; font-weight: bold; color: #06b6d4;" id="statGamesPlayedBig">0</div>
-                    <div style="font-size: 0.9rem; color: #94a3b8; margin-top: 5px;">Games Played</div>
-                </div>
-                <div style="background: rgba(16, 185, 129, 0.1); padding: 20px; border-radius: 10px; text-align: center;">
-                    <div style="font-size: 2.5rem; font-weight: bold; color: #10b981;" id="statRoundBig">0</div>
-                    <div style="font-size: 0.9rem; color: #94a3b8; margin-top: 5px;">Current Round</div>
-                </div>
-                <div style="background: rgba(168, 85, 247, 0.1); padding: 20px; border-radius: 10px; text-align: center;">
-                    <div style="font-size: 2.5rem; font-weight: bold; color: #a855f7;" id="statPlatesBig">0</div>
-                    <div style="font-size: 0.9rem; color: #94a3b8; margin-top: 5px;">Plates on Board</div>
-                </div>
-                <div style="background: rgba(244, 63, 94, 0.1); padding: 20px; border-radius: 10px; text-align: center;">
-                    <div style="font-size: 2.5rem; font-weight: bold; color: #f43f5e;" id="statHeartsBig">0</div>
-                    <div style="font-size: 0.9rem; color: #94a3b8; margin-top: 5px;">Hearts Controlled</div>
-                </div>
+        <!-- Stats Sub-tabs -->
+        <div class="stats-sub-nav">
+            <button class="stats-sub-tab active" data-subtab="overview" onclick="switchStatsTab('overview')">Overview</button>
+            <button class="stats-sub-tab" data-subtab="matches" onclick="switchStatsTab('matches')">Match History</button>
+            <button class="stats-sub-tab" data-subtab="headtohead" onclick="switchStatsTab('headtohead')">Head-to-Head</button>
+            <button class="stats-sub-tab" data-subtab="games" onclick="switchStatsTab('games')">Game Analysis</button>
+            <button class="btn-small primary" onclick="generatePDF()" style="margin-left: auto;">Export PDF</button>
+        </div>
+
+        <!-- Overview Sub-tab -->
+        <div class="stats-sub-pane active" id="stats-overview">
+            <div class="stats-overview-grid">
+                <!-- Team Standings -->
+                <section class="stats-card stats-standings-card">
+                    <h3>Team Standings</h3>
+                    <div class="standings-table" id="statsStandingsTable">
+                        <p class="no-data">Load a tournament to view standings</p>
+                    </div>
+                </section>
+
+                <!-- Tournament Summary -->
+                <section class="stats-card stats-summary-card">
+                    <h3>Tournament Summary</h3>
+                    <div class="summary-stats" id="statsSummaryStats">
+                        <div class="summary-item">
+                            <span class="summary-label">Total Matches</span>
+                            <span class="summary-value" id="statsSummaryMatches">--</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Current Round</span>
+                            <span class="summary-value" id="statsSummaryRounds">--</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Avg Match Duration</span>
+                            <span class="summary-value" id="statsSummaryAvgDuration">--</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Challenges Played</span>
+                            <span class="summary-value" id="statsSummaryChallenges">--</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Notable Streaks -->
+                <section class="stats-card stats-streaks-card">
+                    <h3>Notable Streaks</h3>
+                    <div class="streaks-list" id="statsStreaksList">
+                        <p class="no-data">No streak data available</p>
+                    </div>
+                </section>
+
+                <!-- Points Progress Chart -->
+                <section class="stats-card stats-chart-card">
+                    <h3>Points Progress</h3>
+                    <div class="chart-container" id="statsPointsChartContainer">
+                        <canvas id="statsPointsChart"></canvas>
+                    </div>
+                </section>
             </div>
         </div>
 
-        <div class="panel" style="margin-top: 20px;">
-            <h3>👥 Team Rankings</h3>
-            <div id="teamsListStats">
-                <p style="text-align: center; opacity: 0.7; font-style: italic;">Initialize game to see teams</p>
+        <!-- Match History Sub-tab -->
+        <div class="stats-sub-pane" id="stats-matches">
+            <div class="matches-filters">
+                <select id="statsFilterTeam" onchange="filterStatsMatches()">
+                    <option value="">All Teams</option>
+                </select>
+                <select id="statsFilterGame" onchange="filterStatsMatches()">
+                    <option value="">All Games</option>
+                </select>
+                <select id="statsFilterResult" onchange="filterStatsMatches()">
+                    <option value="">All Results</option>
+                    <option value="won">Wins Only</option>
+                    <option value="lost">Losses Only</option>
+                </select>
+                <input type="search" id="statsFilterSearch" placeholder="Search player names..." oninput="filterStatsMatches()">
+            </div>
+            <div class="matches-list" id="statsMatchesList">
+                <p class="no-data">Load a tournament to view match history</p>
             </div>
         </div>
 
-        <div class="panel" style="margin-top: 20px;">
-            <h3>📜 Match History</h3>
-            <div id="matchHistoryLog" style="max-height: 400px; overflow-y: auto; background: rgba(15, 23, 42, 0.5); padding: 15px; border-radius: 10px;">
-                <p style="text-align: center; opacity: 0.7;">No match history yet</p>
+        <!-- Head-to-Head Sub-tab -->
+        <div class="stats-sub-pane" id="stats-headtohead">
+            <div class="h2h-matrix-container" id="statsH2HMatrixContainer">
+                <p class="no-data">Load a tournament to view head-to-head records</p>
+            </div>
+            <div class="h2h-detail" id="statsH2HDetail">
+                <p class="h2h-hint">Click a cell in the matrix to see detailed matchup history</p>
             </div>
         </div>
 
-        <div class="panel" style="margin-top: 20px;">
-            <h3>⚖️ Points Correction</h3>
-            <p style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 12px;">
-                Adjust team points manually. Changes are logged.
-            </p>
-            <div id="pointsCorrectionPanel">
-                <p class="queue-empty">Load a tournament to see teams</p>
+        <!-- Game Analysis Sub-tab -->
+        <div class="stats-sub-pane" id="stats-games">
+            <div class="games-grid">
+                <section class="stats-card game-breakdown-card">
+                    <h3>Games Breakdown</h3>
+                    <div class="game-breakdown" id="statsGameBreakdown">
+                        <p class="no-data">No game data available</p>
+                    </div>
+                </section>
+
+                <section class="stats-card team-game-stats-card">
+                    <h3>Team Performance by Game</h3>
+                    <div class="team-game-stats" id="statsTeamGameStats">
+                        <p class="no-data">No data available</p>
+                    </div>
+                </section>
+
+                <section class="stats-card format-breakdown-card">
+                    <h3>Format Breakdown</h3>
+                    <div class="format-breakdown" id="statsFormatBreakdown">
+                        <p class="no-data">No format data available</p>
+                    </div>
+                </section>
             </div>
         </div>
 
-        <div class="panel" style="margin-top: 20px;">
-            <h3>🗂️ Backups</h3>
-            <div style="display: flex; gap: 10px; margin-bottom: 12px;">
-                <button class="btn primary" onclick="createManualBackup()">Create Backup</button>
-                <button class="btn secondary" onclick="refreshBackups()">Refresh</button>
-            </div>
-            <div id="backupPanel">
-                <p class="queue-empty">No backups yet</p>
-            </div>
-        </div>
-
-        <div class="panel" style="margin-top: 20px;">
-            <h3>💾 Data Management</h3>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <button class="btn" onclick="exportGameState()">📥 Export Game State</button>
-                <button class="btn" onclick="saveGameState()">💾 Save to Firebase</button>
-                <button class="btn" onclick="clearLog()">🗑️ Clear Game Log</button>
-                <button class="btn secondary" onclick="recalculateTeamStats()">🔄 Recalculate Stats</button>
-            </div>
-        </div>
     </div>
 
     <!-- Tab 6: Spells Panel -->
@@ -555,18 +599,18 @@
         <div class="panel">
             <h3>🔮 Spell Card Management</h3>
 
-            <div class="stats-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
-                <div style="background: rgba(168, 85, 247, 0.1); padding: 20px; border-radius: 10px; text-align: center;">
-                    <div style="font-size: 2.5rem; font-weight: bold; color: #a855f7;" id="totalSpellsDef">0</div>
-                    <div style="font-size: 0.9rem; color: #94a3b8; margin-top: 5px;">Spell Definitions</div>
+            <div class="stat-cards stat-cards--3" style="margin-bottom: 20px;">
+                <div class="stat-card stat-card--lg stat-card--purple">
+                    <div class="stat-card__value" id="totalSpellsDef">0</div>
+                    <div class="stat-card__label">Spell Definitions</div>
                 </div>
-                <div style="background: rgba(16, 185, 129, 0.1); padding: 20px; border-radius: 10px; text-align: center;">
-                    <div style="font-size: 2.5rem; font-weight: bold; color: #10b981;" id="totalSpellsHeld">0</div>
-                    <div style="font-size: 0.9rem; color: #94a3b8; margin-top: 5px;">In Team Hands</div>
+                <div class="stat-card stat-card--lg stat-card--green">
+                    <div class="stat-card__value" id="totalSpellsHeld">0</div>
+                    <div class="stat-card__label">In Team Hands</div>
                 </div>
-                <div style="background: rgba(244, 63, 94, 0.1); padding: 20px; border-radius: 10px; text-align: center;">
-                    <div style="font-size: 2.5rem; font-weight: bold; color: #f43f5e;" id="totalSpellsCast">0</div>
-                    <div style="font-size: 0.9rem; color: #94a3b8; margin-top: 5px;">Spells Cast</div>
+                <div class="stat-card stat-card--lg stat-card--rose">
+                    <div class="stat-card__value" id="totalSpellsCast">0</div>
+                    <div class="stat-card__label">Spells Cast</div>
                 </div>
             </div>
 
@@ -589,16 +633,16 @@
         <!-- Team Spell Distribution -->
         <div class="panel" style="margin-top: 20px;">
             <h3>📦 Distribute Spells to Teams</h3>
-            <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 15px;">
+            <p style="color: #9aa1ad; font-size: 0.9rem; margin-bottom: 15px;">
                 Select a team and spell cards to add to their hand
             </p>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <!-- Team Selection -->
                 <div>
-                    <label style="display: block; margin-bottom: 8px; color: #94a3b8; font-size: 0.9rem;">Select Team:</label>
+                    <label style="display: block; margin-bottom: 8px; color: #9aa1ad; font-size: 0.9rem;">Select Team:</label>
                     <select id="spellDistTeam" onchange="updateTeamSpellInventory()"
-                            style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
+                            style="width: 100%; padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white;">
                         <option value="">-- Choose Team --</option>
                     </select>
 
@@ -612,9 +656,9 @@
 
                 <!-- Spell Selection -->
                 <div>
-                    <label style="display: block; margin-bottom: 8px; color: #94a3b8; font-size: 0.9rem;">Select Spell to Add:</label>
+                    <label style="display: block; margin-bottom: 8px; color: #9aa1ad; font-size: 0.9rem;">Select Spell to Add:</label>
                     <select id="spellToDistribute"
-                            style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white; margin-bottom: 10px;">
+                            style="width: 100%; padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white; margin-bottom: 10px;">
                         <option value="">-- Choose Spell --</option>
                     </select>
 
@@ -643,9 +687,9 @@
             <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                 <input type="text" id="spellSearchInput" placeholder="🔍 Search spells..."
                        oninput="filterSpells()"
-                       style="flex: 1; padding: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
+                       style="flex: 1; padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white;">
                 <select id="spellTypeFilter" onchange="filterSpells()"
-                        style="padding: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
+                        style="padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white;">
                     <option value="all">All Types</option>
                     <option value="pre-game">Pre-Game</option>
                     <option value="instant">Instant</option>
@@ -674,7 +718,7 @@
         <!-- Active Effects Admin -->
         <div class="panel" style="margin-top: 20px;">
             <h3>⚡ Active Effects</h3>
-            <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 10px;">
+            <p style="color: #9aa1ad; font-size: 0.9rem; margin-bottom: 10px;">
                 Currently active spell conditions and buffs
             </p>
             <div id="activeEffectsAdmin" style="max-height: 400px; overflow-y: auto;">
@@ -691,9 +735,12 @@
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">
                     Real-time log of all game-state-changing actions in this tournament
                 </p>
-                <div style="display: flex; gap: 6px;">
-                    <button class="btn-small secondary" onclick="exportActionLogJSON()">Export JSON</button>
-                    <button class="btn-small secondary" onclick="exportActionLogCSV()">Export CSV</button>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                    <button class="btn-small secondary" onclick="exportActionLogJSON()">Action Log JSON</button>
+                    <button class="btn-small secondary" onclick="exportActionLogCSV()">Action Log CSV</button>
+                    <button class="btn-small secondary" onclick="exportTournamentHistory('json')">Tournament JSON</button>
+                    <button class="btn-small secondary" onclick="exportTournamentHistory('csv')">Match History CSV</button>
+                    <button class="btn-small primary" onclick="openReplayWindow()">Replay</button>
                 </div>
             </div>
 
@@ -725,139 +772,6 @@
         </div>
     </div>
 
-    <!-- Tab 7: History Panel -->
-    <div id="historyPanel" class="god-tab-panel">
-        <div class="panel">
-            <h3>📜 Tournament History & Logs</h3>
-            <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 15px;">
-                Complete log of all matches, spell casts, and actions for this tournament
-            </p>
-
-            <!-- Export Buttons -->
-            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                <button class="btn primary" onclick="exportTournamentHistory('json')" data-tooltip="Download complete tournament data as JSON">
-                    📥 Export as JSON
-                </button>
-                <button class="btn primary" onclick="exportTournamentHistory('csv')" data-tooltip="Download match history as CSV spreadsheet">
-                    📊 Export as CSV
-                </button>
-                <button class="btn secondary" onclick="refreshHistoryDisplay()" data-tooltip="Reload history from Firebase">
-                    🔄 Refresh
-                </button>
-            </div>
-        </div>
-
-        <!-- Match History Section -->
-        <div class="panel" style="margin-top: 20px;">
-            <h3>🏆 Match History</h3>
-            <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 10px;">
-                All completed matches with full details
-            </p>
-
-            <!-- Filters -->
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <input type="text" id="matchHistorySearch" placeholder="🔍 Search matches..."
-                       oninput="filterMatchHistory()"
-                       style="flex: 1; padding: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
-                <select id="matchHistoryGameFilter" onchange="filterMatchHistory()"
-                        style="padding: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
-                    <option value="all">All Games</option>
-                    <option value="CS2">CS2</option>
-                    <option value="Dota2">Dota 2</option>
-                    <option value="Valorant">Valorant</option>
-                    <option value="StarCraft2">StarCraft 2</option>
-                    <option value="Predecessor">Predecessor</option>
-                </select>
-            </div>
-
-            <div id="matchHistoryDisplay" style="max-height: 500px; overflow-y: auto; background: rgba(15, 23, 42, 0.5); padding: 15px; border-radius: 10px;">
-                <p style="text-align: center; opacity: 0.7;">No matches played yet. Confirm match results to see history.</p>
-            </div>
-        </div>
-
-        <!-- Spell Cast History Section -->
-        <div class="panel" style="margin-top: 20px;">
-            <h3>🔮 Spell Cast History</h3>
-            <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 10px;">
-                All spell cards cast during this tournament
-            </p>
-
-            <!-- Filters -->
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <select id="spellHistoryTeamFilter" onchange="filterSpellHistory()"
-                        style="flex: 1; padding: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
-                    <option value="all">All Teams</option>
-                </select>
-                <select id="spellHistoryTypeFilter" onchange="filterSpellHistory()"
-                        style="flex: 1; padding: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
-                    <option value="all">All Types</option>
-                    <option value="pre-game">Pre-Game</option>
-                    <option value="instant">Instant</option>
-                    <option value="tactical">Tactical</option>
-                    <option value="defensive">Defensive</option>
-                </select>
-            </div>
-
-            <div id="spellHistoryDisplay" style="max-height: 500px; overflow-y: auto; background: rgba(15, 23, 42, 0.5); padding: 15px; border-radius: 10px;">
-                <p style="text-align: center; opacity: 0.7;">No spells cast yet.</p>
-            </div>
-        </div>
-
-        <!-- Action Timeline Section -->
-        <div class="panel" style="margin-top: 20px;">
-            <h3>⏱️ Action Timeline</h3>
-            <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 10px;">
-                Chronological timeline of all actions (tiles, spells, match results)
-            </p>
-
-            <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center;">
-                <label style="color: #94a3b8; font-size: 0.85rem;">Show:</label>
-                <label style="color: #94a3b8; font-size: 0.85rem; display: flex; align-items: center; gap: 5px;">
-                    <input type="checkbox" id="showTilePlacements" checked onchange="filterActionTimeline()" style="cursor: pointer;">
-                    🎯 Tiles
-                </label>
-                <label style="color: #94a3b8; font-size: 0.85rem; display: flex; align-items: center; gap: 5px;">
-                    <input type="checkbox" id="showSpellCasts" checked onchange="filterActionTimeline()" style="cursor: pointer;">
-                    🔮 Spells
-                </label>
-                <label style="color: #94a3b8; font-size: 0.85rem; display: flex; align-items: center; gap: 5px;">
-                    <input type="checkbox" id="showMatchResults" checked onchange="filterActionTimeline()" style="cursor: pointer;">
-                    🏆 Matches
-                </label>
-                <label style="color: #94a3b8; font-size: 0.85rem; display: flex; align-items: center; gap: 5px;">
-                    <input type="checkbox" id="showHeartCaptures" checked onchange="filterActionTimeline()" style="cursor: pointer;">
-                    💖 Hearts
-                </label>
-            </div>
-
-            <div id="actionTimelineDisplay" style="max-height: 500px; overflow-y: auto; background: rgba(15, 23, 42, 0.5); padding: 15px; border-radius: 10px;">
-                <p style="text-align: center; opacity: 0.7;">No actions recorded yet.</p>
-            </div>
-        </div>
-
-        <!-- Statistics Summary -->
-        <div class="panel" style="margin-top: 20px;">
-            <h3>📊 Tournament Statistics</h3>
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
-                <div style="background: rgba(6, 182, 212, 0.1); padding: 20px; border-radius: 10px; text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #06b6d4;" id="histStatTotalMatches">0</div>
-                    <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 5px;">Total Matches</div>
-                </div>
-                <div style="background: rgba(168, 85, 247, 0.1); padding: 20px; border-radius: 10px; text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #a855f7;" id="histStatTotalSpells">0</div>
-                    <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 5px;">Spells Cast</div>
-                </div>
-                <div style="background: rgba(16, 185, 129, 0.1); padding: 20px; border-radius: 10px; text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #10b981;" id="histStatTotalActions">0</div>
-                    <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 5px;">Total Actions</div>
-                </div>
-                <div style="background: rgba(244, 63, 94, 0.1); padding: 20px; border-radius: 10px; text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #f43f5e;" id="histStatDuration">0h 0m</div>
-                    <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 5px;">Duration</div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- Tab 8: Users Panel -->
     <div id="usersPanel" class="god-tab-panel">
@@ -865,22 +779,22 @@
             <h3>👤 User Management</h3>
 
             <!-- Statistics -->
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px;">
-                <div style="background: rgba(6, 182, 212, 0.1); padding: 15px; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #06b6d4;" id="totalUsersCount">0</div>
-                    <div style="font-size: 0.85rem; color: #94a3b8;">Total Users</div>
+            <div class="stat-cards stat-cards--4">
+                <div class="stat-card stat-card--cyan">
+                    <div class="stat-card__value" id="totalUsersCount">0</div>
+                    <div class="stat-card__label">Total Users</div>
                 </div>
-                <div style="background: rgba(255, 215, 0, 0.1); padding: 15px; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #ffd700;" id="godCount">0</div>
-                    <div style="font-size: 0.85rem; color: #94a3b8;">Gods</div>
+                <div class="stat-card stat-card--gold">
+                    <div class="stat-card__value" id="godCount">0</div>
+                    <div class="stat-card__label">Gods</div>
                 </div>
-                <div style="background: rgba(102, 126, 234, 0.1); padding: 15px; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #667eea;" id="adminCount">0</div>
-                    <div style="font-size: 0.85rem; color: #94a3b8;">Admins</div>
+                <div class="stat-card stat-card--blue">
+                    <div class="stat-card__value" id="adminCount">0</div>
+                    <div class="stat-card__label">Admins</div>
                 </div>
-                <div style="background: rgba(0, 212, 255, 0.1); padding: 15px; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #00d4ff;" id="playerCount">0</div>
-                    <div style="font-size: 0.85rem; color: #94a3b8;">Players</div>
+                <div class="stat-card stat-card--sky">
+                    <div class="stat-card__value" id="playerCount">0</div>
+                    <div class="stat-card__label">Players</div>
                 </div>
             </div>
 
@@ -888,9 +802,9 @@
             <div style="display: grid; grid-template-columns: 1fr 200px 150px; gap: 10px; margin-bottom: 15px;">
                 <input type="text" id="userSearch" placeholder="🔍 Search by name, email, or UID..."
                        oninput="filterUsers()"
-                       style="padding: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white; font-size: 1rem;">
+                       style="padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white; font-size: 1rem;">
                 <select id="roleFilter" onchange="filterUsers()"
-                        style="padding: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
+                        style="padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white;">
                     <option value="all">All Roles</option>
                     <option value="god">God</option>
                     <option value="admin">Admin</option>
@@ -922,6 +836,89 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Seasons Panel (GOD only) -->
+    <div id="seasonsPanel" class="god-tab-panel">
+        <div class="panel">
+            <h3>Season Management</h3>
+            <p style="opacity: 0.7; margin-bottom: 15px;">Create and manage tournament seasons. Each season groups multiple LAN events together for rankings.</p>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button class="btn primary" onclick="openCreateSeasonModal()">+ Create Season</button>
+                <button class="btn" onclick="loadSeasons()">Refresh</button>
+            </div>
+
+            <div id="seasonsList">
+                <p style="text-align: center; opacity: 0.5;">Loading seasons...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Team Picker Modal (Board tab hex click) -->
+    <div id="teamPickerModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 350px;">
+            <div class="modal-header">
+                <h2>Assign Hex: <span id="pickerHexCoord"></span></h2>
+            </div>
+            <div class="modal-body">
+                <div class="team-picker-options" id="teamPickerOptions"></div>
+            </div>
+            <div style="padding: 0 20px 20px;">
+                <button class="btn secondary" onclick="closeTeamPicker()" style="width: 100%;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Result Confirmation Modal -->
+    <div id="resultConfirmModal" class="modal" style="display: none;">
+        <div class="modal-content result-confirm-modal" style="max-width: 600px;">
+            <div id="resultConfirmContent"></div>
+        </div>
+    </div>
+
+    <!-- Create Season Modal -->
+    <div id="createSeasonModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Create New Season</h2>
+                <button onclick="closeCreateSeasonModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+                    <label style="font-size: 0.85rem; color: var(--text-secondary);">Season Name</label>
+                    <input type="text" id="seasonNameInput" placeholder="e.g. Season 1 - 2026"
+                           style="padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary);">
+
+                    <label style="font-size: 0.85rem; color: var(--text-secondary);">Max Tournaments</label>
+                    <input type="number" id="seasonMaxTournaments" value="4" min="1" max="20"
+                           style="padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary);">
+
+                    <label style="font-size: 0.85rem; color: var(--text-secondary);">Status</label>
+                    <select id="seasonStatusInput" style="padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary);">
+                        <option value="upcoming">Upcoming</option>
+                        <option value="active">Active</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn secondary" onclick="closeCreateSeasonModal()">Cancel</button>
+                    <button class="btn primary" onclick="confirmCreateSeason()">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Season Modal -->
+    <div id="editSeasonModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>Edit Season</h2>
+                <button onclick="closeEditSeasonModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div class="modal-body" id="editSeasonModalBody">
+                <!-- Populated dynamically -->
             </div>
         </div>
     </div>
@@ -1031,7 +1028,7 @@
                 <div class="form-group">
                     <label style="color: var(--text-secondary); font-size: 0.9rem;">Break every N rounds (0 = disabled):</label>
                     <input type="number" id="breakIntervalInput" min="0" max="20" value="2"
-                           style="width: 80px; padding: 8px 12px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color, #334155); border-radius: 8px; color: white; font-size: 1rem; margin-top: 6px;">
+                           style="width: 80px; padding: 8px 12px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 8px; color: white; font-size: 1rem; margin-top: 6px;">
                 </div>
                 <p style="color: var(--text-tertiary); font-size: 0.85rem; margin: 12px 0;">
                     Rounds since last break: <strong id="roundsSinceBreak" style="color: var(--accent-primary);">0</strong>
@@ -1075,13 +1072,13 @@
                     <div class="form-group">
                         <label>Email Address *</label>
                         <input type="email" id="userFormEmail" required
-                               style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
+                               style="width: 100%; padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white;">
                     </div>
 
                     <div class="form-group">
                         <label>Display Name *</label>
                         <input type="text" id="userFormDisplayName" required
-                               style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
+                               style="width: 100%; padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white;">
                     </div>
 
                     <div class="form-group" id="passwordGroup">
@@ -1089,14 +1086,14 @@
                         <input type="password" id="userFormPassword" required
                                minlength="6"
                                placeholder="Minimum 6 characters"
-                               style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
+                               style="width: 100%; padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white;">
                         <small style="color: rgba(255, 255, 255, 0.6); font-size: 0.85rem;">Minimum 6 characters</small>
                     </div>
 
                     <div class="form-group">
                         <label>Role *</label>
                         <select id="userFormRole" required
-                                style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
+                                style="width: 100%; padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white;">
                             <option value="user">User (Default)</option>
                             <option value="player">Player</option>
                             <option value="admin">Admin</option>
@@ -1130,6 +1127,15 @@
         <div id="statHearts">0</div>
     </div>
 
+    <!-- PDF Generation Overlay -->
+    <div id="pdfOverlay" class="pdf-overlay hidden">
+        <div class="pdf-progress">
+            <div class="spinner"></div>
+            <div>Generating PDF...</div>
+            <div class="pdf-progress-text" id="pdfProgressText">Preparing tournament data</div>
+        </div>
+    </div>
+
     <!-- Theme toggle -->
     <script>window.BOARDGAME_BASE = '..';</script>
     <script src="../shared/scripts/theme-toggle.js"></script>
@@ -1141,8 +1147,12 @@
     <script src="../shared/scripts/board-renderer.js"></script>
     <script src="../shared/scripts/match-suggester.js"></script>
     <script src="../shared/scripts/games-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
     <script src="../shared/scripts/player-utils.js"></script>
     <script src="../shared/scripts/toast.js"></script>
+    <script src="../shared/scripts/pdf-generator.js"></script>
 
     <!-- Full-version shared deps -->
     <script src="scripts/balance-optimizer.js"></script>
@@ -1164,6 +1174,7 @@
     <script src="scripts/spell-engine.js"></script>
     <script src="scripts/scoring-ceremony.js"></script>
     <script src="scripts/action-export.js"></script>
+    <script src="scripts/season-manager.js"></script>
     <script src="scripts/god-app.js"></script>
 
     <!-- User management (standalone, reads window.gameState) -->
@@ -1176,6 +1187,27 @@
          */
         function goBackToHome() {
             window.location.href = 'home.html';
+        }
+
+        /**
+         * Stats sub-tab switching
+         */
+        function switchStatsTab(subtab) {
+            document.querySelectorAll('.stats-sub-tab').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.subtab === subtab);
+            });
+            document.querySelectorAll('.stats-sub-pane').forEach(pane => {
+                pane.classList.toggle('active', pane.id === `stats-${subtab}`);
+            });
+        }
+
+        /**
+         * Stats match filter
+         */
+        function filterStatsMatches() {
+            if (window.godApp?.stats) {
+                window.godApp.stats.renderMatchHistory();
+            }
         }
 
         /**
@@ -1206,59 +1238,10 @@
          * Sync data across tabs when switching
          */
         function syncTabData(tabName) {
-            if (tabName === 'board') {
-                // Clone the hex board from Matches tab to Board tab
-                const mainBoard = document.getElementById('hexBoard');
-                const altBoard = document.getElementById('hexBoardAlt');
-                if (mainBoard && altBoard) {
-                    // Copy HTML content
-                    altBoard.innerHTML = mainBoard.innerHTML;
-
-                    // Copy all inline styles (including transform rotation from board-renderer.js)
-                    altBoard.style.cssText = mainBoard.style.cssText;
-                }
-
-                // Sync turn info
-                const mainTurnInfo = document.getElementById('currentTurnInfo');
-                const altTurnInfo = document.getElementById('currentTurnInfoBoard');
-                if (mainTurnInfo && altTurnInfo) {
-                    altTurnInfo.innerHTML = mainTurnInfo.innerHTML;
-                }
-            }
-
             if (tabName === 'stats') {
-                // Sync statistics from small stats to big stats
-                const syncStat = (smallId, bigId) => {
-                    const small = document.getElementById(smallId);
-                    const big = document.getElementById(bigId);
-                    if (small && big) {
-                        big.textContent = small.textContent;
-                    }
-                };
-
-                syncStat('statGamesPlayed', 'statGamesPlayedBig');
-                syncStat('statRound', 'statRoundBig');
-                syncStat('statPlates', 'statPlatesBig');
-                syncStat('statHearts', 'statHeartsBig');
-
-                // Sync Team Rankings (since they were removed from Matches)
-                const teamsListStats = document.getElementById('teamsListStats');
-                if (window.godApp?.teams && teamsListStats) {
-                    // Re-render teams to populate hidden teamsList, then copy to Stats
-                    window.godApp.teams.renderTeamsList();
-                    setTimeout(() => {
-                        const teamsList = document.getElementById('teamsList');
-                        if (teamsList && teamsListStats) {
-                            teamsListStats.innerHTML = teamsList.innerHTML;
-                        }
-                    }, 100);
-                }
-
-                // Sync game log to match history
-                const gameLog = document.getElementById('gameLog');
-                const matchHistory = document.getElementById('matchHistoryLog');
-                if (gameLog && matchHistory) {
-                    matchHistory.innerHTML = gameLog.innerHTML;
+                // Render rich statistics from StatsManager
+                if (window.godApp?.stats) {
+                    window.godApp.stats.renderAllStats();
                 }
             }
 
@@ -1282,8 +1265,25 @@
         /**
          * Tab Switching Function
          */
+        /**
+         * Hide tabs that require a higher role than the current user has
+         */
+        function applyRoleTabRestrictions(role) {
+            if (role === 'god') return; // God sees everything
+            document.querySelectorAll('.god-nav-tab[data-role="god"]').forEach(tab => {
+                tab.style.display = 'none';
+            });
+        }
+
         function switchGodTab(tabName) {
             console.log('[God Mode] Switching to tab:', tabName);
+
+            // Check role restrictions
+            const tabBtn = document.querySelector(`.god-nav-tab[data-tab="${tabName}"]`);
+            if (tabBtn?.dataset.role === 'god' && window.godApp?._currentUserRole !== 'god') {
+                console.warn('[God Mode] Access denied to tab:', tabName);
+                return;
+            }
 
             // Hide all tab panels
             document.querySelectorAll('.god-tab-panel').forEach(panel => {
@@ -1295,10 +1295,13 @@
                 tab.classList.remove('active');
             });
 
-            // Show selected panel
+            // Show selected panel (fallback to tournaments if tab was removed)
             const targetPanel = document.getElementById(`${tabName}Panel`);
             if (targetPanel) {
                 targetPanel.classList.add('active');
+            } else {
+                document.getElementById('tournamentsPanel')?.classList.add('active');
+                tabName = 'tournaments';
             }
 
             // Mark nav tab as active
@@ -1325,13 +1328,9 @@
                 }
             }
 
-            // If switching to History tab, load history data
-            if (tabName === 'history') {
-                setTimeout(() => {
-                    if (typeof refreshHistoryDisplay === 'function') {
-                        refreshHistoryDisplay();
-                    }
-                }, 100);
+            // If switching to Seasons tab, load seasons
+            if (tabName === 'seasons') {
+                window.godApp?.seasons?.loadSeasons();
             }
 
             // Save to sessionStorage
@@ -1459,449 +1458,10 @@
         }
 
         // ===========================
-        // HISTORY TAB FUNCTIONS
+        // EXPORT FUNCTIONS
         // ===========================
 
-        /**
-         * Get team name at a specific timestamp (handles name changes)
-         * @param {number} teamId - Team ID
-         * @param {string} timestamp - ISO timestamp
-         * @returns {string} Team name at that time
-         */
-        function getTeamNameAtTime(teamId, timestamp) {
-            const team = window.gameState?.teams?.find(t => t.id === teamId);
-            if (!team) return 'Unknown Team';
-
-            // If no name history, return current name
-            if (!team.nameHistory || team.nameHistory.length === 0) {
-                return team.name;
-            }
-
-            // Find the name that was active at the given timestamp
-            const matchTime = new Date(timestamp).getTime();
-            let nameAtTime = team.name;  // Start with current name
-
-            // Sort name history by timestamp (oldest first)
-            const sortedHistory = [...team.nameHistory].sort((a, b) =>
-                new Date(a.changedAt).getTime() - new Date(b.changedAt).getTime()
-            );
-
-            // Walk backwards through history to find the name at match time
-            for (let i = sortedHistory.length - 1; i >= 0; i--) {
-                const change = sortedHistory[i];
-                const changeTime = new Date(change.changedAt).getTime();
-
-                if (changeTime > matchTime) {
-                    // This change happened AFTER the match, use the old name
-                    nameAtTime = change.oldName;
-                } else {
-                    // This change happened BEFORE the match, we've found our answer
-                    break;
-                }
-            }
-
-            return nameAtTime;
-        }
-
-        /**
-         * Get player name from UID
-         * @param {string} uid - Player UID
-         * @param {number} teamId - Team ID
-         * @returns {string} Player name
-         */
-        function getPlayerName(uid, teamId) {
-            const team = window.gameState?.teams?.find(t => t.id === teamId);
-            if (!team) return 'Unknown';
-
-            const player = team.players?.find(p => p.uid === uid || p.email === uid);
-            return player?.name || 'Unknown';
-        }
-
-        /**
-         * Refresh all history displays
-         */
-        function refreshHistoryDisplay() {
-            if (!window.gameState) {
-                console.warn('[History] No game state loaded');
-                return;
-            }
-
-            console.log('[History] Refreshing history display');
-            displayMatchHistory();
-            displaySpellHistory();
-            displayActionTimeline();
-            updateHistoryStatistics();
-        }
-
-        /**
-         * Display match history with filtering
-         */
-        function displayMatchHistory() {
-            const gameHistory = window.gameState?.gameHistory || [];
-            const display = document.getElementById('matchHistoryDisplay');
-
-            if (!display) return;
-
-            if (gameHistory.length === 0) {
-                display.innerHTML = '<p style="text-align: center; opacity: 0.7;">No matches played yet. Confirm match results to see history.</p>';
-                return;
-            }
-
-            let html = '';
-            gameHistory.slice().reverse().forEach((match, index) => {
-                const matchNum = gameHistory.length - index;
-                const timestamp = new Date(match.timestamp).toLocaleString('en-GB', {
-                    day: '2-digit', month: '2-digit', year: 'numeric',
-                    hour: '2-digit', minute: '2-digit'
-                });
-
-                // Get team names at match time using ID lookup
-                const winnerNames = (match.winningTeamIds || []).map(id =>
-                    getTeamNameAtTime(id, match.timestamp)
-                ).join(' & ');
-
-                const loserNames = (match.losingTeamIds || []).map(id =>
-                    getTeamNameAtTime(id, match.timestamp)
-                ).join(' & ');
-
-                // Check if any teams have been renamed since this match
-                let nameChangeNote = '';
-                const changedTeams = [];
-                [...(match.winningTeamIds || []), ...(match.losingTeamIds || [])].forEach(teamId => {
-                    const team = window.gameState.teams?.find(t => t.id === teamId);
-                    const matchTimeName = getTeamNameAtTime(teamId, match.timestamp);
-                    if (team && team.name !== matchTimeName) {
-                        changedTeams.push(`"${matchTimeName}" is now "${team.name}"`);
-                    }
-                });
-                if (changedTeams.length > 0) {
-                    nameChangeNote = `<div style="font-size: 0.75rem; color: #f7ba32; margin-top: 8px; padding: 6px; background: rgba(247, 186, 50, 0.1); border-radius: 4px;">ℹ️ Name changes: ${changedTeams.join(', ')}</div>`;
-                }
-
-                html += `
-                    <div class="match-history-item" style="background: rgba(247, 240, 227, 0.05); padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #2278a3;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <div>
-                                <strong style="color: #00d4ff;">Match #${matchNum}</strong>
-                                <span style="margin-left: 10px; color: #94a3b8; font-size: 0.85rem;">${match.game || 'Unknown'} ${match.playType || ''}</span>
-                            </div>
-                            <span style="color: #94a3b8; font-size: 0.75rem;">${timestamp}</span>
-                        </div>
-                        <div style="margin-bottom: 8px;">
-                            <span style="color: #10b981;">🏆 Winner: ${winnerNames || 'Unknown'}</span>
-                        </div>
-                        <div style="margin-bottom: 8px;">
-                            <span style="color: #f43f5e;">Loser: ${loserNames || 'Unknown'}</span>
-                        </div>
-                        ${match.resultNotes ? `<div style="font-size: 0.85rem; color: #94a3b8; font-style: italic; margin-top: 8px;">📝 ${match.resultNotes}</div>` : ''}
-                        ${nameChangeNote}
-                    </div>
-                `;
-            });
-
-            display.innerHTML = html;
-        }
-
-        /**
-         * Filter match history
-         */
-        function filterMatchHistory() {
-            const searchTerm = document.getElementById('matchHistorySearch')?.value.toLowerCase() || '';
-            const gameFilter = document.getElementById('matchHistoryGameFilter')?.value || 'all';
-            const gameHistory = window.gameState?.gameHistory || [];
-
-            const display = document.getElementById('matchHistoryDisplay');
-            if (!display) return;
-
-            const filtered = gameHistory.filter(match => {
-                // Search in team names (both historical and current)
-                const winnerNames = (match.winningTeamIds || []).map(id =>
-                    getTeamNameAtTime(id, match.timestamp)
-                ).join(' ');
-                const loserNames = (match.losingTeamIds || []).map(id =>
-                    getTeamNameAtTime(id, match.timestamp)
-                ).join(' ');
-
-                const matchesSearch = searchTerm === '' ||
-                    winnerNames?.toLowerCase().includes(searchTerm) ||
-                    loserNames?.toLowerCase().includes(searchTerm) ||
-                    match.game?.toLowerCase().includes(searchTerm);
-
-                const matchesGame = gameFilter === 'all' || match.game === gameFilter;
-
-                return matchesSearch && matchesGame;
-            });
-
-            if (filtered.length === 0) {
-                display.innerHTML = '<p style="text-align: center; opacity: 0.7;">No matches found.</p>';
-                return;
-            }
-
-            let html = '';
-            filtered.slice().reverse().forEach((match, index) => {
-                const matchNum = gameHistory.indexOf(match) + 1;
-                const timestamp = new Date(match.timestamp).toLocaleString('en-GB', {
-                    day: '2-digit', month: '2-digit', year: 'numeric',
-                    hour: '2-digit', minute: '2-digit'
-                });
-
-                // Get team names at match time using ID lookup
-                const winnerNames = (match.winningTeamIds || []).map(id =>
-                    getTeamNameAtTime(id, match.timestamp)
-                ).join(' & ');
-
-                const loserNames = (match.losingTeamIds || []).map(id =>
-                    getTeamNameAtTime(id, match.timestamp)
-                ).join(' & ');
-
-                // Check if any teams have been renamed since this match
-                let nameChangeNote = '';
-                const changedTeams = [];
-                [...(match.winningTeamIds || []), ...(match.losingTeamIds || [])].forEach(teamId => {
-                    const team = window.gameState.teams?.find(t => t.id === teamId);
-                    const matchTimeName = getTeamNameAtTime(teamId, match.timestamp);
-                    if (team && team.name !== matchTimeName) {
-                        changedTeams.push(`"${matchTimeName}" is now "${team.name}"`);
-                    }
-                });
-                if (changedTeams.length > 0) {
-                    nameChangeNote = `<div style="font-size: 0.75rem; color: #f7ba32; margin-top: 8px; padding: 6px; background: rgba(247, 186, 50, 0.1); border-radius: 4px;">ℹ️ Name changes: ${changedTeams.join(', ')}</div>`;
-                }
-
-                html += `
-                    <div class="match-history-item" style="background: rgba(247, 240, 227, 0.05); padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #2278a3;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <div>
-                                <strong style="color: #00d4ff;">Match #${matchNum}</strong>
-                                <span style="margin-left: 10px; color: #94a3b8; font-size: 0.85rem;">${match.game || 'Unknown'} ${match.playType || ''}</span>
-                            </div>
-                            <span style="color: #94a3b8; font-size: 0.75rem;">${timestamp}</span>
-                        </div>
-                        <div style="margin-bottom: 8px;">
-                            <span style="color: #10b981;">🏆 Winner: ${winnerNames || 'Unknown'}</span>
-                        </div>
-                        <div style="margin-bottom: 8px;">
-                            <span style="color: #f43f5e;">Loser: ${loserNames || 'Unknown'}</span>
-                        </div>
-                        ${match.resultNotes ? `<div style="font-size: 0.85rem; color: #94a3b8; font-style: italic; margin-top: 8px;">📝 ${match.resultNotes}</div>` : ''}
-                        ${nameChangeNote}
-                    </div>
-                `;
-            });
-
-            display.innerHTML = html;
-        }
-
-        /**
-         * Display spell cast history
-         */
-        function displaySpellHistory() {
-            const spellHistory = window.gameState?.spellHistory || [];
-            const display = document.getElementById('spellHistoryDisplay');
-
-            if (!display) return;
-
-            // Populate team filter
-            const teamFilter = document.getElementById('spellHistoryTeamFilter');
-            if (teamFilter && window.gameState?.teams) {
-                const currentValue = teamFilter.value;
-                teamFilter.innerHTML = '<option value="all">All Teams</option>';
-                window.gameState.teams.forEach(team => {
-                    teamFilter.innerHTML += `<option value="${team.id}">${team.name}</option>`;
-                });
-                teamFilter.value = currentValue;
-            }
-
-            if (spellHistory.length === 0) {
-                display.innerHTML = '<p style="text-align: center; opacity: 0.7;">No spells cast yet.</p>';
-                return;
-            }
-
-            let html = '';
-            spellHistory.slice().reverse().forEach((spell, index) => {
-                const team = window.gameState.teams?.find(t => t.id === spell.teamId);
-                const teamName = team?.name || 'Unknown Team';
-                const teamColor = team?.color || '#888';
-                const timestamp = new Date(spell.timestamp).toLocaleString('en-GB', {
-                    day: '2-digit', month: '2-digit', year: 'numeric',
-                    hour: '2-digit', minute: '2-digit'
-                });
-
-                html += `
-                    <div class="spell-history-item" style="background: rgba(247, 240, 227, 0.05); padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid ${teamColor};">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                            <strong style="color: ${teamColor};">${spell.spellName || spell.spellId}</strong>
-                            <span style="color: #94a3b8; font-size: 0.75rem;">${timestamp}</span>
-                        </div>
-                        <div style="font-size: 0.85rem; color: #94a3b8;">
-                            Cast by: <span style="color: ${teamColor};">${teamName}</span>
-                        </div>
-                    </div>
-                `;
-            });
-
-            display.innerHTML = html;
-        }
-
-        /**
-         * Filter spell history
-         */
-        function filterSpellHistory() {
-            const teamFilter = document.getElementById('spellHistoryTeamFilter')?.value || 'all';
-            const typeFilter = document.getElementById('spellHistoryTypeFilter')?.value || 'all';
-            const spellHistory = window.gameState?.spellHistory || [];
-
-            const display = document.getElementById('spellHistoryDisplay');
-            if (!display) return;
-
-            const filtered = spellHistory.filter(spell => {
-                const matchesTeam = teamFilter === 'all' || spell.teamId == teamFilter;
-                const matchesType = typeFilter === 'all' || spell.timing === typeFilter;
-
-                return matchesTeam && matchesType;
-            });
-
-            if (filtered.length === 0) {
-                display.innerHTML = '<p style="text-align: center; opacity: 0.7;">No spells found.</p>';
-                return;
-            }
-
-            let html = '';
-            filtered.slice().reverse().forEach((spell) => {
-                const team = window.gameState.teams?.find(t => t.id === spell.teamId);
-                const teamName = team?.name || 'Unknown Team';
-                const teamColor = team?.color || '#888';
-                const timestamp = new Date(spell.timestamp).toLocaleString('en-GB', {
-                    day: '2-digit', month: '2-digit', year: 'numeric',
-                    hour: '2-digit', minute: '2-digit'
-                });
-
-                html += `
-                    <div class="spell-history-item" style="background: rgba(247, 240, 227, 0.05); padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid ${teamColor};">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                            <strong style="color: ${teamColor};">${spell.spellName || spell.spellId}</strong>
-                            <span style="color: #94a3b8; font-size: 0.75rem;">${timestamp}</span>
-                        </div>
-                        <div style="font-size: 0.85rem; color: #94a3b8;">
-                            Cast by: <span style="color: ${teamColor};">${teamName}</span>
-                        </div>
-                    </div>
-                `;
-            });
-
-            display.innerHTML = html;
-        }
-
-        /**
-         * Display action timeline
-         */
-        function displayActionTimeline() {
-            const actionHistory = window.gameState?.actionHistory || [];
-            const display = document.getElementById('actionTimelineDisplay');
-
-            if (!display) return;
-
-            if (actionHistory.length === 0) {
-                display.innerHTML = '<p style="text-align: center; opacity: 0.7;">No actions recorded yet.</p>';
-                return;
-            }
-
-            let html = '';
-            actionHistory.slice().reverse().forEach((action) => {
-                const timestamp = new Date(action.timestamp).toLocaleString('en-GB', {
-                    hour: '2-digit', minute: '2-digit', second: '2-digit'
-                });
-
-                let icon = '📋';
-                let actionText = action.type;
-                let color = '#94a3b8';
-
-                switch (action.type) {
-                    case 'PLACE_PLATE':
-                        icon = '🎯';
-                        actionText = `Tile placed at ${action.data?.coord || 'unknown'}`;
-                        color = '#2278a3';
-                        break;
-                    case 'USE_SPELL':
-                        icon = '🔮';
-                        actionText = `Spell cast: ${action.data?.spellCard || 'unknown'}`;
-                        color = '#a855f7';
-                        break;
-                    case 'MATCH_RESULT':
-                        icon = '🏆';
-                        actionText = `Match completed`;
-                        color = '#10b981';
-                        break;
-                    case 'CAPTURE_HEART':
-                        icon = '💖';
-                        actionText = `Heart hex captured`;
-                        color = '#f43f5e';
-                        break;
-                }
-
-                html += `
-                    <div class="action-timeline-item" data-type="${action.type}" style="padding: 10px; border-left: 3px solid ${color}; margin-bottom: 8px; background: rgba(247, 240, 227, 0.03); border-radius: 4px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="color: ${color};">${icon} ${actionText}</span>
-                            <span style="color: #94a3b8; font-size: 0.75rem;">${timestamp}</span>
-                        </div>
-                    </div>
-                `;
-            });
-
-            display.innerHTML = html;
-        }
-
-        /**
-         * Filter action timeline
-         */
-        function filterActionTimeline() {
-            const showTiles = document.getElementById('showTilePlacements')?.checked;
-            const showSpells = document.getElementById('showSpellCasts')?.checked;
-            const showMatches = document.getElementById('showMatchResults')?.checked;
-            const showHearts = document.getElementById('showHeartCaptures')?.checked;
-
-            const items = document.querySelectorAll('.action-timeline-item');
-            items.forEach(item => {
-                const type = item.getAttribute('data-type');
-                let show = false;
-
-                if (type === 'PLACE_PLATE' && showTiles) show = true;
-                if (type === 'USE_SPELL' && showSpells) show = true;
-                if (type === 'MATCH_RESULT' && showMatches) show = true;
-                if (type === 'CAPTURE_HEART' && showHearts) show = true;
-
-                item.style.display = show ? 'block' : 'none';
-            });
-        }
-
-        /**
-         * Update history statistics
-         */
-        function updateHistoryStatistics() {
-            const gameHistory = window.gameState?.gameHistory || [];
-            const spellHistory = window.gameState?.spellHistory || [];
-            const actionHistory = window.gameState?.actionHistory || [];
-
-            // Total matches
-            document.getElementById('histStatTotalMatches').textContent = gameHistory.length;
-
-            // Total spells
-            document.getElementById('histStatTotalSpells').textContent = spellHistory.length;
-
-            // Total actions
-            document.getElementById('histStatTotalActions').textContent = actionHistory.length;
-
-            // Calculate duration
-            if (gameHistory.length > 0) {
-                const firstMatch = new Date(gameHistory[0].timestamp);
-                const lastMatch = new Date(gameHistory[gameHistory.length - 1].timestamp);
-                const duration = lastMatch - firstMatch;
-                const hours = Math.floor(duration / (1000 * 60 * 60));
-                const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
-                document.getElementById('histStatDuration').textContent = `${hours}h ${minutes}m`;
-            }
-        }
+        function refreshHistoryDisplay() { /* no-op, History tab removed */ }
 
         /**
          * Export tournament history as JSON or CSV
@@ -1913,7 +1473,7 @@
             }
 
             const tournamentData = {
-                tournamentId: window.gameState.gameId,
+                tournamentId: window.gameState.tournamentId,
                 tournamentName: window.gameState.name,
                 exportedAt: new Date().toISOString(),
                 matchHistory: window.gameState.gameHistory || [],
@@ -1932,7 +1492,7 @@
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `tournament-${window.gameState.gameId}-${new Date().toISOString().split('T')[0]}.json`;
+                a.download = `tournament-${window.gameState.tournamentId}-${new Date().toISOString().split('T')[0]}.json`;
                 a.click();
                 URL.revokeObjectURL(url);
 
@@ -1955,7 +1515,7 @@
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `tournament-matches-${window.gameState.gameId}-${new Date().toISOString().split('T')[0]}.csv`;
+                a.download = `tournament-matches-${window.gameState.tournamentId}-${new Date().toISOString().split('T')[0]}.csv`;
                 a.click();
                 URL.revokeObjectURL(url);
 

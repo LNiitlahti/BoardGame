@@ -837,7 +837,7 @@ class SpellEngine {
                         ${spell.rarity || 'common'}
                     </div>
                 </div>
-                <div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px;">
+                <div style="font-size: 0.75rem; color: #9aa1ad; text-transform: uppercase; margin-bottom: 8px;">
                     ${spell.type} &bull; ${spell.timing}
                 </div>
                 <div style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.5; margin-bottom: 10px;">
@@ -930,7 +930,7 @@ class SpellEngine {
         preview.style.display = 'block';
         preview.innerHTML = `
             <h4 style="margin: 0 0 8px 0; color: #a855f7;">${this._teams?.escapeHtml(spell.name) || spell.name}</h4>
-            <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 8px;">
+            <div style="font-size: 0.75rem; color: #9aa1ad; margin-bottom: 8px;">
                 ${spell.type} &bull; ${spell.rarity} &bull; ${spell.timing}
             </div>
             <div style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.5;">
@@ -1004,7 +1004,7 @@ class SpellEngine {
                         ${entry.roundNumber ? ` (Round ${entry.roundNumber})` : ''}
                     </div>
                     ${entry.result?.changes?.note ? `
-                        <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 5px; font-style: italic;">
+                        <div style="font-size: 0.75rem; color: #9aa1ad; margin-top: 5px; font-style: italic;">
                             ${this._teams?.escapeHtml(entry.result.changes.note) || ''}
                         </div>
                     ` : ''}
@@ -1058,7 +1058,7 @@ class SpellEngine {
         const gs = this._gameState;
         const phase = gs.currentPhase?.name;
 
-        if (phase !== 'spell_phase' || !gs.spellPhase?.isActive) {
+        if (!phase || !phase.startsWith('spell_window') || !gs.spellPhase?.isActive) {
             container.style.display = 'none';
             return;
         }

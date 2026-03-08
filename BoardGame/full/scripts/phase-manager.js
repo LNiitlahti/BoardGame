@@ -6,60 +6,98 @@
  * indicator bar, and logs all phase transitions via ActionLogger.
  *
  * Firestore field:
- *   gameState.currentPhase = { name, roundNumber, startedAt, returnToPhase? }
+ *   gameState.currentPhase = { name, roundNumber, startedAt, returnToPhase?,
+ *                              challengeGamesPlayed? }
  *
  * Requirements and canAdvance are computed client-side only (not persisted).
  *
  * Phase flow per round:
- *   PRE_GAME_SETUP → ROUND_START (auto) → CHALLENGE_SELECTION
- *   → PRE_GAME_INSTRUCTIONS (manual) → LOBBY_READY (auto when all ready)
- *   → [BREAK?] → MATCHES_IN_PROGRESS → SCORING_AND_PLACEMENT
- *   → SPELL_PHASE → ROUND_END → (loop to ROUND_START or TOURNAMENT_END)
+ *   SCORING_VP → SCORING_HEX → HEX_PLACEMENT_1 → SPELL_WINDOW_1
+ *   → HEX_PLACEMENT_2 → CHALLENGES → SPELL_WINDOW_2 → CHALLENGE_GAME
+ *   → SPELL_WINDOW_3 (loop→CHALLENGE_GAME up to 7×) → BOARD_RESOLVED
+ *   → SPELL_WINDOW_4 (loop→CHALLENGES) → MATCH_1_SETUP → MATCH_1_LOBBY
+ *   → MATCH_1_PLAYING → MATCH_2_SETUP → MATCH_2_LOBBY → MATCH_2_PLAYING
+ *   → ROUND_ADVANCE → (loop to SCORING_VP)
  *
- * Lobby readiness (Week 6):
- *   gameState.lobbyReady = { [playerUid]: { ready, readyAt, teamId, name } }
- *   Reset to {} when entering lobby_ready. Auto-advances when all playing
- *   players are ready.
+ * Lobby readiness:
+ *   gameState.lobbyReady = { [playerUid]: { gameLobby, discord, ... } }
+ *   Two-status readiness: game lobby + Discord channel. Both must be true.
+ *   Reset to {} when entering match_1_lobby or match_2_lobby.
+ *   Auto-advances when all playing players are ready.
+ *
+ * Spell windows:
+ *   Optional phases where admin can begin spell casting or skip.
+ *   If spellPhase.isActive, requirements track turn completion.
+ *   Admin calls beginSpells() to start, or just advances to skip.
  */
 
 // ── Phase constants ──────────────────────────────────────────────
 
 const PHASE_ORDER = [
     'pre_game_setup',
-    'round_start',
-    'challenge_selection',
-    'pre_game_instructions',
-    'lobby_ready',
+    'scoring_vp',
+    'scoring_hex',
+    'hex_placement_1',
+    'spell_window_1',
+    'hex_placement_2',
+    'challenges',
+    'spell_window_2',
+    'challenge_game',
+    'spell_window_3',
+    'board_resolved',
+    'spell_window_4',
+    'match_1_setup',
+    'match_1_lobby',
+    'match_1_playing',
+    'match_2_setup',
+    'match_2_lobby',
+    'match_2_playing',
+    'round_advance',
     'break',
-    'matches_in_progress',
-    'scoring_and_placement',
-    'spell_phase',
-    'round_end',
     'tournament_end'
 ];
 
 const PHASE_DISPLAY = {
-    pre_game_setup:        { name: 'Pre-Game Setup',         icon: '\u2699' },
-    round_start:           { name: 'Round Start',            icon: '\u{1F3C1}' },
-    challenge_selection:   { name: 'Challenge Selection',    icon: '\u2694' },
-    pre_game_instructions: { name: 'Pre-Game Instructions',  icon: '\u{1F4CB}' },
-    lobby_ready:           { name: 'Lobby Ready',            icon: '\u{1F3AE}' },
-    break:                 { name: 'Break',                  icon: '\u23F8' },
-    matches_in_progress:   { name: 'Matches In Progress',    icon: '\u{1F3AE}' },
-    scoring_and_placement: { name: 'Scoring & Placement',    icon: '\u{1F3AF}' },
-    spell_phase:           { name: 'Spell Phase',            icon: '\u{1F52E}' },
-    round_end:             { name: 'Round End',              icon: '\u{1F4CA}' },
-    tournament_end:        { name: 'Tournament End',         icon: '\u{1F3C6}' }
+    pre_game_setup:   { name: 'Pre-Game Setup',       icon: '\u2699' },
+    scoring_vp:       { name: 'Scoring: Victory Points', icon: '\u{1F3C6}' },
+    scoring_hex:      { name: 'Scoring: Hex',         icon: '\u2B22' },
+    hex_placement_1:  { name: 'Hex Placement — Game 1', icon: '\u{1F5FA}' },
+    spell_window_1:   { name: 'Spell Window',         icon: '\u2728' },
+    hex_placement_2:  { name: 'Hex Placement — Game 2', icon: '\u{1F5FA}' },
+    challenges:       { name: 'Challenges Issued',    icon: '\u2694' },
+    spell_window_2:   { name: 'Spell Window',         icon: '\u2728' },
+    challenge_game:   { name: 'Challenge Game',       icon: '\u{1F3AE}' },
+    spell_window_3:   { name: 'Spell Window',         icon: '\u2728' },
+    board_resolved:   { name: 'Board Resolved',       icon: '\u{1F6E1}' },
+    spell_window_4:   { name: 'Spell Window',         icon: '\u2728' },
+    match_1_setup:    { name: 'Match 1 — Setup',      icon: '\u{1F3DF}' },
+    match_1_lobby:    { name: 'Match 1 — Lobby',      icon: '\u{1F3AE}' },
+    match_1_playing:  { name: 'Match 1 — Playing',    icon: '\u{1F3AE}' },
+    match_2_setup:    { name: 'Match 2 — Setup',      icon: '\u{1F3DF}' },
+    match_2_lobby:    { name: 'Match 2 — Lobby',      icon: '\u{1F3AE}' },
+    match_2_playing:  { name: 'Match 2 — Playing',    icon: '\u{1F3AE}' },
+    round_advance:    { name: 'Round Advance',        icon: '\u23ED' },
+    break:            { name: 'Break',                icon: '\u23F8' },
+    tournament_end:   { name: 'Tournament End',       icon: '\u{1F3C6}' }
 };
 
 /** Phases that auto-advance immediately (no admin interaction needed) */
-const AUTO_ADVANCE_PHASES = ['round_start'];
+const AUTO_ADVANCE_PHASES = ['round_advance'];
 
 /** Phases that auto-advance only when all requirements are met */
-const AUTO_ADVANCE_WHEN_MET = ['lobby_ready', 'round_end', 'spell_phase'];
+const AUTO_ADVANCE_WHEN_MET = ['match_1_lobby', 'match_2_lobby'];
 
 /** Phases skipped in normal linear flow (only entered via dedicated methods) */
 const SKIP_IN_LINEAR_FLOW = ['break'];
+
+/** Valid loop-back targets from spell windows */
+const LOOP_TARGETS = {
+    spell_window_3: 'challenge_game',   // Loop back for another challenge game
+    spell_window_4: 'challenges'        // Loop back for another challenge round
+};
+
+/** Maximum challenge games per round */
+const MAX_CHALLENGE_GAMES = 7;
 
 // ── PhaseManager class ───────────────────────────────────────────
 
@@ -96,6 +134,44 @@ class PhaseManager {
 
         // Guard flag to prevent duplicate auto-advance calls
         this._autoAdvancePending = false;
+
+        // ── Hooks (wired by GodApp / admin-phase-adapter) ──
+        // this._onAwardPoints        — fire when leaving scoring_hex
+        // this._onScoringCeremony    — fire when entering scoring_vp
+        // this._onSpellPhaseEntered  — fire when admin begins spells
+        // this._onRoundStartSpells   — fire at start of round (expire conditions, backup)
+        // this._onRoundStartBackup   — fire at start of round
+    }
+
+    // ── Legacy phase migration ──────────────────────────────────
+
+    /**
+     * Migrate old phase names to new ones. Call once on load.
+     * Handles tournaments mid-game with the old phase flow.
+     */
+    migratePhaseIfNeeded() {
+        const gs = this._gameState;
+        if (!gs.currentPhase?.name) return false;
+
+        const MIGRATION_MAP = {
+            'round_start':           'scoring_vp',
+            'challenge_selection':   'challenges',
+            'pre_game_instructions': 'match_1_setup',
+            'lobby_ready':           'match_1_lobby',
+            'matches_in_progress':   'match_1_playing',
+            'scoring_and_placement': 'scoring_vp',
+            'spell_phase':           'spell_window_1',
+            'round_end':             'round_advance'
+        };
+
+        const oldName = gs.currentPhase.name;
+        const newName = MIGRATION_MAP[oldName];
+        if (newName) {
+            console.warn(`[PhaseManager] Migrating phase "${oldName}" → "${newName}"`);
+            gs.currentPhase.name = newName;
+            return true; // caller should save
+        }
+        return false;
     }
 
     // ── Core API ─────────────────────────────────────────────────
@@ -128,6 +204,41 @@ class PhaseManager {
     getNextPhaseDisplayName() {
         const next = this.getNextPhase();
         return next ? (PHASE_DISPLAY[next]?.name || next) : null;
+    }
+
+    // ── Phase identity helpers ───────────────────────────────────
+
+    /** Is the current phase a lobby phase? */
+    isLobbyPhase(phase) {
+        const p = phase || this.getCurrentPhase();
+        return p === 'match_1_lobby' || p === 'match_2_lobby';
+    }
+
+    /** Is the current phase a playing/match-in-progress phase? */
+    isPlayingPhase(phase) {
+        const p = phase || this.getCurrentPhase();
+        return p === 'match_1_playing' || p === 'match_2_playing' || p === 'challenge_game';
+    }
+
+    /** Is the current phase a spell window? */
+    isSpellWindow(phase) {
+        const p = phase || this.getCurrentPhase();
+        return p && p.startsWith('spell_window');
+    }
+
+    /** Is the current phase a match setup phase? */
+    isMatchSetup(phase) {
+        const p = phase || this.getCurrentPhase();
+        return p === 'match_1_setup' || p === 'match_2_setup' || p === 'challenges';
+    }
+
+    /** Get current match slot (1 or 2), or 0 if not in a match phase */
+    getCurrentMatchSlot() {
+        const p = this.getCurrentPhase();
+        if (p && p.startsWith('match_1')) return 1;
+        if (p && p.startsWith('match_2')) return 2;
+        if (p === 'challenge_game') return 0; // challenge, not a numbered slot
+        return 0;
     }
 
     /**
@@ -187,55 +298,80 @@ class PhaseManager {
             return false;
         }
 
-        // Break interval check: when advancing FROM lobby_ready, auto-insert break if due
-        if (current === 'lobby_ready' && this._isBreakDue()) {
-            await this._autoInsertBreak('matches_in_progress');
+        // Break interval check: when advancing to match_1_lobby, auto-insert break if due
+        if (nextPhase === 'match_1_lobby' && this._isBreakDue()) {
+            await this._autoInsertBreak('match_1_lobby');
             return true;
         }
 
-        // Round number logic
+        // ── Round number logic ──
         let newRound = gs.currentPhase?.roundNumber || 0;
-        if (current === 'pre_game_setup' || current === 'round_end') {
+        if (current === 'pre_game_setup' || current === 'round_advance') {
             newRound += 1;
         }
 
+        // ── Preserve challenge game counter across phases within a round ──
+        let challengeGamesPlayed = gs.currentPhase?.challengeGamesPlayed || 0;
+
+        // Reset challenge counter at start of new round
+        if (current === 'pre_game_setup' || current === 'round_advance') {
+            challengeGamesPlayed = 0;
+        }
+
+        // Increment counter when entering challenge_game via linear flow
+        // (loopBack from spell_window_3 handles its own increment separately)
+        if (nextPhase === 'challenge_game') {
+            challengeGamesPlayed++;
+        }
+
+        // ── Phase exit hooks ──
+
+        // Award hex territory points when leaving scoring_hex (skip round 1 — no previous round)
+        if (current === 'scoring_hex' && this._onAwardPoints && newRound > 1) {
+            this._onAwardPoints();
+        }
+
+        // Clear spell phase state when leaving any spell window
+        if (this.isSpellWindow(current)) {
+            this._clearSpellPhaseState();
+        }
+
         // Increment break interval counter when completing a round
-        if (current === 'round_end' && gs.breakSettings) {
+        if (current === 'round_advance' && gs.breakSettings) {
             gs.breakSettings.roundsSinceLastBreak =
                 (gs.breakSettings.roundsSinceLastBreak || 0) + 1;
         }
 
         const previousPhase = { ...gs.currentPhase };
 
-        // Update gameState
+        // ── Update gameState ──
         gs.currentPhase = {
             name: nextPhase,
             roundNumber: newRound,
-            startedAt: new Date().toISOString()
+            startedAt: new Date().toISOString(),
+            challengeGamesPlayed: challengeGamesPlayed
         };
 
-        // Reset lobby readiness when entering lobby_ready
-        if (nextPhase === 'lobby_ready') {
+        // ── Phase enter hooks ──
+
+        // Reset lobby readiness when entering a lobby phase
+        if (this.isLobbyPhase(nextPhase)) {
             const prevLobbyReady = { ...(gs.lobbyReady || {}) };
             this._resetLobbyReady();
             this._logAction('lobby_reset', 'phase', {
-                roundNumber: newRound
+                roundNumber: newRound,
+                matchSlot: nextPhase === 'match_1_lobby' ? 1 : 2
             }, { lobbyReady: prevLobbyReady });
         }
 
-        // Initialize spell phase when entering spell_phase
-        if (nextPhase === 'spell_phase' && this._onSpellPhaseEntered) {
-            this._onSpellPhaseEntered();
-        }
-
-        // Start scoring ceremony when entering scoring_and_placement
-        if (nextPhase === 'scoring_and_placement' && this._onScoringCeremony) {
+        // Scoring ceremony when entering scoring_vp (skip round 1 — nothing to celebrate)
+        if (nextPhase === 'scoring_vp' && this._onScoringCeremony && newRound > 1) {
             this._onScoringCeremony();
         }
 
-        // Expire spell conditions at round start
-        if (nextPhase === 'round_start' && this._onRoundStartSpells) {
-            this._onRoundStartSpells();
+        // Round start hooks (expire conditions, auto-backup)
+        if (nextPhase === 'scoring_vp' && newRound > 0) {
+            if (this._onRoundStartSpells) this._onRoundStartSpells();
         }
 
         // Keep top-level status in sync
@@ -279,6 +415,136 @@ class PhaseManager {
         return true;
     }
 
+    // ── Spell Window Control ────────────────────────────────────
+
+    /**
+     * Begin the spell casting phase during a spell window.
+     * Called by admin when they want teams to cast spells.
+     * Can only be called during spell_window_* phases.
+     */
+    async beginSpells() {
+        const phase = this.getCurrentPhase();
+        if (!this.isSpellWindow(phase)) {
+            this._ui.showStatus('Can only begin spells during a spell window.', 'warning');
+            return;
+        }
+
+        if (this._onSpellPhaseEntered) {
+            this._onSpellPhaseEntered();
+            await this._save();
+            this.recheckRequirements();
+            this.renderPhaseIndicator();
+            this._ui.showStatus('Spell phase started! Teams can now cast spells.', 'success');
+        }
+    }
+
+    /**
+     * Clear spell phase active state (called when leaving a spell window).
+     */
+    _clearSpellPhaseState() {
+        const gs = this._gameState;
+        if (gs.spellPhase?.isActive) {
+            gs.spellPhase.isActive = false;
+        }
+    }
+
+    // ── Challenge Game Loop ─────────────────────────────────────
+
+    /**
+     * Loop back from the current spell window to its loop target.
+     * Only valid from spell_window_3 (→ challenge_game) and
+     * spell_window_4 (→ challenges).
+     * @returns {Promise<boolean>}
+     */
+    async loopBack() {
+        const current = this.getCurrentPhase();
+        const target = LOOP_TARGETS[current];
+
+        if (!target) {
+            this._ui.showStatus('Cannot loop from this phase.', 'warning');
+            return false;
+        }
+
+        const gs = this._gameState;
+        const previousPhase = { ...gs.currentPhase };
+        let challengeGamesPlayed = gs.currentPhase?.challengeGamesPlayed || 0;
+
+        // Challenge game loop: check max, then increment for the next game
+        if (current === 'spell_window_3') {
+            // challengeGamesPlayed = games already played (including the one just finished)
+            // Block if we've already played the max
+            if (challengeGamesPlayed >= MAX_CHALLENGE_GAMES) {
+                this._ui.showStatus(
+                    `Maximum ${MAX_CHALLENGE_GAMES} challenge games per round reached.`,
+                    'warning'
+                );
+                return false;
+            }
+            // Counter will be incremented by advancePhase when entering challenge_game next
+            // But since loopBack sets phase directly (not via advancePhase),
+            // we must increment here
+            challengeGamesPlayed++;
+        }
+
+        // Challenge phase loop: reset game counter for new cycle
+        if (current === 'spell_window_4') {
+            challengeGamesPlayed = 0;
+        }
+
+        // Clear spell phase state before looping
+        this._clearSpellPhaseState();
+
+        gs.currentPhase = {
+            name: target,
+            roundNumber: gs.currentPhase?.roundNumber || 0,
+            startedAt: new Date().toISOString(),
+            challengeGamesPlayed: challengeGamesPlayed
+        };
+
+        await this._save();
+
+        this._logAction('phase_loop', 'phase', {
+            fromPhase: current,
+            toPhase: target,
+            challengeGamesPlayed: challengeGamesPlayed,
+            roundNumber: gs.currentPhase.roundNumber
+        }, { currentPhase: previousPhase });
+
+        this._ui.showStatus(
+            `Looped back to ${PHASE_DISPLAY[target]?.name || target}`,
+            'info'
+        );
+
+        this.recheckRequirements();
+        this.renderPhaseIndicator();
+        return true;
+    }
+
+    /**
+     * Can the current phase loop back?
+     * @returns {{ canLoop: boolean, target: string|null, label: string|null }}
+     */
+    getLoopInfo() {
+        const current = this.getCurrentPhase();
+        const target = LOOP_TARGETS[current];
+        if (!target) return { canLoop: false, target: null, label: null };
+
+        const gs = this._gameState;
+        const gamesPlayed = gs.currentPhase?.challengeGamesPlayed || 0;
+
+        if (current === 'spell_window_3' && gamesPlayed >= MAX_CHALLENGE_GAMES) {
+            return { canLoop: false, target, label: `Max ${MAX_CHALLENGE_GAMES} challenge games reached` };
+        }
+
+        const targetName = PHASE_DISPLAY[target]?.name || target;
+        if (current === 'spell_window_3') {
+            return { canLoop: true, target, label: `\u{1F501} Loop to ${targetName} (${gamesPlayed + 1}/${MAX_CHALLENGE_GAMES})` };
+        }
+        return { canLoop: true, target, label: `\u{1F504} Loop to ${targetName}` };
+    }
+
+    // ── Break System ────────────────────────────────────────────
+
     /**
      * Insert a break. Saves the current phase as returnToPhase.
      */
@@ -295,7 +561,8 @@ class PhaseManager {
             name: 'break',
             roundNumber: gs.currentPhase?.roundNumber || 0,
             startedAt: new Date().toISOString(),
-            returnToPhase: current
+            returnToPhase: current,
+            challengeGamesPlayed: gs.currentPhase?.challengeGamesPlayed || 0
         };
 
         await this._save();
@@ -316,7 +583,8 @@ class PhaseManager {
         const gs = this._gameState;
         if (gs.currentPhase?.name !== 'break') return;
 
-        const returnTo = gs.currentPhase.returnToPhase || 'challenge_selection';
+        const returnTo = gs.currentPhase.returnToPhase || 'scoring_vp';
+        const challengeGamesPlayed = gs.currentPhase.challengeGamesPlayed || 0;
         const previousPhase = { ...gs.currentPhase };
 
         // Reset break interval counter
@@ -328,7 +596,8 @@ class PhaseManager {
         gs.currentPhase = {
             name: returnTo,
             roundNumber: gs.currentPhase?.roundNumber || 0,
-            startedAt: new Date().toISOString()
+            startedAt: new Date().toISOString(),
+            challengeGamesPlayed: challengeGamesPlayed
         };
 
         await this._save();
@@ -344,20 +613,12 @@ class PhaseManager {
 
     // ── Break Interval System ──────────────────────────────────────
 
-    /**
-     * Check if an automatic break is due based on break interval settings.
-     * @returns {boolean}
-     */
     _isBreakDue() {
         const s = this._gameState.breakSettings;
         if (!s || !s.intervalRounds || s.intervalRounds <= 0) return false;
         return (s.roundsSinceLastBreak || 0) >= s.intervalRounds;
     }
 
-    /**
-     * Auto-insert a break (triggered by interval system).
-     * @param {string} returnToPhase  Phase to return to after break ends
-     */
     async _autoInsertBreak(returnToPhase) {
         const gs = this._gameState;
         const previousPhase = { ...gs.currentPhase };
@@ -367,7 +628,8 @@ class PhaseManager {
             roundNumber: gs.currentPhase?.roundNumber || 0,
             startedAt: new Date().toISOString(),
             returnToPhase: returnToPhase,
-            autoInserted: true
+            autoInserted: true,
+            challengeGamesPlayed: gs.currentPhase?.challengeGamesPlayed || 0
         };
 
         await this._save();
@@ -380,16 +642,13 @@ class PhaseManager {
         }, { currentPhase: previousPhase, status: this._gameState.status });
 
         this._ui.showStatus(
-            `Automatic break — ${gs.breakSettings?.roundsSinceLastBreak || 0} rounds since last break.`,
+            `Automatic break \u2014 ${gs.breakSettings?.roundsSinceLastBreak || 0} rounds since last break.`,
             'info'
         );
         this.recheckRequirements();
         this.renderPhaseIndicator();
     }
 
-    /**
-     * Open the break settings modal.
-     */
     openBreakSettings() {
         const gs = this._gameState;
         const modal = document.getElementById('breakSettingsModal');
@@ -404,17 +663,11 @@ class PhaseManager {
         modal.style.display = 'flex';
     }
 
-    /**
-     * Close the break settings modal.
-     */
     closeBreakSettings() {
         const modal = document.getElementById('breakSettingsModal');
         if (modal) modal.style.display = 'none';
     }
 
-    /**
-     * Save break settings from the modal.
-     */
     async saveBreakSettings(triggerBtn) {
         const gs = this._gameState;
         const input = document.getElementById('breakIntervalInput');
@@ -443,9 +696,6 @@ class PhaseManager {
         this.renderPhaseIndicator();
     }
 
-    /**
-     * Reset the rounds-since-last-break counter to 0.
-     */
     async resetBreakCounter() {
         const gs = this._gameState;
         if (!gs.breakSettings) return;
@@ -458,9 +708,6 @@ class PhaseManager {
         if (counterEl) counterEl.textContent = '0';
     }
 
-    /**
-     * Skip the next scheduled break by resetting the counter.
-     */
     async skipNextBreak() {
         const gs = this._gameState;
         if (!gs.breakSettings) return;
@@ -505,10 +752,6 @@ class PhaseManager {
 
     // ── Requirements ─────────────────────────────────────────────
 
-    /**
-     * Recalculate requirements for the current phase and cache them.
-     * Call from GodApp.updateDisplay() and after any manager state change.
-     */
     recheckRequirements() {
         const phase = this.getCurrentPhase();
         if (!phase) {
@@ -521,7 +764,7 @@ class PhaseManager {
             allMet: items.length === 0 || items.every(r => r.met)
         };
 
-        // Auto-advance lobby_ready when all players are ready
+        // Auto-advance lobby phases when all players are ready
         if (AUTO_ADVANCE_WHEN_MET.includes(phase) && this._cachedReqs.allMet && !this._autoAdvancePending) {
             this._autoAdvancePending = true;
             setTimeout(async () => {
@@ -533,10 +776,6 @@ class PhaseManager {
         }
     }
 
-    /**
-     * Get cached requirements for current phase.
-     * @returns {{ items: Array<{label: string, met: boolean}>, allMet: boolean }}
-     */
     getPhaseRequirements() {
         return this._cachedReqs;
     }
@@ -553,6 +792,8 @@ class PhaseManager {
         const players = gs.players || {};
 
         switch (phaseName) {
+
+            // ── Setup ──
             case 'pre_game_setup':
                 return [
                     {
@@ -569,27 +810,102 @@ class PhaseManager {
                     }
                 ];
 
-            case 'challenge_selection':
-                return [
-                    {
-                        label: 'At least one match queued',
-                        met: queue.some(m =>
-                            !m.isBreak && (m.status === 'pending' || m.status === 'ongoing')
-                        )
-                    }
-                ];
+            // ── Scoring phases — manual admin confirmation ──
+            case 'scoring_vp':
+                return []; // Admin reviews VP and clicks Next
+            case 'scoring_hex':
+                return []; // Admin reviews hex scoring and clicks Next
 
-            case 'pre_game_instructions':
-                return [
-                    {
-                        label: 'Match assignments displayed to teams',
-                        met: queue.some(m =>
-                            !m.isBreak && (m.status === 'pending' || m.status === 'ongoing')
-                        )
-                    }
-                ];
+            // ── Hex placement phases ──
+            case 'hex_placement_1':
+            case 'hex_placement_2': {
+                const pendingHex = this._getPendingHexCount();
+                if (pendingHex === 0) {
+                    return [{ label: 'All hex plates placed', met: true }];
+                }
+                return [{
+                    label: `${pendingHex} team${pendingHex !== 1 ? 's' : ''} need to place plates`,
+                    met: false
+                }];
+            }
 
-            case 'lobby_ready': {
+            // ── Spell windows — optional, dynamic ──
+            case 'spell_window_1':
+            case 'spell_window_2':
+            case 'spell_window_3':
+            case 'spell_window_4': {
+                const sp = gs.spellPhase;
+                // If spell phase not started → no requirements (admin can skip or begin)
+                if (!sp || !sp.isActive) return [];
+                // If spell phase active → wait for all teams
+                const allDone = sp.turnOrder && sp.turnOrder.length > 0 &&
+                    sp.teamsCompleted && sp.teamsCompleted.length >= sp.turnOrder.length;
+                return [{
+                    label: allDone
+                        ? 'All teams completed spells'
+                        : `Spell turns: ${sp.teamsCompleted?.length || 0}/${sp.turnOrder?.length || 0} teams done`,
+                    met: allDone
+                }];
+            }
+
+            // ── Challenge phases ──
+            case 'challenges': {
+                const pendingMatches = queue.filter(m => !m.isBreak && m.status === 'pending');
+                return [{
+                    label: pendingMatches.length > 0
+                        ? `${pendingMatches.length} challenge${pendingMatches.length !== 1 ? 's' : ''} queued`
+                        : 'Create challenge matches',
+                    met: pendingMatches.length > 0
+                }];
+            }
+
+            case 'challenge_game': {
+                const ongoing = queue.filter(m => !m.isBreak && m.status === 'ongoing');
+                const pending = queue.filter(m => !m.isBreak && m.status === 'pending');
+                const hasStarted = queue.some(m => !m.isBreak && (m.status === 'ongoing' || m.status === 'completed'));
+
+                if (!hasStarted) {
+                    return [{ label: 'Start challenge matches', met: false }];
+                }
+                const reqs = [];
+                if (ongoing.length > 0) {
+                    reqs.push({
+                        label: `${ongoing.length} match${ongoing.length !== 1 ? 'es' : ''} still playing`,
+                        met: false
+                    });
+                }
+                if (pending.length > 0) {
+                    reqs.push({
+                        label: `${pending.length} match${pending.length !== 1 ? 'es' : ''} not started`,
+                        met: false
+                    });
+                }
+                if (reqs.length === 0) {
+                    reqs.push({ label: 'All challenge results confirmed', met: true });
+                }
+                return reqs;
+            }
+
+            // ── Board resolved — manual admin check ──
+            case 'board_resolved':
+                return []; // Admin verifies board correctness, clicks Next
+
+            // ── Match setup — create matches ──
+            case 'match_1_setup':
+            case 'match_2_setup': {
+                const slot = phaseName === 'match_1_setup' ? 1 : 2;
+                const pendingMatches = queue.filter(m => !m.isBreak && m.status === 'pending');
+                return [{
+                    label: pendingMatches.length > 0
+                        ? `${pendingMatches.length} match${pendingMatches.length !== 1 ? 'es' : ''} queued (Slot ${slot})`
+                        : `Create matches for Slot ${slot}`,
+                    met: pendingMatches.length > 0
+                }];
+            }
+
+            // ── Lobby phases — two-status readiness ──
+            case 'match_1_lobby':
+            case 'match_2_lobby': {
                 const lobbyReady = gs.lobbyReady || {};
                 const mustReady = this._getPlayersWhoMustReady();
 
@@ -597,72 +913,63 @@ class PhaseManager {
                     return [{ label: 'No players need to ready up', met: true }];
                 }
 
-                const readyCount = mustReady.filter(uid => lobbyReady[uid]?.ready).length;
-                const allReady = readyCount === mustReady.length;
+                const lobbyCount = mustReady.filter(uid => {
+                    const r = lobbyReady[uid];
+                    return r?.gameLobby === true || r?.ready === true;
+                }).length;
+                const discordCount = mustReady.filter(uid => {
+                    const r = lobbyReady[uid];
+                    return r?.discord === true || r?.ready === true;
+                }).length;
 
                 return [
                     {
-                        label: `${readyCount}/${mustReady.length} players ready`,
-                        met: allReady
+                        label: `Game lobby: ${lobbyCount}/${mustReady.length}`,
+                        met: lobbyCount === mustReady.length
+                    },
+                    {
+                        label: `Discord: ${discordCount}/${mustReady.length}`,
+                        met: discordCount === mustReady.length
                     }
                 ];
             }
 
+            // ── Playing phases — all matches completed ──
+            case 'match_1_playing':
+            case 'match_2_playing': {
+                const ongoingMatches = queue.filter(m => !m.isBreak && m.status === 'ongoing');
+                const pendingNonBreak = queue.filter(m => !m.isBreak && m.status === 'pending');
+                const hasStarted = queue.some(m => !m.isBreak && (m.status === 'ongoing' || m.status === 'completed'));
+
+                if (!hasStarted) {
+                    return [{ label: 'Start matches first', met: false }];
+                }
+                const reqs = [];
+                if (ongoingMatches.length > 0) {
+                    reqs.push({
+                        label: `${ongoingMatches.length} match${ongoingMatches.length !== 1 ? 'es' : ''} still playing`,
+                        met: false
+                    });
+                }
+                if (pendingNonBreak.length > 0) {
+                    reqs.push({
+                        label: `${pendingNonBreak.length} match${pendingNonBreak.length !== 1 ? 'es' : ''} not started`,
+                        met: false
+                    });
+                }
+                if (reqs.length === 0) {
+                    reqs.push({ label: 'All match results confirmed', met: true });
+                }
+                return reqs;
+            }
+
+            // ── Break — admin ends manually ──
             case 'break':
-                // Admin ends break manually — never auto-met
-                return [
-                    { label: 'Admin ends break', met: false }
-                ];
+                return [{ label: 'Admin ends break', met: false }];
 
-            case 'matches_in_progress':
-                return [
-                    {
-                        label: 'All match results confirmed',
-                        met: !queue.some(m =>
-                            !m.isBreak && m.status === 'ongoing'
-                        )
-                    }
-                ];
-
-            case 'scoring_and_placement':
-                return [
-                    {
-                        label: 'All winning teams placed plates',
-                        met: this._getPendingHexCount() === 0
-                    }
-                ];
-
-            case 'spell_phase': {
-                const sp = gs.spellPhase;
-                // No spell system or no active spell phase → auto-met (backward compatible)
-                if (!sp || !sp.isActive) return [];
-                const allDone = sp.turnOrder && sp.turnOrder.length > 0 &&
-                    sp.teamsCompleted && sp.teamsCompleted.length >= sp.turnOrder.length;
-                return [{
-                    label: allDone
-                        ? 'All teams completed spell phase'
-                        : `Spell turns: ${sp.teamsCompleted?.length || 0}/${sp.turnOrder?.length || 0} teams done`,
-                    met: allDone
-                }];
-            }
-
-            case 'round_end': {
-                const currentRound = gs.currentPhase?.roundNumber || 0;
-                const history = gs.pointsHistory || [];
-                return [
-                    {
-                        label: 'Round points awarded',
-                        met: history.some(e => e.round === currentRound)
-                    }
-                ];
-            }
-
-            case 'round_start':
-                // Auto-advance: always met
-                return [];
-
+            // ── Auto-advance / terminal ──
+            case 'round_advance':
             case 'tournament_end':
-                // Terminal
                 return [];
 
             default:
@@ -673,12 +980,13 @@ class PhaseManager {
     // ── Phase transition helpers ─────────────────────────────────
 
     /**
-     * Get the effective next phase, skipping break and auto-advance phases.
-     * Special: round_end loops back to round_start (not tournament_end).
+     * Get the effective next phase, skipping break and other skip-in-linear phases.
+     * round_advance loops back to scoring_vp.
      */
     _getEffectiveNextPhase(currentPhaseName) {
-        if (currentPhaseName === 'round_end') {
-            return 'round_start';
+        // Round advance loops back to scoring_vp
+        if (currentPhaseName === 'round_advance') {
+            return 'scoring_vp';
         }
 
         const idx = PHASE_ORDER.indexOf(currentPhaseName);
@@ -695,13 +1003,9 @@ class PhaseManager {
      * Handle phases that auto-advance immediately.
      */
     async _handleAutoAdvance(phaseName) {
-        if (phaseName === 'round_start') {
-            // Brief pause for logging, then advance
+        if (phaseName === 'round_advance') {
             await this.advancePhase();
         }
-        // spell_phase is now interactive (Weeks 8-9) — uses AUTO_ADVANCE_WHEN_MET
-        // pre_game_instructions is a manual admin phase (Week 6)
-        // lobby_ready uses AUTO_ADVANCE_WHEN_MET (handled in recheckRequirements)
     }
 
     // ── Lobby Ready ─────────────────────────────────────────────
@@ -743,9 +1047,6 @@ class PhaseManager {
         return playerUids;
     }
 
-    /**
-     * Reset the lobbyReady map. Called when entering lobby_ready phase.
-     */
     _resetLobbyReady() {
         this._gameState.lobbyReady = {};
     }
@@ -754,7 +1055,8 @@ class PhaseManager {
      * Force all required players to ready status (admin override).
      */
     forceAllReady() {
-        if (this.getCurrentPhase() !== 'lobby_ready') return;
+        const phase = this.getCurrentPhase();
+        if (!this.isLobbyPhase(phase)) return;
 
         const gs = this._gameState;
         if (!gs.lobbyReady) gs.lobbyReady = {};
@@ -763,9 +1065,10 @@ class PhaseManager {
         const teams = gs.teams || [];
         const prevLobbyState = { ...(gs.lobbyReady || {}) };
 
+        const now = new Date().toISOString();
         mustReady.forEach(uid => {
-            if (gs.lobbyReady[uid]?.ready) return;
-            // Find player name and team
+            const existing = gs.lobbyReady[uid];
+            if (existing?.gameLobby && existing?.discord) return;
             let playerName = uid;
             let teamId = null;
             for (const team of teams) {
@@ -777,8 +1080,10 @@ class PhaseManager {
                 }
             }
             gs.lobbyReady[uid] = {
-                ready: true,
-                readyAt: new Date().toISOString(),
+                gameLobby: true,
+                discord: true,
+                gameLobbyAt: existing?.gameLobbyAt || now,
+                discordAt: existing?.discordAt || now,
                 teamId: teamId,
                 name: playerName
             };
@@ -786,16 +1091,13 @@ class PhaseManager {
 
         this._logAction('force_all_ready', 'admin', {
             playerCount: mustReady.length,
-            roundNumber: gs.currentPhase?.roundNumber
+            roundNumber: gs.currentPhase?.roundNumber,
+            matchSlot: phase === 'match_1_lobby' ? 1 : 2
         }, { lobbyReady: prevLobbyState });
     }
 
     // ── UI Rendering ─────────────────────────────────────────────
 
-    /**
-     * Render/update the phase indicator bar in the DOM.
-     * Called from GodApp.updateDisplay() and after phase changes.
-     */
     renderPhaseIndicator() {
         const bar = document.getElementById('phaseIndicatorBar');
         if (!bar) return;
@@ -806,7 +1108,6 @@ class PhaseManager {
         const broadcastBar = document.getElementById('broadcastBar');
         const displayControlBar = document.getElementById('displayControlBar');
 
-        // Show only when a tournament is loaded and has a currentPhase
         if (!phase || !gs.teams) {
             bar.style.display = 'none';
             if (broadcastBar) broadcastBar.style.display = 'none';
@@ -817,7 +1118,6 @@ class PhaseManager {
         bar.style.display = '';
         if (broadcastBar) {
             broadcastBar.style.display = 'flex';
-            // Sync broadcast input with current value
             const broadcastInput = document.getElementById('broadcastInput');
             if (broadcastInput && gs.broadcastMessage?.text && !broadcastInput.value) {
                 broadcastInput.value = gs.broadcastMessage.text;
@@ -825,7 +1125,6 @@ class PhaseManager {
         }
         if (displayControlBar) {
             displayControlBar.style.display = 'flex';
-            // Sync display override dropdown with current value
             const modeSelect = document.getElementById('displayModeOverride');
             if (modeSelect) {
                 modeSelect.value = gs.displayOverride?.mode || '';
@@ -850,6 +1149,15 @@ class PhaseManager {
             const round = gs.currentPhase?.roundNumber || 0;
             roundEl.textContent = round > 0 ? `Round ${round}` : '';
             roundEl.style.display = round > 0 ? '' : 'none';
+        }
+
+        // Challenge games counter badge
+        const challengeBadge = document.getElementById('challengeGamesBadge');
+        if (challengeBadge) {
+            const gamesPlayed = gs.currentPhase?.challengeGamesPlayed || 0;
+            const showBadge = (phase === 'challenge_game' || phase === 'spell_window_3') && gamesPlayed > 0;
+            challengeBadge.textContent = showBadge ? `Game ${gamesPlayed + 1}/${MAX_CHALLENGE_GAMES}` : '';
+            challengeBadge.style.display = showBadge ? '' : 'none';
         }
 
         // Requirements checklist
@@ -888,16 +1196,41 @@ class PhaseManager {
             breakBtn.style.display = (phase === 'break' || phase === 'tournament_end' || phase === 'pre_game_setup') ? 'none' : '';
         }
 
-        // Lobby ready admin controls
+        // Lobby ready admin controls (for both lobby phases)
         const lobbyControls = document.getElementById('lobbyAdminControls');
         if (lobbyControls) {
-            if (phase === 'lobby_ready') {
+            if (this.isLobbyPhase(phase)) {
                 lobbyControls.style.display = '';
                 lobbyControls.innerHTML =
                     `<button class="btn-small secondary" onclick="forceAllReady()" title="Mark all players as ready">Force All Ready</button>`;
             } else {
                 lobbyControls.style.display = 'none';
                 lobbyControls.innerHTML = '';
+            }
+        }
+
+        // Spell window controls
+        const spellControls = document.getElementById('spellWindowControls');
+        if (spellControls) {
+            if (this.isSpellWindow(phase)) {
+                const sp = gs.spellPhase;
+                const isActive = sp?.isActive;
+                let html = '';
+                if (!isActive) {
+                    html += `<button class="btn-small primary" onclick="beginSpells()" title="Start spell casting phase">\u2728 Begin Spells</button>`;
+                }
+                // Loop button
+                const loopInfo = this.getLoopInfo();
+                if (loopInfo.canLoop) {
+                    html += `<button class="btn-small secondary" onclick="loopBack()" title="${loopInfo.label}">${loopInfo.label}</button>`;
+                } else if (loopInfo.target && !loopInfo.canLoop) {
+                    html += `<span class="phase-req-item unmet" style="font-size: 0.75rem">${this._escHtml(loopInfo.label)}</span>`;
+                }
+                spellControls.style.display = '';
+                spellControls.innerHTML = html;
+            } else {
+                spellControls.style.display = 'none';
+                spellControls.innerHTML = '';
             }
         }
 
@@ -923,7 +1256,6 @@ class PhaseManager {
         const modal = document.getElementById('forceAdvanceModal');
         if (!modal) return;
 
-        // Populate unmet requirements list
         const listEl = document.getElementById('forceAdvanceRequirements');
         if (listEl) {
             const reqs = this._cachedReqs;
@@ -948,7 +1280,6 @@ class PhaseManager {
 
     // ── Utilities ────────────────────────────────────────────────
 
-    /** Escape HTML to prevent XSS in dynamic content */
     _escHtml(str) {
         const div = document.createElement('div');
         div.textContent = str;

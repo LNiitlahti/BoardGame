@@ -10,7 +10,7 @@
  */
 
 let currentUser = null;
-let currentGameId = null;
+let currentTournamentId = null;
 let currentTeamId = null;
 let gameData = null;
 let teamData = null;
@@ -39,12 +39,12 @@ document.addEventListener('firebase-ready', function() {
 
         // Get gameId and teamId from URL params
         const urlParams = new URLSearchParams(window.location.search);
-        currentGameId = urlParams.get('gameId');
+        currentTournamentId = urlParams.get('tournamentId') || urlParams.get('gameId');
         currentTeamId = parseInt(urlParams.get('teamId'));
 
-        console.log('[Team Controls] Game ID:', currentGameId, 'Team ID:', currentTeamId);
+        console.log('[Team Controls] Tournament ID:', currentTournamentId, 'Team ID:', currentTeamId);
 
-        if (!currentGameId || isNaN(currentTeamId)) {
+        if (!currentTournamentId || isNaN(currentTeamId)) {
             console.warn('[Team Controls] Missing gameId or teamId in URL');
 
             // Try to get from user document
@@ -54,12 +54,12 @@ document.addEventListener('firebase-ready', function() {
 
                 if (userDoc.exists) {
                     const userData = userDoc.data();
-                    currentGameId = userData.assignedGameId;
+                    currentTournamentId = userData.assignedTournamentId || userData.assignedGameId;
                     currentTeamId = userData.assignedTeamId;
 
-                    if (currentGameId && currentTeamId) {
+                    if (currentTournamentId && currentTeamId) {
                         // Redirect with proper params
-                        window.location.href = `team.html?gameId=${currentGameId}&teamId=${currentTeamId}`;
+                        window.location.href = `team.html?tournamentId=${currentTournamentId}&teamId=${currentTeamId}`;
                         return;
                     }
                 }
@@ -84,9 +84,9 @@ document.addEventListener('firebase-ready', function() {
 async function loadTournamentData() {
     try {
         const db = firebase.firestore();
-        const tournamentRef = db.collection('tournaments').doc(currentGameId);
+        const tournamentRef = db.collection('tournaments').doc(currentTournamentId);
 
-        console.log('[Team Controls] Loading tournament:', currentGameId);
+        console.log('[Team Controls] Loading tournament:', currentTournamentId);
 
         // Set up real-time listener
         unsubscribeGameListener = tournamentRef.onSnapshot((doc) => {
@@ -128,9 +128,8 @@ async function loadTournamentData() {
             }));
 
             // Render all sections
-            renderTeamHeader();
+            renderScoreStrip();
             renderTeammates();
-            renderTeamStats();
             renderSpellCards();
             renderActiveConditions();
             renderBoard();
@@ -151,54 +150,66 @@ async function loadTournamentData() {
 }
 
 /**
- * Render team header (name and points)
+ * Resolve player display name from registry (linked name) with fallback to legacy name
  */
-function renderTeamHeader() {
-    const teamColor = getHexColor(teamData.color);
-    const teamNameElement = document.getElementById('teamNameDisplay');
-    const teamPointsElement = document.getElementById('teamPointsDisplay');
-
-    teamNameElement.textContent = teamData.name || `Team ${currentTeamId}`;
-    teamNameElement.classList.remove('team-loading-pulse');
-    teamPointsElement.textContent = teamData.points || 0;
-
-    // Add team color indicator to the header
-    teamNameElement.style.borderLeft = `6px solid ${teamColor}`;
-    teamNameElement.style.paddingLeft = '15px';
-    teamNameElement.style.color = teamColor;
-
-    // Also add a color badge
-    const existingBadge = document.querySelector('.team-color-badge');
-    if (existingBadge) {
-        existingBadge.remove();
+function _resolvePlayerName(player) {
+    if (player.id && window.PlayerUtils && gameData?.players) {
+        const info = window.PlayerUtils.getPlayerDisplayInfo(gameData, player.id);
+        if (info.name && info.name !== 'Unknown') return info.name;
     }
+    return player.name || 'Player';
+}
 
-    const colorBadge = document.createElement('span');
-    colorBadge.className = 'team-color-badge';
-    colorBadge.style.cssText = `
-        display: inline-block;
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        background: ${teamColor};
-        border: 2px solid ${teamColor};
-        box-shadow: 0 0 10px ${teamColor}80;
-        margin-left: 10px;
-        vertical-align: middle;
-    `;
-    teamNameElement.appendChild(colorBadge);
-
-    // Apply team color border to all team panels
-    document.querySelectorAll('.team-panel').forEach(panel => {
-        panel.style.borderTop = `4px solid ${teamColor}`;
-        panel.style.boxShadow = `0 0 15px ${teamColor}20`;
+/**
+ * Get per-player win counts from game history
+ */
+function _getPlayerWinCounts() {
+    const wins = {};
+    (gameData?.gameHistory || []).forEach(match => {
+        (match.winningPlayerIds || []).forEach(id => {
+            wins[id] = (wins[id] || 0) + 1;
+        });
     });
+    return wins;
+}
 
-    // Apply team color to the main header
-    const teamHeader = document.querySelector('.team-header');
-    if (teamHeader) {
-        teamHeader.style.borderBottom = `3px solid ${teamColor}`;
-    }
+/**
+ * Render score strip showing all teams (matches view.html style)
+ */
+function renderScoreStrip() {
+    const container = document.getElementById('scoreStrip');
+    if (!container) return;
+
+    const teams = gameData.teams || [];
+    const playerWins = _getPlayerWinCounts();
+
+    container.innerHTML = teams.map(team => {
+        const color = getHexColor(team.color);
+        const players = team.players || [];
+        const hexPts = team.points || 0;
+        const victoryPts = team.gamesWon || 0;
+        const totalPts = hexPts + victoryPts;
+        const isYou = String(team.id) === String(currentTeamId);
+
+        const playersHtml = players.map((p, i) => {
+            const name = _resolvePlayerName(p);
+            const w = p.id ? (playerWins[p.id] || 0) : 0;
+            const sep = i < players.length - 1 ? '<span class="sc-psep">&middot;</span>' : '';
+            return `<div class="sc-player"><span class="sc-pname">${name}</span><span class="sc-pstar"><span class="star">\u2605</span><span class="pcount">${w}</span></span></div>${sep}`;
+        }).join('');
+
+        return `
+            <div class="sc ${isYou ? 'is-you' : ''}" style="--c: ${color};">
+                <div class="sc-tname-area"><span class="sc-tname">${team.name || 'Team ' + team.id}</span></div>
+                <div class="sc-players-area">${playersHtml}</div>
+                <div class="sc-score-area">
+                    <span class="sc-score-num w">${victoryPts}</span>
+                    <span class="sc-score-num pts">${hexPts}</span>
+                    <span class="sc-score-num total">${totalPts}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 /**
@@ -212,63 +223,122 @@ function renderTeammates() {
         return;
     }
 
+    const isLobbyPhase = gameData?.currentPhase?.name === 'match_1_lobby' || gameData?.currentPhase?.name === 'match_2_lobby';
+    const lobbyReady = gameData?.lobbyReady || {};
+
+    // Find match assignment info for this team (discord channel, side label, lobby creator)
+    const matchInfo = _getTeamMatchInfo();
+
     container.innerHTML = teamData.players.map(player => {
         const isYou = player.uid === currentUser.uid;
+        const playerName = _escapeHtmlSafe(_resolvePlayerName(player));
+
+        // Lobby ready status for this player
+        let readyHTML = '';
+        if (player.uid) {
+            const r = lobbyReady[player.uid] || {};
+            const gl = r.gameLobby === true || r.ready === true;
+            const dc = r.discord === true || r.ready === true;
+            const canClick = isLobbyPhase;
+
+            if (isYou) {
+                // Always show buttons for the current user; only clickable during lobby phase
+                const glDisabled = gl || !canClick;
+                const dcDisabled = dc || !canClick;
+                readyHTML = `
+                    <div class="teammate-ready-buttons">
+                        <button class="teammate-ready-btn ${dc ? 'is-ready' : ''} ${!canClick ? 'phase-locked' : ''}" ${dcDisabled ? 'disabled' : ''}
+                                onclick="event.stopPropagation(); setReadyStatus('discord')">
+                            &#x1F3A7; ${dc ? '&#x2713;' : 'Discord'}
+                        </button>
+                        <button class="teammate-ready-btn ${gl ? 'is-ready' : ''} ${!canClick ? 'phase-locked' : ''}" ${glDisabled ? 'disabled' : ''}
+                                onclick="event.stopPropagation(); setReadyStatus('gameLobby')">
+                            &#x1F3AE; ${gl ? '&#x2713;' : 'Lobby'}
+                        </button>
+                    </div>`;
+            } else {
+                // Always show status indicators for teammates
+                readyHTML = `
+                    <div class="teammate-ready-indicators">
+                        <span class="teammate-ready-icon ${dc ? 'on' : ''}">&#x1F3A7;</span>
+                        <span class="teammate-ready-icon ${gl ? 'on' : ''}">&#x1F3AE;</span>
+                    </div>`;
+            }
+        }
+
+        // Check if this player is the lobby creator
+        const isCreator = matchInfo.lobbyCreatorUid === player.uid;
+
         return `
             <div class="teammate-item ${isYou ? 'you' : ''}">
                 ${isYou ? '<span class="you-label">YOU</span>' : ''}
-                <div class="teammate-name">${player.name || player.email || 'Unknown Player'}</div>
+                ${isCreator ? '<span class="you-label" style="background: rgba(168,85,247,0.2); color: #a855f7; border-color: rgba(168,85,247,0.3);">LOBBY CREATOR</span>' : ''}
+                <div class="teammate-info-row">
+                    <div class="teammate-name">${playerName}</div>
+                    ${readyHTML}
+                </div>
                 ${player.email && !isYou ? `<div class="teammate-id">${player.email}</div>` : ''}
             </div>
         `;
     }).join('');
+
+    // Show match assignment details (Discord channel + side) below the player list
+    if (matchInfo.hasMatch) {
+        let assignmentHTML = '<div class="teammate-assignment-info">';
+        if (matchInfo.discordChannel) {
+            assignmentHTML += `<div class="assignment-badge discord-badge">&#x1F3A7; Discord Channel <strong>#${matchInfo.discordChannel}</strong></div>`;
+        }
+        if (matchInfo.sideLabel) {
+            assignmentHTML += `<div class="assignment-badge side-badge">&#x1F3AE; Game Lobby <strong>${matchInfo.sideLabel}</strong></div>`;
+        }
+        assignmentHTML += '</div>';
+        container.insertAdjacentHTML('beforeend', assignmentHTML);
+    }
 }
 
 /**
- * Render team statistics
+ * Find the current team's match assignment info (Discord channel, side label, lobby creator).
  */
-function renderTeamStats() {
-    // Calculate stats from game history
-    let wins = 0;
-    let losses = 0;
+function _getTeamMatchInfo() {
+    const result = { hasMatch: false, discordChannel: null, sideLabel: null, lobbyCreatorUid: null };
+    const queue = gameData?.gameQueue || [];
 
-    if (gameData.gameHistory && Array.isArray(gameData.gameHistory)) {
-        gameData.gameHistory.forEach(game => {
-            const winners = Array.isArray(game.winner) ? game.winner : [game.winner];
-            const losers = Array.isArray(game.loser) ? game.loser : [game.loser];
+    for (const match of queue) {
+        if (match.isBreak || match.status === 'completed') continue;
+        const sides = match.teams || match.sides || [];
 
-            // Check if this team won or lost
-            const teamWon = winners.some(w =>
-                w === teamData.name ||
-                (teamData.players && teamData.players.some(p => p.name === w))
-            );
+        const mySide = sides.find(side =>
+            (side.players || []).some(p =>
+                teamData.players?.some(tp => tp.uid === p.uid || tp.name === p.name)
+            )
+        );
 
-            const teamLost = losers.some(l =>
-                l === teamData.name ||
-                (teamData.players && teamData.players.some(p => p.name === l))
-            );
+        if (!mySide) continue;
 
-            if (teamWon) wins++;
-            if (teamLost) losses++;
-        });
+        result.hasMatch = true;
+        const mySideId = mySide.id || 'TEAM_A';
+
+        // Discord channel
+        if (match.discordChannels?.[mySideId]) {
+            result.discordChannel = match.discordChannels[mySideId];
+        }
+
+        // Side label: TEAM_A → "Side A", TEAM_B → "Side B"
+        const sideIndex = sides.indexOf(mySide);
+        const sideLetter = mySideId.replace('TEAM_', '');
+        result.sideLabel = sideLetter.length === 1
+            ? `Side ${sideLetter}`
+            : `Side ${String.fromCharCode(65 + sideIndex)}`;
+
+        // Lobby creator
+        if (match.lobbyCreators?.[mySideId]?.uid) {
+            result.lobbyCreatorUid = match.lobbyCreators[mySideId].uid;
+        }
+
+        break; // Use first active match
     }
 
-    const gamesPlayed = wins + losses;
-
-    // Count heart hexes controlled by this team
-    let heartsControlled = 0;
-    if (gameData.heartHexControl) {
-        Object.values(gameData.heartHexControl).forEach(controller => {
-            if (controller === teamData.color || controller === teamData.name) {
-                heartsControlled++;
-            }
-        });
-    }
-
-    document.getElementById('teamWins').textContent = wins;
-    document.getElementById('teamLosses').textContent = losses;
-    document.getElementById('teamGamesPlayed').textContent = gamesPlayed;
-    document.getElementById('teamHeartsControlled').textContent = heartsControlled;
+    return result;
 }
 
 /**
@@ -320,9 +390,9 @@ function viewSpellDetail(spellId) {
     const modal = document.createElement('div');
     modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:10000;';
     modal.innerHTML = `
-        <div style="background: var(--bg-secondary, #1e293b); padding: 25px; border-radius: 12px; max-width: 450px; width: 90%; color: white; border: 2px solid rgba(168,85,247,0.4);">
+        <div style="background: var(--bg-panel, rgba(20, 22, 30, 0.95)); padding: 25px; border-radius: 12px; max-width: 450px; width: 90%; color: white; border: 2px solid rgba(168,85,247,0.4);">
             <h3 style="color: #a855f7; margin-top: 0;">${name}</h3>
-            ${nameEn ? `<p style="color: #94a3b8; font-size: 0.85rem; margin-top: -10px;">${nameEn}</p>` : ''}
+            ${nameEn ? `<p style="color: #9aa1ad; font-size: 0.85rem; margin-top: -10px;">${nameEn}</p>` : ''}
             <p style="font-size: 0.8rem; color: #64748b; text-transform: uppercase;">${def.type || ''} &bull; ${def.rarity || ''} &bull; ${def.timing || ''}</p>
             <p style="line-height: 1.6; color: #cbd5e1;">${desc}</p>
             <button class="btn secondary" onclick="this.closest('div[style]').remove()" style="width: 100%; margin-top: 15px;">Close</button>
@@ -338,7 +408,7 @@ function renderSpellPhaseOverlay() {
     if (!overlay) return;
 
     const phaseName = gameData?.currentPhase?.name;
-    if (phaseName !== 'spell_phase') {
+    if (!phaseName || !phaseName.startsWith('spell_window')) {
         overlay.style.display = 'none';
         return;
     }
@@ -466,7 +536,7 @@ async function castSpellViaFirestore(spellId, targetData) {
     const effectEntry = _buildActiveEffect(spellId, def, targetData);
 
     try {
-        const tournamentRef = window.firebaseDB.collection('tournaments').doc(currentGameId);
+        const tournamentRef = window.firebaseDB.collection('tournaments').doc(currentTournamentId);
         const update = {
             [`spellPiles.${currentTeamId}.hand`]: newHand,
             [`spellPiles.${currentTeamId}.usedPile`]: newUsed,
@@ -489,7 +559,7 @@ async function castSpellViaFirestore(spellId, targetData) {
 /** End spell turn without casting (pass) */
 async function endSpellTurn() {
     try {
-        const tournamentRef = window.firebaseDB.collection('tournaments').doc(currentGameId);
+        const tournamentRef = window.firebaseDB.collection('tournaments').doc(currentTournamentId);
         await tournamentRef.update({
             [`spellPhase.teamsCompleted`]: firebase.firestore.FieldValue.arrayUnion(currentTeamId)
         });
@@ -586,7 +656,7 @@ function renderActiveConditions() {
                         background: rgba(168,85,247,0.05); border-radius: 4px; font-size: 0.85rem;">
                 <span>${eff.icon || '\u{1F52E}'}</span>
                 <strong>${name}</strong>: ${text}
-                ${eff.expiresAfterRound != null ? `<span style="color: #94a3b8;"> (until R${eff.expiresAfterRound})</span>` : ''}
+                ${eff.expiresAfterRound != null ? `<span style="color: #9aa1ad;"> (until R${eff.expiresAfterRound})</span>` : ''}
             </div>
         `;
     }).join('');
@@ -606,10 +676,10 @@ function showSpellConfirmation(spell) {
         const name = _escapeHtmlSafe(spell.name || '');
         const desc = _escapeHtmlSafe(spell.descriptionEn || spell.description || '');
         modal.innerHTML = `
-            <div style="background: var(--bg-secondary, #1e293b); padding: 25px; border-radius: 12px; max-width: 450px; width: 90%; color: white; border: 2px solid rgba(168,85,247,0.4);">
+            <div style="background: var(--bg-panel, rgba(20, 22, 30, 0.95)); padding: 25px; border-radius: 12px; max-width: 450px; width: 90%; color: white; border: 2px solid rgba(168,85,247,0.4);">
                 <h3 style="color: #a855f7; margin-top: 0;">Cast Spell</h3>
                 <h4 style="color: white;">${name}</h4>
-                <p style="color: #94a3b8; font-size: 0.85rem;">${spell.type || ''} &bull; ${spell.rarity || ''}</p>
+                <p style="color: #9aa1ad; font-size: 0.85rem;">${spell.type || ''} &bull; ${spell.rarity || ''}</p>
                 <p style="line-height: 1.6; color: #cbd5e1;">${desc}</p>
                 <div style="display: flex; gap: 10px; margin-top: 20px;">
                     <button id="confirmSpellBtn" class="btn primary" style="flex: 1;">Cast Spell</button>
@@ -647,7 +717,7 @@ function _pickTargetTeam(spell) {
 
         const needsBan = spell.effect?.type === 'ban';
         modal.innerHTML = `
-            <div style="background: var(--bg-secondary, #1e293b); padding: 25px; border-radius: 12px; max-width: 450px; width: 90%; color: white; border: 2px solid rgba(168,85,247,0.4);">
+            <div style="background: var(--bg-panel, rgba(20, 22, 30, 0.95)); padding: 25px; border-radius: 12px; max-width: 450px; width: 90%; color: white; border: 2px solid rgba(168,85,247,0.4);">
                 <h3 style="color: #a855f7; margin-top: 0;">Select Target Team</h3>
                 <div id="targetTeamList" style="display: flex; flex-direction: column; gap: 8px; margin: 15px 0;">
                     ${teams.map(t => `
@@ -659,9 +729,9 @@ function _pickTargetTeam(spell) {
                 </div>
                 ${needsBan ? `
                     <div id="banInputSection" style="display: none; margin-top: 10px;">
-                        <label style="color: #94a3b8; font-size: 0.85rem;">What is banned?</label>
+                        <label style="color: #9aa1ad; font-size: 0.85rem;">What is banned?</label>
                         <input type="text" id="bannedElementInput" placeholder="e.g. AWP, Operator, Sage..."
-                               style="width: 100%; padding: 10px; margin-top: 5px; background: rgba(15,23,42,0.8); border: 1px solid #334155; border-radius: 8px; color: white;">
+                               style="width: 100%; padding: 10px; margin-top: 5px; background: rgba(11,13,16,0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: white;">
                         <button class="btn primary" id="confirmBanBtn" style="width: 100%; margin-top: 10px;">Confirm Ban</button>
                     </div>
                 ` : ''}
@@ -712,14 +782,14 @@ function _pickTargetPlayer(spell) {
                 playersHtml += `
                     <button class="btn secondary target-player-btn" data-team-id="${t.id}" data-player-name="${_escapeHtmlSafe(p.name || p.displayName || '')}" data-player-uid="${p.uid || ''}"
                             style="text-align: left; border-left: 4px solid ${t.color || '#666'};">
-                        ${_escapeHtmlSafe(p.name || p.displayName || 'Player')} <span style="color:#94a3b8;">(${_escapeHtmlSafe(t.name)})</span>
+                        ${_escapeHtmlSafe(p.name || p.displayName || 'Player')} <span style="color:#9aa1ad;">(${_escapeHtmlSafe(t.name)})</span>
                     </button>
                 `;
             });
         });
 
         modal.innerHTML = `
-            <div style="background: var(--bg-secondary, #1e293b); padding: 25px; border-radius: 12px; max-width: 450px; width: 90%; color: white; border: 2px solid rgba(168,85,247,0.4);">
+            <div style="background: var(--bg-panel, rgba(20, 22, 30, 0.95)); padding: 25px; border-radius: 12px; max-width: 450px; width: 90%; color: white; border: 2px solid rgba(168,85,247,0.4);">
                 <h3 style="color: #a855f7; margin-top: 0;">Select Target Player</h3>
                 <div style="display: flex; flex-direction: column; gap: 8px; margin: 15px 0; max-height: 300px; overflow-y: auto;">
                     ${playersHtml}
@@ -753,19 +823,69 @@ function _escapeHtmlSafe(str) {
 }
 
 /**
- * Render game board
+ * Render game board with all effects enabled by default
  */
+let boardModule = null;
+
 function renderBoard() {
     const hexBoardContainer = document.getElementById('hexBoard');
 
     if (!boardRenderer) {
-        const boardModule = new BoardModule();
+        boardModule = new BoardModule();
         boardRenderer = new BoardRenderer(hexBoardContainer, boardModule, {
-            responsive: true
+            responsive: true,
+            showHeartImages: true
         });
+        // Enable all effects by default (no toggle panel)
+        document.body.classList.add('effect-hex-images', 'effect-heart-glow', 'effect-pulse-hearts', 'effect-rooms');
     }
 
     boardRenderer.render(gameData);
+    applyTeamColorsToBoard();
+    applyHexImages(true);
+}
+
+/**
+ * Apply team-N CSS classes to hexes for color overlays
+ */
+function applyTeamColorsToBoard() {
+    document.querySelectorAll('.board-hex').forEach(hex => {
+        hex.classList.remove('team-1', 'team-2', 'team-3', 'team-4', 'team-5', 'team-6');
+        const coord = hex.dataset.coord;
+        if (gameData?.board && gameData.board[coord]) {
+            hex.classList.add(`team-${gameData.board[coord]}`);
+        }
+    });
+}
+
+/**
+ * Apply hex terrain images dynamically via CSS
+ */
+function applyHexImages(enabled) {
+    let styleEl = document.getElementById('hex-images-dynamic-css');
+
+    if (!enabled) {
+        if (styleEl) styleEl.remove();
+        return;
+    }
+
+    if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = 'hex-images-dynamic-css';
+        document.head.appendChild(styleEl);
+    }
+
+    const hexCoords = boardModule.generateHexCoordinates();
+    let css = '';
+
+    hexCoords.forEach(([q, r]) => {
+        const coord = `q${q}r${r}`;
+        css += `body.effect-hex-images .board-hex[data-coord="${coord}"]::before {
+            background-image: url('${(window.BOARDGAME_BASE || '.')}/shared/images/hexes/coords/${coord}.png');
+        }\n`;
+    });
+
+    styleEl.textContent = css;
 }
 
 /**
@@ -773,184 +893,204 @@ function renderBoard() {
  */
 function renderCurrentMatch() {
     const container = document.getElementById('currentMatchDisplay');
-
-    console.log('[Team Controls] Rendering current match:', {
-        currentTurn: gameData.currentTurn,
-        selectedGames: gameData.selectedGames?.length || 0,
-        gameQueue: gameData.gameQueue?.length || 0
-    });
-
-    // Check for matches in multiple sources
     const matchesSource = gameData.gameQueue || gameData.selectedGames || [];
 
     if (matchesSource.length === 0) {
-        container.innerHTML = '<div class="match-status waiting">⏳ No matches scheduled</div>';
+        container.innerHTML = '<div class="empty-state">No matches scheduled</div>';
         return;
     }
 
+    // Find current match
     let currentMatch = null;
-
-    // Strategy 1: If there's a currentTurn, find that match
     if (gameData.currentTurn) {
         currentMatch = matchesSource.find(
             g => g.game === gameData.currentTurn.game || g.gameNumber === gameData.currentTurn.game
         );
     }
-
-    // Strategy 2: If no currentTurn or match not found, use the first pending/waiting match as "current"
     if (!currentMatch) {
         currentMatch = matchesSource.find(m =>
             m.status === 'pending' || m.status === 'waiting' || m.status === 'upcoming' || m.status === 'scheduled' || !m.status
         );
-        console.log('[Team Controls] No active match, using first pending match as current:', currentMatch);
     }
-
-    console.log('[Team Controls] Found current match:', currentMatch);
 
     if (!currentMatch) {
-        container.innerHTML = '<div class="match-status waiting">⏳ No active match. Waiting for next game...</div>';
+        container.innerHTML = '<div class="empty-state">Waiting for next game...</div>';
         return;
     }
 
-    // Check if this team is playing in current match - try multiple methods
-    let isPlaying = false;
-
-    if (currentMatch.sides && Array.isArray(currentMatch.sides)) {
-        isPlaying = currentMatch.sides.some(side =>
-            side.players?.some(p =>
-                teamData.players?.some(tp =>
-                    tp.uid === p.uid ||
-                    tp.name === p.name ||
-                    tp.email === p.email
-                )
-            )
-        );
-    }
-
-    // Fallback: Check if team name is in the match
-    if (!isPlaying && teamData.name) {
-        const matchStr = JSON.stringify(currentMatch).toLowerCase();
-        isPlaying = matchStr.includes(teamData.name.toLowerCase());
-    }
-
-    console.log('[Team Controls] Is team playing in current match:', isPlaying);
-
-    // Determine match status text
     const isActiveMatch = gameData.currentTurn && (currentMatch.game === gameData.currentTurn.game || currentMatch.gameNumber === gameData.currentTurn.game);
-    const statusText = isActiveMatch && isPlaying ? '🎮 IT\'S YOUR TURN!' : isActiveMatch ? '⏳ Match in progress...' : '📋 NEXT MATCH';
-    const statusClass = isActiveMatch && isPlaying ? 'active' : isActiveMatch ? 'waiting' : 'upcoming';
+    const gameName = getGameDisplayName(currentMatch.gameId || currentMatch.gameType || currentMatch.game);
 
-    if (!isPlaying) {
-        // Show the match info anyway but indicate team involvement
-        const sidesData = currentMatch.sides || currentMatch.teams || [];
-        console.log('[Team Controls] Rendering sides (not playing):', sidesData);
+    container.innerHTML = renderMatchCard(currentMatch, gameName, isActiveMatch ? 'live' : 'next');
 
-        let sidesHTML = '';
-        if (sidesData.length === 0) {
-            sidesHTML = '<div style="opacity: 0.5;">No sides configured</div>';
-        } else {
-            const sideElements = sidesData.map((side, index) => {
-                const playersHTML = (side.players || []).map(p => {
-                    return `<div class="player-badge">${p.name || 'Player'}</div>`;
-                }).join('');
+    window.currentDisplayedMatchId = currentMatch.game || currentMatch.gameNumber;
+}
 
-                return `
-                    <div class="match-side">
-                        <div class="team-label">
-                            Side ${String.fromCharCode(65 + index)}
-                        </div>
-                        <div class="player-list">
-                            ${playersHTML || '<div class="empty-state-inline">No players</div>'}
-                        </div>
-                    </div>
-                `;
-            });
-
-            // Add VS dividers between all sides
-            sidesHTML = sideElements.reduce((acc, side, index) => {
-                acc.push(side);
-                if (index < sideElements.length - 1) {
-                    acc.push('<div class="vs-divider">VS</div>');
-                }
-                return acc;
-            }, []).join('');
-        }
-
-        container.innerHTML = `
-            <div class="match-status ${statusClass}">${statusText}</div>
-            <div style="text-align: center; font-weight: bold; font-size: 0.9rem; margin: 8px 0 6px 0; color: var(--accent-primary);">
-                Game ${currentMatch.game || currentMatch.gameNumber} - ${currentMatch.gameType || 'Match'}
-            </div>
-            <div class="match-details">
-                <div class="match-sides">
-                    ${sidesHTML}
-                </div>
-                ${currentMatch.notes ? `<div style="margin-top: 8px; font-size: 0.85rem; opacity: 0.7; font-style: italic; text-align: center;">${currentMatch.notes}</div>` : ''}
-            </div>
-        `;
-        return;
-    }
-
-    // Find which side we're on
-    const sidesData = currentMatch.sides || currentMatch.teams || [];
-    console.log('[Team Controls] Rendering sides (playing):', sidesData);
-
-    let ourSideIndex = -1;
-    sidesData.forEach((side, index) => {
-        if ((side.players || []).some(p => teamData.players?.some(tp => tp.uid === p.uid || tp.name === p.name || tp.email === p.email))) {
-            ourSideIndex = index;
-        }
-    });
+/**
+ * Render a match card in view.html style
+ */
+function renderMatchCard(match, gameName, type) {
+    const sidesData = match.teams || match.sides || [];
+    const statusLabel = type === 'live' ? 'LIVE' : type === 'next' ? 'NEXT' : '';
+    const cardClass = type === 'live' ? 'mc-live' : type === 'next' ? 'mc-next' : 'mc-queued';
 
     let sidesHTML = '';
-    if (sidesData.length === 0) {
-        sidesHTML = '<div style="opacity: 0.5;">No sides configured</div>';
-    } else {
-        const sideElements = sidesData.map((side, index) => {
-            const isOurSide = index === ourSideIndex;
-            const playersHTML = (side.players || []).map(p => {
-                return `<div class="player-badge">${p.name || 'Player'}</div>`;
-            }).join('');
+    if (sidesData.length >= 2) {
+        const sideCards = sidesData.map((side) => {
+            const players = getMatchSidePlayers(side);
+            const isOurSide = players.some(p =>
+                teamData.players?.some(tp => tp.id === p.id || tp.uid === p.uid || tp.name === p.name)
+            );
+            const sideColor = players.length > 0 ? players[0].color : '#8a8fa0';
+            const playersHTML = players.map(p =>
+                `<span class="mc-player" style="color: ${p.color};">${p.name}</span>`
+            ).join('');
 
-            return `
-                <div class="match-side ${isOurSide ? 'your-side' : ''}">
-                    <div class="team-label">
-                        ${isOurSide ? '⭐ Your Side' : `Side ${String.fromCharCode(65 + index)}`}
-                    </div>
-                    <div class="player-list">
-                        ${playersHTML || '<div class="empty-state-inline">No players</div>'}
-                    </div>
-                </div>
-            `;
+            return `<div class="mc-side ${isOurSide ? 'mc-you' : ''}" style="--sc: ${sideColor};">
+                ${playersHTML}
+            </div>`;
         });
 
-        // Add VS dividers between all sides
-        sidesHTML = sideElements.reduce((acc, side, index) => {
-            acc.push(side);
-            if (index < sideElements.length - 1) {
-                acc.push('<div class="vs-divider">VS</div>');
-            }
-            return acc;
-        }, []).join('');
+        sidesHTML = sideCards.join('<div class="mc-vs">VS</div>');
     }
 
-    const matchHTML = `
-        <div class="match-status ${statusClass}">${statusText}</div>
-        <div style="text-align: center; font-weight: bold; font-size: 0.9rem; margin: 8px 0 6px 0; color: var(--accent-primary);">
-            Game ${currentMatch.game || currentMatch.gameNumber} - ${currentMatch.gameType || 'Match'}
-        </div>
-        <div class="match-details">
-            <div class="match-sides">
-                ${sidesHTML}
+    return `
+        <div class="mc ${cardClass}">
+            <div class="mc-top">
+                <span class="mc-game">${gameName}</span>
+                ${statusLabel ? `<span class="mc-badge mc-badge-${type}">${statusLabel}</span>` : ''}
             </div>
-            ${currentMatch.notes ? `<div style="margin-top: 8px; font-size: 0.85rem; opacity: 0.7; font-style: italic; text-align: center;">${currentMatch.notes}</div>` : ''}
+            <div class="mc-matchup">${sidesHTML}</div>
         </div>
     `;
+}
 
-    container.innerHTML = matchHTML;
+/**
+ * Resolve match side to player objects with name and color.
+ * Handles both formats:
+ *   - New: { id, playerIds: [...] }
+ *   - Legacy: { players: [{ name, uid, ... }] }
+ */
+function getMatchSidePlayers(side) {
+    if (!side) return [];
 
-    // Store the current match so upcoming matches can skip it
-    window.currentDisplayedMatchId = currentMatch.game || currentMatch.gameNumber;
+    // New format: playerIds array — resolve via PlayerUtils or gameData
+    if (side.playerIds && Array.isArray(side.playerIds)) {
+        return side.playerIds.map(playerId => {
+            const name = resolveCurrentPlayerName(playerId, null, 'Player');
+            // Determine team from registry or slot notation
+            let teamId = null;
+            if (gameData.players?.[playerId]?.teamId) {
+                teamId = gameData.players[playerId].teamId;
+            } else if (window.PlayerUtils) {
+                const info = window.PlayerUtils.getPlayerDisplayInfo(gameData, playerId);
+                teamId = info.teamId;
+            } else {
+                // Optimizer slot notation fallback
+                const slotMatch = typeof playerId === 'string' && playerId.match(/^(\d+)[a-z]$/);
+                if (slotMatch) teamId = parseInt(slotMatch[1]);
+            }
+            const teamColor = teamId ? getTeamColorById(teamId) : '#8a8fa0';
+            return { id: playerId, name, color: teamColor, teamId };
+        });
+    }
+
+    // Legacy format: players array with embedded data
+    if (side.players && Array.isArray(side.players)) {
+        return side.players.map(p => {
+            const playerId = p.id || p.uid;
+            const teamId = p.originalTeamId;
+
+            // Resolve current name from live data (embedded name may be stale after player linking)
+            let name = resolveCurrentPlayerName(playerId, teamId, p.name);
+
+            const color = p.originalTeamColor ? getHexColor(p.originalTeamColor) :
+                          teamId ? getTeamColorById(teamId) : '#8a8fa0';
+            return { id: playerId, name, color, teamId };
+        });
+    }
+
+    return [];
+}
+
+/**
+ * Get team color by team ID from gameData
+ */
+function getTeamColorById(teamId) {
+    if (!teamId || !gameData?.teams) return '#8a8fa0';
+    const team = gameData.teams.find(t => String(t.id) === String(teamId));
+    return team?.color ? getHexColor(team.color) : '#8a8fa0';
+}
+
+/**
+ * Resolve current player name from live data.
+ * Queue entries embed player names at creation time, but those become stale
+ * when players are linked/replaced. This resolves the current name by checking:
+ * 1. PlayerUtils registry (p_xxx IDs)
+ * 2. gameData.players registry directly
+ * 3. Team players array by ID match
+ * 4. Optimizer slot notation (e.g. "1a" = team 1, player index 0)
+ */
+function resolveCurrentPlayerName(playerId, teamId, fallbackName) {
+    const name = fallbackName || 'Player';
+    if (!playerId) return name;
+
+    // 1. Try PlayerUtils (handles p_xxx registry IDs)
+    if (window.PlayerUtils) {
+        const info = window.PlayerUtils.getPlayerDisplayInfo(gameData, playerId);
+        if (info.name && info.name !== 'Unknown') return info.name;
+    }
+
+    // 2. Direct registry lookup
+    if (gameData.players && gameData.players[playerId]?.name) {
+        return gameData.players[playerId].name;
+    }
+
+    // 3. Search team players by ID — resolve from registry
+    for (const team of (gameData.teams || [])) {
+        const player = (team.players || []).find(p => p.id === playerId);
+        if (player) return _resolvePlayerName(player);
+    }
+
+    // 4. Optimizer slot notation (e.g. "1a" → team 1, index 0; "2b" → team 2, index 1)
+    const slotMatch = typeof playerId === 'string' && playerId.match(/^(\d+)([a-z])$/);
+    if (slotMatch) {
+        const slotTeamId = parseInt(slotMatch[1]);
+        const slotIdx = slotMatch[2].charCodeAt(0) - 97; // 'a'=0, 'b'=1
+        const team = (gameData.teams || []).find(t => String(t.id) === String(slotTeamId));
+        if (team?.players?.[slotIdx]) {
+            // Resolve from registry first (linked name), fall back to legacy array name
+            const p = team.players[slotIdx];
+            return _resolvePlayerName(p);
+        }
+    }
+
+    // 5. If teamId provided, try finding by array position in that team
+    if (teamId) {
+        const team = (gameData.teams || []).find(t => String(t.id) === String(teamId));
+        if (team?.players) {
+            // Find the player by matching name (last resort for pre-migration data)
+            const tp = team.players.find(p => p.name === name);
+            if (tp?.name) return tp.name;
+        }
+    }
+
+    return name;
+}
+
+/**
+ * Get display name for a game
+ */
+function getGameDisplayName(gameId) {
+    if (!gameId) return 'Match';
+    if (gameData.gameDefinitions && gameData.gameDefinitions[gameId]) {
+        return gameData.gameDefinitions[gameId].name || gameId;
+    }
+    if (typeof GAMES_CONFIG !== 'undefined' && GAMES_CONFIG.games) {
+        const game = GAMES_CONFIG.games.find(g => g.id === gameId);
+        if (game) return game.name;
+    }
+    return gameId;
 }
 
 /**
@@ -958,120 +1098,30 @@ function renderCurrentMatch() {
  */
 function renderUpcomingMatches() {
     const container = document.getElementById('upcomingMatchesList');
-
-    // Check multiple possible sources for matches (same as view.html)
     const matchesData = gameData.gameQueue || gameData.selectedGames || gameData.upcomingMatches || gameData.matches || [];
 
-    console.log('[Team Controls] Checking upcoming matches:', {
-        gameQueue: gameData.gameQueue?.length || 0,
-        selectedGames: gameData.selectedGames?.length || 0,
-        upcomingMatches: gameData.upcomingMatches?.length || 0,
-        matches: gameData.matches?.length || 0,
-        totalMatchesData: matchesData.length,
-        teamData: teamData,
-        gameData: gameData
-    });
-
     if (matchesData.length === 0) {
-        container.innerHTML = '<p style="text-align: center; opacity: 0.5;">No upcoming matches scheduled</p>';
+        container.innerHTML = '<p class="empty-state-inline">No upcoming matches scheduled</p>';
         return;
     }
 
-    // Filter upcoming matches that involve this team
-    const upcomingMatches = matchesData.filter(match => {
-        // Skip completed matches
+    // Filter: not completed, not current
+    const displayMatches = matchesData.filter(match => {
         if (match.status === 'completed') return false;
-
-        // Skip the match being shown as current
         const matchId = match.game || match.gameNumber;
-        if (window.currentDisplayedMatchId && matchId === window.currentDisplayedMatchId) {
-            console.log('[Team Controls] Skipping match shown as current:', matchId);
-            return false;
-        }
-
-        // Also skip if there's a currentTurn and this is that match
-        if (gameData.currentTurn && (match.game === gameData.currentTurn.game || match.gameNumber === gameData.currentTurn.game)) {
-            return false;
-        }
-
-        // Check if this team is involved - try multiple methods
-        let isInvolved = false;
-
-        // Method 1: Check sides with player matching
-        if (match.sides && Array.isArray(match.sides)) {
-            isInvolved = match.sides.some(side =>
-                side.players?.some(p =>
-                    teamData.players?.some(tp =>
-                        tp.uid === p.uid ||
-                        tp.name === p.name ||
-                        tp.email === p.email
-                    )
-                )
-            );
-        }
-
-        // Method 2: Check if team name is mentioned
-        if (!isInvolved && teamData.name) {
-            const matchStr = JSON.stringify(match).toLowerCase();
-            isInvolved = matchStr.includes(teamData.name.toLowerCase());
-        }
-
-        // Method 3: For pending/waiting matches, show all (like view.html does)
-        if (!isInvolved && (match.status === 'pending' || match.status === 'waiting' || match.status === 'upcoming' || match.status === 'scheduled')) {
-            console.log('[Team Controls] Including match due to pending status:', match);
-            isInvolved = true;
-        }
-
-        console.log('[Team Controls] Match check:', {
-            game: match.game || match.gameNumber,
-            status: match.status,
-            isInvolved: isInvolved,
-            sides: match.sides,
-            teamPlayers: teamData.players
-        });
-
-        return isInvolved;
+        if (window.currentDisplayedMatchId && matchId === window.currentDisplayedMatchId) return false;
+        if (gameData.currentTurn && (match.game === gameData.currentTurn.game || match.gameNumber === gameData.currentTurn.game)) return false;
+        return true;
     });
 
-    console.log('[Team Controls] Filtered upcoming matches:', upcomingMatches.length);
-
-    // If no team-specific matches, show all upcoming matches
-    const displayMatches = upcomingMatches.length > 0 ? upcomingMatches : matchesData.filter(m =>
-        m.status === 'pending' || m.status === 'waiting' || m.status === 'upcoming' || m.status === 'scheduled' || !m.status
-    );
-
-    console.log('[Team Controls] Display matches:', displayMatches.length);
-
     if (displayMatches.length === 0) {
-        container.innerHTML = '<p style="text-align: center; opacity: 0.5;">No upcoming matches scheduled</p>';
+        container.innerHTML = '<p class="empty-state-inline">No upcoming matches scheduled</p>';
         return;
     }
 
     container.innerHTML = displayMatches.slice(0, 5).map(match => {
-        // Get opponent info
-        let opponentInfo = '';
-        if (match.sides && match.sides.length >= 2) {
-            const opponentSide = match.sides.find(side =>
-                !side.players?.some(p => teamData.players?.some(tp => tp.uid === p.uid || tp.name === p.name))
-            );
-            if (opponentSide && opponentSide.players) {
-                const opponentNames = opponentSide.players.map(p => {
-                    const playerColor = getHexColor(p.color || p.teamColor || p.originalTeamColor);
-                    return `<span style="color: ${playerColor};">${p.name || 'Player'}</span>`;
-                }).join(', ');
-                opponentInfo = `<div style="font-size: 0.85rem; opacity: 0.7; margin-top: 4px;">vs ${opponentNames}</div>`;
-            }
-        }
-
-        return `
-            <div style="background: var(--cream-alpha-1); padding: 10px; border-radius: var(--radius-md); margin-bottom: 10px;">
-                <div style="font-weight: bold; color: var(--accent-primary);">Game ${match.game || match.gameNumber}</div>
-                <div style="font-size: 0.85rem; opacity: 0.7; margin-top: 4px;">
-                    ${match.gameType || 'Match'} - ${match.playType || 'Unknown format'}
-                </div>
-                ${opponentInfo}
-            </div>
-        `;
+        const gameName = getGameDisplayName(match.gameId || match.gameType || match.game);
+        return renderMatchCard(match, gameName, 'queued');
     }).join('');
 }
 
@@ -1109,40 +1159,46 @@ function getHexColor(color) {
  */
 function renderRecentEvents() {
     const container = document.getElementById('recentEventsList');
-
     const events = gameData.events || gameData.gameHistory || [];
 
     if (events.length === 0) {
-        container.innerHTML = '<p style="text-align: center; opacity: 0.5;">No recent events</p>';
+        container.innerHTML = '<p class="empty-state-inline">No recent events</p>';
         return;
     }
 
     const recentEvents = events.slice(-10).reverse();
 
     container.innerHTML = recentEvents.map(event => {
-        let message = event.text || event.message || event.description || '';
-
-        // Format game history entries
+        // Game history entries → result card style
         if (event.gameNumber || event.game) {
-            const gameNum = event.gameNumber || event.game;
-            const winner = Array.isArray(event.winner) ? event.winner.join(', ') : event.winner;
-            const loser = Array.isArray(event.loser) ? event.loser.join(', ') : event.loser;
-            message = `Game ${gameNum}: ${winner} defeated ${loser}`;
+            const gameName = getGameDisplayName(event.gameId || event.gameType || event.game);
+            const winners = Array.isArray(event.winner) ? event.winner : [event.winner];
+            const losers = Array.isArray(event.loser) ? event.loser : [event.loser];
+
+            const winnersHTML = winners.filter(Boolean).map(w =>
+                `<span class="rc-player rc-win">${w}</span>`
+            ).join('');
+            const losersHTML = losers.filter(Boolean).map(l =>
+                `<span class="rc-player rc-loss">${l}</span>`
+            ).join('');
+
+            return `
+                <div class="rc">
+                    <div class="rc-top">
+                        <span class="rc-game">${gameName}</span>
+                    </div>
+                    <div class="rc-matchup">
+                        <div class="rc-side">${winnersHTML}<span class="rc-badge">WIN</span></div>
+                        <div class="rc-vs">vs</div>
+                        <div class="rc-side rc-loser">${losersHTML}</div>
+                    </div>
+                </div>
+            `;
         }
 
-        let timestamp = '';
-        if (event.timestamp) {
-            timestamp = new Date(event.timestamp).toLocaleTimeString();
-        } else if (event.date) {
-            timestamp = new Date(event.date).toLocaleTimeString();
-        }
-
-        return `
-            <div style="background: var(--cream-alpha-05); padding: 8px; border-radius: var(--radius-sm); margin-bottom: 8px; font-size: 0.85rem;">
-                ${timestamp ? `<div style="opacity: 0.5; font-size: 0.75rem;">${timestamp}</div>` : ''}
-                <div>${message}</div>
-            </div>
-        `;
+        // Generic events
+        const message = event.text || event.message || event.description || '';
+        return `<div class="rc rc-event"><div class="rc-msg">${message}</div></div>`;
     }).join('');
 }
 
@@ -1272,7 +1328,7 @@ async function submitVote() {
 
     try {
         const db = firebase.firestore();
-        const tournamentRef = db.collection('tournaments').doc(currentGameId);
+        const tournamentRef = db.collection('tournaments').doc(currentTournamentId);
 
         // Use gameQueue (full version) or selectedGames (legacy)
         const matchSource = gameData.gameQueue || gameData.selectedGames || [];
@@ -1415,7 +1471,7 @@ async function calculateVoteConsensus(matchIndex) {
         // Consensus reached!
         try {
             const db = firebase.firestore();
-            const tournamentRef = db.collection('tournaments').doc(currentGameId);
+            const tournamentRef = db.collection('tournaments').doc(currentTournamentId);
 
             await tournamentRef.update({
                 [`${queueField}.${matchIndex}.voteConsensus`]: {
@@ -1452,7 +1508,7 @@ async function saveTeamName() {
 
     try {
         const db = firebase.firestore();
-        const tournamentRef = db.collection('tournaments').doc(currentGameId);
+        const tournamentRef = db.collection('tournaments').doc(currentTournamentId);
 
         const team = gameData.teams.find(t => String(t.id) === String(currentTeamId));
         if (!team) {
@@ -1521,13 +1577,13 @@ function renderPhaseOverlays() {
     if (lobbyOverlay) lobbyOverlay.style.display = 'none';
     if (spellOverlay) spellOverlay.style.display = 'none';
 
-    if (currentPhase === 'pre_game_instructions') {
+    if (currentPhase === 'match_1_setup' || currentPhase === 'match_2_setup') {
         renderPreGameInstructions();
         if (preGameOverlay) preGameOverlay.style.display = 'flex';
-    } else if (currentPhase === 'lobby_ready') {
+    } else if (currentPhase === 'match_1_lobby' || currentPhase === 'match_2_lobby') {
         renderLobbyReady();
         if (lobbyOverlay) lobbyOverlay.style.display = 'flex';
-    } else if (currentPhase === 'spell_phase') {
+    } else if (currentPhase && currentPhase.startsWith('spell_window')) {
         renderSpellPhaseOverlay();
     }
 }
@@ -1577,7 +1633,7 @@ function renderMatchCardsInto(container) {
             )
         );
         const opponentNames = opponentSide
-            ? (opponentSide.players || []).map(p => p.name || 'Player').join(', ')
+            ? (opponentSide.players || []).map(p => resolveCurrentPlayerName(p.id || p.uid, p.teamId, p.name)).join(', ')
             : 'TBD';
 
         // Find opponent team
@@ -1602,31 +1658,145 @@ function renderMatchCardsInto(container) {
 }
 
 /**
- * Render the lobby ready overlay with ready button and readiness status.
+ * Render the lobby ready overlay with two-button readiness, Discord info, and lobby creator role.
  */
 function renderLobbyReady() {
-    // Render match cards
     const cardsContainer = document.getElementById('matchAssignmentCardsLobby');
     if (cardsContainer) {
-        renderMatchCardsInto(cardsContainer);
+        renderMatchCardsWithDiscord(cardsContainer);
     }
 
-    // Update ready button state
-    const readyBtn = document.getElementById('readyUpBtn');
+    // Update two-button ready state
     const lobbyReady = gameData.lobbyReady || {};
-    const isReady = lobbyReady[currentUser.uid]?.ready === true;
+    const myStatus = lobbyReady[currentUser.uid] || {};
+    const gameLobbyReady = myStatus.gameLobby === true || myStatus.ready === true;
+    const discordReady = myStatus.discord === true || myStatus.ready === true;
 
-    if (readyBtn) {
-        readyBtn.textContent = isReady ? 'READY!' : 'READY UP';
-        readyBtn.classList.toggle('is-ready', isReady);
-        readyBtn.disabled = isReady;
+    const gameLobbyBtn = document.getElementById('readyGameLobbyBtn');
+    const discordBtn = document.getElementById('readyDiscordBtn');
+
+    if (gameLobbyBtn) {
+        gameLobbyBtn.textContent = gameLobbyReady ? '\uD83C\uDFAE Game Lobby \u2713' : '\uD83C\uDFAE Game Lobby';
+        gameLobbyBtn.classList.toggle('is-ready', gameLobbyReady);
+        gameLobbyBtn.disabled = gameLobbyReady;
     }
 
+    if (discordBtn) {
+        discordBtn.textContent = discordReady ? '\uD83C\uDFA7 Discord \u2713' : '\uD83C\uDFA7 Discord';
+        discordBtn.classList.toggle('is-ready', discordReady);
+        discordBtn.disabled = discordReady;
+    }
+
+    renderLobbyCreatorRole();
     renderReadinessStatus();
 }
 
 /**
- * Show per-team readiness in the lobby overlay.
+ * Render match cards enriched with Discord channel and lobby creator info.
+ */
+function renderMatchCardsWithDiscord(container) {
+    const queue = gameData.gameQueue || [];
+
+    const teamMatches = queue.filter(match => {
+        if (match.isBreak || match.status === 'completed') return false;
+        const sides = match.teams || match.sides || [];
+        return sides.some(side =>
+            (side.players || []).some(p =>
+                teamData.players?.some(tp =>
+                    tp.uid === p.uid || tp.name === p.name || tp.email === p.email
+                )
+            )
+        );
+    });
+
+    if (teamMatches.length === 0) {
+        container.innerHTML = '<div class="empty-state">No matches assigned this round. Relax!</div>';
+        return;
+    }
+
+    container.innerHTML = teamMatches.map(match => {
+        const gameId = match.gameType || match.game || '';
+        const gameName = resolveGameName(gameId);
+        const gameImage = resolveGameImage(gameId);
+        const matchTeams = match.teams || match.sides || [];
+
+        // Find which side we're on
+        const mySide = matchTeams.find(side =>
+            (side.players || []).some(p =>
+                teamData.players?.some(tp => tp.uid === p.uid || tp.name === p.name)
+            )
+        );
+        const mySideId = mySide?.id || 'TEAM_A';
+
+        // Discord channel for our side
+        const discordChannel = match.discordChannels?.[mySideId];
+        const discordHTML = discordChannel
+            ? `<div class="discord-channel-badge">\uD83C\uDFA7 Discord Channel #${discordChannel}</div>`
+            : '';
+
+        // Lobby creator for our side
+        const lobbyCreator = match.lobbyCreators?.[mySideId];
+        const isCreator = lobbyCreator?.uid === currentUser.uid;
+        const creatorHTML = lobbyCreator
+            ? `<div class="lobby-creator-info">${isCreator
+                ? '<strong>\u2B50 YOU CREATE THE GAME LOBBY</strong>'
+                : `Join <strong>${lobbyCreator.name || 'Player'}</strong>'s lobby`
+            }</div>`
+            : '';
+
+        // Opponent info
+        const opponentSide = matchTeams.find(side => side !== mySide);
+        const opponentNames = opponentSide
+            ? (opponentSide.players || []).map(p => resolveCurrentPlayerName(p.id || p.uid, p.teamId, p.name)).join(', ')
+            : 'TBD';
+        const opponentTeamId = opponentSide?.players?.[0]?.teamId;
+        const opponentTeam = opponentTeamId != null
+            ? gameData.teams?.find(t => String(t.id) === String(opponentTeamId))
+            : null;
+        const opponentTeamName = opponentTeam?.name || 'Opponent';
+        const opponentColor = getHexColor(opponentTeam?.color);
+
+        return `
+            <div class="match-assignment-card">
+                ${gameImage ? `<img src="${gameImage}" class="game-image" alt="${gameName}" onerror="this.style.display='none'">` : ''}
+                <div class="game-name">${gameName}</div>
+                <div class="opponent-info">
+                    vs <span style="color: ${opponentColor}; font-weight: 600;">${opponentTeamName}</span>
+                </div>
+                <div class="opponent-players">${opponentNames}</div>
+                ${discordHTML}
+                ${creatorHTML}
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * Show lobby creator role prominently if current user is the designated creator.
+ */
+function renderLobbyCreatorRole() {
+    const roleContainer = document.getElementById('lobbyCreatorRole');
+    if (!roleContainer) return;
+
+    const queue = gameData.gameQueue || [];
+    let isCreator = false;
+
+    queue.forEach(match => {
+        if (match.isBreak || match.status === 'completed') return;
+        const lobbyCreators = match.lobbyCreators || {};
+        Object.values(lobbyCreators).forEach(creator => {
+            if (creator?.uid === currentUser.uid) isCreator = true;
+        });
+    });
+
+    roleContainer.style.display = isCreator ? '' : 'none';
+    if (isCreator) {
+        roleContainer.innerHTML = '<span class="lobby-creator-banner">\u2B50 You are the lobby creator \u2014 create the game and invite your team!</span>';
+    }
+}
+
+/**
+ * Show per-team readiness (two-status) in the lobby overlay.
  */
 function renderReadinessStatus() {
     const container = document.getElementById('readyStatus');
@@ -1640,7 +1810,8 @@ function renderReadinessStatus() {
     const activeTeamIds = new Set();
     queue.forEach(match => {
         if (match.isBreak || match.status === 'completed') return;
-        (match.sides || []).forEach(side => {
+        const sides = match.teams || match.sides || [];
+        sides.forEach(side => {
             (side.players || []).forEach(p => {
                 if (p.teamId !== undefined) activeTeamIds.add(String(p.teamId));
             });
@@ -1652,20 +1823,21 @@ function renderReadinessStatus() {
         .map(team => {
             const players = team.players || [];
             const teamColor = getHexColor(team.color);
-            const readyCount = players.filter(p => lobbyReady[p.uid]?.ready).length;
 
             return `
                 <div class="ready-team-group">
                     <div class="ready-team-name" style="color: ${teamColor};">
                         ${team.name || 'Team ' + team.id}
-                        (${readyCount}/${players.length})
                     </div>
                     <div>
                         ${players.map(p => {
-                            const isReady = lobbyReady[p.uid]?.ready === true;
+                            const r = lobbyReady[p.uid] || {};
+                            const gl = r.gameLobby === true || r.ready === true;
+                            const dc = r.discord === true || r.ready === true;
                             const isYou = p.uid === currentUser.uid;
-                            return `<span class="ready-player ${isReady ? 'is-ready' : 'not-ready'}">
-                                ${isReady ? '\u2713' : '\u2717'}
+                            return `<span class="ready-player ${gl && dc ? 'is-ready' : 'not-ready'}">
+                                <span class="ready-icon ${gl ? 'on' : ''}">\uD83C\uDFAE</span>
+                                <span class="ready-icon ${dc ? 'on' : ''}">\uD83C\uDFA7</span>
                                 ${p.name || 'Player'}${isYou ? ' (you)' : ''}
                             </span>`;
                         }).join('')}
@@ -1678,32 +1850,41 @@ function renderReadinessStatus() {
 }
 
 /**
- * Mark current player as ready in Firebase.
+ * Set a specific readiness status for the current player.
+ * @param {'gameLobby'|'discord'} statusType
  */
-async function toggleReady() {
-    if (!currentUser || !currentGameId) return;
+async function setReadyStatus(statusType) {
+    if (!currentUser || !currentTournamentId) return;
 
     const lobbyReady = gameData.lobbyReady || {};
-    if (lobbyReady[currentUser.uid]?.ready) return; // Already ready
+    const existing = lobbyReady[currentUser.uid] || {};
+
+    // Already set this status
+    if (existing[statusType] === true) return;
 
     try {
         const db = firebase.firestore();
-        const tournamentRef = db.collection('tournaments').doc(currentGameId);
+        const tournamentRef = db.collection('tournaments').doc(currentTournamentId);
+        const now = new Date().toISOString();
 
         await tournamentRef.update({
-            [`lobbyReady.${currentUser.uid}`]: {
-                ready: true,
-                readyAt: new Date().toISOString(),
-                teamId: currentTeamId,
-                name: currentUser.displayName || currentUser.email || 'Player'
-            }
+            [`lobbyReady.${currentUser.uid}.${statusType}`]: true,
+            [`lobbyReady.${currentUser.uid}.${statusType}At`]: now,
+            [`lobbyReady.${currentUser.uid}.teamId`]: currentTeamId,
+            [`lobbyReady.${currentUser.uid}.name`]: currentUser.displayName || currentUser.email || 'Player'
         });
 
-        console.log('[Team Controls] Player marked as ready');
+        console.log(`[Team Controls] Player marked ${statusType} ready`);
     } catch (error) {
-        console.error('[Team Controls] Error setting ready:', error);
-        showStatus('Error confirming ready: ' + error.message, 'error');
+        console.error(`[Team Controls] Error setting ${statusType} ready:`, error);
+        showStatus(`Error confirming ${statusType}: ` + error.message, 'error');
     }
+}
+
+/** Legacy: mark both statuses ready at once */
+async function toggleReady() {
+    await setReadyStatus('gameLobby');
+    await setReadyStatus('discord');
 }
 
 /**

@@ -53,6 +53,9 @@ class ActionLogger {
 
         try {
             const tournamentRef = db.collection('tournaments').doc(tournamentId);
+            // Use a dedicated counter doc so _save() writes to the tournament doc
+            // don't cause transaction contention
+            const counterRef = tournamentRef.collection('meta').doc('actionLogCounter');
             const actionLogRef = tournamentRef.collection('actionLog').doc();
 
             const user = this._getUser();
@@ -66,8 +69,8 @@ class ActionLogger {
             };
 
             await db.runTransaction(async (transaction) => {
-                const tournamentDoc = await transaction.get(tournamentRef);
-                const currentSeq = tournamentDoc.data()?.actionLogSequence || 0;
+                const counterDoc = await transaction.get(counterRef);
+                const currentSeq = counterDoc.exists ? (counterDoc.data()?.seq || 0) : 0;
                 const nextSeq = currentSeq + 1;
 
                 const entry = {
@@ -85,7 +88,7 @@ class ActionLogger {
                     undoneAt: null
                 };
 
-                transaction.update(tournamentRef, { actionLogSequence: nextSeq });
+                transaction.set(counterRef, { seq: nextSeq });
                 transaction.set(actionLogRef, entry);
             });
         } catch (error) {

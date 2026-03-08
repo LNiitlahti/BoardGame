@@ -1,0 +1,2485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spell Card Generator</title>
+
+    <!-- Favicons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="../shared/images/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../shared/images/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../shared/images/favicon/favicon-16x16.png">
+    <link rel="shortcut icon" href="../shared/images/favicon/favicon.ico">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0a0c14;
+            color: #e2e8f0;
+            font-family: 'Quantico', sans-serif;
+            min-height: 100vh;
+        }
+
+        /* === TOP BAR === */
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            border-bottom: 1px solid rgba(200, 179, 126, 0.2);
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .top-bar h1 {
+            font-family: 'Russo One', sans-serif;
+            font-size: 1.3rem;
+            color: #c8b37e;
+            letter-spacing: 1px;
+        }
+
+        .top-bar-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .top-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .load-existing-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .load-existing-group select {
+            background: #161927;
+            color: #e2e8f0;
+            border: 1px solid rgba(200, 179, 126, 0.3);
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-family: 'Quantico', sans-serif;
+            font-size: 0.8rem;
+            min-width: 200px;
+        }
+
+        /* === LAYOUT === */
+        .layout {
+            display: flex;
+            gap: 24px;
+            padding: 24px;
+            max-width: 1600px;
+            margin: 0 auto;
+            min-height: calc(100vh - 70px);
+        }
+
+        .form-panel {
+            flex: 1;
+            min-width: 0;
+            overflow-y: auto;
+            max-height: calc(100vh - 100px);
+            padding-right: 8px;
+        }
+
+        .preview-panel {
+            width: 380px;
+            flex-shrink: 0;
+            position: sticky;
+            top: 24px;
+            align-self: flex-start;
+        }
+
+        /* === PANELS === */
+        .panel {
+            background: rgba(15, 17, 25, 0.9);
+            border: 1px solid rgba(200, 179, 126, 0.25);
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .panel h3 {
+            font-family: 'Russo One', sans-serif;
+            color: #c8b37e;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel h3 .panel-icon {
+            font-size: 1rem;
+        }
+
+        /* === FORM ELEMENTS === */
+        .form-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1;
+        }
+
+        .form-group.half { flex: 0.5; }
+        .form-group.third { flex: 0.33; }
+
+        label {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 700;
+        }
+
+        label .optional {
+            color: #64748b;
+            font-weight: 400;
+            text-transform: none;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="color"],
+        select,
+        textarea {
+            background: #161927;
+            color: #e2e8f0;
+            border: 1px solid rgba(200, 179, 126, 0.3);
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-family: 'Quantico', sans-serif;
+            font-size: 0.85rem;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #c8b37e;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        input[type="color"] {
+            width: 50px;
+            height: 34px;
+            padding: 2px;
+            cursor: pointer;
+        }
+
+        input[type="checkbox"] {
+            accent-color: #c8b37e;
+            width: 16px;
+            height: 16px;
+        }
+
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .checkbox-row label {
+            text-transform: none;
+            font-size: 0.85rem;
+            color: #e2e8f0;
+        }
+
+        /* Checkbox group (multi-select via checkboxes) */
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(22, 25, 39, 0.8);
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(200, 179, 126, 0.15);
+            cursor: pointer;
+            text-transform: none;
+            font-size: 0.8rem;
+            color: #cbd5e1;
+            transition: all 0.15s;
+        }
+
+        .checkbox-group label:has(input:checked) {
+            border-color: #c8b37e;
+            background: rgba(200, 179, 126, 0.1);
+            color: #c8b37e;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 12px;
+            height: 12px;
+        }
+
+        /* === BUTTONS === */
+        .btn {
+            padding: 8px 16px;
+            border: 1px solid rgba(200, 179, 126, 0.4);
+            border-radius: 6px;
+            font-family: 'Quantico', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #c8b37e, #a0915e);
+            color: #0a0c14;
+        }
+        .btn-primary:hover { filter: brightness(1.1); }
+
+        .btn-secondary {
+            background: rgba(200, 179, 126, 0.1);
+            color: #c8b37e;
+        }
+        .btn-secondary:hover { background: rgba(200, 179, 126, 0.2); }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+        .btn-danger:hover { background: rgba(239, 68, 68, 0.25); }
+
+        .btn-success {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+        .btn-success:hover { background: rgba(16, 185, 129, 0.25); }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* === STATUS === */
+        .status-bar {
+            padding: 0 24px;
+        }
+
+        .status {
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            transition: opacity 0.3s;
+        }
+
+        .status:empty { display: none; }
+        .status.success { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .status.error { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .status.info { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+
+        /* === PREVIEW CARD === */
+        .card-preview {
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .card-preview-inner {
+            padding: 20px;
+            position: relative;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .card-icon {
+            font-size: 2rem;
+            line-height: 1;
+        }
+
+        .card-badges {
+            display: flex;
+            gap: 6px;
+        }
+
+        .card-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-type {
+            background: rgba(200, 179, 126, 0.2);
+            color: #c8b37e;
+            border: 1px solid rgba(200, 179, 126, 0.3);
+        }
+
+        .badge-rarity-common { background: rgba(148, 163, 184, 0.2); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
+        .badge-rarity-uncommon { background: rgba(52, 211, 153, 0.2); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3); }
+        .badge-rarity-rare { background: rgba(96, 165, 250, 0.2); color: #60a5fa; border: 1px solid rgba(96, 165, 250, 0.3); }
+        .badge-rarity-legendary { background: rgba(251, 191, 36, 0.2); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3); }
+
+        .card-name {
+            font-family: 'Russo One', sans-serif;
+            font-size: 1.2rem;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }
+
+        .card-name-en {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            font-style: italic;
+            margin-bottom: 12px;
+        }
+
+        .card-category {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .category-a { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .category-b { background: rgba(168, 85, 247, 0.2); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.3); }
+
+        .card-description {
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: #cbd5e1;
+            margin-bottom: 12px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+        }
+
+        .card-timing {
+            display: flex;
+            gap: 12px;
+            font-size: 0.75rem;
+            color: #94a3b8;
+            margin-bottom: 10px;
+        }
+
+        .card-timing span { display: flex; align-items: center; gap: 4px; }
+
+        .card-effect {
+            padding: 10px;
+            background: rgba(200, 179, 126, 0.05);
+            border: 1px solid rgba(200, 179, 126, 0.15);
+            border-radius: 6px;
+            font-size: 0.8rem;
+        }
+
+        .card-effect-title {
+            color: #c8b37e;
+            font-weight: 700;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .card-effect-details {
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+
+        .card-effect-details .key { color: #cbd5e1; }
+
+        .preview-toggle {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .preview-toggle button {
+            flex: 1;
+            padding: 6px;
+            border: 1px solid rgba(200, 179, 126, 0.3);
+            border-radius: 6px;
+            background: transparent;
+            color: #94a3b8;
+            font-family: 'Quantico', sans-serif;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preview-toggle button.active {
+            background: rgba(200, 179, 126, 0.15);
+            color: #c8b37e;
+            border-color: #c8b37e;
+        }
+
+        /* JSON preview */
+        .json-preview {
+            background: #0d0f18;
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.72rem;
+            color: #94a3b8;
+            max-height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            line-height: 1.4;
+        }
+
+        .json-preview .json-key { color: #60a5fa; }
+        .json-preview .json-string { color: #34d399; }
+        .json-preview .json-number { color: #fbbf24; }
+        .json-preview .json-bool { color: #f472b6; }
+        .json-preview .json-null { color: #64748b; }
+
+        /* === CONDITIONAL SECTIONS === */
+        .conditional-section {
+            display: none;
+        }
+
+        .conditional-section.visible {
+            display: block;
+        }
+
+        /* === TEMPLATE SELECTOR === */
+        .template-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 24px;
+            background: rgba(200, 179, 126, 0.05);
+            border-bottom: 1px solid rgba(200, 179, 126, 0.1);
+        }
+
+        .template-bar label {
+            color: #c8b37e;
+            font-size: 0.8rem;
+        }
+
+        .template-bar select {
+            background: #161927;
+            color: #e2e8f0;
+            border: 1px solid rgba(200, 179, 126, 0.3);
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-family: 'Quantico', sans-serif;
+            font-size: 0.8rem;
+        }
+
+        /* === SCROLLBAR === */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(200, 179, 126, 0.3); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(200, 179, 126, 0.5); }
+
+        /* === DEMO BOARD === */
+        .demo-section {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0 24px 24px;
+        }
+
+        .demo-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            padding: 12px 0;
+            user-select: none;
+        }
+
+        .demo-header h2 {
+            font-family: 'Russo One', sans-serif;
+            font-size: 1.1rem;
+            color: #c8b37e;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .demo-header .toggle-arrow {
+            transition: transform 0.2s;
+            color: #94a3b8;
+        }
+
+        .demo-header .toggle-arrow.open { transform: rotate(90deg); }
+
+        .demo-content {
+            display: none;
+        }
+
+        .demo-content.open { display: flex; gap: 20px; }
+
+        .demo-board-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 0;
+        }
+
+        .demo-board-section {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 450px;
+            border-radius: 12px;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        #demoBoardContainer { position: relative; }
+
+        .demo-board-section .board-hex {
+            cursor: pointer;
+            transition: filter 0.15s ease;
+        }
+        .demo-board-section .board-hex:hover { filter: brightness(1.3); }
+
+        .demo-sidebar {
+            width: 300px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .demo-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .team-selector {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .team-btn {
+            padding: 6px 14px;
+            border: 2px solid transparent;
+            border-radius: 6px;
+            font-family: 'Quantico', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #fff;
+            opacity: 0.6;
+        }
+
+        .team-btn.active {
+            opacity: 1;
+            border-color: #fff;
+            box-shadow: 0 0 8px currentColor;
+        }
+
+        .team-btn.eraser {
+            background: #333;
+            color: #e2e8f0;
+        }
+
+        .demo-log {
+            max-height: 200px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .demo-log-entry {
+            padding: 4px 8px;
+            background: rgba(200, 179, 126, 0.05);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: #94a3b8;
+            border-left: 3px solid;
+        }
+
+        .demo-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .demo-stat {
+            padding: 6px 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            font-size: 0.75rem;
+            text-align: center;
+        }
+
+        .demo-stat .stat-label { color: #64748b; display: block; font-size: 0.65rem; text-transform: uppercase; }
+        .demo-stat .stat-value { color: #e2e8f0; font-weight: 700; font-size: 1rem; }
+
+        /* Team color overrides for demo board (override default #667eea occupied) */
+        .demo-board-section .board-hex.occupied[data-team="1"]::before { background: #e74c3c; }
+        .demo-board-section .board-hex.occupied[data-team="2"]::before { background: #3498db; }
+        .demo-board-section .board-hex.occupied[data-team="3"]::before { background: #2ecc71; }
+        .demo-board-section .board-hex.occupied[data-team="4"]::before { background: #f1c40f; }
+        .demo-board-section .board-hex.occupied[data-team="5"]::before { background: #2c3e50; }
+
+        /* Hex effect highlights */
+        .board-hex.demo-highlight-destroy {
+            animation: pulse-destroy 0.6s ease-in-out 3;
+        }
+        @keyframes pulse-destroy {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(0.4) sepia(1) saturate(5) hue-rotate(-10deg); }
+        }
+
+        .board-hex.demo-highlight-shield {
+            animation: pulse-shield 0.8s ease-in-out 2;
+        }
+        @keyframes pulse-shield {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.5) drop-shadow(0 0 6px rgba(52, 211, 153, 0.8)); }
+        }
+
+        .board-hex.demo-highlight-place {
+            animation: pulse-place 0.6s ease-in-out 2;
+        }
+        @keyframes pulse-place {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.5) drop-shadow(0 0 6px rgba(96, 165, 250, 0.8)); }
+        }
+
+        .board-hex.demo-highlight-points {
+            animation: pulse-points 0.8s ease-in-out 2;
+        }
+        @keyframes pulse-points {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.8) drop-shadow(0 0 8px rgba(251, 191, 36, 0.8)); }
+        }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 1100px) {
+            .layout {
+                flex-direction: column;
+            }
+            .preview-panel {
+                width: 100%;
+                position: static;
+            }
+            .form-panel {
+                max-height: none;
+            }
+            .demo-content.open {
+                flex-direction: column;
+            }
+            .demo-sidebar {
+                width: 100%;
+            }
+        }
+
+        /* Hidden file input */
+        .hidden-input { display: none; }
+
+        /* Reward/Penalty sub-forms */
+        .sub-form {
+            padding: 10px;
+            margin-top: 8px;
+            background: rgba(0, 0, 0, 0.15);
+            border: 1px solid rgba(200, 179, 126, 0.1);
+            border-radius: 6px;
+        }
+
+        .sub-form-title {
+            font-size: 0.75rem;
+            color: #c8b37e;
+            font-weight: 700;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP BAR -->
+    <div class="top-bar">
+        <div class="top-bar-left">
+            <h1>Spell Card Generator</h1>
+            <div class="load-existing-group">
+                <select id="existingCards">
+                    <option value="">-- Load existing card --</option>
+                </select>
+                <button class="btn btn-secondary" onclick="loadSelectedCard()">Load</button>
+            </div>
+        </div>
+        <div class="top-bar-actions">
+            <button class="btn btn-primary" onclick="saveToFirebase()">Save to Firebase</button>
+            <button class="btn btn-secondary" onclick="duplicateCard()">Duplicate</button>
+            <button class="btn btn-success" onclick="exportJSON()">Export JSON</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('importInput').click()">Import JSON</button>
+            <button class="btn btn-danger" onclick="deleteFromFirebase()">Delete</button>
+            <button class="btn btn-secondary" onclick="resetForm()">New Card</button>
+            <input type="file" id="importInput" class="hidden-input" accept=".json" onchange="importJSON(event)">
+        </div>
+    </div>
+
+    <!-- TEMPLATE BAR -->
+    <div class="template-bar">
+        <label>START FROM TEMPLATE:</label>
+        <select id="templateSelect" onchange="applyTemplate(this.value)">
+            <option value="">-- Select template --</option>
+            <option value="buff">Buff Spell</option>
+            <option value="debuff">Debuff Spell</option>
+            <option value="board">Board Spell</option>
+            <option value="points">Points Spell</option>
+            <option value="counter">Counter Spell</option>
+            <option value="challenge">Challenge Spell</option>
+            <option value="bet">Bet Spell</option>
+            <option value="blank">Blank (clear all)</option>
+        </select>
+    </div>
+
+    <!-- STATUS -->
+    <div class="status-bar">
+        <div id="status" class="status"></div>
+    </div>
+
+    <!-- MAIN LAYOUT -->
+    <div class="layout">
+        <!-- FORM PANEL -->
+        <div class="form-panel">
+
+            <!-- Identity -->
+            <div class="panel">
+                <h3><span class="panel-icon">&#x1f3f7;</span> Identity</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>ID <span class="optional">(auto-generated from name)</span></label>
+                        <input type="text" id="spellId" placeholder="e.g. mountain-purification">
+                    </div>
+                    <div class="form-group half">
+                        <label>Card Number <span class="optional">(optional)</span></label>
+                        <input type="number" id="cardNumber" min="0" placeholder="#">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Name (Finnish)</label>
+                        <input type="text" id="spellName" placeholder="Haltiasuoja" oninput="autoSlugify(); updatePreview()">
+                    </div>
+                    <div class="form-group">
+                        <label>Name (English) <span class="optional">(optional)</span></label>
+                        <input type="text" id="spellNameEn" placeholder="Elf Protection" oninput="updatePreview()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Classification -->
+            <div class="panel">
+                <h3><span class="panel-icon">&#x1f4cb;</span> Classification</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Type</label>
+                        <select id="spellType" onchange="updatePreview()">
+                            <option value="">-- Select --</option>
+                            <option value="pre-game">Pre-Game</option>
+                            <option value="instant">Instant</option>
+                            <option value="defensive">Defensive</option>
+                            <option value="aggressive">Aggressive</option>
+                            <option value="tactical">Tactical</option>
+                            <option value="challenge">Challenge</option>
+                            <option value="debuff">Debuff</option>
+                            <option value="buff">Buff</option>
+                            <option value="counter">Counter</option>
+                            <option value="event-modifier">Event Modifier</option>
+                            <option value="placement">Placement</option>
+                            <option value="bet">Bet</option>
+                            <option value="permanent-buff">Permanent Buff</option>
+                            <option value="rare-treasure">Rare Treasure</option>
+                            <option value="special">Special</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Rarity</label>
+                        <select id="spellRarity" onchange="updatePreview()">
+                            <option value="common">Common</option>
+                            <option value="uncommon">Uncommon</option>
+                            <option value="rare">Rare</option>
+                            <option value="legendary">Legendary</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="spellCategory" onchange="updatePreview()">
+                            <option value="">-- Select --</option>
+                            <option value="A">A — Board/Points (system-executed)</option>
+                            <option value="B">B — Condition (human-enforced)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Descriptions -->
+            <div class="panel">
+                <h3><span class="panel-icon">&#x1f4dd;</span> Descriptions</h3>
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label>Description (Finnish)</label>
+                    <textarea id="spellDescription" rows="3" placeholder="Full Finnish description..." oninput="updatePreview()"></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label>Description (English) <span class="optional">(optional)</span></label>
+                    <textarea id="spellDescriptionEn" rows="3" placeholder="English translation..." oninput="updatePreview()"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Short Description <span class="optional">(one-liner)</span></label>
+                        <input type="text" id="shortDescription" placeholder="Protect tiles from removal" oninput="updatePreview()">
+                    </div>
+                    <div class="form-group">
+                        <label>Flavor Text <span class="optional">(optional)</span></label>
+                        <input type="text" id="flavorText" placeholder="Optional lore text..." oninput="updatePreview()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timing & Targeting -->
+            <div class="panel">
+                <h3><span class="panel-icon">&#x23f1;</span> Timing & Targeting</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Timing</label>
+                        <select id="spellTiming" onchange="updatePreview()">
+                            <option value="">-- Select --</option>
+                            <option value="pre-game">Pre-Game</option>
+                            <option value="post-game">Post-Game</option>
+                            <option value="anytime">Anytime</option>
+                            <option value="placement">On Placement</option>
+                            <option value="after-placement">After Placement</option>
+                            <option value="persistent">Persistent</option>
+                            <option value="reactive">Reactive</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Target Type</label>
+                        <select id="targetType" onchange="updatePreview()">
+                            <option value="">-- Select --</option>
+                            <option value="self">Self</option>
+                            <option value="opponent-team">Opponent Team</option>
+                            <option value="opponent-player">Opponent Player</option>
+                            <option value="opponents">All Opponents</option>
+                            <option value="board">Board</option>
+                            <option value="center">Center</option>
+                            <option value="adjacent-enemies">Adjacent Enemies</option>
+                            <option value="opponent-card">Opponent Card</option>
+                            <option value="opponent-draw">Opponent Draw</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group half">
+                        <div class="checkbox-row">
+                            <input type="checkbox" id="requiresTargetSelection" onchange="toggleTargetCount(); updatePreview()">
+                            <label for="requiresTargetSelection">Requires target selection</label>
+                        </div>
+                    </div>
+                    <div class="form-group half conditional-section" id="targetCountGroup">
+                        <label>Target Count</label>
+                        <input type="number" id="targetCount" min="1" value="1" onchange="updatePreview()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Effect -->
+            <div class="panel">
+                <h3><span class="panel-icon">&#x2728;</span> Effect</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Effect Type</label>
+                        <select id="effectType" onchange="updateEffectFields(); updatePreview()">
+                            <option value="">-- Select --</option>
+                            <option value="multiplier">Multiplier</option>
+                            <option value="destroy_adjacent">Destroy Adjacent</option>
+                            <option value="streak_bonus">Streak Bonus</option>
+                            <option value="shield">Shield</option>
+                            <option value="copy_spell">Copy Spell</option>
+                            <option value="challenge">Challenge</option>
+                            <option value="bonus_points">Bonus Points</option>
+                            <option value="extra_placement">Extra Placement</option>
+                            <option value="ban">Ban</option>
+                            <option value="silence">Silence</option>
+                            <option value="modifier">Modifier</option>
+                            <option value="permanent_buff">Permanent Buff</option>
+                            <option value="counter">Counter</option>
+                            <option value="bet">Bet</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Condition & Duration -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Condition <span class="optional">(optional)</span></label>
+                        <select id="effectCondition" onchange="updatePreview()">
+                            <option value="">None</option>
+                            <option value="team_wins">Team Wins</option>
+                            <option value="placement_1_or_2">Placement 1st or 2nd</option>
+                            <option value="win_streak_3">3-Win Streak</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Duration <span class="optional">(optional)</span></label>
+                        <select id="effectDuration" onchange="updatePreview()">
+                            <option value="">None</option>
+                            <option value="next_game">Next Game</option>
+                            <option value="one_game">One Game</option>
+                            <option value="permanent">Permanent</option>
+                            <option value="until_used">Until Used</option>
+                            <option value="next_round_end">Next Round End</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Numeric fields (shown/hidden by effect type) -->
+                <div class="conditional-section" id="numericFields">
+                    <div class="form-row">
+                        <div class="form-group conditional-section" id="multiplierGroup">
+                            <label>Multiplier</label>
+                            <input type="number" id="effectMultiplier" min="1" value="2" onchange="updatePreview()">
+                        </div>
+                        <div class="form-group conditional-section" id="bonusPointsGroup">
+                            <label>Bonus Points</label>
+                            <input type="number" id="effectBonusPoints" min="0" onchange="updatePreview()">
+                        </div>
+                        <div class="form-group conditional-section" id="bonusTilesGroup">
+                            <label>Bonus Tiles</label>
+                            <input type="number" id="effectBonusTiles" min="0" onchange="updatePreview()">
+                        </div>
+                        <div class="form-group conditional-section" id="usesGroup">
+                            <label>Uses</label>
+                            <input type="number" id="effectUses" min="1" onchange="updatePreview()">
+                        </div>
+                        <div class="form-group conditional-section" id="predictionsGroup">
+                            <label>Predictions</label>
+                            <input type="number" id="effectPredictions" min="1" onchange="updatePreview()">
+                        </div>
+                        <div class="form-group conditional-section" id="streakGroup">
+                            <label>Streak Required</label>
+                            <input type="number" id="effectStreak" min="1" onchange="updatePreview()">
+                        </div>
+                        <div class="form-group conditional-section" id="amountGroup">
+                            <label>Amount</label>
+                            <input type="number" id="effectAmount" min="1" onchange="updatePreview()">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Target sub-field -->
+                <div class="form-row">
+                    <div class="form-group conditional-section" id="effectTargetGroup">
+                        <label>Effect Sub-Target</label>
+                        <select id="effectTarget" onchange="updatePreview()">
+                            <option value="">None</option>
+                            <option value="adjacent_opponent_tiles">Adjacent Opponent Tiles</option>
+                            <option value="game_element">Game Element</option>
+                            <option value="single_player">Single Player</option>
+                            <option value="used_opponent_card">Used Opponent Card</option>
+                        </select>
+                    </div>
+                    <div class="form-group conditional-section" id="triggerGroup">
+                        <label>Trigger</label>
+                        <select id="effectTrigger" onchange="updatePreview()">
+                            <option value="">None</option>
+                            <option value="draw_hex_placement">Draw Hex Placement</option>
+                            <option value="heart_capture">Heart Capture</option>
+                            <option value="opponent_event_draw">Opponent Event Draw</option>
+                            <option value="on_placement">On Placement</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Applies To / Restrictions / Protects -->
+                <div class="conditional-section" id="appliesToGroup" style="margin-bottom: 12px;">
+                    <label style="margin-bottom: 6px; display: block;">Applies To</label>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" value="points" onchange="updatePreview()"> Points</label>
+                        <label><input type="checkbox" value="tiles" onchange="updatePreview()"> Tiles</label>
+                    </div>
+                </div>
+
+                <div class="conditional-section" id="restrictionsGroup" style="margin-bottom: 12px;">
+                    <label style="margin-bottom: 6px; display: block;">Restrictions</label>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" value="no_hearts_adjacent" onchange="updatePreview()"> No Hearts Adjacent</label>
+                        <label><input type="checkbox" value="no_opponent_adjacent" onchange="updatePreview()"> No Opponent Adjacent</label>
+                    </div>
+                </div>
+
+                <div class="conditional-section" id="protectsGroup" style="margin-bottom: 12px;">
+                    <label style="margin-bottom: 6px; display: block;">Protects</label>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" value="tiles" onchange="updatePreview()"> Tiles</label>
+                        <label><input type="checkbox" value="negative_effects" onchange="updatePreview()"> Negative Effects</label>
+                    </div>
+                </div>
+
+                <!-- Calculation -->
+                <div class="form-group conditional-section" id="calculationGroup" style="margin-bottom: 12px;">
+                    <label>Calculation Method</label>
+                    <select id="effectCalculation" onchange="updatePreview()">
+                        <option value="">None (flat value)</option>
+                        <option value="controlled_hearts">Controlled Hearts</option>
+                    </select>
+                </div>
+
+                <!-- Counter Action -->
+                <div class="form-group conditional-section" id="counterActionGroup" style="margin-bottom: 12px;">
+                    <label>Counter Action</label>
+                    <select id="effectCounterAction" onchange="updatePreview()">
+                        <option value="">None</option>
+                        <option value="cancel_and_discard">Cancel and Discard</option>
+                    </select>
+                </div>
+
+                <!-- Reward sub-form -->
+                <div class="conditional-section" id="rewardGroup">
+                    <div class="sub-form">
+                        <div class="sub-form-title">Reward</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Points</label>
+                                <input type="number" id="rewardPoints" min="0" onchange="updatePreview()">
+                            </div>
+                            <div class="form-group">
+                                <label>Tiles</label>
+                                <input type="number" id="rewardTiles" min="0" onchange="updatePreview()">
+                            </div>
+                            <div class="form-group">
+                                <label>Placement</label>
+                                <input type="text" id="rewardPlacement" placeholder="e.g. center_adjacent" onchange="updatePreview()">
+                            </div>
+                        </div>
+                        <div class="checkbox-row">
+                            <input type="checkbox" id="rewardCanReplace" onchange="updatePreview()">
+                            <label for="rewardCanReplace">Can replace existing tiles</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bonus sub-form -->
+                <div class="conditional-section" id="bonusSubGroup">
+                    <div class="sub-form">
+                        <div class="sub-form-title">Bonus</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Tiles</label>
+                                <input type="number" id="bonusSubTiles" min="0" onchange="updatePreview()">
+                            </div>
+                            <div class="form-group">
+                                <label>Points</label>
+                                <input type="number" id="bonusSubPoints" min="0" onchange="updatePreview()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Penalty sub-form -->
+                <div class="conditional-section" id="penaltyGroup">
+                    <div class="sub-form">
+                        <div class="sub-form-title">Penalty</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Destroy Tiles</label>
+                                <input type="number" id="penaltyDestroyTiles" min="0" onchange="updatePreview()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Display -->
+            <div class="panel">
+                <h3><span class="panel-icon">&#x1f3a8;</span> Display</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Icon <span class="optional">(emoji or text)</span></label>
+                        <input type="text" id="spellIcon" placeholder="e.g. &#x1f6e1;" oninput="updatePreview()">
+                    </div>
+                    <div class="form-group half">
+                        <label>Card Colour</label>
+                        <input type="color" id="spellColor" value="#c8b37e" oninput="updatePreview()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metadata -->
+            <div class="panel">
+                <h3><span class="panel-icon">&#x2699;</span> Metadata</h3>
+                <div class="checkbox-row">
+                    <input type="checkbox" id="isActive" checked onchange="updatePreview()">
+                    <label for="isActive">Active (available for use)</label>
+                </div>
+                <div class="form-group">
+                    <label>Admin Notes <span class="optional">(not shown to players)</span></label>
+                    <textarea id="adminNotes" rows="2" placeholder="Internal notes..." oninput="updatePreview()"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- PREVIEW PANEL -->
+        <div class="preview-panel">
+            <div class="panel" style="position: sticky; top: 0;">
+                <h3><span class="panel-icon">&#x1f441;</span> Preview</h3>
+
+                <div class="preview-toggle">
+                    <button class="active" onclick="setPreviewMode('player', this)">Player View</button>
+                    <button onclick="setPreviewMode('admin', this)">Admin / JSON</button>
+                </div>
+
+                <div id="playerPreview">
+                    <div class="card-preview" id="cardPreview">
+                        <div class="card-preview-inner" style="border: 2px solid rgba(200, 179, 126, 0.3); border-radius: 12px;">
+                            <div class="card-header">
+                                <span class="card-icon" id="previewIcon"></span>
+                                <div class="card-badges">
+                                    <span class="card-badge badge-type" id="previewType"></span>
+                                    <span class="card-badge" id="previewRarity"></span>
+                                </div>
+                            </div>
+                            <div class="card-name" id="previewName">Card Name</div>
+                            <div class="card-name-en" id="previewNameEn"></div>
+                            <div class="card-category" id="previewCategory"></div>
+                            <div class="card-description" id="previewDescription">Card description will appear here...</div>
+                            <div class="card-timing" id="previewTiming"></div>
+                            <div class="card-effect" id="previewEffect" style="display: none;">
+                                <div class="card-effect-title">Effect</div>
+                                <div class="card-effect-details" id="previewEffectDetails"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="adminPreview" style="display: none;">
+                    <div class="json-preview" id="jsonPreview"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DEMO BOARD SECTION -->
+    <div class="demo-section">
+        <div class="panel">
+            <div class="demo-header" onclick="toggleDemoBoard()">
+                <h2>
+                    <span class="toggle-arrow" id="demoArrow">&#x25b6;</span>
+                    Effect Demo Board
+                </h2>
+                <span style="font-size: 0.75rem; color: #64748b;">Click to expand — place tiles and simulate spell effects</span>
+            </div>
+            <div class="demo-content" id="demoContent">
+                <div class="demo-board-area">
+                    <section class="demo-board-section">
+                        <div id="demoBoardContainer"></div>
+                    </section>
+                </div>
+                <div class="demo-sidebar">
+                    <!-- Team Selector -->
+                    <div class="panel">
+                        <h3>Place Tiles</h3>
+                        <p style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 8px;">Select a team, then click hexes to place tiles.</p>
+                        <div class="team-selector" id="teamSelector">
+                            <button class="team-btn active" data-team="1" style="background: #e74c3c;" onclick="selectDemoTeam(1, this)">Team 1</button>
+                            <button class="team-btn" data-team="2" style="background: #3498db;" onclick="selectDemoTeam(2, this)">Team 2</button>
+                            <button class="team-btn" data-team="3" style="background: #2ecc71;" onclick="selectDemoTeam(3, this)">Team 3</button>
+                            <button class="team-btn" data-team="4" style="background: #f1c40f; color: #333;" onclick="selectDemoTeam(4, this)">Team 4</button>
+                            <button class="team-btn" data-team="5" style="background: #2c3e50;" onclick="selectDemoTeam(5, this)">Team 5</button>
+                            <button class="team-btn eraser" data-team="0" onclick="selectDemoTeam(0, this)">Eraser</button>
+                        </div>
+                    </div>
+
+                    <!-- Board Stats -->
+                    <div class="panel">
+                        <h3>Board State</h3>
+                        <div class="demo-stats" id="demoStats">
+                            <div class="demo-stat"><span class="stat-label">Total Tiles</span><span class="stat-value" id="statTotal">0</span></div>
+                            <div class="demo-stat"><span class="stat-label">Hearts Held</span><span class="stat-value" id="statHearts">0</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Simulate Effect -->
+                    <div class="panel">
+                        <h3>Simulate Effect</h3>
+                        <p style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 8px;">Uses the current card's effect on the selected team's tiles.</p>
+                        <div class="demo-controls">
+                            <button class="btn btn-primary" onclick="simulateCurrentEffect()">Cast Current Spell</button>
+                            <button class="btn btn-secondary" onclick="resetDemoBoard()">Reset Board</button>
+                            <button class="btn btn-secondary" onclick="randomizeDemoBoard()">Randomize Tiles</button>
+                        </div>
+                    </div>
+
+                    <!-- Effect Log -->
+                    <div class="panel">
+                        <h3>Effect Log</h3>
+                        <div class="demo-log" id="demoLog">
+                            <div class="demo-log-entry" style="border-color: #64748b;">Place tiles and cast spells to see effects here</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>window.BOARDGAME_BASE = '..';</script>
+    <script src="../shared/scripts/firebase-loader.js"></script>
+    <script src="../shared/scripts/config.js"></script>
+    <script src="../shared/scripts/board-module.js"></script>
+    <script src="../shared/scripts/board-renderer.js"></script>
+    <script>
+        // ============================================
+        // SPELL CARD GENERATOR
+        // ============================================
+
+        let currentPreviewMode = 'player';
+        let firebaseReady = false;
+        let allCards = [];
+
+        // Wait for Firebase
+        if (window.firebaseDB) {
+            firebaseReady = true;
+            loadExistingCards();
+        } else {
+            document.addEventListener('firebase-ready', () => {
+                firebaseReady = true;
+                loadExistingCards();
+            }, { once: true });
+        }
+
+        // ============================================
+        // TEMPLATES
+        // ============================================
+
+        const TEMPLATES = {
+            buff: {
+                type: 'permanent-buff',
+                rarity: 'uncommon',
+                category: 'B',
+                timing: 'persistent',
+                targetType: 'self',
+                effectType: 'permanent_buff',
+                effectDuration: 'next_round_end'
+            },
+            debuff: {
+                type: 'debuff',
+                rarity: 'uncommon',
+                category: 'B',
+                timing: 'pre-game',
+                targetType: 'opponent-team',
+                effectType: 'ban',
+                effectDuration: 'next_game'
+            },
+            board: {
+                type: 'placement',
+                rarity: 'uncommon',
+                category: 'A',
+                timing: 'placement',
+                targetType: 'board',
+                effectType: 'extra_placement'
+            },
+            points: {
+                type: 'instant',
+                rarity: 'common',
+                category: 'A',
+                timing: 'post-game',
+                targetType: 'self',
+                effectType: 'bonus_points'
+            },
+            counter: {
+                type: 'counter',
+                rarity: 'rare',
+                category: 'A',
+                timing: 'reactive',
+                targetType: 'opponent-draw',
+                effectType: 'counter'
+            },
+            challenge: {
+                type: 'challenge',
+                rarity: 'uncommon',
+                category: 'B',
+                timing: 'pre-game',
+                targetType: 'center',
+                effectType: 'challenge'
+            },
+            bet: {
+                type: 'bet',
+                rarity: 'uncommon',
+                category: 'A',
+                timing: 'pre-game',
+                targetType: 'self',
+                effectType: 'bet'
+            }
+        };
+
+        function applyTemplate(templateKey) {
+            if (templateKey === 'blank' || !templateKey) {
+                resetForm();
+                return;
+            }
+
+            const t = TEMPLATES[templateKey];
+            if (!t) return;
+
+            resetForm();
+
+            if (t.type) document.getElementById('spellType').value = t.type;
+            if (t.rarity) document.getElementById('spellRarity').value = t.rarity;
+            if (t.category) document.getElementById('spellCategory').value = t.category;
+            if (t.timing) document.getElementById('spellTiming').value = t.timing;
+            if (t.targetType) document.getElementById('targetType').value = t.targetType;
+            if (t.effectType) document.getElementById('effectType').value = t.effectType;
+            if (t.effectDuration) document.getElementById('effectDuration').value = t.effectDuration;
+
+            updateEffectFields();
+            updatePreview();
+            showStatus(`Template "${templateKey}" applied`, 'info');
+        }
+
+        // ============================================
+        // FORM HELPERS
+        // ============================================
+
+        function autoSlugify() {
+            const name = document.getElementById('spellName').value;
+            const idField = document.getElementById('spellId');
+            // Only auto-slug if the ID field is empty or was previously auto-generated
+            if (!idField.dataset.manual) {
+                idField.value = slugify(name);
+            }
+        }
+
+        function slugify(text) {
+            return text
+                .toLowerCase()
+                .replace(/[äå]/g, 'a')
+                .replace(/ö/g, 'o')
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '')
+                .substring(0, 60);
+        }
+
+        // Mark ID field as manually edited if user types in it
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('spellId').addEventListener('input', function() {
+                this.dataset.manual = 'true';
+            });
+            updatePreview();
+        });
+
+        function toggleTargetCount() {
+            const group = document.getElementById('targetCountGroup');
+            const checked = document.getElementById('requiresTargetSelection').checked;
+            group.classList.toggle('visible', checked);
+        }
+
+        // ============================================
+        // EFFECT TYPE → VISIBLE FIELDS MAPPING
+        // ============================================
+
+        const EFFECT_FIELD_MAP = {
+            multiplier:       { numeric: ['multiplierGroup'], checkboxGroups: ['appliesToGroup'] },
+            destroy_adjacent: { fields: ['effectTargetGroup', 'triggerGroup'] },
+            streak_bonus:     { numeric: ['streakGroup'], subForms: ['bonusSubGroup'] },
+            shield:           { checkboxGroups: ['protectsGroup'] },
+            copy_spell:       { fields: ['effectTargetGroup'] },
+            challenge:        { subForms: ['rewardGroup'] },
+            bonus_points:     { fields: ['calculationGroup'], numeric: ['bonusPointsGroup'] },
+            extra_placement:  { numeric: ['amountGroup'], checkboxGroups: ['restrictionsGroup'] },
+            ban:              { fields: ['effectTargetGroup'] },
+            silence:          { fields: ['effectTargetGroup'] },
+            modifier:         { fields: ['triggerGroup'], numeric: ['usesGroup'] },
+            permanent_buff:   { fields: ['triggerGroup'], subForms: ['bonusSubGroup'] },
+            counter:          { fields: ['triggerGroup', 'counterActionGroup'] },
+            bet:              { numeric: ['predictionsGroup'], subForms: ['rewardGroup', 'penaltyGroup'] }
+        };
+
+        function updateEffectFields() {
+            const effectType = document.getElementById('effectType').value;
+
+            // Hide all conditional effect fields
+            const allConditional = document.querySelectorAll('#numericFields .conditional-section, #effectTargetGroup, #triggerGroup, #appliesToGroup, #restrictionsGroup, #protectsGroup, #calculationGroup, #counterActionGroup, #rewardGroup, #bonusSubGroup, #penaltyGroup');
+            allConditional.forEach(el => el.classList.remove('visible'));
+
+            // Show numericFields container only if needed
+            document.getElementById('numericFields').classList.remove('visible');
+
+            if (!effectType) return;
+
+            const config = EFFECT_FIELD_MAP[effectType];
+            if (!config) return;
+
+            if (config.numeric && config.numeric.length > 0) {
+                document.getElementById('numericFields').classList.add('visible');
+                config.numeric.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.classList.add('visible');
+                });
+            }
+
+            if (config.fields) {
+                config.fields.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.classList.add('visible');
+                });
+            }
+
+            if (config.checkboxGroups) {
+                config.checkboxGroups.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.classList.add('visible');
+                });
+            }
+
+            if (config.subForms) {
+                config.subForms.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.classList.add('visible');
+                });
+            }
+        }
+
+        // ============================================
+        // BUILD SPELL OBJECT FROM FORM
+        // ============================================
+
+        function buildSpellObject() {
+            const spell = {};
+
+            // Identity
+            spell.id = document.getElementById('spellId').value.trim();
+            spell.name = document.getElementById('spellName').value.trim();
+            const nameEn = document.getElementById('spellNameEn').value.trim();
+            if (nameEn) spell.nameEn = nameEn;
+            const cardNum = document.getElementById('cardNumber').value;
+            if (cardNum) spell.cardNumber = parseInt(cardNum);
+
+            // Classification
+            spell.type = document.getElementById('spellType').value;
+            spell.rarity = document.getElementById('spellRarity').value;
+            const category = document.getElementById('spellCategory').value;
+            if (category) spell.category = category;
+
+            // Descriptions
+            spell.description = document.getElementById('spellDescription').value.trim();
+            const descEn = document.getElementById('spellDescriptionEn').value.trim();
+            if (descEn) spell.descriptionEn = descEn;
+            const shortDesc = document.getElementById('shortDescription').value.trim();
+            if (shortDesc) spell.shortDescription = shortDesc;
+            const flavor = document.getElementById('flavorText').value.trim();
+            if (flavor) spell.flavorText = flavor;
+
+            // Timing & Targeting
+            spell.timing = document.getElementById('spellTiming').value;
+            spell.targetType = document.getElementById('targetType').value;
+            if (document.getElementById('requiresTargetSelection').checked) {
+                spell.requiresTargetSelection = true;
+                spell.targetCount = parseInt(document.getElementById('targetCount').value) || 1;
+            }
+
+            // Effect
+            const effectType = document.getElementById('effectType').value;
+            if (effectType) {
+                spell.effect = { type: effectType };
+                const eff = spell.effect;
+
+                // Condition & Duration
+                const condition = document.getElementById('effectCondition').value;
+                if (condition) eff.condition = condition;
+                const duration = document.getElementById('effectDuration').value;
+                if (duration) eff.duration = duration;
+
+                // Numeric fields
+                const multiplier = document.getElementById('effectMultiplier').value;
+                if (multiplier && document.getElementById('multiplierGroup').classList.contains('visible')) {
+                    eff.multiplier = parseInt(multiplier);
+                }
+                const bonusPoints = document.getElementById('effectBonusPoints').value;
+                if (bonusPoints && document.getElementById('bonusPointsGroup').classList.contains('visible')) {
+                    eff.bonusPoints = parseInt(bonusPoints);
+                }
+                const bonusTiles = document.getElementById('effectBonusTiles').value;
+                if (bonusTiles && document.getElementById('bonusTilesGroup').classList.contains('visible')) {
+                    eff.bonusTiles = parseInt(bonusTiles);
+                }
+                const uses = document.getElementById('effectUses').value;
+                if (uses && document.getElementById('usesGroup').classList.contains('visible')) {
+                    eff.uses = parseInt(uses);
+                }
+                const predictions = document.getElementById('effectPredictions').value;
+                if (predictions && document.getElementById('predictionsGroup').classList.contains('visible')) {
+                    eff.predictions = parseInt(predictions);
+                }
+                const streak = document.getElementById('effectStreak').value;
+                if (streak && document.getElementById('streakGroup').classList.contains('visible')) {
+                    eff.streakRequired = parseInt(streak);
+                }
+                const amount = document.getElementById('effectAmount').value;
+                if (amount && document.getElementById('amountGroup').classList.contains('visible')) {
+                    eff.amount = parseInt(amount);
+                }
+
+                // Target & Trigger
+                const effectTarget = document.getElementById('effectTarget').value;
+                if (effectTarget && document.getElementById('effectTargetGroup').classList.contains('visible')) {
+                    eff.target = effectTarget;
+                }
+                const trigger = document.getElementById('effectTrigger').value;
+                if (trigger && document.getElementById('triggerGroup').classList.contains('visible')) {
+                    eff.trigger = trigger;
+                }
+
+                // Checkbox groups
+                if (document.getElementById('appliesToGroup').classList.contains('visible')) {
+                    const appliesTo = getCheckedValues('#appliesToGroup');
+                    if (appliesTo.length) eff.applies_to = appliesTo;
+                }
+                if (document.getElementById('restrictionsGroup').classList.contains('visible')) {
+                    const restrictions = getCheckedValues('#restrictionsGroup');
+                    if (restrictions.length) eff.restrictions = restrictions;
+                }
+                if (document.getElementById('protectsGroup').classList.contains('visible')) {
+                    const protects = getCheckedValues('#protectsGroup');
+                    if (protects.length) eff.protects = protects;
+                }
+
+                // Calculation
+                const calc = document.getElementById('effectCalculation').value;
+                if (calc && document.getElementById('calculationGroup').classList.contains('visible')) {
+                    eff.calculation = calc;
+                }
+
+                // Counter action
+                const counterAction = document.getElementById('effectCounterAction').value;
+                if (counterAction && document.getElementById('counterActionGroup').classList.contains('visible')) {
+                    eff.action = counterAction;
+                }
+
+                // Reward
+                if (document.getElementById('rewardGroup').classList.contains('visible')) {
+                    const reward = {};
+                    const rp = document.getElementById('rewardPoints').value;
+                    if (rp) reward.points = parseInt(rp);
+                    const rt = document.getElementById('rewardTiles').value;
+                    if (rt) reward.tiles = parseInt(rt);
+                    const rpl = document.getElementById('rewardPlacement').value.trim();
+                    if (rpl) reward.placement = rpl;
+                    if (document.getElementById('rewardCanReplace').checked) reward.can_replace = true;
+                    if (Object.keys(reward).length) eff.reward = reward;
+                }
+
+                // Bonus sub-form
+                if (document.getElementById('bonusSubGroup').classList.contains('visible')) {
+                    const bonus = {};
+                    const bt = document.getElementById('bonusSubTiles').value;
+                    if (bt) bonus.tiles = parseInt(bt);
+                    const bp = document.getElementById('bonusSubPoints').value;
+                    if (bp) bonus.points = parseInt(bp);
+                    if (Object.keys(bonus).length) eff.bonus = bonus;
+                }
+
+                // Penalty sub-form
+                if (document.getElementById('penaltyGroup').classList.contains('visible')) {
+                    const penalty = {};
+                    const pd = document.getElementById('penaltyDestroyTiles').value;
+                    if (pd) penalty.destroy_tiles = parseInt(pd);
+                    if (Object.keys(penalty).length) eff.penalty = penalty;
+                }
+
+                // Bet reward_per_correct / penalty_all_wrong (special for bet type)
+                if (effectType === 'bet') {
+                    if (eff.reward) {
+                        eff.reward_per_correct = eff.reward;
+                        delete eff.reward;
+                    }
+                    if (eff.penalty) {
+                        eff.penalty_all_wrong = eff.penalty;
+                        delete eff.penalty;
+                    }
+                }
+            }
+
+            // Display
+            const icon = document.getElementById('spellIcon').value.trim();
+            if (icon) spell.icon = icon;
+            const color = document.getElementById('spellColor').value;
+            if (color && color !== '#c8b37e') spell.color = color;
+
+            // Metadata
+            spell.isActive = document.getElementById('isActive').checked;
+            const notes = document.getElementById('adminNotes').value.trim();
+            if (notes) spell.notes = notes;
+
+            return spell;
+        }
+
+        function getCheckedValues(containerSelector) {
+            const container = document.querySelector(containerSelector);
+            const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        // ============================================
+        // POPULATE FORM FROM SPELL OBJECT
+        // ============================================
+
+        function populateForm(spell) {
+            resetForm(true);
+
+            // Identity
+            document.getElementById('spellId').value = spell.id || '';
+            document.getElementById('spellId').dataset.manual = spell.id ? 'true' : '';
+            document.getElementById('spellName').value = spell.name || '';
+            document.getElementById('spellNameEn').value = spell.nameEn || '';
+            document.getElementById('cardNumber').value = spell.cardNumber || '';
+
+            // Classification
+            document.getElementById('spellType').value = spell.type || '';
+            document.getElementById('spellRarity').value = spell.rarity || 'common';
+            document.getElementById('spellCategory').value = spell.category || '';
+
+            // Descriptions
+            document.getElementById('spellDescription').value = spell.description || '';
+            document.getElementById('spellDescriptionEn').value = spell.descriptionEn || '';
+            document.getElementById('shortDescription').value = spell.shortDescription || '';
+            document.getElementById('flavorText').value = spell.flavorText || '';
+
+            // Timing & Targeting
+            document.getElementById('spellTiming').value = spell.timing || '';
+            document.getElementById('targetType').value = spell.targetType || '';
+            document.getElementById('requiresTargetSelection').checked = spell.requiresTargetSelection || false;
+            document.getElementById('targetCount').value = spell.targetCount || 1;
+            toggleTargetCount();
+
+            // Effect
+            if (spell.effect) {
+                const e = spell.effect;
+                document.getElementById('effectType').value = e.type || '';
+                updateEffectFields();
+
+                document.getElementById('effectCondition').value = e.condition || '';
+                document.getElementById('effectDuration').value = e.duration || '';
+                document.getElementById('effectMultiplier').value = e.multiplier || 2;
+                document.getElementById('effectBonusPoints').value = e.bonusPoints || '';
+                document.getElementById('effectBonusTiles').value = e.bonusTiles || '';
+                document.getElementById('effectUses').value = e.uses || '';
+                document.getElementById('effectPredictions').value = e.predictions || '';
+                document.getElementById('effectStreak').value = e.streakRequired || '';
+                document.getElementById('effectAmount').value = e.amount || '';
+                document.getElementById('effectTarget').value = e.target || '';
+                document.getElementById('effectTrigger').value = e.trigger || '';
+                document.getElementById('effectCalculation').value = e.calculation || '';
+                document.getElementById('effectCounterAction').value = e.action || '';
+
+                // Checkbox arrays
+                setCheckedValues('#appliesToGroup', e.applies_to || []);
+                setCheckedValues('#restrictionsGroup', e.restrictions || []);
+                setCheckedValues('#protectsGroup', e.protects || []);
+
+                // Reward
+                const reward = e.reward || e.reward_per_correct;
+                if (reward) {
+                    document.getElementById('rewardPoints').value = reward.points || '';
+                    document.getElementById('rewardTiles').value = reward.tiles || '';
+                    document.getElementById('rewardPlacement').value = reward.placement || '';
+                    document.getElementById('rewardCanReplace').checked = reward.can_replace || false;
+                }
+
+                // Bonus
+                if (e.bonus) {
+                    document.getElementById('bonusSubTiles').value = e.bonus.tiles || '';
+                    document.getElementById('bonusSubPoints').value = e.bonus.points || '';
+                }
+
+                // Penalty
+                const penalty = e.penalty || e.penalty_all_wrong;
+                if (penalty) {
+                    document.getElementById('penaltyDestroyTiles').value = penalty.destroy_tiles || '';
+                }
+            }
+
+            // Display
+            document.getElementById('spellIcon').value = spell.icon || '';
+            document.getElementById('spellColor').value = spell.color || '#c8b37e';
+
+            // Metadata
+            document.getElementById('isActive').checked = spell.isActive !== false;
+            document.getElementById('adminNotes').value = spell.notes || '';
+
+            updatePreview();
+        }
+
+        function setCheckedValues(containerSelector, values) {
+            const container = document.querySelector(containerSelector);
+            container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.checked = values.includes(cb.value);
+            });
+        }
+
+        // ============================================
+        // PREVIEW RENDERING
+        // ============================================
+
+        let previewDebounce = null;
+        function updatePreview() {
+            clearTimeout(previewDebounce);
+            previewDebounce = setTimeout(_doUpdatePreview, 80);
+        }
+
+        function _doUpdatePreview() {
+            const spell = buildSpellObject();
+
+            if (currentPreviewMode === 'player') {
+                renderPlayerPreview(spell);
+            } else {
+                renderAdminPreview(spell);
+            }
+        }
+
+        function renderPlayerPreview(spell) {
+            // Icon
+            document.getElementById('previewIcon').textContent = spell.icon || '';
+
+            // Type badge
+            const typeBadge = document.getElementById('previewType');
+            typeBadge.textContent = spell.type || 'type';
+            typeBadge.style.display = spell.type ? '' : 'none';
+
+            // Rarity badge
+            const rarityBadge = document.getElementById('previewRarity');
+            rarityBadge.textContent = spell.rarity || '';
+            rarityBadge.className = `card-badge badge-rarity-${spell.rarity || 'common'}`;
+
+            // Name
+            document.getElementById('previewName').textContent = spell.name || 'Untitled Card';
+            const nameEn = document.getElementById('previewNameEn');
+            nameEn.textContent = spell.nameEn || '';
+            nameEn.style.display = spell.nameEn ? '' : 'none';
+
+            // Category
+            const catEl = document.getElementById('previewCategory');
+            if (spell.category) {
+                catEl.textContent = spell.category === 'A' ? 'A \u2014 System-Executed' : 'B \u2014 Human-Enforced';
+                catEl.className = `card-category ${spell.category === 'A' ? 'category-a' : 'category-b'}`;
+                catEl.style.display = '';
+            } else {
+                catEl.style.display = 'none';
+            }
+
+            // Description
+            document.getElementById('previewDescription').textContent = spell.description || 'No description yet...';
+
+            // Timing info
+            const timingEl = document.getElementById('previewTiming');
+            const parts = [];
+            if (spell.timing) parts.push(`<span>\u23f1 ${spell.timing}</span>`);
+            if (spell.targetType) parts.push(`<span>\u{1f3af} ${spell.targetType}</span>`);
+            timingEl.innerHTML = parts.join('');
+
+            // Effect summary
+            const effectEl = document.getElementById('previewEffect');
+            const detailsEl = document.getElementById('previewEffectDetails');
+            if (spell.effect) {
+                effectEl.style.display = '';
+                detailsEl.innerHTML = buildEffectSummaryHTML(spell.effect);
+            } else {
+                effectEl.style.display = 'none';
+            }
+
+            // Card border colour
+            const cardInner = document.querySelector('.card-preview-inner');
+            const color = spell.color || '#c8b37e';
+            cardInner.style.borderColor = color + '80';
+            cardInner.style.background = `linear-gradient(135deg, ${color}08, ${color}03)`;
+        }
+
+        function buildEffectSummaryHTML(effect) {
+            const lines = [];
+            lines.push(`<span class="key">Type:</span> ${effect.type}`);
+
+            if (effect.condition) lines.push(`<span class="key">Condition:</span> ${effect.condition}`);
+            if (effect.duration) lines.push(`<span class="key">Duration:</span> ${effect.duration}`);
+            if (effect.multiplier) lines.push(`<span class="key">Multiplier:</span> ${effect.multiplier}x`);
+            if (effect.bonusPoints) lines.push(`<span class="key">Bonus Points:</span> +${effect.bonusPoints}`);
+            if (effect.bonusTiles) lines.push(`<span class="key">Bonus Tiles:</span> +${effect.bonusTiles}`);
+            if (effect.amount) lines.push(`<span class="key">Amount:</span> ${effect.amount}`);
+            if (effect.uses) lines.push(`<span class="key">Uses:</span> ${effect.uses}`);
+            if (effect.predictions) lines.push(`<span class="key">Predictions:</span> ${effect.predictions}`);
+            if (effect.streakRequired) lines.push(`<span class="key">Streak:</span> ${effect.streakRequired}`);
+            if (effect.trigger) lines.push(`<span class="key">Trigger:</span> ${effect.trigger}`);
+            if (effect.target) lines.push(`<span class="key">Target:</span> ${effect.target}`);
+            if (effect.calculation) lines.push(`<span class="key">Calculation:</span> ${effect.calculation}`);
+            if (effect.action) lines.push(`<span class="key">Action:</span> ${effect.action}`);
+            if (effect.applies_to) lines.push(`<span class="key">Applies to:</span> ${effect.applies_to.join(', ')}`);
+            if (effect.restrictions) lines.push(`<span class="key">Restrictions:</span> ${effect.restrictions.join(', ')}`);
+            if (effect.protects) lines.push(`<span class="key">Protects:</span> ${effect.protects.join(', ')}`);
+            if (effect.reward) lines.push(`<span class="key">Reward:</span> ${JSON.stringify(effect.reward)}`);
+            if (effect.reward_per_correct) lines.push(`<span class="key">Per Correct:</span> ${JSON.stringify(effect.reward_per_correct)}`);
+            if (effect.bonus) lines.push(`<span class="key">Bonus:</span> ${JSON.stringify(effect.bonus)}`);
+            if (effect.penalty) lines.push(`<span class="key">Penalty:</span> ${JSON.stringify(effect.penalty)}`);
+            if (effect.penalty_all_wrong) lines.push(`<span class="key">All Wrong:</span> ${JSON.stringify(effect.penalty_all_wrong)}`);
+
+            return lines.join('<br>');
+        }
+
+        function renderAdminPreview(spell) {
+            const json = JSON.stringify(spell, null, 2);
+            // Syntax highlight
+            const highlighted = json
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"([^"]+)":/g, '<span class="json-key">"$1"</span>:')
+                .replace(/: "([^"]*)"/g, ': <span class="json-string">"$1"</span>')
+                .replace(/: (\d+)/g, ': <span class="json-number">$1</span>')
+                .replace(/: (true|false)/g, ': <span class="json-bool">$1</span>')
+                .replace(/: (null)/g, ': <span class="json-null">null</span>');
+            document.getElementById('jsonPreview').innerHTML = highlighted;
+        }
+
+        function setPreviewMode(mode, btn) {
+            currentPreviewMode = mode;
+            document.getElementById('playerPreview').style.display = mode === 'player' ? '' : 'none';
+            document.getElementById('adminPreview').style.display = mode === 'admin' ? '' : 'none';
+
+            document.querySelectorAll('.preview-toggle button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            updatePreview();
+        }
+
+        // ============================================
+        // FIREBASE OPERATIONS
+        // ============================================
+
+        async function ensureFirebase() {
+            if (firebaseReady && window.firebaseDB) return true;
+            showStatus('Waiting for Firebase connection...', 'info');
+            await new Promise(resolve => {
+                document.addEventListener('firebase-ready', resolve, { once: true });
+            });
+            firebaseReady = true;
+            return true;
+        }
+
+        async function loadExistingCards() {
+            try {
+                await ensureFirebase();
+                const snapshot = await window.firebaseDB.collection('spellCards').get();
+                allCards = [];
+                const select = document.getElementById('existingCards');
+                // Keep first option
+                select.innerHTML = '<option value="">-- Load existing card --</option>';
+
+                snapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    allCards.push(data);
+                    const option = document.createElement('option');
+                    option.value = doc.id;
+                    option.textContent = `${data.name || doc.id} (${data.type || '?'})`;
+                    select.appendChild(option);
+                });
+
+                showStatus(`Loaded ${allCards.length} existing cards from Firebase`, 'success');
+            } catch (error) {
+                console.error('Failed to load cards:', error);
+                showStatus('Failed to load existing cards: ' + error.message, 'error');
+            }
+        }
+
+        function loadSelectedCard() {
+            const select = document.getElementById('existingCards');
+            const id = select.value;
+            if (!id) return showStatus('Select a card to load', 'info');
+
+            const card = allCards.find(c => c.id === id);
+            if (!card) return showStatus('Card not found', 'error');
+
+            populateForm(card);
+            showStatus(`Loaded: ${card.name}`, 'success');
+        }
+
+        async function saveToFirebase() {
+            const spell = buildSpellObject();
+
+            if (!spell.id) return showStatus('ID is required', 'error');
+            if (!spell.name) return showStatus('Name is required', 'error');
+
+            try {
+                await ensureFirebase();
+                const db = window.firebaseDB;
+
+                // Add timestamps
+                spell.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+                // Only set createdAt if new
+                const existing = allCards.find(c => c.id === spell.id);
+                if (!existing) {
+                    spell.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                }
+
+                await db.collection('spellCards').doc(spell.id).set(spell, { merge: true });
+                showStatus(`Saved "${spell.name}" to Firebase`, 'success');
+
+                // Refresh card list
+                await loadExistingCards();
+            } catch (error) {
+                showStatus('Save failed: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+
+        async function deleteFromFirebase() {
+            const id = document.getElementById('spellId').value.trim();
+            if (!id) return showStatus('No card ID to delete', 'error');
+
+            if (!confirm(`Delete "${id}" from Firebase? This cannot be undone.`)) return;
+
+            try {
+                await ensureFirebase();
+                await window.firebaseDB.collection('spellCards').doc(id).delete();
+                showStatus(`Deleted "${id}" from Firebase`, 'success');
+                resetForm();
+                await loadExistingCards();
+            } catch (error) {
+                showStatus('Delete failed: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+
+        // ============================================
+        // IMPORT / EXPORT
+        // ============================================
+
+        function exportJSON() {
+            const spell = buildSpellObject();
+            if (!spell.id) return showStatus('Card has no ID', 'error');
+
+            const json = JSON.stringify(spell, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${spell.id}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showStatus(`Exported ${spell.id}.json`, 'success');
+        }
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const spell = JSON.parse(e.target.result);
+                    populateForm(spell);
+                    showStatus(`Imported: ${spell.name || spell.id}`, 'success');
+                } catch (err) {
+                    showStatus('Invalid JSON file: ' + err.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+            // Reset input so same file can be re-imported
+            event.target.value = '';
+        }
+
+        // ============================================
+        // DUPLICATE & RESET
+        // ============================================
+
+        function duplicateCard() {
+            const spell = buildSpellObject();
+            spell.id = spell.id ? spell.id + '-copy' : '';
+            spell.name = spell.name ? spell.name + ' (Copy)' : '';
+            populateForm(spell);
+            document.getElementById('spellId').dataset.manual = '';
+            showStatus('Card duplicated. Change name/ID and save.', 'info');
+        }
+
+        function resetForm(skipPreview) {
+            // Clear all inputs
+            document.querySelectorAll('.form-panel input[type="text"], .form-panel input[type="number"], .form-panel textarea').forEach(el => {
+                el.value = '';
+            });
+            document.querySelectorAll('.form-panel select').forEach(el => {
+                el.selectedIndex = 0;
+            });
+            document.querySelectorAll('.form-panel input[type="checkbox"]').forEach(el => {
+                el.checked = el.id === 'isActive'; // Only isActive defaults to checked
+            });
+            document.getElementById('spellColor').value = '#c8b37e';
+            document.getElementById('spellRarity').value = 'common';
+            document.getElementById('spellId').dataset.manual = '';
+            document.getElementById('templateSelect').value = '';
+
+            // Hide conditional sections
+            document.querySelectorAll('.conditional-section').forEach(el => el.classList.remove('visible'));
+
+            if (!skipPreview) updatePreview();
+        }
+
+        // ============================================
+        // STATUS
+        // ============================================
+
+        let statusTimeout = null;
+        function showStatus(message, type = 'info') {
+            clearTimeout(statusTimeout);
+            const el = document.getElementById('status');
+            el.textContent = message;
+            el.className = `status ${type}`;
+            statusTimeout = setTimeout(() => { el.textContent = ''; }, 5000);
+        }
+
+        // ============================================
+        // DEMO BOARD
+        // ============================================
+
+        let demoBoardModule = null;
+        let demoBoardRenderer = null;
+        let demoBoardState = {};      // { "q1r2": teamId, ... }
+        let demoSelectedTeam = 1;
+        let demoBoardInitialized = false;
+        const DEMO_TEAM_COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#2c3e50'];
+
+        function toggleDemoBoard() {
+            const content = document.getElementById('demoContent');
+            const arrow = document.getElementById('demoArrow');
+            const isOpen = content.classList.toggle('open');
+            arrow.classList.toggle('open', isOpen);
+
+            if (isOpen && !demoBoardInitialized) {
+                initDemoBoard();
+            }
+        }
+
+        function initDemoBoard() {
+            demoBoardModule = new BoardModule(1);
+            const container = document.getElementById('demoBoardContainer');
+            demoBoardRenderer = new BoardRenderer(container, demoBoardModule, {
+                responsive: true,
+                showHeartImages: true
+            });
+            demoBoardModule.setRoomHexes(['q1r2', 'q-1r3', 'q2r-3', 'q-2r1', 'q3r-1', 'q-3r2']);
+            renderDemoBoard();
+            demoBoardInitialized = true;
+        }
+
+        function renderDemoBoard() {
+            if (!demoBoardRenderer) return;
+
+            demoBoardRenderer.render({
+                board: demoBoardState,
+                rooms: demoBoardModule.roomHexes || []
+            });
+
+            // Add click handlers (team colors handled by CSS via data-team attribute)
+            document.querySelectorAll('.demo-board-section .board-hex').forEach(hex => {
+                hex.onclick = () => handleDemoHexClick(hex.dataset.coord);
+            });
+
+            updateDemoStats();
+        }
+
+        function handleDemoHexClick(coord) {
+            const m = coord.match(/q(-?\d+)r(-?\d+)/);
+            if (!m) return;
+
+            const hexType = demoBoardModule.getHexType(parseInt(m[1]), parseInt(m[2]));
+
+            if (demoSelectedTeam === 0) {
+                // Eraser mode
+                if (demoBoardState[coord]) {
+                    delete demoBoardState[coord];
+                    addDemoLog('Removed tile at ' + coord, '#94a3b8');
+                }
+            } else {
+                if (hexType === 'mountain-heart' || hexType === 'side-heart') {
+                    // Allow placing on hearts (they're special tiles worth VP)
+                }
+                demoBoardState[coord] = demoSelectedTeam;
+                addDemoLog(`Team ${demoSelectedTeam} placed tile at ${coord}`, DEMO_TEAM_COLORS[demoSelectedTeam - 1]);
+            }
+
+            renderDemoBoard();
+        }
+
+        function selectDemoTeam(teamId, btn) {
+            demoSelectedTeam = teamId;
+            document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+
+        function resetDemoBoard() {
+            demoBoardState = {};
+            renderDemoBoard();
+            clearDemoLog();
+            addDemoLog('Board reset', '#94a3b8');
+        }
+
+        function randomizeDemoBoard() {
+            demoBoardState = {};
+            const coords = demoBoardModule.generateHexCoordinates();
+            // Place ~8-12 random tiles per team around starting locations
+            const starts = demoBoardModule.startingLocations;
+            for (let t = 1; t <= 5; t++) {
+                const startCoord = starts[t - 1];
+                if (!startCoord) continue;
+                const sm = startCoord.match(/q(-?\d+)r(-?\d+)/);
+                if (!sm) continue;
+                demoBoardState[startCoord] = t;
+                // Place tiles spreading from start
+                let frontier = [startCoord];
+                let placed = 1;
+                const maxTiles = 6 + Math.floor(Math.random() * 5);
+                while (placed < maxTiles && frontier.length > 0) {
+                    const pick = frontier[Math.floor(Math.random() * frontier.length)];
+                    const pm = pick.match(/q(-?\d+)r(-?\d+)/);
+                    if (!pm) break;
+                    const neighbors = demoBoardModule.getHexNeighbors(parseInt(pm[1]), parseInt(pm[2]));
+                    const available = neighbors.filter(n => !demoBoardState[n]);
+                    if (available.length === 0) {
+                        frontier = frontier.filter(f => f !== pick);
+                        continue;
+                    }
+                    const chosen = available[Math.floor(Math.random() * available.length)];
+                    demoBoardState[chosen] = t;
+                    frontier.push(chosen);
+                    placed++;
+                }
+            }
+            renderDemoBoard();
+            clearDemoLog();
+            addDemoLog('Board randomized with 5 teams', '#c8b37e');
+        }
+
+        function updateDemoStats() {
+            const total = Object.keys(demoBoardState).length;
+            document.getElementById('statTotal').textContent = total;
+
+            // Count hearts
+            let hearts = 0;
+            for (const [coord, teamId] of Object.entries(demoBoardState)) {
+                const m = coord.match(/q(-?\d+)r(-?\d+)/);
+                if (m) {
+                    const type = demoBoardModule.getHexType(parseInt(m[1]), parseInt(m[2]));
+                    if (type === 'mountain-heart' || type === 'side-heart') hearts++;
+                }
+            }
+            document.getElementById('statHearts').textContent = hearts;
+        }
+
+        // ============================================
+        // EFFECT SIMULATION
+        // ============================================
+
+        function simulateCurrentEffect() {
+            const spell = buildSpellObject();
+            if (!spell.effect) {
+                addDemoLog('No effect defined on current card', '#ef4444');
+                return;
+            }
+
+            const teamId = demoSelectedTeam || 1;
+            if (teamId === 0) {
+                addDemoLog('Select a team first (not eraser)', '#ef4444');
+                return;
+            }
+
+            const effect = spell.effect;
+            const teamTiles = Object.entries(demoBoardState).filter(([c, t]) => t === teamId).map(([c]) => c);
+            const opponentTiles = Object.entries(demoBoardState).filter(([c, t]) => t !== teamId && t > 0).map(([c, t]) => ({ coord: c, team: t }));
+
+            addDemoLog(`Casting "${spell.name || spell.id || 'unnamed'}" for Team ${teamId}`, DEMO_TEAM_COLORS[teamId - 1]);
+
+            switch (effect.type) {
+                case 'destroy_adjacent':
+                    simulateDestroyAdjacent(teamId, teamTiles, opponentTiles);
+                    break;
+                case 'shield':
+                    simulateShield(teamId, teamTiles);
+                    break;
+                case 'extra_placement':
+                    simulateExtraPlacement(teamId, teamTiles, effect);
+                    break;
+                case 'multiplier':
+                    simulateMultiplier(teamId, teamTiles, effect);
+                    break;
+                case 'bonus_points':
+                    simulateBonusPoints(teamId, effect);
+                    break;
+                case 'challenge':
+                    simulateChallenge(teamId, effect);
+                    break;
+                case 'permanent_buff':
+                    simulatePermanentBuff(teamId, teamTiles, effect);
+                    break;
+                case 'counter':
+                    addDemoLog('Counter: would block next opponent spell draw', '#60a5fa');
+                    break;
+                case 'ban':
+                    addDemoLog('Ban: opponent cannot use a game element next match', '#a855f7');
+                    break;
+                case 'silence':
+                    addDemoLog('Silence: target player cannot speak next game', '#a855f7');
+                    break;
+                case 'copy_spell':
+                    addDemoLog('Copy: would copy a used opponent card', '#60a5fa');
+                    break;
+                case 'modifier':
+                    addDemoLog('Modifier: next draw yields double cards', '#fbbf24');
+                    break;
+                case 'bet':
+                    simulateBet(effect);
+                    break;
+                case 'streak_bonus':
+                    simulateStreakBonus(effect);
+                    break;
+                default:
+                    addDemoLog(`Effect type "${effect.type}" — no board simulation available`, '#64748b');
+            }
+
+            renderDemoBoard();
+        }
+
+        function simulateDestroyAdjacent(teamId, teamTiles, opponentTiles) {
+            let destroyed = 0;
+            const destroyedCoords = [];
+
+            for (const tile of teamTiles) {
+                const m = tile.match(/q(-?\d+)r(-?\d+)/);
+                if (!m) continue;
+                const neighbors = demoBoardModule.getHexNeighbors(parseInt(m[1]), parseInt(m[2]));
+                for (const n of neighbors) {
+                    if (demoBoardState[n] && demoBoardState[n] !== teamId) {
+                        destroyedCoords.push(n);
+                        delete demoBoardState[n];
+                        destroyed++;
+                    }
+                }
+            }
+
+            // Highlight destroyed hexes
+            highlightHexes(destroyedCoords, 'demo-highlight-destroy');
+            addDemoLog(`Destroyed ${destroyed} adjacent opponent tile(s)`, '#ef4444');
+        }
+
+        function simulateShield(teamId, teamTiles) {
+            highlightHexes(teamTiles, 'demo-highlight-shield');
+            addDemoLog(`Shielded ${teamTiles.length} tile(s) — protected until next round`, '#34d399');
+        }
+
+        function simulateExtraPlacement(teamId, teamTiles, effect) {
+            const amount = effect.amount || 2;
+            let placed = 0;
+            const placedCoords = [];
+
+            // Find valid spots adjacent to team tiles
+            const occupied = new Set(Object.keys(demoBoardState));
+            for (const tile of teamTiles) {
+                if (placed >= amount) break;
+                const m = tile.match(/q(-?\d+)r(-?\d+)/);
+                if (!m) continue;
+                const neighbors = demoBoardModule.getHexNeighbors(parseInt(m[1]), parseInt(m[2]));
+                for (const n of neighbors) {
+                    if (placed >= amount) break;
+                    if (!occupied.has(n)) {
+                        // Check restrictions
+                        if (effect.restrictions) {
+                            const nm = n.match(/q(-?\d+)r(-?\d+)/);
+                            if (nm) {
+                                const type = demoBoardModule.getHexType(parseInt(nm[1]), parseInt(nm[2]));
+                                if (effect.restrictions.includes('no_hearts_adjacent') && (type === 'mountain-heart' || type === 'side-heart')) continue;
+                                if (effect.restrictions.includes('no_opponent_adjacent')) {
+                                    const adjNeighbors = demoBoardModule.getHexNeighbors(parseInt(nm[1]), parseInt(nm[2]));
+                                    const touchesOpponent = adjNeighbors.some(an => demoBoardState[an] && demoBoardState[an] !== teamId);
+                                    if (touchesOpponent) continue;
+                                }
+                            }
+                        }
+                        demoBoardState[n] = teamId;
+                        occupied.add(n);
+                        placedCoords.push(n);
+                        placed++;
+                    }
+                }
+            }
+
+            highlightHexes(placedCoords, 'demo-highlight-place');
+            addDemoLog(`Extra placement: ${placed} tile(s) placed`, '#60a5fa');
+        }
+
+        function simulateMultiplier(teamId, teamTiles, effect) {
+            const mult = effect.multiplier || 2;
+            let points = 0;
+            const heartCoords = [];
+
+            for (const tile of teamTiles) {
+                const m = tile.match(/q(-?\d+)r(-?\d+)/);
+                if (!m) continue;
+                const val = demoBoardModule.getHexValue(parseInt(m[1]), parseInt(m[2]));
+                if (val > 0) {
+                    points += val;
+                    heartCoords.push(tile);
+                }
+            }
+
+            highlightHexes(heartCoords, 'demo-highlight-points');
+            addDemoLog(`Multiplier ${mult}x: ${points} base VP \u2192 ${points * mult} VP, tiles ${teamTiles.length} \u2192 ${teamTiles.length * mult}`, '#fbbf24');
+        }
+
+        function simulateBonusPoints(teamId, effect) {
+            if (effect.calculation === 'controlled_hearts') {
+                let hearts = 0;
+                const heartCoords = [];
+                for (const [coord, t] of Object.entries(demoBoardState)) {
+                    if (t !== teamId) continue;
+                    const m = coord.match(/q(-?\d+)r(-?\d+)/);
+                    if (!m) continue;
+                    const type = demoBoardModule.getHexType(parseInt(m[1]), parseInt(m[2]));
+                    if (type === 'mountain-heart' || type === 'side-heart') {
+                        hearts++;
+                        heartCoords.push(coord);
+                    }
+                }
+                highlightHexes(heartCoords, 'demo-highlight-points');
+                addDemoLog(`Bonus points: +${hearts} VP (${hearts} heart(s) controlled)`, '#fbbf24');
+            } else {
+                const bonus = effect.bonusPoints || 0;
+                addDemoLog(`Bonus points: +${bonus} VP awarded`, '#fbbf24');
+            }
+        }
+
+        function simulateChallenge(teamId, effect) {
+            const reward = effect.reward || {};
+            const msgs = [];
+            if (reward.points) msgs.push(`+${reward.points} VP`);
+            if (reward.placement) {
+                // Place tile at center adjacent
+                const centerNeighbors = demoBoardModule.getHexNeighbors(0, 0);
+                const available = centerNeighbors.filter(n => !demoBoardState[n]);
+                if (available.length > 0) {
+                    const pick = available[0];
+                    demoBoardState[pick] = teamId;
+                    highlightHexes([pick], 'demo-highlight-place');
+                    msgs.push(`tile placed at ${pick}`);
+                } else if (reward.can_replace) {
+                    const opponentAdj = centerNeighbors.filter(n => demoBoardState[n] && demoBoardState[n] !== teamId);
+                    if (opponentAdj.length > 0) {
+                        const pick = opponentAdj[0];
+                        const oldTeam = demoBoardState[pick];
+                        demoBoardState[pick] = teamId;
+                        highlightHexes([pick], 'demo-highlight-place');
+                        msgs.push(`replaced Team ${oldTeam} tile at ${pick}`);
+                    }
+                }
+            }
+            addDemoLog(`Challenge won: ${msgs.join(', ') || 'reward applied'}`, '#c8b37e');
+        }
+
+        function simulatePermanentBuff(teamId, teamTiles, effect) {
+            const heartCoords = [];
+            for (const tile of teamTiles) {
+                const m = tile.match(/q(-?\d+)r(-?\d+)/);
+                if (!m) continue;
+                const type = demoBoardModule.getHexType(parseInt(m[1]), parseInt(m[2]));
+                if (type === 'mountain-heart' || type === 'side-heart') heartCoords.push(tile);
+            }
+            highlightHexes(heartCoords, 'demo-highlight-points');
+            const bonus = effect.bonus || {};
+            addDemoLog(`Permanent buff active: +${bonus.points || 1} VP per future heart capture`, '#34d399');
+        }
+
+        function simulateBet(effect) {
+            const predictions = effect.predictions || 3;
+            const correct = Math.floor(Math.random() * (predictions + 1));
+            const reward = effect.reward_per_correct || effect.reward || {};
+            const penalty = effect.penalty_all_wrong || effect.penalty || {};
+
+            if (correct === 0 && penalty.destroy_tiles) {
+                // Destroy random tiles from active team
+                const teamTiles = Object.entries(demoBoardState).filter(([c, t]) => t === demoSelectedTeam).map(([c]) => c);
+                const toDestroy = teamTiles.slice(0, penalty.destroy_tiles);
+                toDestroy.forEach(c => delete demoBoardState[c]);
+                highlightHexes(toDestroy, 'demo-highlight-destroy');
+                addDemoLog(`Bet: 0/${predictions} correct \u2014 ${toDestroy.length} tile(s) destroyed (penalty)`, '#ef4444');
+            } else {
+                addDemoLog(`Bet: ${correct}/${predictions} correct \u2014 +${correct * (reward.points || 1)} VP, +${correct * (reward.tiles || 1)} tiles`, '#fbbf24');
+            }
+        }
+
+        function simulateStreakBonus(effect) {
+            const streak = effect.streakRequired || 3;
+            const bonus = effect.bonus || {};
+            addDemoLog(`Streak bonus: ${streak}-win streak achieved \u2014 +${bonus.points || 0} VP, +${bonus.tiles || 0} tiles`, '#fbbf24');
+        }
+
+        // ============================================
+        // DEMO HELPERS
+        // ============================================
+
+        function highlightHexes(coords, className) {
+            setTimeout(() => {
+                coords.forEach(coord => {
+                    const hex = document.querySelector(`.demo-board-section .board-hex[data-coord="${coord}"]`);
+                    if (hex) {
+                        hex.classList.add(className);
+                        setTimeout(() => hex.classList.remove(className), 2000);
+                    }
+                });
+            }, 100);
+        }
+
+        function addDemoLog(message, color = '#94a3b8') {
+            const log = document.getElementById('demoLog');
+            const entry = document.createElement('div');
+            entry.className = 'demo-log-entry';
+            entry.style.borderColor = color;
+            entry.textContent = message;
+            log.insertBefore(entry, log.firstChild);
+
+            // Keep max 20 entries
+            while (log.children.length > 20) {
+                log.removeChild(log.lastChild);
+            }
+        }
+
+        function clearDemoLog() {
+            document.getElementById('demoLog').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

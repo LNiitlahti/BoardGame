@@ -46,6 +46,11 @@ class ErrorHandler {
   setupGlobalErrorHandlers() {
     // Handle uncaught errors
     window.addEventListener('error', (event) => {
+      // Ignore null errors (ResizeObserver loop, cross-origin scripts, etc.)
+      if (!event.error && !event.message) return;
+      // Ignore benign ResizeObserver loop errors
+      if (event.message && event.message.includes('ResizeObserver')) return;
+
       console.error('[ErrorHandler] Uncaught error:', event.error);
       this.showError('An unexpected error occurred. Please try again.');
 

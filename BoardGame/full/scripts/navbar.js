@@ -83,18 +83,18 @@
      * Build URL with current tournament context
      */
     function buildNavUrl(href) {
-        const currentGameId = sessionStorage.getItem('currentGameId') || localStorage.getItem('currentGameId');
+        const currentTournamentId = sessionStorage.getItem('currentTournamentId') || localStorage.getItem('currentTournamentId');
         const currentTeamId = sessionStorage.getItem('currentTeamId') || localStorage.getItem('currentTeamId');
 
         let url = href;
         const params = new URLSearchParams();
 
-        if (currentGameId) {
+        if (currentTournamentId) {
             // Use 'tournament' for god.html, 'gameId' for others
             if (href === 'god.html') {
-                params.set('tournament', currentGameId);
+                params.set('tournament', currentTournamentId);
             } else {
-                params.set('gameId', currentGameId);
+                params.set('tournamentId', currentTournamentId);
             }
         }
         if (currentTeamId && (href === 'team.html')) {
@@ -140,8 +140,9 @@
                 tournaments.sort((a, b) => a.name.localeCompare(b.name));
             } else {
                 // Regular users/players - show their assigned tournament
-                if (userData.assignedGameId) {
-                    const doc = await db.collection('tournaments').doc(userData.assignedGameId).get();
+                const assignedId = userData.assignedTournamentId || userData.assignedGameId; // backward compat
+                if (assignedId) {
+                    const doc = await db.collection('tournaments').doc(assignedId).get();
                     if (doc.exists) {
                         tournaments.push({
                             id: doc.id,
@@ -203,8 +204,8 @@
         const tournamentId = selectElement.value;
 
         if (tournamentId) {
-            localStorage.setItem('currentGameId', tournamentId);
-            sessionStorage.setItem('currentGameId', tournamentId); // Also keep in session for compatibility
+            localStorage.setItem('currentTournamentId', tournamentId);
+            sessionStorage.setItem('currentTournamentId', tournamentId); // Also keep in session for compatibility
 
             // Find tournament name
             const tournament = availableTournaments.find(t => t.id === tournamentId);
@@ -223,9 +224,9 @@
 
             console.log('[Navbar] Tournament selected:', tournamentId);
         } else {
-            localStorage.removeItem('currentGameId');
+            localStorage.removeItem('currentTournamentId');
             localStorage.removeItem('currentTournamentName');
-            sessionStorage.removeItem('currentGameId');
+            sessionStorage.removeItem('currentTournamentId');
             sessionStorage.removeItem('currentTournamentName');
         }
     };
@@ -250,10 +251,11 @@
     function getCurrentTournamentId() {
         const urlParams = new URLSearchParams(window.location.search);
         return urlParams.get('tournament') ||
-               urlParams.get('gameId') ||
-               urlParams.get('game') ||
-               sessionStorage.getItem('currentGameId') ||
-               localStorage.getItem('currentGameId');
+               urlParams.get('tournamentId') ||
+               urlParams.get('gameId') ||  // backward compat
+               urlParams.get('game') ||    // backward compat
+               sessionStorage.getItem('currentTournamentId') ||
+               localStorage.getItem('currentTournamentId');
     }
 
     /**
@@ -397,10 +399,11 @@
             let currentTournamentId = getCurrentTournamentId();
 
             // If player is assigned to a tournament, use that
-            if (userData.assignedGameId && !currentTournamentId) {
-                currentTournamentId = userData.assignedGameId;
-                localStorage.setItem('currentGameId', currentTournamentId);
-                sessionStorage.setItem('currentGameId', currentTournamentId);
+            const assignedTournament = userData.assignedTournamentId || userData.assignedGameId; // backward compat
+            if (assignedTournament && !currentTournamentId) {
+                currentTournamentId = assignedTournament;
+                localStorage.setItem('currentTournamentId', currentTournamentId);
+                sessionStorage.setItem('currentTournamentId', currentTournamentId);
             }
 
             // Also store team ID if player has one
@@ -430,8 +433,8 @@
 
             // Store current tournament ID
             if (currentTournamentId) {
-                localStorage.setItem('currentGameId', currentTournamentId);
-                sessionStorage.setItem('currentGameId', currentTournamentId);
+                localStorage.setItem('currentTournamentId', currentTournamentId);
+                sessionStorage.setItem('currentTournamentId', currentTournamentId);
             }
 
             // Insert navbar into page
@@ -467,7 +470,7 @@
             await firebase.auth().signOut();
             // Clear both session and local storage for tournament data
             sessionStorage.clear();
-            localStorage.removeItem('currentGameId');
+            localStorage.removeItem('currentTournamentId');
             localStorage.removeItem('currentTeamId');
             localStorage.removeItem('currentTournamentName');
             window.location.href = (window.BOARDGAME_BASE || '.') + '/login.html';

@@ -18,6 +18,7 @@ class GodApp {
         this._currentUserRole = null;
         this._boardModule = null;
         this._boardRenderer = null;
+        this._suppressLoadToast = false;
 
         // Action logger (created in init)
         this.actionLogger = null;
@@ -167,6 +168,11 @@ class GodApp {
         // Wire getPendingHexCount into PhaseManager (ResultManager must exist first)
         this.phase._getPendingHexCount = () => this.result?._pendingHexWins?.length || 0;
 
+        // Migrate old phase names if tournament was mid-game with old flow
+        if (this.phase.migratePhaseIfNeeded()) {
+            this.saveGameState();
+        }
+
         // ScoringCeremony — animated scoring sequence (Phase 3)
         if (typeof ScoringCeremony !== 'undefined') {
             this.ceremony = new ScoringCeremony(this.gameState, {
@@ -189,6 +195,26 @@ class GodApp {
         this.phase._onRoundStartSpells = () => {
             this.spells?.expireConditions();
             this.backup?.autoBackup();
+        };
+
+        // Wire hex territory points award when leaving scoring_hex
+        this.phase._onAwardPoints = () => {
+            const gs = this.gameState;
+            const roundNumber = gs.currentPhase?.roundNumber || 0;
+            const history = gs.pointsHistory || [];
+            if (!history.some(e => e.round === roundNumber)) {
+                const pointsAwarded = this.stats.awardRoundPoints();
+                gs.pointsHistory = history;
+                gs.pointsHistory.push({
+                    round: roundNumber,
+                    pointsAwarded: pointsAwarded,
+                    timestamp: new Date().toISOString()
+                });
+                const msg = Object.entries(pointsAwarded)
+                    .map(([team, pts]) => `${team}: +${pts}`)
+                    .join(', ') || 'No points';
+                this.ui.showStatus(`Round ${roundNumber} points: ${msg}`, 'success');
+            }
         };
 
         // Wire scoring ceremony hook into PhaseManager
@@ -222,6 +248,16 @@ class GodApp {
             });
         }
 
+        // SeasonManager — tournament season grouping
+        if (typeof SeasonManager !== 'undefined') {
+            this.seasons = new SeasonManager({
+                getFirebaseDB: () => window.firebaseDB,
+                getCurrentUser: () => this._currentUser,
+                getCurrentUserRole: () => this._currentUserRole,
+                uiManager: this.ui
+            });
+        }
+
         // Wire window globals for HTML onclick handlers
         this._wireGlobalFunctions();
 
@@ -249,8 +285,7 @@ class GodApp {
     initializeBoardModules() {
         this._boardModule = new BoardModule(1);
 
-        // Try hexBoardAlt first (Board tab), then hexBoard (legacy)
-        const hexBoardContainer = document.getElementById('hexBoardAlt') || document.getElementById('hexBoard');
+        const hexBoardContainer = document.getElementById('hexBoard');
         if (!hexBoardContainer) {
             console.warn('[GodApp] No hex board container found — skipping board init');
             return;
@@ -308,18 +343,31 @@ class GodApp {
         if (!name || !name.trim()) return;
 
         try {
+            // Load default rooms if available
+            let defaultRooms = [];
+            try {
+                const configDoc = await window.firebaseDB.collection('config').doc('defaultRooms').get();
+                if (configDoc.exists && configDoc.data().rooms?.length) {
+                    defaultRooms = configDoc.data().rooms;
+                }
+            } catch (e) {
+                console.warn('Could not load default rooms:', e);
+            }
+
             const tournamentRef = window.firebaseDB.collection('tournaments').doc();
             await tournamentRef.set({
                 name: name.trim(),
                 status: 'setup',
+                seasonId: null,
                 createdAt: new Date().toISOString(),
                 currentRound: 0,
                 gamesPlayed: 0,
                 teams: [],
+                players: {},
                 matchQueue: [],
                 gameHistory: [],
                 board: {},
-                rooms: [],
+                rooms: defaultRooms,
                 selectedGames: []
             });
 
@@ -418,7 +466,9 @@ class GodApp {
                         window.smartMatchGenerator = new SmartMatchGenerator(this.gameState);
                     }
 
-                    if (this.gameState.status === 'archived') {
+                    if (this._suppressLoadToast) {
+                        this._suppressLoadToast = false;
+                    } else if (this.gameState.status === 'archived') {
                         this.ui.showStatus('This tournament is archived. Changes are blocked by the server.', 'warning');
                     } else {
                         this.ui.showStatus('Tournament loaded', 'success');
@@ -453,7 +503,6 @@ class GodApp {
         // Merge new data in-place
         Object.assign(this.gameState, newData);
         this.gameState.tournamentId = tournamentId;
-        this.gameState.gameId = tournamentId; // compat alias for user-management.js
     }
 
     // ------------------------------------------------------------------
@@ -680,6 +729,7 @@ class GodApp {
             delete saveData.onboarding;
 
             const cleanData = this._removeUndefined(saveData);
+            this._suppressLoadToast = true;
             await tournamentRef.set(cleanData, { merge: true });
 
             this.ui.updateConnectionStatus('connected');
@@ -873,6 +923,8 @@ class GodApp {
             await app.saveGameState();
             app.updateDisplay();
         };
+        window.beginSpells = () => app.phase?.beginSpells();
+        window.loopBack = () => app.phase?.loopBack();
 
         // BoardManager
         window.renderBoard = () => app.board?.renderBoard();
@@ -881,6 +933,8 @@ class GodApp {
         window.closeTeamPicker = () => app.board.closeTeamPicker();
         window.highlightValidPlacements = () => app.board.highlightValidPlacements();
         window.clearHighlights = () => app.board.clearHighlights();
+        window.saveDefaultRooms = () => app.board.saveDefaultRooms();
+        window.loadDefaultRooms = () => app.board.loadDefaultRooms();
 
         // MatchQueueManager
         window.startMatch = (id) => app.queue.startMatch(id);
@@ -1143,6 +1197,29 @@ class GodApp {
             return app.actionLogger.getActions({ limit: 50, startAfter });
         };
 
+        // SeasonManager
+        window.loadSeasons = () => app.seasons?.loadSeasons();
+        window.openCreateSeasonModal = () => {
+            document.getElementById('createSeasonModal').style.display = 'flex';
+        };
+        window.closeCreateSeasonModal = () => {
+            document.getElementById('createSeasonModal').style.display = 'none';
+        };
+        window.confirmCreateSeason = () => app.seasons?.createSeasonFromModal();
+        window.openEditSeasonModal = (id) => app.seasons?.openEditModal(id);
+        window.closeEditSeasonModal = () => {
+            document.getElementById('editSeasonModal').style.display = 'none';
+        };
+        window.confirmEditSeason = (id) => app.seasons?.confirmEdit(id);
+        window.deleteSeasonById = (id) => app.seasons?.deleteSeason(id);
+        window.addTournamentToSeason = (sid, tid) => app.seasons?.addTournamentToSeason(sid, tid);
+        window.removeTournamentFromSeason = (sid, tid) => app.seasons?.removeTournamentFromSeason(sid, tid);
+        window.addSelectedTournamentToSeason = (seasonId) => {
+            const select = document.getElementById(`seasonAddTournament-${seasonId}`);
+            const tid = select?.value;
+            if (tid) app.seasons?.addTournamentToSeason(seasonId, tid);
+        };
+
         // Expose board references for compatibility
         Object.defineProperty(window, 'boardRenderer', {
             get: () => app._boardRenderer,
@@ -1186,6 +1263,11 @@ document.addEventListener('firebase-ready', async function () {
 
             godApp._currentUserRole = userData.isGod ? 'god' : 'admin';
 
+            // Apply tab restrictions based on role
+            if (typeof applyRoleTabRestrictions === 'function') {
+                applyRoleTabRestrictions(godApp._currentUserRole);
+            }
+
             const userNameEl = document.getElementById('userName');
             const roleBadgeEl = document.getElementById('roleBadge');
             if (userNameEl) userNameEl.textContent = userData.displayName || user.email;
@@ -1199,6 +1281,10 @@ document.addEventListener('firebase-ready', async function () {
 
             // Initialize all OOP managers
             godApp.init();
+
+            // Wire board modules into UI (ui created by init())
+            godApp.ui.setBoardModules(godApp._boardModule, godApp._boardRenderer);
+            godApp.ui.initEffectsPanel();
 
             // Connection monitoring
             godApp.ui.initConnectionMonitor();

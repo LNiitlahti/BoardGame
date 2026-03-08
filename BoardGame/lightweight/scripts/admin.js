@@ -11,7 +11,7 @@
 // GLOBAL STATE
 // =============================================================================
 
-let gameState = null;
+let gameState = {};
 let activeListener = null;
 let boardModule = null;
 let boardRenderer = null;
@@ -355,6 +355,11 @@ async function loadTournament(tournamentId) {
     }
 
     currentTournamentId = tournamentId;
+
+    // Cache tournament context for navbar and cross-page navigation
+    sessionStorage.setItem('currentTournamentId', tournamentId);
+    localStorage.setItem('currentTournamentId', tournamentId);
+
     showStatus('Loading tournament...', 'info');
 
     try {
@@ -363,7 +368,10 @@ async function loadTournament(tournamentId) {
         // Set up real-time listener
         activeListener = window.firebaseOnSnapshot(tournamentRef, async (docSnapshot) => {
             if (docSnapshot.exists) {
-                gameState = docSnapshot.data();
+                const newData = docSnapshot.data();
+                // In-place update keeps the object reference stable for OOP modules
+                Object.keys(gameState).forEach(k => { if (!(k in newData)) delete gameState[k]; });
+                Object.assign(gameState, newData);
                 gameState.tournamentId = tournamentId;
 
                 // Check if migration to normalized players is needed
@@ -376,6 +384,17 @@ async function loadTournament(tournamentId) {
 
                 // Update connection status
                 updateConnectionStatus('connected');
+
+                // Cache tournament name for navbar
+                const tName = gameState.tournamentName || gameState.name || tournamentId;
+                sessionStorage.setItem('currentTournamentName', tName);
+                localStorage.setItem('currentTournamentName', tName);
+                const navLabel = document.getElementById('navTournamentLabel');
+                if (navLabel) {
+                    navLabel.textContent = tName;
+                    navLabel.title = tName;
+                    navLabel.classList.remove('empty');
+                }
 
                 // Update all displays
                 updateDisplay();
@@ -414,7 +433,7 @@ function updateTournamentStateButton() {
     const btn = document.getElementById('tournamentStateBtn');
     if (!btn) return;
 
-    if (!gameState) {
+    if (!gameState.teams) {
         btn.style.display = 'none';
         return;
     }
@@ -502,7 +521,7 @@ async function confirmStateChange(newState) {
 // =============================================================================
 
 function updateDisplay() {
-    if (!gameState) return;
+    if (!gameState.teams) return;
 
     // Load room hexes into board module if available
     if (gameState.rooms && boardModule) {
@@ -540,8 +559,14 @@ function updateDisplay() {
     // Update queue
     renderMatchQueue();
 
+    // Render voted matches panel (player voting results)
+    renderVotedMatches();
+
     // Render match creation zones (in case sides changed)
     renderMatchCreationZones();
+
+    // Hook for phase adapter (full/admin.html)
+    if (window._onAdminDisplayUpdate) window._onAdminDisplayUpdate();
 }
 
 /**
@@ -1203,7 +1228,7 @@ async function resetSeatingOrder() {
  * Open the game manager modal
  */
 function openGameManager() {
-    if (!gameState) {
+    if (!gameState.teams) {
         showStatus('Load a tournament first', 'warning');
         return;
     }
@@ -1329,7 +1354,7 @@ function renderGameCatalog() {
  * Add a game from GAMES_CONFIG catalog to the tournament
  */
 async function addCatalogGameToTournament(gameId) {
-    if (!gameState) return;
+    if (!gameState.teams) return;
 
     const game = GAMES_CONFIG.getGame(gameId);
     if (!game) {
@@ -1371,7 +1396,7 @@ async function addCatalogGameToTournament(gameId) {
  * Add a custom game to the tournament
  */
 async function addCustomGameToTournament(triggerBtn) {
-    if (!gameState) return;
+    if (!gameState.teams) return;
 
     const id = document.getElementById('gmCustomId').value.trim().toLowerCase().replace(/[^a-z0-9\-]/g, '');
     const name = document.getElementById('gmCustomName').value.trim();
@@ -1511,8 +1536,8 @@ function handleHexClick(coord) {
     if (matches) {
         const [, q, r] = matches;
         hexType = boardModule.getHexType(parseInt(q), parseInt(r));
-        // Hearts and starting locations cannot be rooms
-        if (hexType === 'mountain-heart' || hexType === 'side-heart' || hexType === 'starting-location') {
+        // Hearts cannot be rooms
+        if (hexType === 'mountain-heart' || hexType === 'side-heart') {
             canBeRoom = false;
         }
     }
@@ -1678,6 +1703,43 @@ async function toggleRoomHex(coord) {
     closeTeamPicker();
     await saveGameState();
     renderBoard();
+}
+
+// =============================================================================
+// DEFAULT ROOMS - SAVE/LOAD
+// =============================================================================
+
+async function saveDefaultRooms() {
+    const rooms = gameState.rooms || [];
+    try {
+        await window.firebaseDB.collection('config').doc('defaultRooms').set({
+            rooms: [...rooms],
+            updatedAt: new Date().toISOString()
+        });
+        showStatus(`Saved ${rooms.length} default rooms`, 'success');
+    } catch (error) {
+        console.error('Error saving default rooms:', error);
+        showStatus('Error saving default rooms', 'error');
+    }
+}
+
+async function loadDefaultRooms() {
+    try {
+        const doc = await window.firebaseDB.collection('config').doc('defaultRooms').get();
+        if (!doc.exists || !doc.data().rooms?.length) {
+            showStatus('No default rooms found', 'error');
+            return;
+        }
+        const rooms = doc.data().rooms;
+        gameState.rooms = [...rooms];
+        boardModule.setRoomHexes(gameState.rooms);
+        await saveGameState();
+        renderBoard();
+        showStatus(`Loaded ${rooms.length} default rooms`, 'success');
+    } catch (error) {
+        console.error('Error loading default rooms:', error);
+        showStatus('Error loading default rooms', 'error');
+    }
 }
 
 // =============================================================================
@@ -1918,6 +1980,7 @@ async function addMatchToQueue(triggerBtn) {
     };
 
     gameState.gameQueue = gameState.gameQueue || [];
+    assignDiscordAndLobby([queueEntry]);
     gameState.gameQueue.push(queueEntry);
 
     await saveGameState(triggerBtn);
@@ -2066,11 +2129,59 @@ function addChallengeToQueue() {
     // Apply color styling to all dropdowns (use onchange to avoid listener accumulation)
     ['challengeSideA1', 'challengeSideA2', 'challengeSideB1', 'challengeSideB2'].forEach(id => {
         const select = document.getElementById(id);
-        select.onchange = () => updateChallengeSelectColor(id);
+        select.onchange = () => {
+            updateChallengeSelectColor(id);
+            updateChallengeHexPicker();
+        };
         updateChallengeSelectColor(id);
     });
 
+    updateChallengeHexPicker();
     document.getElementById('challengeSetupModal').classList.add('active');
+}
+
+/**
+ * Populate the contested hex picker with heart hexes controlled by the selected teams
+ */
+function updateChallengeHexPicker() {
+    const hexField = document.getElementById('challengeHexField');
+    const hexSelect = document.getElementById('challengeHexSelect');
+    if (!hexField || !hexSelect) return;
+
+    // Gather all selected team IDs from both sides
+    const teamIds = ['challengeSideA1', 'challengeSideA2', 'challengeSideB1', 'challengeSideB2']
+        .map(id => document.getElementById(id)?.value)
+        .filter(Boolean)
+        .map(v => parseInt(v) || v);
+
+    // Find heart hexes controlled by any of these teams
+    const heartHexes = [];
+    Object.entries(gameState.heartHexControl || {}).forEach(([coord, ownerId]) => {
+        if (teamIds.some(tid => String(tid) === String(ownerId))) {
+            const team = gameState.teams?.find(t => String(t.id) === String(ownerId));
+            const teamName = team?.name || `Team ${ownerId}`;
+            const hexType = boardModule?.getHexType
+                ? (() => {
+                    const m = coord.match(/q(-?\d+)r(-?\d+)/);
+                    return m ? boardModule.getHexType(parseInt(m[1]), parseInt(m[2])) : '';
+                })()
+                : '';
+            const typeLabel = hexType === 'mountain-heart' ? 'Mountain Heart' : hexType === 'side-heart' ? 'Side Heart' : 'Heart';
+            heartHexes.push({ coord, ownerId, teamName, typeLabel });
+        }
+    });
+
+    if (heartHexes.length === 0) {
+        hexField.style.display = 'none';
+        hexSelect.innerHTML = '<option value="">— No specific hex —</option>';
+        return;
+    }
+
+    hexField.style.display = '';
+    hexSelect.innerHTML = '<option value="">— No specific hex —</option>' +
+        heartHexes.map(h =>
+            `<option value="${h.coord}">${h.typeLabel} (${h.coord}) — ${h.teamName}</option>`
+        ).join('');
 }
 
 /**
@@ -2148,6 +2259,9 @@ async function confirmChallengeSetup(triggerBtn) {
     // Get next match number (persistent, doesn't change with reordering)
     const matchNumber = getNextMatchNumber();
 
+    // Get contested hex (if selected)
+    const challengeHexCoord = document.getElementById('challengeHexSelect')?.value || null;
+
     // Store disputing teams per side for proper hex placement logic
     const queueEntry = {
         id: Date.now(),
@@ -2157,6 +2271,7 @@ async function confirmChallengeSetup(triggerBtn) {
         teams: teams,
         status: 'pending',
         isChallenge: true,
+        challengeHexCoord: challengeHexCoord,
         // New structure: teams grouped by side
         disputingSideA: sideATeams,
         disputingSideB: sideBTeams,
@@ -2181,6 +2296,7 @@ async function confirmChallengeSetup(triggerBtn) {
         insertIndex = firstPendingIndex + 1;
     }
 
+    assignDiscordAndLobby([queueEntry]);
     queue.splice(insertIndex, 0, queueEntry);
 
     // Build status message showing all disputes
@@ -2202,6 +2318,70 @@ async function confirmChallengeSetup(triggerBtn) {
  * Get the next available match number
  * Looks at all matches (including completed) to ensure unique numbering
  */
+/**
+ * Assign Discord channels and lobby creators to match queue entries.
+ * Channels #1-#5 are available. Simultaneous matches get consecutive pairs.
+ * @param {Object[]} entries - Array of queue entries to enrich (mutated in place)
+ */
+function assignDiscordAndLobby(entries) {
+    if (!entries || entries.length === 0) return;
+
+    // Find already-used channels from pending/ongoing matches
+    const queue = gameState?.gameQueue || [];
+    const usedChannels = new Set();
+    queue.forEach(m => {
+        if (m.isBreak || m.status === 'completed') return;
+        if (m.discordChannels) {
+            Object.values(m.discordChannels).forEach(ch => usedChannels.add(ch));
+        }
+    });
+
+    // Available channels 1-5 (5 is overflow/admin)
+    const allChannels = [1, 2, 3, 4, 5];
+    const available = allChannels.filter(ch => !usedChannels.has(ch));
+
+    let channelIdx = 0;
+    entries.forEach(entry => {
+        if (entry.isBreak) return;
+
+        const teams = entry.teams || [];
+        if (teams.length < 2) return;
+
+        // Assign Discord channels per side
+        const discordChannels = {};
+        teams.forEach(team => {
+            if (channelIdx < available.length) {
+                discordChannels[team.id] = available[channelIdx++];
+            }
+        });
+        entry.discordChannels = discordChannels;
+
+        // Designate lobby creators (first player of each side)
+        const lobbyCreators = {};
+        teams.forEach(team => {
+            const players = team.players || [];
+            const playerIds = team.playerIds || [];
+            let creator = null;
+
+            if (players.length > 0) {
+                creator = { name: players[0].name || players[0].email || 'Player', uid: players[0].uid || null, teamId: players[0].teamId };
+            } else if (playerIds.length > 0) {
+                // Resolve from player registry
+                const pid = playerIds[0];
+                const reg = gameState?.players?.[pid];
+                if (reg) {
+                    creator = { name: reg.name || reg.email || 'Player', uid: reg.uid || null, teamId: reg.teamId };
+                }
+            }
+
+            if (creator) {
+                lobbyCreators[team.id] = creator;
+            }
+        });
+        entry.lobbyCreators = lobbyCreators;
+    });
+}
+
 function getNextMatchNumber() {
     const allMatches = gameState?.gameQueue || [];
     if (allMatches.length === 0) return 1;
@@ -2629,6 +2809,7 @@ async function confirmMassImport(triggerBtn) {
             createdAt: new Date().toISOString()
         };
 
+        assignDiscordAndLobby([queueEntry]);
         gameState.gameQueue.push(queueEntry);
         imported++;
     }
@@ -3395,9 +3576,12 @@ async function confirmAutoMatch() {
             autoGenerated: true
         };
 
-        gameState.gameQueue.push(queueEntry);
-        addedMatches.push({ number: matchNumber, format: match.format });
+        addedMatches.push({ entry: queueEntry, number: matchNumber, format: match.format });
     }
+
+    // Assign Discord channels + lobby creators to the batch, then push
+    assignDiscordAndLobby(addedMatches.map(m => m.entry));
+    addedMatches.forEach(m => gameState.gameQueue.push(m.entry));
 
     // Save smart match generator state for session continuity
     if (smartMatchGenerator) {
@@ -3739,6 +3923,107 @@ function renderOngoingMatches() {
             </div>
         `;
     }).join('');
+}
+
+/**
+ * Render voted matches panel — shows matches where players have voted
+ * Admin can accept consensus or override disputed results
+ */
+function renderVotedMatches() {
+    const container = document.getElementById('votedMatchesPanel');
+    if (!container) return;
+
+    const queue = gameState?.gameQueue || [];
+    const votedMatches = queue.filter(m =>
+        m.votes && m.votes.length > 0 && !m.adminConfirmed && !m.isBreak
+    );
+
+    if (votedMatches.length === 0) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+        return;
+    }
+
+    container.style.display = 'block';
+
+    const SIDE_LABELS_VOTE = ['A', 'B', 'C', 'D', 'E'];
+
+    container.innerHTML = '<div class="voted-panel-title">Player Votes</div>' +
+        votedMatches.map(match => {
+            const gameName = getGameDisplayName(match.game || match.gameType);
+            const matchNum = match.matchNumber ? `#${match.matchNumber} ` : '';
+            const votes = match.votes || [];
+            const consensus = match.voteConsensus;
+
+            // Tally votes
+            const voteCounts = {};
+            votes.forEach(v => { voteCounts[v.result] = (voteCounts[v.result] || 0) + 1; });
+            const votesSummary = Object.entries(voteCounts).map(([result, count]) => {
+                if (result === 'draw') return `Draw: ${count}`;
+                const sideMatch = result.match(/side_(\d+)_won/);
+                if (sideMatch) {
+                    const idx = parseInt(sideMatch[1]);
+                    return `${SIDE_LABELS_VOTE[idx] || idx} Won: ${count}`;
+                }
+                return `${result}: ${count}`;
+            }).join(', ');
+
+            const hasConsensus = consensus?.passedThreshold;
+            const badgeClass = hasConsensus ? 'consensus' : 'disputed';
+            const badgeText = hasConsensus ? 'CONSENSUS' : 'DISPUTED';
+
+            const acceptBtn = hasConsensus
+                ? `<button class="btn-small primary" onclick="event.stopPropagation(); acceptVotedResult(${match.id})">Accept</button>`
+                : '';
+
+            return `
+                <div class="voted-match" onclick="openQuickConfirm(${match.id})">
+                    <div class="voted-match-header">
+                        <span class="voted-match-title">${matchNum}${gameName}</span>
+                        <span class="voted-match-badge ${badgeClass}">${badgeText}</span>
+                    </div>
+                    <div class="voted-match-votes">${votes.length} votes: ${votesSummary}</div>
+                    <div class="voted-match-actions">
+                        ${acceptBtn}
+                        <button class="btn-small secondary" onclick="event.stopPropagation(); openQuickConfirm(${match.id})">Override</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+}
+
+/**
+ * Accept a consensus vote result — confirms the winner from player votes
+ */
+async function acceptVotedResult(gameId) {
+    if (_asyncBusy) return;
+    _asyncBusy = true;
+    try {
+        const game = (gameState?.gameQueue || []).find(g => g.id === gameId);
+        if (!game || !game.voteConsensus?.result) {
+            showStatus('No consensus result to accept', 'warning');
+            return;
+        }
+
+        const result = game.voteConsensus.result;
+        const sideMatch = result.match(/side_(\d+)_won/);
+        if (!sideMatch) {
+            showStatus('Cannot parse vote result — use Override instead', 'warning');
+            return;
+        }
+
+        const winnerIndex = parseInt(sideMatch[1]);
+
+        // Mark as admin-confirmed
+        game.adminConfirmed = true;
+        game.adminConfirmedAt = new Date().toISOString();
+
+        // Use existing confirmResult flow
+        selectedQueuedGame = game;
+        await confirmResult(winnerIndex);
+
+        showStatus('Vote accepted — result confirmed!', 'success');
+    } finally { _asyncBusy = false; }
 }
 
 /**
@@ -4408,6 +4693,15 @@ function awardRoundPoints() {
         return {};
     }
 
+    // Collect hex coords under active challenge (pending/ongoing challenge matches)
+    const contestedHexes = new Set();
+    (gameState.gameQueue || []).forEach(m => {
+        if (m.isChallenge && m.challengeHexCoord &&
+            (m.status === 'pending' || m.status === 'ongoing')) {
+            contestedHexes.add(m.challengeHexCoord);
+        }
+    });
+
     const pointsAwarded = {};
 
     gameState.teams.forEach(team => {
@@ -4415,6 +4709,9 @@ function awardRoundPoints() {
 
         // Count points from controlled heart hexes
         Object.entries(gameState.heartHexControl || {}).forEach(([coord, ownerId]) => {
+            // Skip hexes under active challenge — points frozen until resolved
+            if (contestedHexes.has(coord)) return;
+
             if (ownerId === team.id) {
                 const matches = coord.match(/q(-?\d+)r(-?\d+)/);
                 if (matches) {

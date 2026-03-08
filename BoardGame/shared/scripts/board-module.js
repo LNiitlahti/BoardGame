@@ -216,16 +216,14 @@ class BoardModule {
      * @param {Array<string>} roomCoords - Array of coordinate strings like "q1r2"
      */
     setRoomHexes(roomCoords) {
-        // Validate that rooms don't overlap with fixed special hexes
+        // Validate that rooms don't overlap with heart hexes
         const invalidRooms = roomCoords.filter(coord =>
-            this.startingLocations.includes(coord) ||
             this.sideHeartLocations.includes(coord) ||
             coord === this.mountainHeartLocation
         );
 
         if (invalidRooms.length > 0) {
-            console.warn('[BoardModule] Rooms cannot overlap with starting squares or heart hexes:', invalidRooms);
-            // Filter out invalid rooms
+            console.warn('[BoardModule] Rooms cannot overlap with heart hexes:', invalidRooms);
             this.roomHexes = roomCoords.filter(coord => !invalidRooms.includes(coord));
         } else {
             this.roomHexes = [...roomCoords];

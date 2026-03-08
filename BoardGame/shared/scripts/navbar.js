@@ -27,7 +27,7 @@
         ],
         // Admin and above
         admin: [
-            { id: 'admin', label: 'Admin', icon: '⚙️', href: 'admin.html', lightweight: true },
+            { id: 'admin', label: 'Admin', icon: '⚙️', href: 'admin.html' },
             { id: 'view', label: 'Spectator', icon: '📺', href: 'view.html' }
         ],
         // God only
@@ -107,21 +107,21 @@
      * Build URL with current tournament context
      */
     function buildNavUrl(href, item) {
-        const currentGameId = sessionStorage.getItem('currentGameId') || localStorage.getItem('currentGameId');
+        const currentTournamentId = sessionStorage.getItem('currentTournamentId') || localStorage.getItem('currentTournamentId');
         const currentTeamId = sessionStorage.getItem('currentTeamId') || localStorage.getItem('currentTeamId');
 
         // Most nav targets live in /full/, lightweight-flagged ones in /lightweight/
         let url = (item && item.lightweight ? getLightweightBasePath() : getFullBasePath()) + '/' + href;
         const params = new URLSearchParams();
 
-        if (currentGameId) {
+        if (currentTournamentId) {
             // Each page expects a different param name
             if (href === 'god.html') {
-                params.set('tournament', currentGameId);
+                params.set('tournament', currentTournamentId);
             } else if (href === 'admin.html') {
-                params.set('tournamentId', currentGameId);
+                params.set('tournamentId', currentTournamentId);
             } else {
-                params.set('gameId', currentGameId);
+                params.set('tournamentId', currentTournamentId);
             }
         }
         if (currentTeamId && (href === 'team.html')) {
@@ -139,7 +139,7 @@
     /**
      * Create the navbar HTML
      */
-    function createNavbarHTML(userRole, userName) {
+    function createNavbarHTML(userRole, userName, avatarUrl) {
         const currentPage = getCurrentPage();
         const navItems = getNavItemsForRole(userRole);
 
@@ -163,7 +163,7 @@
 
         // Active tournament context
         const tournamentName = sessionStorage.getItem('currentTournamentName') || localStorage.getItem('currentTournamentName');
-        const tournamentId = sessionStorage.getItem('currentGameId') || localStorage.getItem('currentGameId');
+        const tournamentId = sessionStorage.getItem('currentTournamentId') || localStorage.getItem('currentTournamentId');
         const hasTournament = tournamentId && tournamentName;
         const tournamentCtxHTML = hasTournament
             ? `<span class="navbar-tournament-name" id="navTournamentLabel" title="${tournamentName}">${tournamentName}</span>`
@@ -189,6 +189,10 @@
                     <!-- User Section -->
                     <div class="navbar-user">
                         <div class="navbar-connection-status" id="connectionStatus" title="Firebase: Connecting..."></div>
+                        ${avatarUrl
+                            ? `<img class="navbar-avatar" id="navbarAvatar" src="${avatarUrl}" alt="Avatar" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'navbar-avatar-placeholder',id:'navbarAvatar',textContent:'${(userName || 'U').charAt(0).toUpperCase()}'}))">`
+                            : `<span class="navbar-avatar-placeholder" id="navbarAvatar">${(userName || 'U').charAt(0).toUpperCase()}</span>`
+                        }
                         <span class="navbar-role-badge ${roleClass}" id="roleBadge">${roleBadge}</span>
                         <div class="navbar-user-info">
                             <span class="navbar-user-name" id="userName">${userName || 'User'}</span>
@@ -224,9 +228,9 @@
     /**
      * Save navbar state to localStorage for instant rendering on next page load
      */
-    function saveNavbarCache(userRole, userName) {
+    function saveNavbarCache(userRole, userName, avatarUrl) {
         try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify({ role: userRole, name: userName }));
+            localStorage.setItem(CACHE_KEY, JSON.stringify({ role: userRole, name: userName, avatarUrl: avatarUrl || null }));
         } catch (e) { /* quota exceeded — ignore */ }
     }
 
@@ -247,7 +251,7 @@
         const cached = loadNavbarCache();
         if (!cached) return false;
 
-        const html = createNavbarHTML(cached.role, cached.name);
+        const html = createNavbarHTML(cached.role, cached.name, cached.avatarUrl);
         insertNavbar(html);
         return true;
     }
@@ -303,10 +307,11 @@
             let currentTournamentId = getCurrentTournamentId();
 
             // If player is assigned to a tournament, use that
-            if (userData.assignedGameId && !currentTournamentId) {
-                currentTournamentId = userData.assignedGameId;
-                localStorage.setItem('currentGameId', currentTournamentId);
-                sessionStorage.setItem('currentGameId', currentTournamentId);
+            const assignedTournament = userData.assignedTournamentId || userData.assignedGameId; // backward compat
+            if (assignedTournament && !currentTournamentId) {
+                currentTournamentId = assignedTournament;
+                localStorage.setItem('currentTournamentId', currentTournamentId);
+                sessionStorage.setItem('currentTournamentId', currentTournamentId);
             }
 
             // Also store team ID if player has one
@@ -317,15 +322,17 @@
 
             // Store current tournament ID
             if (currentTournamentId) {
-                localStorage.setItem('currentGameId', currentTournamentId);
-                sessionStorage.setItem('currentGameId', currentTournamentId);
+                localStorage.setItem('currentTournamentId', currentTournamentId);
+                sessionStorage.setItem('currentTournamentId', currentTournamentId);
             }
 
+            const avatarUrl = userData.avatarUrl || null;
+
             // Cache for instant rendering on next page load
-            saveNavbarCache(userRole, userName);
+            saveNavbarCache(userRole, userName, avatarUrl);
 
             // Insert navbar into page
-            const navbarHTML = createNavbarHTML(userRole, userName);
+            const navbarHTML = createNavbarHTML(userRole, userName, avatarUrl);
             insertNavbar(navbarHTML);
 
             // We just fetched from Firestore, so Firebase is connected
@@ -350,10 +357,11 @@
     function getCurrentTournamentId() {
         const urlParams = new URLSearchParams(window.location.search);
         return urlParams.get('tournament') ||
-               urlParams.get('gameId') ||
-               urlParams.get('game') ||
-               sessionStorage.getItem('currentGameId') ||
-               localStorage.getItem('currentGameId');
+               urlParams.get('tournamentId') ||
+               urlParams.get('gameId') ||  // backward compat
+               urlParams.get('game') ||   // backward compat
+               sessionStorage.getItem('currentTournamentId') ||
+               localStorage.getItem('currentTournamentId');
     }
 
     /**
@@ -364,7 +372,7 @@
             await firebase.auth().signOut();
             // Clear both session and local storage for tournament data
             sessionStorage.clear();
-            localStorage.removeItem('currentGameId');
+            localStorage.removeItem('currentTournamentId');
             localStorage.removeItem('currentTeamId');
             localStorage.removeItem('currentTournamentName');
             localStorage.removeItem(CACHE_KEY);

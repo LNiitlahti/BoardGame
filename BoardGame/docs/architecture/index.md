@@ -9,6 +9,7 @@
 graph TB
     subgraph Pages
         ADMIN[lightweight/admin.html]
+        ADMIN2[full/admin.html]
         SETUP[lightweight/setup.html]
         ONBOARD[lightweight/onboarding.html]
         VIEW[lightweight/view.html]
@@ -44,6 +45,8 @@ graph TB
         UDM[undo-manager.js]
         SEM[spell-engine.js]
         SCM[scoring-ceremony.js]
+        SNM[season-manager.js]
+        APA[admin-phase-adapter.js]
     end
 
     subgraph View_Modules
@@ -63,6 +66,8 @@ graph TB
     end
 
     ADMIN --> ADM_JS
+    ADMIN2 --> ADM_JS
+    ADMIN2 -->|phase adapter| PMM
     STATS --> ST
     ONBOARD --> OB
     VIEW --> BR
@@ -118,7 +123,7 @@ graph TB
 
 | Diagram File | Source JS | Diagrams | Description |
 |---|---|---|---|
-| [admin-lightweight.md](admin-lightweight.md) | `lightweight/scripts/admin.js` | 10 | Auth, match results, challenges, player formats, game names, queue colors, connection monitor, seating order |
+| [admin-lightweight.md](admin-lightweight.md) | `lightweight/scripts/admin.js` | 14 | Auth, match results, challenges, player formats, game names, queue colors, connection monitor, seating order, breaks, tournament state, points award, Discord auto-assignment |
 | [smart-match-generator.md](smart-match-generator.md) | `scripts/smart-match-generator.js` | 5 | Main pipeline, 5v5 vs 3v3+2v2, rotation state machine, repeat counts |
 | [balance-optimizer.md](balance-optimizer.md) | `scripts/balance-optimizer.js` | 5 | Selection algorithm, split penalty, matrix updates, state restore, stats |
 | [match-suggester.md](match-suggester.md) | `scripts/match-suggester.js` | 2 | 10-match rotation pattern, fairness note |
@@ -129,7 +134,7 @@ graph TB
 | [board-renderer.md](board-renderer.md) | `scripts/board-renderer.js` | 3 | Render pipeline, responsive scaling, incremental updates |
 | [toast.md](toast.md) | `shared/scripts/toast.js` | 3 | Toast lifecycle, connection banner state machine, button loading |
 | [firestore-rules.md](firestore-rules.md) | `firestore.rules` | 6 | Role hierarchy, per-collection permissions, permission matrix, billing costs |
-| [god-modules.md](god-modules.md) | `full/scripts/*.js` (15 modules) | 10 | OOP module architecture, DI graph, data flow, window globals, script loading order, action logger, phase manager, spell engine, backup/undo, voting, scoring ceremony, display manager |
+| [god-modules.md](god-modules.md) | `full/scripts/*.js` (19 modules) | 10 | OOP module architecture, DI graph, data flow, window globals, script loading order, action logger, phase manager (21-phase flow with loops), spell engine, backup/undo, voting, scoring ceremony, display manager, season manager, VP + hex territory points |
 | [replay-analytics.md](replay-analytics.md) | `full/scripts/replay-engine.js`, `summary-generator.js`, `action-export.js` | 9 | Replay engine architecture, state reconstruction, playback, summary generator, action export, god.html integration |
 | [cross-system.md](cross-system.md) | All files | 1 | End-to-end data flow sequence diagram |
 

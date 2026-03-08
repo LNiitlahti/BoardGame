@@ -166,6 +166,10 @@
       auth.onAuthStateChanged(user => {
         if (user && !user.isAnonymous) {
           console.log("User logged in:", user.uid);
+          // Update lastLogin timestamp in Firestore
+          db.collection('users').doc(user.uid).update({
+            lastLogin: new Date().toISOString()
+          }).catch(err => console.warn('Could not update lastLogin:', err));
           showStatus('Login successful! Redirecting...', 'success');
           setTimeout(() => {
             window.location.href = 'index.html';
@@ -276,7 +280,7 @@
           isGod: false,
 
           // Appointment fields (null until admin assigns)
-          assignedGameId: null,
+          assignedTournamentId: null,
           assignedTeamId: null,
           assignedTeamName: null,
           appointedAt: null,

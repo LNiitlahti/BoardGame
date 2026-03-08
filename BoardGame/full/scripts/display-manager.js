@@ -17,41 +17,88 @@ const DISPLAY_MODES = {
         slides: ['next_match_large', 'standings_large', 'board_focus'],
         hidePanels: true
     },
-    pre_game_instructions: {
-        name: 'Pre-Game Instructions',
-        slides: ['next_match_large'],
-        hidePanels: true
-    },
-    lobby_ready: {
-        name: 'Lobby Ready',
-        slides: ['readiness_large'],
-        hidePanels: true
-    },
-    matches_in_progress: {
-        name: 'Matches In Progress',
-        slides: ['live_matches_large'],
-        hidePanels: true
-    },
-    scoring_and_placement: {
-        name: 'Scoring & Placement',
-        slides: null,
-        hidePanels: false
-    },
-    spell_phase: {
-        name: 'Spell Phase',
-        slides: null,
-        hidePanels: false
-    },
-    round_end: {
-        name: 'Round End',
+    // ── Scoring phases ──
+    scoring_vp: {
+        name: 'Scoring: Victory Points',
         slides: ['results_large', 'standings_large'],
         hidePanels: true
     },
-    challenge_selection: {
-        name: 'Challenge Selection',
+    scoring_hex: {
+        name: 'Scoring: Hex',
+        slides: ['board_focus', 'standings_large'],
+        hidePanels: true
+    },
+    // ── Hex placement phases ──
+    hex_placement_1: {
+        name: 'Hex Placement — Game 1',
         slides: null,
         hidePanels: false
     },
+    hex_placement_2: {
+        name: 'Hex Placement — Game 2',
+        slides: null,
+        hidePanels: false
+    },
+    // ── Spell windows ──
+    spell_window_1: { name: 'Spell Window', slides: null, hidePanels: false },
+    spell_window_2: { name: 'Spell Window', slides: null, hidePanels: false },
+    spell_window_3: { name: 'Spell Window', slides: null, hidePanels: false },
+    spell_window_4: { name: 'Spell Window', slides: null, hidePanels: false },
+    // ── Challenge phases ──
+    challenges: {
+        name: 'Challenges Issued',
+        slides: null,
+        hidePanels: false
+    },
+    challenge_game: {
+        name: 'Challenge Game',
+        slides: ['live_matches_large'],
+        hidePanels: true
+    },
+    // ── Board resolved ──
+    board_resolved: {
+        name: 'Board Resolved',
+        slides: ['board_focus'],
+        hidePanels: true
+    },
+    // ── Match phases ──
+    match_1_setup: {
+        name: 'Match 1 — Setup',
+        slides: ['next_match_large'],
+        hidePanels: true
+    },
+    match_1_lobby: {
+        name: 'Match 1 — Lobby',
+        slides: ['readiness_large'],
+        hidePanels: true
+    },
+    match_1_playing: {
+        name: 'Match 1 — Playing',
+        slides: ['live_matches_large'],
+        hidePanels: true
+    },
+    match_2_setup: {
+        name: 'Match 2 — Setup',
+        slides: ['next_match_large'],
+        hidePanels: true
+    },
+    match_2_lobby: {
+        name: 'Match 2 — Lobby',
+        slides: ['readiness_large'],
+        hidePanels: true
+    },
+    match_2_playing: {
+        name: 'Match 2 — Playing',
+        slides: ['live_matches_large'],
+        hidePanels: true
+    },
+    // ── Round advance ──
+    round_advance: {
+        name: 'Round Advance',
+        slides: ['results_large', 'standings_large'],
+        hidePanels: true
+    },
+    // ── Tournament end ──
     tournament_end: {
         name: 'Tournament End',
         slides: ['winner_celebration', 'standings_large'],
@@ -198,6 +245,18 @@ class DisplayManager {
             return this._gameData.gameDefinitions[gameId].shortName;
         }
         return gameId ? gameId.substring(0, 4).toUpperCase() : '?';
+    }
+
+    _getGameImagePath(gameId) {
+        if (window.GAMES_CONFIG) {
+            const game = window.GAMES_CONFIG.games[gameId];
+            if (game?.image) return window.GAMES_CONFIG.resolveImagePath(game.image);
+        }
+        if (this._gameData?.gameDefinitions?.[gameId]?.image) {
+            const img = this._gameData.gameDefinitions[gameId].image;
+            return img.startsWith('http') ? img : (window.BOARDGAME_BASE || '.') + '/' + img;
+        }
+        return null;
     }
 
     _getTeamColor(teamId) {
@@ -1005,25 +1064,39 @@ class DisplayManager {
             phaseBanner.style.borderBottom = '2px solid rgba(247,186,50,0.3)';
             const autoFlag = data.currentPhase?.autoInserted ? ' (Scheduled)' : '';
             phaseBanner.textContent = 'BREAK TIME' + autoFlag;
-        } else if (phaseName === 'matches_in_progress') {
+        } else if (phaseName === 'match_1_playing' || phaseName === 'match_2_playing' || phaseName === 'challenge_game') {
             phaseBanner.style.display = 'block';
             phaseBanner.style.background = 'rgba(16,185,129,0.08)';
             phaseBanner.style.color = '#10b981';
             phaseBanner.style.borderBottom = '2px solid rgba(16,185,129,0.3)';
-            phaseBanner.textContent = 'MATCHES IN PROGRESS';
-        } else if (phaseName === 'scoring_and_placement') {
+            const label = phaseName === 'challenge_game' ? 'CHALLENGE GAME' :
+                          phaseName === 'match_1_playing' ? 'MATCH 1 IN PROGRESS' : 'MATCH 2 IN PROGRESS';
+            phaseBanner.textContent = label;
+        } else if (phaseName === 'scoring_vp' || phaseName === 'scoring_hex') {
             phaseBanner.style.display = 'block';
             phaseBanner.style.background = 'rgba(168,85,247,0.08)';
             phaseBanner.style.color = '#a855f7';
             phaseBanner.style.borderBottom = '2px solid rgba(168,85,247,0.3)';
-            phaseBanner.textContent = 'SCORING & HEX PLACEMENT';
-        } else if (phaseName === 'challenge_selection') {
+            phaseBanner.textContent = phaseName === 'scoring_vp' ? 'SCORING: VICTORY POINTS' : 'SCORING: HEX';
+        } else if (phaseName === 'hex_placement_1' || phaseName === 'hex_placement_2') {
+            phaseBanner.style.display = 'block';
+            phaseBanner.style.background = 'rgba(168,85,247,0.08)';
+            phaseBanner.style.color = '#a855f7';
+            phaseBanner.style.borderBottom = '2px solid rgba(168,85,247,0.3)';
+            phaseBanner.textContent = phaseName === 'hex_placement_1' ? 'HEX PLACEMENT \u2014 Game 1' : 'HEX PLACEMENT \u2014 Game 2';
+        } else if (phaseName === 'challenges') {
             phaseBanner.style.display = 'block';
             phaseBanner.style.background = 'rgba(245,158,11,0.08)';
             phaseBanner.style.color = '#f59e0b';
             phaseBanner.style.borderBottom = '2px solid rgba(245,158,11,0.3)';
-            phaseBanner.textContent = 'CHALLENGE SELECTION \u2014 Teams choosing opponents';
-        } else if (phaseName === 'spell_phase') {
+            phaseBanner.textContent = 'CHALLENGES \u2014 Teams choosing opponents';
+        } else if (phaseName === 'board_resolved') {
+            phaseBanner.style.display = 'block';
+            phaseBanner.style.background = 'rgba(59,130,246,0.08)';
+            phaseBanner.style.color = '#3b82f6';
+            phaseBanner.style.borderBottom = '2px solid rgba(59,130,246,0.3)';
+            phaseBanner.textContent = 'BOARD RESOLVED \u2014 Admin verification';
+        } else if (phaseName && phaseName.startsWith('spell_window')) {
             phaseBanner.style.display = 'block';
             phaseBanner.style.background = 'rgba(168,85,247,0.08)';
             phaseBanner.style.color = '#a855f7';
@@ -1035,10 +1108,16 @@ class DisplayManager {
                 );
                 const teamName = currentTeam?.name ||
                     'Team ' + (sp.turnOrder?.[sp.currentTeamIndex] || '?');
-                phaseBanner.textContent = 'SPELL PHASE \u2014 ' + teamName + ' is choosing...';
+                phaseBanner.textContent = 'SPELL WINDOW \u2014 ' + teamName + ' is choosing...';
             } else {
-                phaseBanner.textContent = 'SPELL PHASE';
+                phaseBanner.textContent = 'SPELL WINDOW';
             }
+        } else if (phaseName === 'match_1_lobby' || phaseName === 'match_2_lobby') {
+            phaseBanner.style.display = 'block';
+            phaseBanner.style.background = 'rgba(59,130,246,0.08)';
+            phaseBanner.style.color = '#3b82f6';
+            phaseBanner.style.borderBottom = '2px solid rgba(59,130,246,0.3)';
+            phaseBanner.textContent = phaseName === 'match_1_lobby' ? 'LOBBY 1 \u2014 Waiting for players' : 'LOBBY 2 \u2014 Waiting for players';
         } else {
             phaseBanner.style.display = 'none';
         }
@@ -1053,12 +1132,17 @@ class DisplayManager {
         if (!ticker) {
             ticker = document.createElement('div');
             ticker.id = 'broadcastTicker';
-            ticker.style.cssText = 'text-align:center; padding:10px 20px; font-family:"Quantico",sans-serif; font-size:18px; font-weight:600; background:rgba(0,212,255,0.06); color:#00d4ff; display:none; border-bottom:1px solid rgba(0,212,255,0.2); letter-spacing:0.5px;';
+            ticker.style.cssText = 'position:absolute; left:0; right:0; z-index:39; text-align:center; padding:10px 20px; font-family:"Quantico",sans-serif; font-size:18px; font-weight:600; background:rgba(0,212,255,0.12); color:#00d4ff; display:none; border-bottom:1px solid rgba(0,212,255,0.3); letter-spacing:0.5px;';
+            // Position below header (or phaseBanner if present)
             const phaseBanner = document.getElementById('phaseBanner');
             const ref = phaseBanner || document.querySelector('.header');
-            if (ref && ref.parentNode) {
-                ref.parentNode.insertBefore(ticker, ref.nextSibling);
+            if (ref) {
+                const refBottom = (ref.offsetTop || 0) + (ref.offsetHeight || 56);
+                ticker.style.top = refBottom + 'px';
+            } else {
+                ticker.style.top = '56px';
             }
+            document.body.appendChild(ticker);
         }
 
         const msg = data.broadcastMessage;
@@ -1124,6 +1208,12 @@ class DisplayManager {
         const phaseName = gameData.currentPhase?.name;
         if (phaseName && DISPLAY_MODES[phaseName] && DISPLAY_MODES[phaseName].slides) {
             return phaseName;
+        }
+
+        // Fallback: if there are ongoing matches, show live display regardless of phase
+        const queue = gameData.gameQueue || [];
+        if (queue.some(m => m.status === 'ongoing' && !m.isBreak)) {
+            return 'match_1_playing';
         }
 
         return null;
@@ -1400,6 +1490,8 @@ class DisplayManager {
         const queue = data.gameQueue || [];
 
         const activeTeamIds = new Set();
+        // Build Discord channel map per team
+        const teamDiscordChannels = {};
         queue.forEach(match => {
             if (match.isBreak || match.status === 'completed') return;
             (match.teams || []).forEach(team => {
@@ -1408,23 +1500,62 @@ class DisplayManager {
                     if (p.originalTeamId != null) activeTeamIds.add(String(p.originalTeamId));
                 });
             });
+            // Map Discord channels to original team IDs
+            if (match.discordChannels) {
+                (match.teams || []).forEach(side => {
+                    const ch = match.discordChannels[side.id];
+                    if (ch == null) return;
+                    const players = this._getMatchTeamPlayers(side);
+                    players.forEach(p => {
+                        if (p.originalTeamId != null) {
+                            teamDiscordChannels[String(p.originalTeamId)] = ch;
+                        }
+                    });
+                });
+            }
+        });
+
+        // Build lobby creator set
+        const lobbyCreatorUids = new Set();
+        queue.forEach(match => {
+            if (match.isBreak || match.status === 'completed') return;
+            Object.values(match.lobbyCreators || {}).forEach(c => {
+                if (c?.uid) lobbyCreatorUids.add(c.uid);
+            });
         });
 
         let rowsHTML = '';
         teams.filter(t => activeTeamIds.size === 0 || activeTeamIds.has(String(t.id))).forEach(team => {
             const players = team.players || [];
-            const readyCount = players.filter(p => lobbyReady[p.uid]?.ready).length;
-            const total = players.length;
-            const allReady = readyCount === total;
             const teamColor = team.color || '#888';
+            const discordCh = teamDiscordChannels[String(team.id)];
+
+            // Per-player readiness matrix
+            let playersHTML = '';
+            players.forEach(p => {
+                const r = lobbyReady[p.uid] || {};
+                const gl = r.gameLobby === true || r.ready === true;
+                const dc = r.discord === true || r.ready === true;
+                const isCreator = lobbyCreatorUids.has(p.uid);
+                const creatorIcon = isCreator ? '<span style="margin-right: 4px;">\u2B50</span>' : '';
+
+                playersHTML += `
+                    <div class="dm-ready-player-row">
+                        <span class="dm-ready-indicator" style="color: ${gl ? '#10b981' : '#ef4444'};">${gl ? '\uD83D\uDFE2' : '\uD83D\uDD34'}\uD83C\uDFAE</span>
+                        <span class="dm-ready-indicator" style="color: ${dc ? '#10b981' : '#ef4444'};">${dc ? '\uD83D\uDFE2' : '\uD83D\uDD34'}\uD83C\uDFA7</span>
+                        ${creatorIcon}<span class="dm-ready-player-name">${p.name || 'Player'}</span>
+                    </div>
+                `;
+            });
+
+            const discordLabel = discordCh ? ` \u2014 Discord #${discordCh}` : '';
 
             rowsHTML += `
                 <div class="dm-team-ready-row" style="border-left-color: ${teamColor};">
-                    <span class="dm-team-name" style="color: ${teamColor}; font-size: 22px; font-weight: 700; flex: 1;">${team.name || 'Team'}</span>
-                    <span class="dm-ready-status" style="color: ${allReady ? '#10b981' : '#ef4444'};">
-                        ${readyCount}/${total}
-                    </span>
-                    <span class="dm-ready-check">${allReady ? '\u2705' : '\u23F3'}</span>
+                    <div style="flex: 1;">
+                        <span class="dm-team-name" style="color: ${teamColor}; font-size: 20px; font-weight: 700;">${team.name || 'Team'}${discordLabel}</span>
+                        <div class="dm-ready-players-grid">${playersHTML}</div>
+                    </div>
                 </div>
             `;
         });
@@ -1432,6 +1563,9 @@ class DisplayManager {
         container.innerHTML = `
             <div class="dm-readiness-large">
                 <div class="dm-readiness-title">Ready Check</div>
+                <div class="dm-readiness-legend" style="text-align: center; font-size: 14px; color: #9aa1ad; margin-bottom: 12px;">
+                    \uD83C\uDFAE = Game Lobby &nbsp; \uD83C\uDFA7 = Discord &nbsp; \u2B50 = Lobby Creator
+                </div>
                 ${rowsHTML}
             </div>
         `;
@@ -1442,13 +1576,17 @@ class DisplayManager {
         const ongoing = queue.filter(m => m.status === 'ongoing' && !m.isBreak);
 
         if (ongoing.length === 0) {
-            container.innerHTML = '<div class="dm-live-match-large"><div class="dm-live-badge">LIVE</div><div class="dm-game-name">Waiting for matches...</div></div>';
+            // No ongoing matches — hide overlay so normal dashboard shows
+            container.classList.remove('active');
+            container.innerHTML = '';
             return;
         }
 
         let matchesHTML = '';
         ongoing.forEach(match => {
             const gameName = this._getGameDisplayName(match.game);
+            const gameImage = this._getGameImagePath(match.game);
+            const logoHtml = gameImage ? `<img class="dm-game-logo" src="${gameImage}" alt="${gameName}">` : '';
             const teams = match.teams || [];
 
             let sidesHTML = '';
@@ -1464,15 +1602,15 @@ class DisplayManager {
             });
 
             matchesHTML += `
-                <div class="dm-live-match-large" style="margin-bottom: 30px;">
-                    <div class="dm-live-badge">LIVE</div>
-                    <div class="dm-game-name">${gameName}</div>
+                <div class="dm-live-match-large">
+                    <div class="dm-live-badge">\u25CF LIVE</div>
+                    <div class="dm-game-header">${logoHtml}<span class="dm-game-name">${gameName}</span></div>
                     <div class="dm-sides">${sidesHTML}</div>
                 </div>
             `;
         });
 
-        container.innerHTML = matchesHTML;
+        container.innerHTML = `<div class="dm-live-matches-wrapper">${matchesHTML}</div>`;
     }
 
     _renderResultsLarge(container, data) {

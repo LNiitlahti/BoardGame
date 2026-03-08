@@ -3,6 +3,16 @@
 # ===========================
 
 # ===========================
+# USER UPLOADS
+# ===========================
+# Avatar images (user-uploaded, keep upload.php)
+avatars/*.jpg
+avatars/*.jpeg
+avatars/*.png
+avatars/*.gif
+avatars/*.webp
+
+# ===========================
 # SECRETS & CREDENTIALS
 # ===========================
 # Firebase config (contains API keys)

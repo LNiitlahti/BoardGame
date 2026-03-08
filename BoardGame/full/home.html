@@ -62,6 +62,27 @@
       padding: 0;
     }
 
+    .home-avatar {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid rgba(200,179,126,0.3);
+      flex-shrink: 0;
+    }
+    .home-avatar-placeholder {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, rgba(30,32,42,0.9), rgba(14,16,22,0.95));
+      color: #c8b37e;
+      font-family: 'Russo One', sans-serif;
+      font-size: 1.4rem;
+      border: 2px solid rgba(200,179,126,0.3);
+      flex-shrink: 0;
+    }
+
     .header-left h1 {
       font-family: 'Russo One', sans-serif;
       font-size: 1.5rem;
@@ -523,12 +544,166 @@
     }
     .home-notice-close:hover { color: #d6d9df; }
 
+    /* ── Season stats ── */
+    .season-stats-panel {
+      background: linear-gradient(180deg, rgba(30,32,42,0.6), rgba(14,16,22,0.75));
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 22px;
+    }
+    .season-stats-panel h3 {
+      font-family: 'Russo One', sans-serif;
+      color: #c8b37e;
+      font-size: 1rem;
+      letter-spacing: 0.04em;
+      margin-bottom: 15px;
+    }
+    .season-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .season-name {
+      font-family: 'Russo One', sans-serif;
+      font-size: 1.15rem;
+      color: #e8d8a8;
+    }
+    .season-status-badge {
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-family: 'Quantico', sans-serif;
+    }
+    .season-status-badge.upcoming { background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+    .season-status-badge.active { background: rgba(0,224,128,0.12); color: #00e080; border: 1px solid rgba(0,224,128,0.25); }
+    .season-status-badge.completed { background: rgba(99,102,241,0.15); color: #6366f1; border: 1px solid rgba(99,102,241,0.3); }
+
+    .season-progress {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .season-progress-bar {
+      flex: 1;
+      height: 6px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .season-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #c8b37e, #e8d8a8);
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+    .season-progress-label {
+      font-size: 0.82rem;
+      color: #9aa1ad;
+      white-space: nowrap;
+    }
+
+    .season-tournament-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .season-tournament-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(51,65,85,0.4);
+      padding: 5px 12px;
+      border-radius: 16px;
+      font-size: 0.8rem;
+      color: #d6d9df;
+    }
+    .season-tournament-chip .chip-status {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .chip-status.playing { background: #00e080; }
+    .chip-status.setup { background: #c8b37e; }
+    .chip-status.finished, .chip-status.complete { background: #6a7088; }
+
+    .season-stats-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #c8b37e;
+      font-size: 0.85rem;
+      text-decoration: none;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .season-stats-link:hover { color: #e8d8a8; }
+
     /* ── Responsive ── */
     @media (max-width: 768px) {
       .header { flex-direction: column; gap: 12px; text-align: center; }
       .header-right { justify-content: center; }
       .header-left h1 { font-size: 1.2rem; }
       .dashboard-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Toast notifications (errorHandler.js) */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 15px 25px;
+      background: rgba(15, 23, 42, 0.95);
+      color: white;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      z-index: 10000;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      border: 2px solid #334155;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      max-width: 400px;
+      word-wrap: break-word;
+    }
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    .toast.toast-error {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.95);
+      box-shadow: 0 10px 40px rgba(239, 68, 68, 0.4);
+    }
+    .toast.toast-success {
+      border-color: #10b981;
+      background: rgba(16, 185, 129, 0.95);
+      box-shadow: 0 10px 40px rgba(16, 185, 129, 0.4);
+    }
+    .toast.toast-warning {
+      border-color: #f59e0b;
+      background: rgba(245, 158, 11, 0.95);
+      box-shadow: 0 10px 40px rgba(245, 158, 11, 0.4);
+    }
+    .toast.toast-info {
+      border-color: #3b82f6;
+      background: rgba(59, 130, 246, 0.95);
+      box-shadow: 0 10px 40px rgba(59, 130, 246, 0.4);
+    }
+    @media (max-width: 768px) {
+      .toast {
+        bottom: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+        text-align: center;
+      }
     }
   </style>
 </head>
@@ -578,7 +753,7 @@
     <!-- Header -->
     <div class="header">
       <div class="header-left" style="display: flex; align-items: center; gap: 16px;">
-        <img src="../shared/images/favicon/android-chrome-512x512.png" alt="Brand Logo" class="brand-logo">
+        <span class="home-avatar-placeholder" id="homeAvatar">?</span>
         <div>
           <h1 style="margin: 0;">Welcome Back, <span id="homeUserName">...</span></h1>
           <p id="roleDescription" style="margin: 5px 0 0 0;">Connecting...</p>
@@ -587,6 +762,25 @@
       <div class="header-right">
         <span id="userBadge" class="user-badge">USER</span>
         <button class="btn-small btn-secondary" onclick="goToPage('profile.html')">Settings</button>
+      </div>
+    </div>
+
+    <!-- Season Statistics -->
+    <div id="seasonStatsPanel" class="season-stats-panel" style="display: none;">
+      <h3>Season Overview</h3>
+      <div id="seasonStatsContent">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- Recent Tournaments (shown for all roles) -->
+    <div class="board-preview" style="margin-bottom: 30px;">
+      <h3>Recent Tournaments</h3>
+      <div id="recentTournaments" class="dashboard-grid" style="margin-top: 20px;">
+        <!-- Skeleton placeholders shown while loading -->
+        <div class="skeleton skeleton-card"></div>
+        <div class="skeleton skeleton-card"></div>
+        <div class="skeleton skeleton-card"></div>
       </div>
     </div>
 
@@ -733,16 +927,6 @@
       </div>
     </div>
 
-    <!-- Recent Tournaments (shown for all roles) -->
-    <div class="board-preview" style="margin-bottom: 30px;">
-      <h3>🏆 Recent Tournaments</h3>
-      <div id="recentTournaments" class="dashboard-grid" style="margin-top: 20px;">
-        <!-- Skeleton placeholders shown while loading -->
-        <div class="skeleton skeleton-card"></div>
-        <div class="skeleton skeleton-card"></div>
-        <div class="skeleton skeleton-card"></div>
-      </div>
-    </div>
   </div>
 
   <script type="module">
@@ -752,7 +936,7 @@
     let auth, db;
     let currentUser = null;
     let userRole = null;
-    let currentActiveTournament = sessionStorage.getItem('currentGameId') || localStorage.getItem('currentGameId') || null;
+    let currentActiveTournament = sessionStorage.getItem('currentTournamentId') || localStorage.getItem('currentTournamentId') || null;
 
     // Wait for Firebase
     document.addEventListener('firebase-ready', async function() {
@@ -766,8 +950,8 @@
 
       // Check auth
       auth.onAuthStateChanged(async (user) => {
-        if (!user) {
-          // Not logged in → redirect to index (router)
+        if (!user || user.isAnonymous) {
+          // Not logged in or anonymous → redirect to index (router)
           window.location.href = '../index.html';
           return;
         }
@@ -783,11 +967,12 @@
         // Show section structure immediately (before data loads)
         showRoleSection(userRole);
 
-        // Load profile, role data, and tournaments IN PARALLEL
+        // Load profile, role data, tournaments, and season stats IN PARALLEL
         await Promise.all([
           loadUserProfile(user.uid),
           loadRoleData(userRole),
-          loadRecentTournaments()
+          loadRecentTournaments(),
+          loadSeasonStats()
         ]);
       });
     });
@@ -797,13 +982,36 @@
         const userDoc = await db.collection('users').doc(uid).get();
         if (userDoc.exists) {
           const userData = userDoc.data();
+          const displayName = userData.displayName || 'User';
           const nameEl = document.getElementById('homeUserName');
-          nameEl.textContent = userData.displayName || 'User';
+          nameEl.textContent = displayName;
           nameEl.classList.add('fade-in');
+
+          // Avatar
+          const avatarEl = document.getElementById('homeAvatar');
+          if (userData.avatarUrl) {
+            const img = document.createElement('img');
+            img.src = userData.avatarUrl;
+            img.alt = 'Avatar';
+            img.className = 'home-avatar';
+            avatarEl.replaceWith(img);
+          } else {
+            avatarEl.textContent = displayName.charAt(0).toUpperCase();
+          }
 
           // Store in app state
           appState.set('currentUser', currentUser);
           appState.set('userProfile', userData);
+
+          // Resolve role from Firestore profile if not already set correctly
+          const firestoreRole = userData.role || (userData.isGod ? 'god' : userData.isAdmin ? 'admin' : null);
+          if (firestoreRole && firestoreRole !== userRole) {
+            console.log('[Home] Role updated from Firestore profile:', userRole, '→', firestoreRole);
+            userRole = firestoreRole;
+            sessionStorage.setItem('userRole', firestoreRole);
+            showRoleSection(firestoreRole);
+            loadRoleData(firestoreRole);
+          }
         }
       } catch (error) {
         console.error('[Home] Error loading profile:', error);
@@ -906,6 +1114,107 @@
       }
     }
 
+    async function loadSeasonStats() {
+      try {
+        // Find the active season (or most recent)
+        const seasonSnapshot = await db.collection('seasons')
+          .where('status', '==', 'active')
+          .limit(1)
+          .get();
+
+        let season = null;
+        if (!seasonSnapshot.empty) {
+          const doc = seasonSnapshot.docs[0];
+          season = { id: doc.id, ...doc.data() };
+        } else {
+          // Fallback: most recently created season
+          const fallbackSnapshot = await db.collection('seasons')
+            .orderBy('createdAt', 'desc')
+            .limit(1)
+            .get();
+          if (!fallbackSnapshot.empty) {
+            const doc = fallbackSnapshot.docs[0];
+            season = { id: doc.id, ...doc.data() };
+          }
+        }
+
+        if (!season || !season.tournamentIds?.length) return;
+
+        // Load tournament docs for the season
+        const tournamentDocs = await Promise.all(
+          season.tournamentIds.map(tid => db.collection('tournaments').doc(tid).get())
+        );
+
+        const tournaments = tournamentDocs
+          .filter(doc => doc.exists)
+          .map(doc => ({ id: doc.id, ...doc.data() }));
+
+        displaySeasonStats(season, tournaments);
+      } catch (error) {
+        console.error('[Home] Error loading season stats:', error);
+      }
+    }
+
+    function displaySeasonStats(season, tournaments) {
+      const panel = document.getElementById('seasonStatsPanel');
+      const content = document.getElementById('seasonStatsContent');
+      if (!panel || !content) return;
+
+      const count = tournaments.length;
+      const max = season.maxTournaments || 4;
+      const progressPct = Math.round((count / max) * 100);
+
+      // Aggregate simple stats across season tournaments
+      let totalMatches = 0;
+      let totalRounds = 0;
+      tournaments.forEach(t => {
+        if (t.gameHistory) totalMatches += t.gameHistory.length;
+        else if (t.gameQueue) totalMatches += t.gameQueue.filter(m => m.status === 'completed').length;
+        if (t.currentRound) totalRounds += (t.currentRound - 1);
+      });
+
+      // Tournament chips
+      const chips = tournaments.map(t => {
+        const st = t.status || 'setup';
+        return `<span class="season-tournament-chip"><span class="chip-status ${st}"></span>${t.name || t.id}</span>`;
+      }).join('');
+
+      // Stats row
+      const statsItems = [];
+      if (totalMatches > 0) statsItems.push(`${totalMatches} matches played`);
+      if (totalRounds > 0) statsItems.push(`${totalRounds} rounds completed`);
+      const statsLine = statsItems.length > 0
+        ? `<div style="font-size: 0.82rem; color: #9aa1ad; margin-bottom: 14px;">${statsItems.join(' · ')}</div>`
+        : '';
+
+      content.innerHTML = `
+        <div class="season-header-row">
+          <span class="season-name">${season.name}</span>
+          <span class="season-status-badge ${season.status}">${season.status}</span>
+        </div>
+        <div class="season-progress">
+          <div class="season-progress-bar"><div class="season-progress-fill" style="width: ${progressPct}%;"></div></div>
+          <span class="season-progress-label">${count} / ${max} tournaments</span>
+        </div>
+        ${chips ? `<div class="season-tournament-list">${chips}</div>` : ''}
+        ${statsLine}
+        <a class="season-stats-link" onclick="goToSeasonStats()">View full season statistics &rarr;</a>
+      `;
+
+      panel.style.display = 'block';
+      panel.classList.add('fade-in');
+    }
+
+    window.goToSeasonStats = function() {
+      // Navigate to statistics page (lightweight version has full stats)
+      const tid = currentActiveTournament;
+      if (tid) {
+        window.location.href = `../lightweight/statistics.html?tournamentId=${tid}`;
+      } else {
+        window.location.href = '../lightweight/statistics.html';
+      }
+    };
+
     async function loadRecentTournaments() {
       try {
         const tournamentsSnapshot = await db.collection('tournaments').get();
@@ -929,7 +1238,7 @@
 
         // If active tournament exists but name wasn't stored, find and store it
         if (currentActiveTournament) {
-          const active = tournaments.find(t => (t.gameId || t.id) === currentActiveTournament);
+          const active = tournaments.find(t => (t.tournamentId || t.id) === currentActiveTournament);
           if (active) {
             const name = active.name || currentActiveTournament;
             sessionStorage.setItem('currentTournamentName', name);
@@ -959,52 +1268,44 @@
       container.innerHTML = tournaments.map((tournament, index) => {
         const status = tournament.status || 'setup';
         const createdDate = tournament.createdAt ? new Date(tournament.createdAt).toLocaleDateString() : 'Unknown';
-        const tournamentId = tournament.gameId || tournament.id;
+        const tournamentId = tournament.tournamentId || tournament.id;
 
         // Find user's team in this tournament
-        let userTeamId = null;
         let userTeamName = null;
-        const userProfile = appState.get('userProfile');
-
         if (tournament.teams && Array.isArray(tournament.teams) && currentUser) {
           const userTeam = tournament.teams.find(team =>
             team.players && team.players.some(player => player.uid === currentUser.uid)
           );
           if (userTeam) {
-            userTeamId = userTeam.id;
             userTeamName = userTeam.name;
           }
         }
 
-        // Determine if user is GOD (can delete)
-        const isGod = userRole === 'god' || userProfile?.isGod === true;
-        const isAdmin = userRole === 'admin' || userRole === 'god' || userProfile?.isAdmin === true;
-
         const isActive = currentActiveTournament === tournamentId;
         const escapedName = (tournament.name || tournamentId).replace(/'/g, "\\'");
+
+        // Compact info line
+        const infoParts = [];
+        if (tournament.teams) infoParts.push(`${tournament.teams.length} teams`);
+        if (tournament.currentRound) infoParts.push(`Round ${tournament.currentRound}`);
+        if (userTeamName) infoParts.push(`Your team: ${userTeamName}`);
+        const infoLine = infoParts.length > 0 ? infoParts.join(' · ') : createdDate;
 
         return `
           <div class="tournament-card fade-in ${isActive ? 'active-tournament' : ''}" id="tcard-${tournamentId}" style="animation-delay: ${index * 0.06}s;">
             <div class="tournament-header">
-              <h4>🏆 ${tournament.name || tournamentId}</h4>
+              <h4>${tournament.name || tournamentId}</h4>
               <div style="display: flex; gap: 6px; align-items: center;">
                 <span class="active-badge">Active</span>
                 <span class="tournament-status ${status}">${status}</span>
               </div>
             </div>
             <div class="tournament-info">
-              <div><strong>ID:</strong> ${tournamentId}</div>
-              <div><strong>Created:</strong> ${createdDate}</div>
-              ${tournament.teams ? `<div><strong>Teams:</strong> ${tournament.teams.length}</div>` : ''}
-              ${tournament.gamesPlayed !== undefined ? `<div><strong>Games Played:</strong> ${tournament.gamesPlayed}</div>` : ''}
-              ${userTeamName ? `<div><strong>Your Team:</strong> ${userTeamName}</div>` : ''}
+              <div>${infoLine}</div>
             </div>
             <div class="tournament-actions">
-              <button class="btn-small btn-enter" onclick="enterTournament('${tournamentId}', '${escapedName}')">${isActive ? 'Active' : 'Enter'}</button>
+              <button class="btn-small ${isActive ? 'btn-secondary' : 'btn-enter'}" onclick="enterTournament('${tournamentId}', '${escapedName}')">${isActive ? 'Selected' : 'Select Active'}</button>
               <button class="btn-small btn-secondary" onclick="viewTournament('${tournamentId}')">View</button>
-              ${isAdmin ? `<button class="btn-small btn-primary" onclick="manageTournament('${tournamentId}')">Manage</button>` : ''}
-              ${userTeamId ? `<button class="btn-small btn-success" onclick="goToTeamControls('${tournamentId}', ${userTeamId})">Team Controls</button>` : ''}
-              ${isGod ? `<button class="btn-small btn-danger" onclick="deleteTournamentConfirm('${tournamentId}', '${escapedName}')">Delete</button>` : ''}
             </div>
           </div>
         `;
@@ -1045,7 +1346,7 @@
 
     // Global functions for buttons
     window.viewTournament = function(tournamentId) {
-      window.location.href = `view.html?gameId=${tournamentId}`;
+      window.location.href = `view.html?tournamentId=${tournamentId}`;
     };
 
     window.manageTournament = function(tournamentId) {
@@ -1054,7 +1355,7 @@
 
     window.goToTeamControls = function(tournamentId, teamId) {
       // Navigate to team controls page
-      window.location.href = `team.html?gameId=${tournamentId}&teamId=${teamId}`;
+      window.location.href = `team.html?tournamentId=${tournamentId}&teamId=${teamId}`;
     };
 
     window.deleteTournamentConfirm = deleteTournamentConfirm;
@@ -1064,8 +1365,8 @@
     window.enterTournament = function(tournamentId, tournamentName) {
       // Store as active tournament
       currentActiveTournament = tournamentId;
-      sessionStorage.setItem('currentGameId', tournamentId);
-      localStorage.setItem('currentGameId', tournamentId);
+      sessionStorage.setItem('currentTournamentId', tournamentId);
+      localStorage.setItem('currentTournamentId', tournamentId);
       sessionStorage.setItem('currentTournamentName', tournamentName);
       localStorage.setItem('currentTournamentName', tournamentName);
 
@@ -1091,8 +1392,8 @@
 
     window.clearActiveTournament = function() {
       currentActiveTournament = null;
-      sessionStorage.removeItem('currentGameId');
-      localStorage.removeItem('currentGameId');
+      sessionStorage.removeItem('currentTournamentId');
+      localStorage.removeItem('currentTournamentId');
       sessionStorage.removeItem('currentTournamentName');
       localStorage.removeItem('currentTournamentName');
       sessionStorage.removeItem('currentTeamId');
@@ -1157,11 +1458,11 @@
     };
 
     window.manageTournaments = function() {
-      errorHandler.showInfo('Tournament management coming soon');
+      window.location.href = 'god.html?tab=tournaments';
     };
 
     window.viewLogs = function() {
-      errorHandler.showInfo('System logs coming soon');
+      window.location.href = 'god.html?tab=history';
     };
 
     window.manageTeams = async function() {
@@ -1224,7 +1525,7 @@
     };
 
     window.manageSpells = function() {
-      errorHandler.showInfo('Spell management coming soon');
+      window.location.href = 'god.html?tab=spells';
     };
 
     window.confirmResults = function() {
@@ -1233,15 +1534,19 @@
     };
 
     window.viewTeamDetails = function() {
-      errorHandler.showInfo('Team details feature coming soon');
+      window.location.href = 'team.html';
     };
 
     window.viewSpellCards = function() {
-      errorHandler.showInfo('Spell cards feature coming soon');
+      window.location.href = 'team.html';
     };
 
     window.viewSchedule = function() {
-      errorHandler.showInfo('Match schedule coming soon');
+      if (currentActiveTournament) {
+        window.open('../lightweight/match-queue.html?tournamentId=' + encodeURIComponent(currentActiveTournament), '_blank');
+      } else {
+        errorHandler.showInfo('No active tournament selected');
+      }
     };
 
     window.contactAdmin = function() {

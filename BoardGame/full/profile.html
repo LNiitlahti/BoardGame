@@ -12,213 +12,478 @@
   <link rel="manifest" href="../shared/images/favicon/site.webmanifest">
   <link rel="shortcut icon" href="../shared/images/favicon/favicon.ico">
 
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preload" href="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js" as="script">
+  <link rel="preload" href="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js" as="script">
+  <link rel="preload" href="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js" as="script">
+  <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../shared/css/navbar.css">
   <script>window.BOARDGAME_BASE = '..';</script>
   <script src="../shared/scripts/firebase-loader.js"></script>
+  <script src="../shared/scripts/navbar.js"></script>
+  <script src="../shared/scripts/platforms-config.js"></script>
+  <script src="../shared/scripts/games-config.js"></script>
   <script type="module" src="scripts/errorHandler.js"></script>
   <script type="module" src="scripts/stateManager.js"></script>
   <style>
-    .profile-container {
-      max-width: 1000px;
-      margin: 0 auto;
-      padding: 20px;
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Quantico', sans-serif;
+      background:
+        radial-gradient(ellipse at top center, rgba(255,255,255,0.04), rgba(0,0,0,0.9) 65%),
+        linear-gradient(to bottom, rgba(10,12,18,0.95), rgba(5,6,10,0.98));
+      min-height: 100vh;
+      color: #d6d9df;
     }
 
+    /* ── Layout ── */
+    .profile-container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+    /* ── Header ── */
     .profile-header {
-      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-      padding: 30px;
-      border-radius: 15px;
-      margin-bottom: 30px;
+      background: linear-gradient(180deg, rgba(30,32,42,0.85), rgba(14,16,22,0.9));
+      border: 1px solid rgba(200,179,126,0.15);
+      padding: 20px 24px;
+      border-radius: 12px;
+      margin-bottom: 28px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
     }
 
-    .profile-header-left h1 {
-      font-size: 2rem;
-      margin-bottom: 10px;
-      color: white;
+    .profile-header h1 {
+      font-family: 'Russo One', sans-serif;
+      font-size: 1.5rem;
+      color: #e8d8a8;
+      letter-spacing: 0.04em;
+      margin: 0;
     }
 
-    .profile-header-left p {
-      color: rgba(255, 255, 255, 0.8);
-      font-size: 1rem;
+    .profile-header p {
+      color: #9aa1ad;
+      font-size: 0.85rem;
+      margin: 5px 0 8px 0;
     }
 
+    /* ── Avatar ── */
+    .avatar-container {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      position: relative;
+      cursor: pointer;
+      flex-shrink: 0;
+      overflow: hidden;
+      border: 2px solid rgba(200,179,126,0.3);
+      transition: border-color 0.2s ease;
+    }
+    .avatar-container:hover {
+      border-color: rgba(200,179,126,0.7);
+    }
+    .avatar-container:hover .avatar-overlay { opacity: 1; }
+
+    .avatar-img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .avatar-placeholder {
+      width: 100%; height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, rgba(30,32,42,0.9), rgba(14,16,22,0.95));
+      color: #c8b37e;
+      font-family: 'Russo One', sans-serif;
+      font-size: 1.6rem;
+      letter-spacing: 0.05em;
+    }
+
+    .avatar-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      color: #e8d8a8;
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-family: 'Quantico', sans-serif;
+    }
+
+    .avatar-uploading {
+      pointer-events: none;
+    }
+    .avatar-uploading .avatar-overlay {
+      opacity: 1;
+      background: rgba(0,0,0,0.7);
+    }
+
+    /* ── Avatar Crop Modal ── */
+    .crop-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      background: rgba(0,0,0,0.85);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+    .crop-modal.active { display: flex; }
+
+    .crop-container {
+      position: relative;
+      width: 280px; height: 280px;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 3px solid rgba(200,179,126,0.5);
+      box-shadow: 0 0 40px rgba(0,0,0,0.6);
+      cursor: grab;
+      touch-action: none;
+    }
+    .crop-container:active { cursor: grabbing; }
+
+    .crop-container img {
+      position: absolute;
+      transform-origin: 0 0;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    .crop-guide {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px dashed rgba(200,179,126,0.25);
+      pointer-events: none;
+    }
+
+    .crop-controls {
+      margin-top: 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: rgba(30,32,42,0.9);
+      padding: 14px 20px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .crop-controls label {
+      color: #9aa1ad;
+      font-size: 0.82rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .crop-controls input[type="range"] {
+      width: 180px;
+      accent-color: #c8b37e;
+    }
+
+    .crop-buttons {
+      margin-top: 16px;
+      display: flex;
+      gap: 12px;
+    }
+
+    .crop-btn {
+      padding: 10px 28px;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Quantico', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .crop-btn-save {
+      background: linear-gradient(135deg, #c8b37e, #a89460);
+      color: #050710;
+    }
+    .crop-btn-save:hover { filter: brightness(1.15); }
+    .crop-btn-cancel {
+      background: rgba(255,255,255,0.08);
+      color: #9aa1ad;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .crop-btn-cancel:hover { background: rgba(255,255,255,0.15); }
+
+    /* ── Role badges ── */
     .user-role-badge {
       display: inline-block;
-      padding: 8px 16px;
+      padding: 6px 14px;
       border-radius: 20px;
-      font-size: 0.9rem;
+      font-size: 0.7rem;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      margin-top: 10px;
+      font-family: 'Quantico', sans-serif;
     }
-
     .user-role-badge.god {
-      background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
-      color: #1a1a1a;
-      box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+      background: linear-gradient(135deg, #e8d8a8, #c8b37e);
+      color: #050710;
+      box-shadow: 0 0 12px rgba(200,179,126,0.3);
     }
-
     .user-role-badge.admin {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
+      background: rgba(200,179,126,0.2);
+      color: #c8b37e;
+      border: 1px solid rgba(200,179,126,0.3);
     }
-
     .user-role-badge.player {
-      background: linear-gradient(135deg, #00d4ff 0%, #00ffc8 100%);
-      color: #1a1a1a;
+      background: rgba(0,224,128,0.15);
+      color: #00e080;
+      border: 1px solid rgba(0,224,128,0.25);
     }
-
     .user-role-badge.user {
-      background: rgba(255, 255, 255, 0.2);
-      color: white;
+      background: rgba(106,112,136,0.2);
+      color: #6a7088;
+      border: 1px solid rgba(255,255,255,0.05);
     }
 
+    /* ── Section cards ── */
     .profile-section {
-      background: rgba(255, 255, 255, 0.05);
-      backdrop-filter: blur(10px);
-      border-radius: 15px;
-      padding: 30px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: linear-gradient(180deg, rgba(30,32,42,0.7), rgba(14,16,22,0.85));
+      backdrop-filter: blur(8px);
+      border-radius: 12px;
+      padding: 24px;
+      border: 1px solid rgba(255,255,255,0.06);
       margin-bottom: 20px;
+      transition: all 0.25s ease;
     }
 
     .profile-section h2 {
-      color: #00d4ff;
+      font-family: 'Russo One', sans-serif;
+      color: #c8b37e;
       margin-bottom: 20px;
-      font-size: 1.5rem;
+      font-size: 1.15rem;
       display: flex;
       align-items: center;
       gap: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
     }
 
+    /* ── Info grid ── */
     .info-grid {
       display: grid;
-      grid-template-columns: 200px 1fr;
-      gap: 15px;
+      grid-template-columns: 180px 1fr;
+      gap: 14px;
       margin-bottom: 20px;
     }
 
     .info-label {
-      color: rgba(255, 255, 255, 0.7);
+      color: #9aa1ad;
       font-weight: 600;
+      font-size: 0.88rem;
     }
 
     .info-value {
-      color: white;
-      font-size: 1rem;
+      color: #d6d9df;
+      font-size: 0.95rem;
     }
 
-    .info-value.editable {
-      background: rgba(255, 255, 255, 0.05);
-      padding: 8px 12px;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      cursor: pointer;
-      transition: all 0.3s;
-    }
-
-    .info-value.editable:hover {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: #00d4ff;
-    }
-
+    /* ── Form inputs ── */
     .form-group {
       margin-bottom: 20px;
     }
 
     .form-group label {
       display: block;
-      color: rgba(255, 255, 255, 0.8);
+      color: #9aa1ad;
       margin-bottom: 8px;
       font-weight: 600;
+      font-size: 0.88rem;
     }
 
     .form-group input {
       width: 100%;
-      padding: 12px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 10px 14px;
+      background: rgba(30,32,42,0.6);
+      border: 1px solid rgba(255,255,255,0.1);
       border-radius: 8px;
-      color: white;
-      font-size: 1rem;
+      color: #d6d9df;
+      font-size: 0.95rem;
+      font-family: 'Quantico', sans-serif;
+      transition: all 0.2s ease;
     }
 
     .form-group input:focus {
       outline: none;
-      border-color: #00d4ff;
-      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(200,179,126,0.5);
+      background: rgba(30,32,42,0.8);
+      box-shadow: 0 0 10px rgba(200,179,126,0.1);
     }
 
+    .form-group input::placeholder { color: #6a7088; }
+
+    .form-group small {
+      color: #6a7088;
+      font-size: 0.82rem;
+    }
+
+    /* ── Tournament cards ── */
     .tournament-card {
-      background: rgba(255, 255, 255, 0.05);
-      padding: 20px;
-      border-radius: 10px;
-      border-left: 4px solid #00d4ff;
+      background: linear-gradient(180deg, rgba(30,32,42,0.7), rgba(14,16,22,0.85));
+      backdrop-filter: blur(8px);
+      border-radius: 12px;
+      padding: 18px;
+      border: 1px solid rgba(255,255,255,0.06);
       margin-bottom: 15px;
-      transition: all 0.3s;
+      transition: all 0.25s ease;
     }
-
     .tournament-card:hover {
-      background: rgba(255, 255, 255, 0.1);
-      transform: translateX(5px);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      border-color: rgba(200,179,126,0.2);
     }
 
     .tournament-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
-
     .tournament-header h4 {
-      color: white;
-      font-size: 1.1rem;
+      font-family: 'Russo One', sans-serif;
+      color: #e8d8a8;
+      font-size: 0.95rem;
       margin: 0;
+      letter-spacing: 0.03em;
     }
 
     .tournament-status {
-      padding: 4px 12px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-family: 'Quantico', sans-serif;
+    }
+    .tournament-status.setup {
+      background: rgba(200,179,126,0.15);
+      color: #c8b37e;
+      border: 1px solid rgba(200,179,126,0.3);
+    }
+    .tournament-status.playing {
+      background: rgba(0,224,128,0.12);
+      color: #00e080;
+      border: 1px solid rgba(0,224,128,0.25);
+    }
+    .tournament-status.finished,
+    .tournament-status.complete {
+      background: rgba(106,112,136,0.15);
+      color: #6a7088;
+      border: 1px solid rgba(106,112,136,0.25);
+    }
+
+    .tournament-info {
+      font-size: 0.82rem;
+      color: #9aa1ad;
+      margin-bottom: 12px;
+      line-height: 1.8;
+    }
+
+    /* ── Per-game stats ── */
+    .game-stats-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+    .game-stats-table th,
+    .game-stats-table td {
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      font-size: 0.88rem;
+    }
+    .game-stats-table th {
+      color: #9aa1ad;
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .game-stats-table td { color: #d6d9df; }
+    .game-stats-table tr:hover td { background: rgba(200,179,126,0.05); }
+    .win-rate-bar {
+      display: inline-block;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.1);
+      width: 60px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+    .win-rate-fill {
+      display: block;
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, #c8b37e, #e8d8a8);
+    }
+
+    /* ── Onboarding section ── */
+    .platform-field {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      background: rgba(30,32,42,0.5);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .platform-field .platform-logo { width: 24px; height: 24px; }
+    .platform-field label {
+      min-width: 100px;
+      color: #9aa1ad;
+      font-weight: 600;
+      font-size: 0.88rem;
+    }
+    .platform-field input {
+      flex: 1;
+      padding: 8px 12px;
+      background: rgba(30,32,42,0.6);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      color: #d6d9df;
+      font-size: 0.9rem;
+      font-family: 'Quantico', sans-serif;
+    }
+    .platform-field input:focus {
+      outline: none;
+      border-color: rgba(200,179,126,0.5);
+    }
+    .onboarding-status {
+      display: inline-block;
+      padding: 3px 10px;
       border-radius: 12px;
       font-size: 0.75rem;
       font-weight: 600;
       text-transform: uppercase;
     }
-
-    .tournament-status.setup {
-      background: rgba(251, 191, 36, 0.2);
-      color: #fbbf24;
-      border: 1px solid #fbbf24;
+    .onboarding-status.complete {
+      background: rgba(0,224,128,0.12);
+      color: #00e080;
+      border: 1px solid rgba(0,224,128,0.25);
+    }
+    .onboarding-status.incomplete {
+      background: rgba(245,158,11,0.12);
+      color: #f59e0b;
+      border: 1px solid rgba(245,158,11,0.25);
     }
 
-    .tournament-status.playing {
-      background: rgba(16, 185, 129, 0.2);
-      color: #10b981;
-      border: 1px solid #10b981;
-    }
-
-    .tournament-status.finished {
-      background: rgba(148, 163, 184, 0.2);
-      color: #94a3b8;
-      border: 1px solid #94a3b8;
-    }
-
-    .tournament-info {
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 0.9rem;
-      margin-bottom: 10px;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 40px;
-      color: rgba(255, 255, 255, 0.5);
-    }
-
+    /* ── Stats grid ── */
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -227,58 +492,172 @@
     }
 
     .stat-box {
-      background: rgba(255, 255, 255, 0.05);
+      background: linear-gradient(180deg, rgba(30,32,42,0.6), rgba(14,16,22,0.75));
       padding: 20px;
-      border-radius: 10px;
+      border-radius: 12px;
       text-align: center;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255,255,255,0.06);
     }
 
     .stat-number {
-      font-size: 2rem;
-      font-weight: bold;
-      color: #00d4ff;
+      font-family: 'Russo One', sans-serif;
+      font-size: 2.2rem;
+      color: #e8d8a8;
       margin-bottom: 5px;
     }
 
     .stat-label {
-      color: rgba(255, 255, 255, 0.7);
+      color: #9aa1ad;
       font-size: 0.85rem;
+    }
+
+    .empty-state { text-align: center; padding: 40px; color: #6a7088; }
+
+    /* ── Buttons ── */
+    .btn-small {
+      padding: 7px 14px;
+      font-size: 0.8rem;
+      border-radius: 6px;
+      border: 1px solid rgba(200,179,126,0.3);
+      cursor: pointer;
+      font-weight: 600;
+      font-family: 'Quantico', sans-serif;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .btn-small:hover { transform: translateY(-1px); }
+
+    .btn-primary {
+      background: linear-gradient(180deg, #3a3a3a, #1a1a1a);
+      color: #c8b37e;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .btn-primary:hover {
+      box-shadow: 0 0 14px rgba(200,179,126,0.3);
+      border-color: rgba(200,179,126,0.5);
+    }
+
+    .btn-secondary {
+      background: rgba(30,32,42,0.6);
+      color: #9aa1ad;
+      border-color: rgba(255,255,255,0.1);
+    }
+    .btn-secondary:hover { color: #d6d9df; border-color: rgba(255,255,255,0.2); }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .profile-header { flex-direction: column; gap: 12px; text-align: center; }
+      .profile-header h1 { font-size: 1.2rem; }
+      .info-grid { grid-template-columns: 1fr; gap: 8px; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .avatar-container { width: 64px; height: 64px; }
+    }
+
+    /* ── Toast notifications (errorHandler.js) ── */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 15px 25px;
+      background: rgba(15, 23, 42, 0.95);
+      color: white;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      z-index: 10000;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      border: 2px solid #334155;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      max-width: 400px;
+      word-wrap: break-word;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.toast-error { border-color: #ef4444; background: rgba(239, 68, 68, 0.95); box-shadow: 0 10px 40px rgba(239, 68, 68, 0.4); }
+    .toast.toast-success { border-color: #10b981; background: rgba(16, 185, 129, 0.95); box-shadow: 0 10px 40px rgba(16, 185, 129, 0.4); }
+    .toast.toast-warning { border-color: #f59e0b; background: rgba(245, 158, 11, 0.95); box-shadow: 0 10px 40px rgba(245, 158, 11, 0.4); }
+    .toast.toast-info { border-color: #3b82f6; background: rgba(59, 130, 246, 0.95); box-shadow: 0 10px 40px rgba(59, 130, 246, 0.4); }
+    @media (max-width: 768px) {
+      .toast { bottom: 10px; right: 10px; left: 10px; max-width: none; text-align: center; }
     }
   </style>
 </head>
 <body>
+  <!-- Navbar container - populated by navbar.js (includes connection status) -->
+  <div id="navbar-container"></div>
+
+  <!-- Hidden file input for avatar upload -->
+  <input type="file" id="avatarFileInput" accept="image/*" style="display: none;">
+
+  <!-- Avatar Crop/Zoom Modal -->
+  <div class="crop-modal" id="cropModal">
+    <div class="crop-container" id="cropContainer">
+      <img id="cropImage" src="" alt="Crop preview">
+      <div class="crop-guide"></div>
+    </div>
+    <div class="crop-controls">
+      <label>Zoom</label>
+      <input type="range" id="cropZoom" min="100" max="300" value="100" step="1">
+    </div>
+    <div class="crop-buttons">
+      <button class="crop-btn crop-btn-cancel" onclick="closeCropModal()">Cancel</button>
+      <button class="crop-btn crop-btn-save" onclick="confirmCrop()">Save</button>
+    </div>
+  </div>
+
   <div class="profile-container">
     <!-- Header -->
     <div class="profile-header">
-      <div class="profile-header-left" style="display: flex; align-items: center; gap: 20px;">
-        <img src="../shared/images/favicon/android-chrome-512x512.png" alt="Brand Logo" class="brand-logo">
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <div class="avatar-container" id="avatarContainer" onclick="triggerAvatarUpload()" title="Click to change avatar">
+          <div class="avatar-placeholder" id="avatarPlaceholder">?</div>
+          <img class="avatar-img" id="avatarImg" style="display: none;" alt="Avatar">
+          <div class="avatar-overlay" id="avatarOverlay">Change</div>
+        </div>
         <div>
-          <h1 style="margin: 0;">⚙️ Profile Settings</h1>
-          <p id="userEmail" style="margin: 10px 0 10px 0;">Loading...</p>
-          <span id="userRoleBadge" class="user-role-badge">USER</span>
+          <h1>Profile Settings</h1>
+          <p id="userEmail">Loading...</p>
+          <span id="userRoleBadge" class="user-role-badge user">USER</span>
         </div>
       </div>
       <div>
-        <button class="btn secondary" onclick="goToHome()">← Back to Home</button>
+        <button class="btn-small btn-secondary" onclick="goToHome()">Back to Home</button>
+      </div>
+    </div>
+
+    <!-- Onboarding Information Section -->
+    <div class="profile-section" id="onboardingSection" style="display: none;">
+      <h2>
+        <span>Event Readiness</span>
+        <span class="onboarding-status" id="onboardingStatus"></span>
+      </h2>
+      <p style="color: #9aa1ad; font-size: 0.85rem; margin-bottom: 16px;">
+        Your gaming platform IDs for the current tournament. Other players use these to add you as a friend.
+      </p>
+      <div id="onboardingFields"></div>
+      <div style="margin-top: 12px;">
+        <button class="btn-small btn-primary" onclick="saveOnboardingChanges()" id="saveOnboardingBtn" style="display: none;">Save Changes</button>
+        <span id="onboardingSaveStatus" style="margin-left: 10px; font-size: 0.85rem; color: #9aa1ad;"></span>
       </div>
     </div>
 
     <!-- Personal Information Section -->
     <div class="profile-section">
-      <h2><span>👤</span> Personal Information</h2>
+      <h2><span>Personal Information</span></h2>
       <div class="info-grid">
         <div class="info-label">Display Name:</div>
         <div class="info-value">
           <span id="displayNameValue">Loading...</span>
-          <button class="btn-small" onclick="editDisplayName()" style="margin-left: 10px;">✏️ Edit</button>
+          <button class="btn-small btn-secondary" onclick="editDisplayName()" style="margin-left: 10px; padding: 4px 10px; font-size: 0.7rem;">Edit</button>
         </div>
 
         <div class="info-label">Email:</div>
         <div class="info-value" id="emailValue">Loading...</div>
 
         <div class="info-label">User ID:</div>
-        <div class="info-value" style="font-family: monospace; font-size: 0.85rem;" id="uidValue">Loading...</div>
+        <div class="info-value" style="font-family: monospace; font-size: 0.82rem; color: #6a7088;" id="uidValue">Loading...</div>
 
         <div class="info-label">Role:</div>
         <div class="info-value" id="roleValue">Loading...</div>
@@ -293,31 +672,32 @@
 
     <!-- Account Settings Section -->
     <div class="profile-section">
-      <h2><span>🔐</span> Account Settings</h2>
+      <h2><span>Account Settings</span></h2>
 
       <div class="form-group">
         <label>Change Display Name</label>
         <div style="display: flex; gap: 10px;">
           <input type="text" id="newDisplayName" placeholder="Enter new display name">
-          <button class="btn primary" onclick="updateDisplayName()" style="white-space: nowrap;">Update Name</button>
+          <button class="btn-small btn-primary" onclick="updateDisplayName()" style="white-space: nowrap;">Update Name</button>
         </div>
       </div>
 
       <div class="form-group">
         <label>Change Password</label>
-        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-          <input type="password" id="newPassword" placeholder="Enter new password (min 6 characters)" minlength="6">
-          <button class="btn primary" onclick="updatePassword()" style="white-space: nowrap;">Update Password</button>
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;">
+          <input type="password" id="newPassword" placeholder="New password (min 6 characters)" minlength="6">
+          <input type="password" id="confirmPassword" placeholder="Confirm new password" minlength="6">
+          <button class="btn-small btn-primary" onclick="updatePassword()" style="white-space: nowrap; align-self: flex-start;">Update Password</button>
         </div>
-        <small style="color: rgba(255, 255, 255, 0.6);">
+        <small>
           You'll be logged out after changing your password and need to log in again.
         </small>
       </div>
     </div>
 
-    <!-- My Tournament Participation Section -->
-    <div class="profile-section">
-      <h2><span>🏆</span> My Tournament Participation</h2>
+    <!-- My Tournament Participation Section (hidden) -->
+    <div class="profile-section" style="display: none;">
+      <h2><span>My Tournament Participation</span></h2>
 
       <!-- My Stats -->
       <div class="stats-grid">
@@ -340,7 +720,7 @@
       </div>
 
       <!-- My Tournaments List -->
-      <h3 style="color: rgba(255, 255, 255, 0.8); margin-top: 20px; margin-bottom: 15px;">
+      <h3 style="font-family: 'Russo One', sans-serif; color: #c8b37e; font-size: 0.95rem; margin-top: 20px; margin-bottom: 15px; letter-spacing: 0.04em;">
         Tournaments I'm Participating In
       </h3>
       <div id="myTournamentsList">
@@ -349,6 +729,14 @@
         </div>
       </div>
     </div>
+
+    <!-- Personal Match Stats Section -->
+    <div class="profile-section" id="personalStatsSection" style="display: none;">
+      <h2><span>Personal Match Stats</span></h2>
+      <div class="stats-grid" id="personalStatsGrid"></div>
+      <div id="perGameStats"></div>
+    </div>
+
   </div>
 
   <script type="module">
@@ -369,9 +757,12 @@
       // Start connection monitoring
       connectionManager.start();
 
-      // Check auth
+      // Wire avatar file input
+      document.getElementById('avatarFileInput').addEventListener('change', handleAvatarFile);
+
+      // Check auth — reject anonymous users
       auth.onAuthStateChanged(async (user) => {
-        if (!user) {
+        if (!user || user.isAnonymous) {
           window.location.href = '../index.html';
           return;
         }
@@ -400,6 +791,9 @@
           document.getElementById('displayNameValue').textContent = displayName;
           document.getElementById('newDisplayName').value = displayName;
 
+          // Avatar
+          loadAvatar(displayName);
+
           // Role
           let role = 'user';
           if (userProfile.isGod === true) role = 'god';
@@ -410,7 +804,7 @@
           roleBadge.textContent = role.toUpperCase();
           roleBadge.className = `user-role-badge ${role}`;
 
-          document.getElementById('roleValue').innerHTML = `<span class="user-role-badge ${role}" style="padding: 4px 12px; font-size: 0.75rem;">${role.toUpperCase()}</span>`;
+          document.getElementById('roleValue').innerHTML = `<span class="user-role-badge ${role}" style="padding: 4px 12px; font-size: 0.7rem;">${role.toUpperCase()}</span>`;
 
           // Dates
           if (userProfile.createdAt) {
@@ -430,54 +824,590 @@
       }
     }
 
+    // ── Avatar ──
+
+    function loadAvatar(displayName) {
+      const img = document.getElementById('avatarImg');
+      const placeholder = document.getElementById('avatarPlaceholder');
+
+      if (userProfile.avatarUrl) {
+        img.src = userProfile.avatarUrl;
+        img.style.display = 'block';
+        placeholder.style.display = 'none';
+      } else {
+        img.style.display = 'none';
+        placeholder.style.display = 'flex';
+        const initials = (displayName || '?').charAt(0).toUpperCase();
+        placeholder.textContent = initials;
+      }
+    }
+
+    // ── Crop Modal State ──
+    let cropState = {
+      img: null,         // HTMLImageElement with loaded source
+      scale: 1,          // current zoom (1 = fit)
+      offsetX: 0,        // pan offset px
+      offsetY: 0,
+      dragging: false,
+      dragStartX: 0,
+      dragStartY: 0,
+      baseScale: 1       // scale that fits image to 280px circle
+    };
+
+    function handleAvatarFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (!file.type.startsWith('image/')) {
+        errorHandler.showError('Please select an image file');
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        errorHandler.showError('Image too large. Maximum 10MB.');
+        return;
+      }
+
+      // Load image and open crop modal
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => openCropModal(img);
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function openCropModal(img) {
+      const containerSize = 280;
+      const minDim = Math.min(img.width, img.height);
+      const baseScale = containerSize / minDim;
+
+      cropState = {
+        img, scale: 1, offsetX: 0, offsetY: 0,
+        dragging: false, dragStartX: 0, dragStartY: 0,
+        baseScale
+      };
+
+      const cropImg = document.getElementById('cropImage');
+      cropImg.src = img.src;
+      document.getElementById('cropZoom').value = 100;
+      document.getElementById('cropModal').classList.add('active');
+
+      updateCropTransform();
+      bindCropEvents();
+    }
+
+    window.closeCropModal = function() {
+      document.getElementById('cropModal').classList.remove('active');
+      document.getElementById('avatarFileInput').value = '';
+      unbindCropEvents();
+    };
+
+    function updateCropTransform() {
+      const cropImg = document.getElementById('cropImage');
+      const containerSize = 280;
+      const s = cropState.baseScale * cropState.scale;
+      const imgW = cropState.img.width * s;
+      const imgH = cropState.img.height * s;
+
+      // Center image, then apply user offset
+      const cx = (containerSize - imgW) / 2 + cropState.offsetX;
+      const cy = (containerSize - imgH) / 2 + cropState.offsetY;
+
+      cropImg.style.width = imgW + 'px';
+      cropImg.style.height = imgH + 'px';
+      cropImg.style.left = cx + 'px';
+      cropImg.style.top = cy + 'px';
+    }
+
+    function clampOffset() {
+      const containerSize = 280;
+      const s = cropState.baseScale * cropState.scale;
+      const imgW = cropState.img.width * s;
+      const imgH = cropState.img.height * s;
+
+      // Don't allow gaps — image must always cover the circle
+      const maxX = Math.max(0, (imgW - containerSize) / 2);
+      const maxY = Math.max(0, (imgH - containerSize) / 2);
+      cropState.offsetX = Math.max(-maxX, Math.min(maxX, cropState.offsetX));
+      cropState.offsetY = Math.max(-maxY, Math.min(maxY, cropState.offsetY));
+    }
+
+    // Zoom slider
+    function onZoomInput(e) {
+      cropState.scale = parseInt(e.target.value) / 100;
+      clampOffset();
+      updateCropTransform();
+    }
+
+    // Mouse drag
+    function onCropMouseDown(e) {
+      e.preventDefault();
+      cropState.dragging = true;
+      cropState.dragStartX = e.clientX - cropState.offsetX;
+      cropState.dragStartY = e.clientY - cropState.offsetY;
+    }
+    function onCropMouseMove(e) {
+      if (!cropState.dragging) return;
+      cropState.offsetX = e.clientX - cropState.dragStartX;
+      cropState.offsetY = e.clientY - cropState.dragStartY;
+      clampOffset();
+      updateCropTransform();
+    }
+    function onCropMouseUp() { cropState.dragging = false; }
+
+    // Touch drag
+    function onCropTouchStart(e) {
+      if (e.touches.length !== 1) return;
+      e.preventDefault();
+      cropState.dragging = true;
+      cropState.dragStartX = e.touches[0].clientX - cropState.offsetX;
+      cropState.dragStartY = e.touches[0].clientY - cropState.offsetY;
+    }
+    function onCropTouchMove(e) {
+      if (!cropState.dragging || e.touches.length !== 1) return;
+      cropState.offsetX = e.touches[0].clientX - cropState.dragStartX;
+      cropState.offsetY = e.touches[0].clientY - cropState.dragStartY;
+      clampOffset();
+      updateCropTransform();
+    }
+    function onCropTouchEnd() { cropState.dragging = false; }
+
+    // Mouse wheel zoom
+    function onCropWheel(e) {
+      e.preventDefault();
+      const slider = document.getElementById('cropZoom');
+      let val = parseInt(slider.value) + (e.deltaY < 0 ? 10 : -10);
+      val = Math.max(100, Math.min(300, val));
+      slider.value = val;
+      cropState.scale = val / 100;
+      clampOffset();
+      updateCropTransform();
+    }
+
+    function bindCropEvents() {
+      const container = document.getElementById('cropContainer');
+      const slider = document.getElementById('cropZoom');
+      slider.addEventListener('input', onZoomInput);
+      container.addEventListener('mousedown', onCropMouseDown);
+      window.addEventListener('mousemove', onCropMouseMove);
+      window.addEventListener('mouseup', onCropMouseUp);
+      container.addEventListener('touchstart', onCropTouchStart, { passive: false });
+      container.addEventListener('touchmove', onCropTouchMove, { passive: false });
+      container.addEventListener('touchend', onCropTouchEnd);
+      container.addEventListener('wheel', onCropWheel, { passive: false });
+    }
+
+    function unbindCropEvents() {
+      const container = document.getElementById('cropContainer');
+      const slider = document.getElementById('cropZoom');
+      slider.removeEventListener('input', onZoomInput);
+      container.removeEventListener('mousedown', onCropMouseDown);
+      window.removeEventListener('mousemove', onCropMouseMove);
+      window.removeEventListener('mouseup', onCropMouseUp);
+      container.removeEventListener('touchstart', onCropTouchStart);
+      container.removeEventListener('touchmove', onCropTouchMove);
+      container.removeEventListener('touchend', onCropTouchEnd);
+      container.removeEventListener('wheel', onCropWheel);
+    }
+
+    // ── Confirm crop and upload ──
+
+    window.confirmCrop = async function() {
+      const container = document.getElementById('avatarContainer');
+      const overlay = document.getElementById('avatarOverlay');
+
+      try {
+        closeCropModal();
+        container.classList.add('avatar-uploading');
+        overlay.textContent = 'Uploading...';
+
+        // Render crop to 200x200 canvas
+        const outputSize = 200;
+        const canvas = document.createElement('canvas');
+        canvas.width = outputSize;
+        canvas.height = outputSize;
+        const ctx = canvas.getContext('2d');
+
+        const containerSize = 280;
+        const s = cropState.baseScale * cropState.scale;
+        const imgW = cropState.img.width * s;
+        const imgH = cropState.img.height * s;
+        const cx = (containerSize - imgW) / 2 + cropState.offsetX;
+        const cy = (containerSize - imgH) / 2 + cropState.offsetY;
+
+        // Map the visible 280px circle to source image coordinates
+        const ratio = outputSize / containerSize;
+        const sx = -cx / s;
+        const sy = -cy / s;
+        const sSize = containerSize / s;
+
+        ctx.drawImage(cropState.img, sx, sy, sSize, sSize, 0, 0, outputSize, outputSize);
+
+        const blob = await new Promise((resolve, reject) => {
+          canvas.toBlob(b => b ? resolve(b) : reject(new Error('Canvas export failed')), 'image/jpeg', 0.85);
+        });
+
+        // Upload via PHP
+        const formData = new FormData();
+        formData.append('uid', currentUser.uid);
+        formData.append('avatar', blob, 'profile.jpg');
+
+        const base = window.BOARDGAME_BASE || '..';
+
+        // Detect VS Code Live Server (ports 5500/5501 don't support PHP)
+        const liveServerPorts = ['5500', '5501'];
+        if (liveServerPorts.includes(window.location.port)) {
+          throw new Error('Avatar upload requires PHP. Use "php -S localhost:8000" or deploy to your hosting.');
+        }
+
+        const res = await fetch(base + '/avatars/upload.php', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!res.ok) throw new Error('Server returned ' + res.status + '. Make sure PHP is available on your hosting.');
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Upload failed');
+
+        const avatarUrl = result.avatarUrl;
+
+        // Save URL to Firestore
+        await db.collection('users').doc(currentUser.uid).set({
+          avatarUrl: avatarUrl,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+
+        // Update UI
+        const img = document.getElementById('avatarImg');
+        const placeholder = document.getElementById('avatarPlaceholder');
+        img.src = avatarUrl;
+        img.style.display = 'block';
+        placeholder.style.display = 'none';
+
+        if (userProfile) userProfile.avatarUrl = avatarUrl;
+
+        // Update navbar avatar immediately
+        const navAvatar = document.getElementById('navbarAvatar');
+        if (navAvatar) {
+          if (navAvatar.tagName === 'IMG') {
+            navAvatar.src = avatarUrl;
+          } else {
+            // Replace placeholder with img
+            const newImg = document.createElement('img');
+            newImg.className = 'navbar-avatar';
+            newImg.id = 'navbarAvatar';
+            newImg.src = avatarUrl;
+            newImg.alt = 'Avatar';
+            navAvatar.replaceWith(newImg);
+          }
+        }
+        // Update navbar cache so it persists on next page load
+        try {
+          const cached = JSON.parse(localStorage.getItem('navbarCache') || '{}');
+          cached.avatarUrl = avatarUrl;
+          localStorage.setItem('navbarCache', JSON.stringify(cached));
+        } catch (e) {}
+
+        errorHandler.showSuccess('Avatar updated!');
+      } catch (error) {
+        console.error('[Profile] Avatar upload error:', error);
+        errorHandler.showError(error.message || 'Failed to upload avatar.');
+      } finally {
+        container.classList.remove('avatar-uploading');
+        overlay.textContent = 'Change';
+        document.getElementById('avatarFileInput').value = '';
+      }
+    };
+
+    // ── Tournaments ──
+
+    // Find the player's registry ID (p_xxx) from their Firebase UID
+    function findMyPlayerId(tournament) {
+      const uid = currentUser.uid;
+      // Check normalized registry
+      if (tournament.players) {
+        for (const [pid, p] of Object.entries(tournament.players)) {
+          if (p.uid === uid) return pid;
+        }
+      }
+      // Fallback: check legacy team.players arrays
+      for (const team of (tournament.teams || [])) {
+        for (const p of (team.players || [])) {
+          if (p.uid === uid) return p.id || null;
+        }
+      }
+      return null;
+    }
+
     async function loadMyTournaments() {
       try {
-        // Load tournaments where user is a participant
         const tournamentsSnapshot = await db.collection('tournaments').get();
         const myTournaments = [];
-        let totalGames = 0;
-        let totalWins = 0;
         let currentTeamName = null;
+        let currentTournament = null;
+
+        // Personal stats across all tournaments
+        let totalMatches = 0;
+        let totalWins = 0;
+        let totalLosses = 0;
+        const perGameStats = {}; // { gameId: { played, won } }
 
         tournamentsSnapshot.forEach(doc => {
           const tournament = { id: doc.id, ...doc.data() };
 
-          // Check if user is in any team in this tournament
           if (tournament.teams && Array.isArray(tournament.teams)) {
             const myTeam = tournament.teams.find(team =>
               team.players && team.players.some(player => player.uid === currentUser.uid)
             );
 
             if (myTeam) {
-              myTournaments.push({
-                ...tournament,
-                myTeam: myTeam
-              });
-
-              // Calculate stats
-              if (myTeam.gamesPlayed) totalGames += myTeam.gamesPlayed;
-              if (myTeam.gamesWon) totalWins += myTeam.gamesWon;
+              myTournaments.push({ ...tournament, myTeam });
               if (!currentTeamName && tournament.status === 'playing') {
                 currentTeamName = myTeam.name;
+                currentTournament = tournament;
+              }
+
+              // Calculate personal stats from match history
+              const myPid = findMyPlayerId(tournament);
+              const myUid = currentUser.uid;
+              if (myPid && tournament.gameHistory) {
+                for (const match of tournament.gameHistory) {
+                  const winIds = match.winningPlayerIds || [];
+                  const loseIds = match.losingPlayerIds || [];
+                  // Check both p_xxx ID and Firebase UID (legacy data may use either)
+                  const isWinner = winIds.includes(myPid) || winIds.includes(myUid);
+                  const isLoser = loseIds.includes(myPid) || loseIds.includes(myUid);
+
+                  if (isWinner || isLoser) {
+                    totalMatches++;
+                    const gameId = match.game || 'unknown';
+                    if (!perGameStats[gameId]) perGameStats[gameId] = { played: 0, won: 0 };
+                    perGameStats[gameId].played++;
+
+                    if (isWinner) {
+                      totalWins++;
+                      perGameStats[gameId].won++;
+                    } else {
+                      totalLosses++;
+                    }
+                  }
+                }
               }
             }
           }
         });
 
-        // Update stats
+        // Update summary stats
         document.getElementById('statMyTournaments').textContent = myTournaments.length;
-        document.getElementById('statMyGames').textContent = totalGames;
+        document.getElementById('statMyGames').textContent = totalMatches;
         document.getElementById('statMyWins').textContent = totalWins;
         document.getElementById('statMyTeam').textContent = currentTeamName || '-';
 
-        // Display tournaments
         displayMyTournaments(myTournaments);
+        displayPersonalStats(totalMatches, totalWins, totalLosses, perGameStats);
 
+        // Load onboarding for current active tournament
+        if (currentTournament) {
+          await loadOnboardingInfo(currentTournament);
+        }
       } catch (error) {
         console.error('[Profile] Error loading tournaments:', error);
         errorHandler.handleFirebaseError(error, 'loadMyTournaments');
       }
     }
+
+    // ── Personal Stats ──
+
+    function displayPersonalStats(totalMatches, totalWins, totalLosses, perGameStats) {
+      const section = document.getElementById('personalStatsSection');
+      if (totalMatches === 0) {
+        section.style.display = 'none';
+        return;
+      }
+      section.style.display = 'block';
+
+      const winRate = totalMatches > 0 ? Math.round((totalWins / totalMatches) * 100) : 0;
+
+      document.getElementById('personalStatsGrid').innerHTML = `
+        <div class="stat-box">
+          <div class="stat-number">${totalMatches}</div>
+          <div class="stat-label">Matches Played</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number" style="color: #00e080;">${totalWins}</div>
+          <div class="stat-label">Wins</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number" style="color: #ef4444;">${totalLosses}</div>
+          <div class="stat-label">Losses</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number">${winRate}%</div>
+          <div class="stat-label">Win Rate</div>
+        </div>
+      `;
+
+      // Per-game breakdown
+      const gameEntries = Object.entries(perGameStats).sort((a, b) => b[1].played - a[1].played);
+      if (gameEntries.length === 0) {
+        document.getElementById('perGameStats').innerHTML = '';
+        return;
+      }
+
+      const getGameName = (id) => {
+        if (typeof GAMES_CONFIG !== 'undefined') {
+          const game = GAMES_CONFIG.getGame(id);
+          if (game) return game.name;
+        }
+        return id;
+      };
+
+      document.getElementById('perGameStats').innerHTML = `
+        <h3 style="font-family: 'Russo One', sans-serif; color: #c8b37e; font-size: 0.95rem; margin-top: 20px; margin-bottom: 12px; letter-spacing: 0.04em;">
+          Per-Game Breakdown
+        </h3>
+        <table class="game-stats-table">
+          <thead>
+            <tr><th>Game</th><th>Played</th><th>Won</th><th>Lost</th><th>Win Rate</th></tr>
+          </thead>
+          <tbody>
+            ${gameEntries.map(([gameId, s]) => {
+              const wr = s.played > 0 ? Math.round((s.won / s.played) * 100) : 0;
+              return `<tr>
+                <td>${getGameName(gameId)}</td>
+                <td>${s.played}</td>
+                <td style="color: #00e080;">${s.won}</td>
+                <td style="color: #ef4444;">${s.played - s.won}</td>
+                <td>
+                  ${wr}%
+                  <span class="win-rate-bar"><span class="win-rate-fill" style="width: ${wr}%"></span></span>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    // ── Onboarding Info ──
+
+    let onboardingTournament = null;
+    let onboardingData = null;
+    let myPlayerIdForOnboarding = null;
+    let onboardingDirty = false;
+
+    async function loadOnboardingInfo(tournament) {
+      onboardingTournament = tournament;
+      myPlayerIdForOnboarding = findMyPlayerId(tournament);
+      if (!myPlayerIdForOnboarding) return;
+
+      try {
+        const onbDoc = await db.collection('tournaments').doc(tournament.id || tournament.tournamentId)
+          .collection('onboarding').doc('state').get();
+
+        if (!onbDoc.exists) return;
+
+        onboardingData = onbDoc.data();
+        const myData = onboardingData?.players?.[myPlayerIdForOnboarding];
+        if (!myData && !onboardingData?.players) return;
+
+        renderOnboardingSection(myData || {});
+      } catch (error) {
+        console.error('[Profile] Error loading onboarding:', error);
+      }
+    }
+
+    function renderOnboardingSection(myData) {
+      const section = document.getElementById('onboardingSection');
+      section.style.display = 'block';
+
+      // Status badge
+      const statusEl = document.getElementById('onboardingStatus');
+      if (myData.completedAt) {
+        statusEl.textContent = 'Complete';
+        statusEl.className = 'onboarding-status complete';
+      } else {
+        statusEl.textContent = 'Incomplete';
+        statusEl.className = 'onboarding-status incomplete';
+      }
+
+      // Platform fields
+      const platformIds = myData.platformIds || {};
+      const activePlatforms = typeof PLATFORMS_CONFIG !== 'undefined'
+        ? PLATFORMS_CONFIG.getActivePlatforms()
+        : [];
+
+      if (activePlatforms.length === 0) {
+        document.getElementById('onboardingFields').innerHTML =
+          '<p style="color: #6a7088;">No platform configuration available.</p>';
+        return;
+      }
+
+      document.getElementById('onboardingFields').innerHTML = activePlatforms.map(p => `
+        <div class="platform-field">
+          ${p.icon || ''}
+          <label>${p.name}</label>
+          <input type="text"
+                 id="platform_${p.id}"
+                 value="${escapeAttr(platformIds[p.id] || '')}"
+                 placeholder="${p.placeholder || ''}"
+                 oninput="markOnboardingDirty()">
+        </div>
+      `).join('');
+
+      document.getElementById('saveOnboardingBtn').style.display = 'none';
+      onboardingDirty = false;
+    }
+
+    function escapeAttr(str) {
+      return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    window.markOnboardingDirty = function() {
+      if (!onboardingDirty) {
+        onboardingDirty = true;
+        document.getElementById('saveOnboardingBtn').style.display = 'inline-block';
+        document.getElementById('onboardingSaveStatus').textContent = '';
+      }
+    };
+
+    window.saveOnboardingChanges = async function() {
+      if (!onboardingTournament || !myPlayerIdForOnboarding) return;
+
+      const activePlatforms = typeof PLATFORMS_CONFIG !== 'undefined'
+        ? PLATFORMS_CONFIG.getActivePlatforms()
+        : [];
+
+      const updates = {};
+      for (const p of activePlatforms) {
+        const input = document.getElementById(`platform_${p.id}`);
+        if (input) {
+          updates[`players.${myPlayerIdForOnboarding}.platformIds.${p.id}`] = input.value.trim();
+        }
+      }
+      updates[`players.${myPlayerIdForOnboarding}.lastUpdated`] = new Date().toISOString();
+
+      try {
+        const tournamentId = onboardingTournament.id || onboardingTournament.tournamentId;
+        await db.collection('tournaments').doc(tournamentId)
+          .collection('onboarding').doc('state')
+          .update(updates);
+
+        onboardingDirty = false;
+        document.getElementById('saveOnboardingBtn').style.display = 'none';
+        document.getElementById('onboardingSaveStatus').textContent = 'Saved!';
+        setTimeout(() => {
+          const el = document.getElementById('onboardingSaveStatus');
+          if (el) el.textContent = '';
+        }, 2000);
+
+        errorHandler.showSuccess('Platform IDs updated!');
+      } catch (error) {
+        console.error('[Profile] Error saving onboarding:', error);
+        errorHandler.showError('Failed to save: ' + error.message);
+      }
+    };
 
     function displayMyTournaments(tournaments) {
       const container = document.getElementById('myTournamentsList');
@@ -498,7 +1428,7 @@
         return `
           <div class="tournament-card">
             <div class="tournament-header">
-              <h4>🏆 ${tournament.name || tournament.id}</h4>
+              <h4>${tournament.name || tournament.id}</h4>
               <span class="tournament-status ${status}">${status}</span>
             </div>
             <div class="tournament-info">
@@ -506,17 +1436,22 @@
               <div><strong>Created:</strong> ${createdDate}</div>
               ${tournament.myTeam.points !== undefined ? `<div><strong>Team Points:</strong> ${tournament.myTeam.points}</div>` : ''}
             </div>
-            <div style="display: flex; gap: 10px;">
-              <button class="btn secondary" onclick="viewTournament('${tournament.gameId || tournament.id}')">👁️ View</button>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-small btn-primary" onclick="viewTournament('${tournament.tournamentId || tournament.id}')">View</button>
             </div>
           </div>
         `;
       }).join('');
     }
 
-    // Global functions
+    // ── Global functions ──
+
     window.goToHome = function() {
       window.location.href = 'home.html';
+    };
+
+    window.triggerAvatarUpload = function() {
+      document.getElementById('avatarFileInput').click();
     };
 
     window.editDisplayName = function() {
@@ -532,18 +1467,13 @@
       }
 
       try {
-        // Update Firestore
         await db.collection('users').doc(currentUser.uid).update({
           displayName: newName,
           updatedAt: new Date().toISOString()
         });
 
-        // Update display
         document.getElementById('displayNameValue').textContent = newName;
-
         errorHandler.showSuccess('Display name updated successfully!');
-
-        // Reload profile
         await loadUserProfile();
       } catch (error) {
         console.error('[Profile] Error updating display name:', error);
@@ -553,9 +1483,15 @@
 
     window.updatePassword = async function() {
       const newPassword = document.getElementById('newPassword').value;
+      const confirmPwd = document.getElementById('confirmPassword').value;
 
       if (!newPassword || newPassword.length < 6) {
         errorHandler.showError('Password must be at least 6 characters long');
+        return;
+      }
+
+      if (newPassword !== confirmPwd) {
+        errorHandler.showError('Passwords do not match');
         return;
       }
 
@@ -565,10 +1501,8 @@
 
       try {
         await currentUser.updatePassword(newPassword);
-
         errorHandler.showSuccess('Password updated successfully! Logging out...');
 
-        // Log out after password change
         setTimeout(async () => {
           await auth.signOut();
           window.location.href = '../index.html';
@@ -585,7 +1519,7 @@
     };
 
     window.viewTournament = function(tournamentId) {
-      window.location.href = `view.html?gameId=${tournamentId}`;
+      window.location.href = `view.html?tournamentId=${tournamentId}`;
     };
   </script>
 </body>

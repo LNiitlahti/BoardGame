@@ -1,6 +1,6 @@
 # God Mode OOP Modules — Logic Diagrams
 
-> Source: `BoardGame/full/scripts/` (18 modules)
+> Source: `BoardGame/full/scripts/` (19 modules)
 > Replaces the monolithic `god-scripts.js` with dependency-injected ES6 classes.
 > Last updated: March 2026
 
@@ -15,17 +15,18 @@
 | BoardManager | `full/scripts/board-manager.js` | Hex board rendering, click handling, team assignment, rooms, plates, points, win condition | BoardModule, BoardRenderer, UIManager, TeamManager |
 | MatchQueueManager | `full/scripts/match-queue-manager.js` | Queue rendering, drag-reorder, match start, break management, persistent numbering | UIManager, TeamManager |
 | MatchCreationManager | `full/scripts/match-creation-manager.js` | Drag-drop match creation, challenges, mass import, editing, auto-generation, game catalog | UIManager, TeamManager, MatchQueueManager, SmartMatchGenerator |
-| ResultManager | `full/scripts/result-manager.js` | Match result confirmation, quick-confirm popup, game history, pending hex notifications | UIManager, TeamManager, MatchQueueManager, BoardManager |
+| ResultManager | `full/scripts/result-manager.js` | Match result confirmation, quick-confirm popup, game history, pending hex notifications, instant VP award on win | UIManager, TeamManager, MatchQueueManager, BoardManager |
 | StatsManager | `full/scripts/stats-manager.js` | Statistics recalculation, point awarding, round advancement, points correction UI | BoardModule, UIManager, TeamManager |
 | BackupManager | `full/scripts/backup-manager.js` | Tournament snapshots to Firestore subcollection, auto-backup on round start, restore with pre-restore safety backup | None (leaf — receives callbacks via constructor) |
 | UndoManager | `full/scripts/undo-manager.js` | Reverse logged actions using previousState snapshots, preview changes, mark entries undone in Firestore | ActionLogger, UIManager, ResultManager, BoardManager, MatchQueueManager, StatsManager |
 | SpellEngine | `full/scripts/spell-engine.js` | Spell definitions, draw piles, spell phase turns, effect handlers, conditions, admin UI | UIManager, TeamManager, BoardManager |
-| ScoringCeremony | `full/scripts/scoring-ceremony.js` | Animated step-by-step scoring walkthrough, plays during scoring_and_placement, driven by god.html, rendered on view.html via ceremonyState | None (leaf — receives callbacks via constructor) |
+| ScoringCeremony | `full/scripts/scoring-ceremony.js` | Animated step-by-step scoring walkthrough, plays during scoring_vp phase (round 2+), driven by god.html, rendered on view.html via ceremonyState | None (leaf — receives callbacks via constructor) |
 | DisplayManager | `full/scripts/display-manager.js` | Smart display engine for view.html (v2) — renders lightweight-quality 1920×1080 layout (dual arena, territory map, queue, results, score strip), phase-aware display modes with auto-rotation, ceremony overlay | BoardModule, BoardRenderer, ScoringCeremony (static renderStep), GAMES_CONFIG, PlayerUtils |
 | ReplayEngine | `full/scripts/replay-engine.js` | Backup-anchored forward replay, state reconstruction at any action, playback controls | None (leaf — reads Firestore directly, used by replay.html) |
 | SummaryGenerator | `full/scripts/summary-generator.js` | Post-tournament analytics: overview, team stats, key moments, hex analysis, round summaries | BoardModule (optional) |
 | ActionExport | `full/scripts/action-export.js` | JSON/CSV export of action log entries | ActionLogger (static describeAction) |
-| GodApp | `full/scripts/god-app.js` | Orchestrator: creates all managers + ActionLogger + PhaseManager + SpellEngine + BackupManager + UndoManager + ScoringCeremony + ActionExport, Firebase listener, save/load, window globals | All of the above |
+| SeasonManager | `full/scripts/season-manager.js` | Tournament season CRUD, tournament-season linking, seasons list rendering, edit/create modals | None (leaf — receives getters via constructor) |
+| GodApp | `full/scripts/god-app.js` | Orchestrator: creates all managers + ActionLogger + PhaseManager + SpellEngine + BackupManager + UndoManager + ScoringCeremony + ActionExport + SeasonManager, Firebase listener, save/load, window globals, tab access control | All of the above |
 
 ## 2. Dependency Graph
 
@@ -42,6 +43,7 @@ graph TD
     SM[StatsManager]
     BK[BackupManager — leaf]
     UM[UndoManager]
+    SN[SeasonManager — leaf]
     GA[GodApp — orchestrator]
 
     PM --> UI
@@ -99,6 +101,8 @@ graph TD
     GA --> UM
     GA --> SE
     GA --> SC
+    GA --> SN
+    GA --> AE[ActionExport — leaf]
 ```
 
 **Note:** ActionLogger is not injected directly into managers. Instead, GodApp creates a `logAction` closure and passes it as `logActionCallback` to all managers via DI. This avoids coupling managers to ActionLogger.
@@ -151,7 +155,7 @@ flowchart TD
     I3 --> I4["new UndoManager(gameState, { actionLogger, uiManager, resultManager, boardManager, queueManager, statsManager, saveCallback, logActionCallback })"]
     I4 --> I5["new SpellEngine(gameState, { uiManager, teamManager, boardManager, saveCallback, logActionCallback, ... })"]
     I5 --> I6["new ScoringCeremony(gameState, { saveCallback, logActionCallback, getActionLogEntries, onStepChanged, context: 'god' })"]
-    I6 --> I7["Wire phase._onSpellPhaseEntered, phase._onRoundStartSpells, phase._onScoringCeremony, board._onRoomHexPlacement, phase._onRoundStartBackup"]
+    I6 --> I7["Wire hooks: phase._onSpellPhaseEntered, phase._onRoundStartSpells, phase._onScoringCeremony, phase._onAwardPoints (scoring_hex exit), board._onRoomHexPlacement, phase._onRoundStartBackup"]
 ```
 
 Every manager receives the **same `gameState` object reference**. Mutations happen in-place; no manager ever replaces the reference.
@@ -202,7 +206,7 @@ flowchart TD
 |---|---|---|
 | UIManager | 3 | `showStatus`, `addLog`, `clearLog` |
 | TeamManager | 14 | `getTeamColor`, `openPlayerManager`, `updateTeamName`, `openSeatingOrder` |
-| PhaseManager | 10 | `advancePhase`, `forceAdvancePhase`, `confirmForceAdvance`, `closeForceAdvanceModal`, `getCurrentPhase`, `getPhaseRequirements`, `insertBreak`, `endBreak`, `endTournament`, `forceAllReady` |
+| PhaseManager | 12 | `advancePhase`, `forceAdvancePhase`, `confirmForceAdvance`, `closeForceAdvanceModal`, `getCurrentPhase`, `getPhaseRequirements`, `insertBreak`, `endBreak`, `endTournament`, `forceAllReady`, `beginSpells`, `loopBack` |
 | BoardManager | 4 | `assignTeamToHex`, `toggleRoomHex`, `closeTeamPicker`, `highlightValidPlacements` |
 | MatchQueueManager | 14 | `startMatch`, `removeFromQueue`, `dragQueueItem`, `addBreakToQueue`, `confirmClearQueue` |
 | MatchCreationManager | 24 | `dragTeam`, `dropToSide`, `addMatchToQueue`, `confirmChallengeSetup`, `generateSuggestedMatches`, `openGameManager` |
@@ -238,7 +242,7 @@ graph TD
     GS --> currentRound["currentRound — round number"]
     GS --> status["status — setup|playing|finished|archived"]
     GS --> currentPhase["currentPhase{} — phase name, roundNumber, startedAt"]
-    GS --> lobbyReady["lobbyReady{} — per-player ready status (uid → {ready, readyAt, teamId, name})"]
+    GS --> lobbyReady["lobbyReady{} — per-player ready status (uid → {gameLobby, discord, gameLobbyAt, discordAt, teamId, name})"]
     GS --> breakSettings["breakSettings{} — interval, roundsSinceLastBreak, lastBreakAt"]
     GS --> broadcastMessage["broadcastMessage{} — admin broadcast text for view.html"]
     GS --> spellDefinitions["spellDefinitions{} — cached spell card metadata"]
@@ -248,6 +252,7 @@ graph TD
     GS --> spellHistory["spellHistory[] — cast spell log"]
     GS --> ceremonyState["ceremonyState{} — isActive, roundNumber, currentStepIndex, currentStep, isPaused, totalSteps"]
     GS --> displayOverride["displayOverride{} — mode, rotationInterval, forcedSlideIndex"]
+    GS --> pointsHistory["pointsHistory[] — per-round hex territory points log"]
 
     PM[PhaseManager] -->|reads/writes| currentPhase
     PM -->|reads/writes| lobbyReady
@@ -310,6 +315,7 @@ graph TD
    ├── spell-engine.js            ← Phase 1 Weeks 8-9
    ├── scoring-ceremony.js        ← Phase 3
    ├── action-export.js           ← Phase 4
+   ├── season-manager.js          ← Season system
    └── god-app.js
 
 4. Standalone
@@ -359,49 +365,69 @@ The `actionLogSequence` counter lives on the tournament document and is incremen
 - **Window global wiring**: All HTML onclick handlers call `window.fn()`. GodApp wires these once during `init()`. This is the only place managers are coupled to the DOM event model.
 - **Constructor DI**: Every manager receives `gameState` as first arg and a deps object as second. No managers import or reference each other by global name.
 
-## Week 6: Pre-Game Instructions + Lobby Ready Gate
+## Phase Flow (Current)
 
-- `pre_game_instructions` is a **manual admin phase** (removed from `AUTO_ADVANCE_PHASES`). Admin reviews match assignments, teams see them on team.html, then clicks "Next Phase".
-- `lobby_ready` **auto-advances when all requirements are met** (via `AUTO_ADVANCE_WHEN_MET` constant + `recheckRequirements()` trigger). No admin click needed.
-- **Per-player readiness**: `gameState.lobbyReady = { [playerUid]: { ready, readyAt, teamId, name } }`. Only players on teams with pending/ongoing matches must ready up.
-- **Reset on entry**: `lobbyReady` is cleared to `{}` when entering the `lobby_ready` phase (in `advancePhase()`).
-- **Team.html direct writes**: Players write readiness via `tournamentRef.update({ ['lobbyReady.<uid>']: {...} })` — safe for concurrent writes since each player writes to their own key path.
-- **Admin override**: `forceAllReady()` marks all required players as ready from god.html.
-- **Cross-page display**: team.html shows full-screen overlays during both phases; view.html shows phase banner + readiness progress in events panel.
+The tournament phase state machine uses 21 phases with loops and optional spell windows.
 
-## Week 7: Break Interval System + Semi-Auto Loop
+### Round Flow
+```
+scoring_vp → scoring_hex → hex_placement_1 → spell_window_1 → hex_placement_2
+→ challenges → spell_window_2 → challenge_game → spell_window_3
+  (loop → challenge_game, max 7×) → board_resolved → spell_window_4
+  (loop → challenges) → match_1_setup → match_1_lobby → match_1_playing
+→ match_2_setup → match_2_lobby → match_2_playing → round_advance → (loop)
+```
 
-### Semi-Auto Loop Completion
-- `spell_phase` added to `AUTO_ADVANCE_PHASES` — auto-skips until Weeks 8-9 implement real spell logic.
-- `round_end` added to `AUTO_ADVANCE_WHEN_MET` — auto-advances after points are awarded (via `pointsHistory` requirement check).
-- `StatsManager.confirmAdvanceRound()` no longer manually increments `gs.currentRound`. Uses `gs.currentPhase.roundNumber` as canonical source. PhaseManager handles round increments on `round_end → round_start` transition.
-- **Full auto cycle**: `round_start(auto) → challenge_selection → pre_game_instructions → lobby_ready(auto when ready) → [break if due] → matches_in_progress → scoring_and_placement → spell_phase(auto) → round_end(auto after points) → round_start(auto) → …`
+### Auto-Advance
+- `AUTO_ADVANCE_PHASES = ['round_advance']` — immediate auto-advance (loops to scoring_vp)
+- `AUTO_ADVANCE_WHEN_MET = ['match_1_lobby', 'match_2_lobby']` — auto-advance when all players ready
+
+### Points System
+- **Victory points (VP)**: Awarded instantly in `ResultManager.confirmResult()` when a non-challenge match result is confirmed (+1 VP per win for teams with full credit). `confirmCorrectResult()` reverses/re-awards VP on correction.
+- **Hex territory points**: Awarded when leaving `scoring_hex` via `_onAwardPoints` hook (wired in GodApp and admin-phase-adapter). `awardRoundPoints()` scans `heartHexControl` — side hearts = +1, mountain hearts = +2.
+- **scoring_vp phase**: Pure review/ceremony phase — VPs already awarded on match result confirmation. `_onScoringCeremony` hook fires here (round 2+).
+- **scoring_hex phase**: Admin reviews hex state; hex territory points awarded on exit (round 2+).
+- **Contested hex freeze**: `awardRoundPoints()` skips heart hexes with `challengeHexCoord` matching a pending/ongoing challenge match.
+
+### Lobby Readiness (match_1_lobby, match_2_lobby)
+- **Two-status readiness**: `gameState.lobbyReady = { [playerUid]: { gameLobby, discord, gameLobbyAt, discordAt, teamId, name } }`. Both must be `true` per player. Legacy `ready: true` treated as both met.
+- **Discord channel auto-assignment**: `assignDiscordAndLobby(entries)` in admin.js assigns channels #1-#5 to match sides and designates lobby creators. Stored on match doc as `discordChannels` + `lobbyCreators`.
+- **Phase requirements**: Two separate pills — "Game lobby: X/Y" and "Discord: X/Y". Both must be fully met for auto-advance.
+- **Reset on entry**: `lobbyReady` is cleared to `{}` when entering `match_1_lobby` or `match_2_lobby`.
+- **Team.html two-button UI**: Players see per-match Discord channel assignment, lobby creator role, and two buttons. Each writes independently via `tournamentRef.update({ ['lobbyReady.<uid>.<status>']: true })`.
+- **Admin override**: `forceAllReady()` marks all required players as ready (both statuses).
+- **startMatch() phase advance**: admin-phase-adapter overrides `startMatch()` — when phase is a setup/lobby phase, auto-advances (force=true) through to the corresponding playing phase.
+
+### Spell Windows (spell_window_1 through spell_window_4)
+- Optional phases — admin can begin spell casting (`beginSpells()`) or skip by advancing.
+- If spellPhase.isActive, requirements track team turn completion.
+- Loop-back from `spell_window_3 → challenge_game` (max 7 games per round) and `spell_window_4 → challenges`.
+
+### Challenge Game Loop
+- `LOOP_TARGETS = { spell_window_3: 'challenge_game', spell_window_4: 'challenges' }`
+- `MAX_CHALLENGE_GAMES = 7` — blocks looping after 7 challenge games per round
+- `challengeGamesPlayed` counter on `currentPhase` tracks count, reset on new round
 
 ### Break Interval System
-- **New Firestore field**: `gameState.breakSettings = { intervalRounds: 2, roundsSinceLastBreak: 0, lastBreakAt: null }`
-- `roundsSinceLastBreak` incremented on each `round_end → round_start` transition.
+- **Firestore field**: `gameState.breakSettings = { intervalRounds: 2, roundsSinceLastBreak: 0, lastBreakAt: null }`
+- `roundsSinceLastBreak` incremented on `round_advance` exit.
 - `_isBreakDue()` checks `roundsSinceLastBreak >= intervalRounds`.
-- When advancing FROM `lobby_ready`, if break is due: `_autoInsertBreak('matches_in_progress')` inserts break with `returnToPhase` and `autoInserted: true` flag.
+- When advancing TO `match_1_lobby`, if break is due: `_autoInsertBreak('match_1_lobby')` inserts break with `returnToPhase` and `autoInserted: true` flag.
 - Counter resets to 0 in `endBreak()`.
 - Break settings modal in god.html: configure interval, reset counter, skip next break.
 - Break interval badge in phase indicator: shows `⏸ 1/2` counter.
 - Action types: `break_auto_inserted`, `break_settings_changed`, `break_skipped`.
 
-### view.html Enhancements
-- **Phase banners** for all major phases: `challenge_selection` (yellow), `matches_in_progress` (green), `scoring_and_placement` (purple), `break` (yellow).
-- **Break content**: During break phase, events panel shows team standings sorted by points.
-- **Live match display**: During `matches_in_progress`, ongoing matches render with 22px player names (vs 11px default) for readability across the room.
-- **Broadcast message**: Admin can send a text message from god.html that appears as a cyan banner on view.html. Stored as `gameState.broadcastMessage = { text, sentAt, sentBy }`.
+### Legacy Phase Migration
+- `migratePhaseIfNeeded()` converts old phase names on load: `round_start → scoring_vp`, `challenge_selection → challenges`, `pre_game_instructions → match_1_setup`, `lobby_ready → match_1_lobby`, `matches_in_progress → match_1_playing`, `scoring_and_placement → scoring_vp`, `spell_phase → spell_window_1`, `round_end → round_advance`.
 
-### Next Round Modal
-- Added missing `nextRoundModal` HTML to god.html (StatsManager.advanceRound() references it).
-- StatsManager modal display uses `style.display = 'flex'/'none'` to match other modals.
-- CSS: `.points-preview-item`, `.points-preview-team`, `.points-preview-dot`, `.points-preview-name`, `.points-preview-points`.
+### Broadcast Message
+- Admin can send text from god.html/admin.html shown as cyan banner on view.html. Stored as `gameState.broadcastMessage = { text, sentAt, sentBy }`.
 
-### Window Global Wiring (5 new)
-| Module | New globals |
+### Additional Window Globals (Phase Flow)
+| Module | Globals |
 |---|---|
-| PhaseManager | `openBreakSettings`, `closeBreakSettings`, `saveBreakSettings`, `resetBreakCounter`, `skipNextBreak` |
+| PhaseManager | `openBreakSettings`, `closeBreakSettings`, `saveBreakSettings`, `resetBreakCounter`, `skipNextBreak`, `beginSpells`, `loopBack` |
 | GodApp | `setBroadcastMessage`, `clearBroadcastMessage` |
 
 ## Phase 2: Admin Power — Edit, Correct, Undo
@@ -419,7 +445,7 @@ The `actionLogSequence` counter lives on the tournament document and is incremen
 
 ### Result Correction
 - `ResultManager.openCorrectResultModal(matchId)` — renders team selection for changing winner
-- `confirmCorrectResult()` reverses old winner stats (gamesWon, gamesLost, gamesPlayed, points), applies new winner, updates queue entry + history entry
+- `confirmCorrectResult()` reverses old winner stats (gamesWon, gamesLost, gamesPlayed, points/VP), applies new winner stats + VP, updates queue entry + history entry
 - Corrected matches marked with `corrected: true`, `originalWinner` preserved
 - Action type: `match_result_corrected`
 

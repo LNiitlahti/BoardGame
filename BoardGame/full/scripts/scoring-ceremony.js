@@ -152,7 +152,7 @@ class ScoringCeremony {
                 const team = teams.find(t => String(t.id) === String(p.winningTeamIds[0]));
                 if (team) {
                     winnerName = team.name;
-                    winnerColor = team.color || '#3b82f6';
+                    winnerColor = team.color || '#2278a3';
                 }
             }
 
@@ -177,7 +177,7 @@ class ScoringCeremony {
             const teams = this._gameState.teams || [];
             const team = teams.find(t => String(t.id) === String(p.teamId));
             const teamName = team?.name || p.teamName || 'Team';
-            const teamColor = team?.color || '#3b82f6';
+            const teamColor = team?.color || '#2278a3';
 
             steps.push({
                 type: 'plate_placement',
@@ -396,7 +396,7 @@ class ScoringCeremony {
         container.innerHTML = `
             <span class="step-type">${ScoringCeremony._stepLabel(step.type)}</span>
             <span>${step.icon || ''} ${step.title || ''}</span>
-            ${step.detail ? `<span style="color: #94a3b8; font-size: 0.8rem;"> — ${step.detail}</span>` : ''}
+            ${step.detail ? `<span style="color: #9aa1ad; font-size: 0.8rem;"> — ${step.detail}</span>` : ''}
         `;
     }
 
@@ -420,11 +420,11 @@ class ScoringCeremony {
     static _resolveColor(color) {
         if (color && color.startsWith('#')) return color;
         const map = {
-            'blue': '#3b82f6', 'red': '#ef4444', 'green': '#10b981',
-            'yellow': '#f59e0b', 'purple': '#a855f7', 'orange': '#f97316',
+            'blue': '#2278a3', 'red': '#de392c', 'green': '#2e9158',
+            'yellow': '#f7ba32', 'purple': '#a855f7', 'orange': '#f97316',
             'teal': '#14b8a6', 'pink': '#ec4899'
         };
-        return map[color?.toLowerCase()] || '#3b82f6';
+        return map[color?.toLowerCase()] || '#2278a3';
     }
 }
 

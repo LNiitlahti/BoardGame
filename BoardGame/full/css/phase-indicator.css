@@ -1,0 +1,492 @@
+/**
+ * Flow Panel + Phase Indicator CSS
+ *
+ * Unified tournament flow control panel for admin.html.
+ * Also provides styles for god.html phase indicator bar,
+ * broadcast bar, break settings, and force advance modal.
+ */
+
+/* ==================== FLOW PANEL (admin.html) ==================== */
+
+.flow-panel {
+  background: var(--bg-panel, rgba(20, 22, 30, 0.85));
+  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-lg, 12px);
+  margin: 1rem 1.5rem 0;
+  animation: fadeIn 0.3s ease;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+
+.flow-panel.phase-break {
+  border-color: rgba(247, 186, 50, 0.4);
+  background: rgba(247, 186, 50, 0.06);
+}
+
+.flow-panel.phase-ended {
+  border-color: rgba(34, 120, 163, 0.4);
+  background: rgba(34, 120, 163, 0.06);
+}
+
+/* ── Timeline Track ── */
+
+.flow-timeline {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.25);
+  border-bottom: 1px solid var(--border-soft, rgba(255, 255, 255, 0.06));
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.flow-timeline::-webkit-scrollbar { display: none; }
+
+.flow-tl-step {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.flow-tl-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.flow-tl-label {
+  font-size: 0.6rem;
+  font-family: 'Quantico', var(--font-secondary, sans-serif);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.2);
+  padding: 0 6px;
+  transition: all 0.3s ease;
+}
+
+.flow-tl-connector {
+  width: 16px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+/* Timeline states */
+.flow-tl-step.done .flow-tl-dot {
+  background: #5dd39e;
+  box-shadow: 0 0 4px rgba(93, 211, 158, 0.3);
+}
+.flow-tl-step.done .flow-tl-label { color: rgba(93, 211, 158, 0.6); }
+.flow-tl-step.done + .flow-tl-connector,
+.flow-tl-connector.done { background: rgba(93, 211, 158, 0.3); }
+
+.flow-tl-step.active .flow-tl-dot {
+  background: var(--accent-gold, #c8b37e);
+  box-shadow: 0 0 8px rgba(200, 179, 126, 0.5);
+  width: 10px;
+  height: 10px;
+}
+.flow-tl-step.active .flow-tl-label {
+  color: var(--accent-gold, #c8b37e);
+  font-weight: 700;
+  font-size: 0.65rem;
+}
+
+.flow-tl-step.future .flow-tl-dot { background: rgba(255, 255, 255, 0.1); }
+.flow-tl-step.future .flow-tl-label { color: rgba(255, 255, 255, 0.15); }
+
+.flow-tl-step.skipped .flow-tl-dot {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  width: 6px;
+  height: 6px;
+}
+.flow-tl-step.skipped .flow-tl-label { color: rgba(255, 255, 255, 0.1); font-size: 0.55rem; }
+
+/* ── Flow Body ── */
+
+.flow-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 14px 20px;
+}
+
+/* Current phase section */
+.flow-current {
+  flex-shrink: 0;
+  min-width: 200px;
+  max-width: 260px;
+}
+
+.flow-phase-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.flow-phase-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.flow-phase-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.flow-phase-label {
+  font-size: 0.55rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent-steel, #8f98a6);
+  font-family: 'Quantico', var(--font-secondary, sans-serif);
+}
+
+.flow-phase-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--accent-gold, #c8b37e);
+  font-family: 'Russo One', var(--font-primary, sans-serif);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+}
+
+.flow-round-badge {
+  font-size: 0.7rem;
+  color: var(--text-muted, #9aa1ad);
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 9999px;
+  font-family: 'Quantico', var(--font-secondary, sans-serif);
+  white-space: nowrap;
+  align-self: center;
+}
+
+.flow-guidance {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #9aa1ad);
+  margin: 8px 0 0;
+  line-height: 1.4;
+  font-family: 'Quantico', var(--font-secondary, sans-serif);
+}
+
+.flow-guidance strong {
+  color: var(--accent-gold, #c8b37e);
+}
+
+/* ── Action items area ── */
+
+.flow-actions {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: flex-start;
+  align-content: flex-start;
+  min-width: 0;
+}
+
+.flow-action-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  padding: 4px 12px;
+  border-radius: 8px;
+  white-space: nowrap;
+  font-family: 'Quantico', var(--font-secondary, sans-serif);
+  border: 1px solid transparent;
+}
+
+/* Requirement pill states */
+.flow-action-item.req-met {
+  background: rgba(46, 145, 88, 0.12);
+  color: #5dd39e;
+  border-color: rgba(46, 145, 88, 0.2);
+}
+
+.flow-action-item.req-unmet {
+  background: rgba(222, 57, 44, 0.1);
+  color: #ff6b5e;
+  border-color: rgba(222, 57, 44, 0.15);
+}
+
+/* Pending action items (hex placement, votes) */
+.flow-action-item.action-pending {
+  background: rgba(247, 186, 50, 0.1);
+  color: var(--accent-warning, #f7ba32);
+  border-color: rgba(247, 186, 50, 0.2);
+  cursor: default;
+}
+
+.flow-action-item.action-pending .flow-action-team {
+  font-weight: 700;
+}
+
+.flow-action-item.action-vote {
+  background: rgba(0, 168, 232, 0.1);
+  color: #58c4f0;
+  border-color: rgba(0, 168, 232, 0.2);
+}
+
+.flow-action-icon {
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+
+/* ── Controls section ── */
+
+.flow-controls {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.flow-controls .btn {
+  white-space: nowrap;
+}
+
+.flow-controls-secondary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ==================== PHASE INDICATOR BAR (god.html compat) ==================== */
+
+.phase-indicator-bar {
+  background: var(--bg-panel, rgba(20, 22, 30, 0.85));
+  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-lg, 12px);
+  padding: 12px 20px;
+  margin-bottom: 1.5rem;
+  animation: fadeIn 0.3s ease;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.phase-indicator-bar.phase-break {
+  border-color: rgba(247, 186, 50, 0.4);
+  background: rgba(247, 186, 50, 0.06);
+}
+
+.phase-indicator-bar.phase-ended {
+  border-color: rgba(34, 120, 163, 0.4);
+  background: rgba(34, 120, 163, 0.06);
+}
+
+.phase-indicator-content {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.phase-indicator-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.phase-indicator-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent-steel, #8f98a6);
+  font-family: 'Quantico', var(--font-secondary, sans-serif);
+}
+
+.phase-indicator-icon {
+  font-size: 1.2rem;
+}
+
+.phase-indicator-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent-gold, #c8b37e);
+  font-family: 'Russo One', var(--font-primary, sans-serif);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.phase-indicator-round {
+  font-size: 0.8rem;
+  color: var(--text-muted, #9aa1ad);
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 9999px;
+  font-family: 'Quantico', var(--font-secondary, sans-serif);
+}
+
+.phase-indicator-center {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.phase-indicator-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ==================== REQUIREMENT PILLS ==================== */
+
+.phase-req-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  white-space: nowrap;
+  font-family: 'Quantico', var(--font-secondary, sans-serif);
+}
+
+.phase-req-item.met {
+  background: rgba(46, 145, 88, 0.15);
+  color: #5dd39e;
+}
+
+.phase-req-item.unmet {
+  background: rgba(222, 57, 44, 0.15);
+  color: #ff6b5e;
+}
+
+.phase-req-check {
+  font-size: 0.75rem;
+}
+
+/* ==================== BREAK INTERVAL BADGE ==================== */
+
+.break-interval-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted, #9aa1ad);
+  background: rgba(11, 13, 16, 0.6);
+  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  font-family: 'Quantico', var(--font-secondary, sans-serif);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.break-interval-badge:hover {
+  border-color: var(--accent-gold, #c8b37e);
+  color: var(--accent-gold, #c8b37e);
+}
+
+.break-interval-badge.break-due {
+  color: var(--accent-warning, #f7ba32);
+  border-color: rgba(247, 186, 50, 0.4);
+  background: rgba(247, 186, 50, 0.1);
+}
+
+/* ==================== BROADCAST BAR ==================== */
+
+.broadcast-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 20px;
+  background: rgba(0, 212, 255, 0.04);
+  border-top: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
+}
+
+/* ==================== FORCE ADVANCE MODAL ==================== */
+
+.force-advance-req {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 0.9rem;
+  color: var(--text-muted, #9aa1ad);
+}
+
+.force-advance-req.met {
+  color: #5dd39e;
+}
+
+.force-advance-req.unmet {
+  color: #ff6b5e;
+}
+
+/* ==================== PHASE MODAL (display:flex pattern) ==================== */
+
+.phase-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.phase-modal .phase-modal-content {
+  background: linear-gradient(180deg, rgba(30, 32, 42, 0.95), rgba(14, 16, 22, 0.98));
+  border-radius: var(--radius-lg, 12px);
+  padding: 0;
+  border: 1px solid var(--border-accent, rgba(200, 179, 126, 0.3));
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.phase-modal .phase-modal-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.phase-modal .phase-modal-header h2 {
+  margin: 0;
+  color: var(--text-primary, #f7f0e3);
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: 'Russo One', var(--font-primary, sans-serif);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.phase-modal .phase-modal-body {
+  padding: 20px;
+}
+
+/* ==================== ANIMATION ==================== */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

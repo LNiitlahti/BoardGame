@@ -325,15 +325,19 @@ class MatchCreationManager {
     dragPlayer(event, teamId, playerIndex) {
         event.stopPropagation();
         const team = this._gameState?.teams?.find(t => t.id === teamId);
-        if (!team || !team.players || !team.players[playerIndex]) return;
+        // Get players from registry (correct p_xxx IDs) or fallback to legacy array
+        const teamPlayers = window.PlayerUtils
+            ? window.PlayerUtils.getTeamPlayers(this._gameState, teamId)
+            : (team?.players || []);
+        if (!team || !teamPlayers[playerIndex]) return;
 
-        const player = team.players[playerIndex];
+        const player = teamPlayers[playerIndex];
         event.dataTransfer.setData('application/json', JSON.stringify({
             type: 'player',
             teamId: teamId,
             playerIndex: playerIndex,
             player: {
-                id: player.id || player.uid,
+                id: player.id,
                 name: player.name,
                 originalTeamId: teamId,
                 originalTeamName: team.name,
@@ -374,9 +378,12 @@ class MatchCreationManager {
                     return;
                 }
 
-                // Add all players from the team
-                const players = (team.players || []).map(p => ({
-                    id: p.id || p.uid,
+                // Add all players from the team (prefer registry players for correct p_xxx IDs)
+                const teamPlayers = window.PlayerUtils
+                    ? window.PlayerUtils.getTeamPlayers(this._gameState, team.id)
+                    : (team.players || []);
+                const players = teamPlayers.map(p => ({
+                    id: p.id,
                     name: p.name,
                     originalTeamId: team.id,
                     originalTeamName: team.name,
@@ -858,9 +865,9 @@ class MatchCreationManager {
             return team.playerIds;
         }
 
-        // Old format: players array with id/uid
+        // Old format: players array with id
         if (team.players && Array.isArray(team.players)) {
-            return team.players.map(p => p.id || p.uid).filter(Boolean);
+            return team.players.map(p => p.id).filter(Boolean);
         }
 
         return [];

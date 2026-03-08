@@ -368,22 +368,20 @@ async function deleteUser(uid, displayName) {
 // =============================================================================
 // USER APPOINTMENT SYSTEM
 // =============================================================================
-// Handles assigning registered users to tournament teams
+// USER APPOINTMENT SYSTEM — Click-to-Assign with Player Registry
+// =============================================================================
 
-/**
- * Global state for user appointments
- */
 let unassignedUsers = [];
-let unassignedUsersSearchTerm = ''; // Search filter for unassigned users
-let pendingAppointments = {}; // { teamId: { playerIndex: userData } }
+let unassignedUsersSearchTerm = '';
+let selectedUserForAssignment = null; // { uid, displayName, email }
 
 /**
- * Load all users without tournament assignments
- * Shows users who are not assigned OR assigned to different tournaments
+ * Load all registered users available for assignment.
+ * Includes users not assigned to the current tournament.
+ * Also loads users already assigned to this tournament (for the roster).
  */
 async function loadUnassignedUsers() {
-    // Access gameState from god-scripts.js
-    if (!window.gameState || !window.gameState.gameId) {
+    if (!window.gameState || !window.gameState.tournamentId) {
         if (typeof showStatus === 'function') {
             showStatus('Load a tournament first', 'error');
         }
@@ -391,57 +389,41 @@ async function loadUnassignedUsers() {
     }
 
     try {
-        console.log('[User Appointment] Loading users for tournament:', window.gameState.gameId);
         const usersSnapshot = await window.firebaseDB.collection('users').get();
         unassignedUsers = [];
 
-        console.log('[User Appointment] Total users in database:', usersSnapshot.size);
+        // Collect UIDs already linked in the tournament player registry
+        const assignedUids = new Set();
+        const registry = window.gameState.players || {};
+        Object.values(registry).forEach(p => {
+            if (p.uid) assignedUids.add(p.uid);
+        });
 
         usersSnapshot.forEach(doc => {
             const userData = doc.data();
             const uid = doc.id;
 
-            console.log('[User Appointment] Checking user:', uid, {
-                email: userData.email,
-                displayName: userData.displayName,
-                assignedGameId: userData.assignedGameId,
-                isPlayer: userData.isPlayer
+            unassignedUsers.push({
+                uid,
+                displayName: userData.displayName || `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Unknown User',
+                email: userData.email || 'No email',
+                fullName: userData.fullName || null,
+                alreadyInTournament: assignedUids.has(uid),
+                currentAssignment: (userData.assignedTournamentId && userData.assignedTournamentId !== window.gameState.tournamentId) ? {
+                    tournamentId: userData.assignedTournamentId,
+                    teamName: userData.assignedTeamName
+                } : null
             });
-
-            // Include users who:
-            // 1. Have no assignedGameId
-            // 2. Are assigned to a different tournament
-            // 3. Are not god or admin (filter out system users)
-            const isSystemUser = userData.isGod === true || userData.isAdmin === true;
-
-            if (!isSystemUser && (!userData.assignedGameId || userData.assignedGameId !== window.gameState.gameId)) {
-                unassignedUsers.push({
-                    uid,
-                    displayName: userData.displayName || `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Unknown User',
-                    email: userData.email || 'No email',
-                    currentAssignment: userData.assignedGameId ? {
-                        gameId: userData.assignedGameId,
-                        teamId: userData.assignedTeamId,
-                        teamName: userData.assignedTeamName
-                    } : null
-                });
-            }
         });
 
-        console.log('[User Appointment] Unassigned users:', unassignedUsers);
-
-        // Update window reference for global access
         window.unassignedUsers = unassignedUsers;
-
+        selectedUserForAssignment = null;
         renderUnassignedUsers();
+        renderTeamAssignmentSlots();
 
         if (typeof showStatus === 'function') {
-            showStatus(`Found ${unassignedUsers.length} unassigned users`, 'success');
+            showStatus(`Found ${unassignedUsers.length} available users`, 'success');
         }
-        if (typeof addLog === 'function') {
-            addLog(`📋 Found ${unassignedUsers.length} unassigned users`, 'info');
-        }
-
     } catch (error) {
         console.error('[User Appointment] Error loading users:', error);
         if (typeof showStatus === 'function') {
@@ -462,102 +444,76 @@ function filterUnassignedUsers() {
 }
 
 /**
- * Render the list of unassigned users with drag-and-drop
- * Filters out users who are already in pending appointments
+ * Select a user for assignment (click-to-select)
+ */
+function selectUserForAssignment(uid) {
+    if (selectedUserForAssignment?.uid === uid) {
+        // Deselect
+        selectedUserForAssignment = null;
+    } else {
+        selectedUserForAssignment = unassignedUsers.find(u => u.uid === uid) || null;
+    }
+    renderUnassignedUsers();
+    renderTeamAssignmentSlots();
+}
+
+/**
+ * Render the list of available users as clickable cards
  */
 function renderUnassignedUsers() {
     const container = document.getElementById('unassignedUsersList');
     if (!container) return;
 
-    // Get list of assigned user UIDs
-    const assignedUIDs = new Set();
-    for (const teamId in pendingAppointments) {
-        for (const playerIndex in pendingAppointments[teamId]) {
-            assignedUIDs.add(pendingAppointments[teamId][playerIndex].uid);
-        }
-    }
+    let availableUsers = [...unassignedUsers];
 
-    // Filter out users who are already assigned
-    let availableUsers = unassignedUsers.filter(user => !assignedUIDs.has(user.uid));
-
-    // Apply search filter
     if (unassignedUsersSearchTerm) {
-        availableUsers = availableUsers.filter(user => {
-            return user.displayName.toLowerCase().includes(unassignedUsersSearchTerm) ||
-                   user.email.toLowerCase().includes(unassignedUsersSearchTerm);
-        });
+        availableUsers = availableUsers.filter(user =>
+            user.displayName.toLowerCase().includes(unassignedUsersSearchTerm) ||
+            user.email.toLowerCase().includes(unassignedUsersSearchTerm)
+        );
     }
 
     if (availableUsers.length === 0) {
-        const message = unassignedUsersSearchTerm
+        container.innerHTML = unassignedUsersSearchTerm
             ? `<p style="text-align: center; opacity: 0.5;">No users found matching "${unassignedUsersSearchTerm}"</p>`
-            : '<p style="text-align: center; opacity: 0.5;">No unassigned users available</p>';
-        container.innerHTML = message;
+            : '<p style="text-align: center; opacity: 0.5;">No available users. Click Refresh to reload.</p>';
         return;
     }
 
+    // Sort: unassigned first, then already-in-tournament
+    availableUsers.sort((a, b) => (a.alreadyInTournament ? 1 : 0) - (b.alreadyInTournament ? 1 : 0));
+
     container.innerHTML = availableUsers.map(user => {
-        const assignmentNote = user.currentAssignment
-            ? `<div style="font-size: 0.75rem; opacity: 0.7; margin-top: 4px;">Currently: ${user.currentAssignment.teamName} (${user.currentAssignment.gameId})</div>`
-            : '';
+        const isSelected = selectedUserForAssignment?.uid === user.uid;
+        const borderColor = isSelected ? '#10b981' : user.alreadyInTournament ? '#6b7280' : '#06b6d4';
+        const bgColor = isSelected ? 'rgba(16, 185, 129, 0.15)' : user.alreadyInTournament ? 'rgba(107, 114, 128, 0.15)' : 'rgba(51, 65, 85, 0.5)';
+        const assignmentNote = user.alreadyInTournament
+            ? `<div style="font-size: 0.75rem; color: #8b5cf6; margin-top: 4px;">Already linked in this tournament</div>`
+            : user.currentAssignment
+                ? `<div style="font-size: 0.75rem; color: #f59e0b; margin-top: 4px;">Assigned elsewhere: ${user.currentAssignment.teamName || user.currentAssignment.tournamentId}</div>`
+                : '';
 
         return `
-            <div class="user-drag-item"
-                 draggable="true"
-                 ondragstart="handleUserDragStart(event, '${user.uid}')"
-                 ondragend="dragEnd(event)"
-                 style="background: rgba(51, 65, 85, 0.5); padding: 10px; margin-bottom: 8px; border-radius: 5px; border-left: 3px solid #06b6d4; cursor: move;">
-                <div style="font-weight: 600;">${user.displayName}</div>
-                <div style="font-size: 0.85rem; opacity: 0.8;">${user.email}</div>
-                ${assignmentNote}
+            <div onclick="selectUserForAssignment('${user.uid}')"
+                 style="background: ${bgColor}; padding: 10px; margin-bottom: 8px; border-radius: 5px; border-left: 3px solid ${borderColor}; cursor: pointer; transition: background 0.15s;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-weight: 600;">${user.displayName}</div>
+                        <div style="font-size: 0.85rem; opacity: 0.8;">${user.email}</div>
+                        ${assignmentNote}
+                    </div>
+                    ${isSelected ? '<div style="color: #10b981; font-weight: bold; font-size: 1.2rem;">&#10003;</div>' : ''}
+                </div>
             </div>
         `;
     }).join('');
 }
 
 /**
- * Handle drag start for user items
- */
-function handleUserDragStart(event, uid) {
-    event.target.classList.add('dragging');
-
-    const user = unassignedUsers.find(u => u.uid === uid);
-    event.dataTransfer.setData('application/json', JSON.stringify({
-        type: 'user',
-        uid: uid,
-        userData: user
-    }));
-}
-
-/**
- * Allow drop on valid drop zones
- */
-function allowDrop(event) {
-    event.preventDefault();
-    event.currentTarget.classList.add('drag-over');
-}
-
-/**
- * Remove drag over styling when leaving drop zone
- */
-function dragLeave(event) {
-    event.currentTarget.classList.remove('drag-over');
-}
-
-/**
- * Clean up after drag ends
- */
-function dragEnd(event) {
-    event.target.classList.remove('dragging');
-    // Remove all drag-over classes
-    document.querySelectorAll('.drag-over').forEach(el => {
-        el.classList.remove('drag-over');
-    });
-}
-
-/**
- * Render team assignment slots as drop zones
- * Only shows teams that have empty slots (missing players)
+ * Render team assignment slots.
+ * Uses the normalized player registry (PlayerUtils) to show current roster.
+ * Placeholder players (no uid) show "Link" button when a user is selected.
+ * Teams are limited to exactly 2 player slots.
  */
 function renderTeamAssignmentSlots() {
     const container = document.getElementById('teamAssignmentSlots');
@@ -568,67 +524,73 @@ function renderTeamAssignmentSlots() {
         return;
     }
 
-    // Filter teams to only show those with empty slots
-    const teamsWithEmptySlots = window.gameState.teams.filter(team => {
-        // Check if any player slot is empty (no name or no UID)
-        return team.players.some(player => !player.name || !player.uid);
-    });
-
-    if (teamsWithEmptySlots.length === 0) {
-        container.innerHTML = '<p style="text-align: center; opacity: 0.5; color: #10b981;">✓ All teams are fully assigned!</p>';
-        return;
-    }
-
-    // Use getTeamColor from god-scripts.js if available
     const getColor = (teamId) => {
-        if (typeof getTeamColor === 'function') {
-            return getTeamColor(teamId);
-        }
+        if (window.godApp?.teams) return window.godApp.teams.getTeamColor(teamId);
+        if (typeof getTeamColor === 'function') return getTeamColor(teamId);
         return '#666';
     };
 
-    container.innerHTML = teamsWithEmptySlots.map(team => {
+    container.innerHTML = window.gameState.teams.map(team => {
+        const playerIds = window.PlayerUtils
+            ? window.PlayerUtils.getTeamPlayerIds(window.gameState, team.id)
+            : (team.playerIds || []);
+        const players = playerIds.map((pid, idx) => {
+            const p = window.PlayerUtils?.getPlayerById(window.gameState, pid);
+            return p ? { ...p, playerId: pid, slotIndex: idx } : null;
+        }).filter(Boolean);
+
+        const teamFull = players.length >= 2;
+
+        // Only show "Assign" if team has fewer than 2 players AND a user is selected
+        const assignBtnHtml = (selectedUserForAssignment && !teamFull)
+            ? `<button onclick="assignSelectedUserToTeam(${team.id})" class="btn-small primary" style="margin-top: 8px; width: 100%;">
+                   + Assign ${escapeHtml(selectedUserForAssignment.displayName)}
+               </button>`
+            : '';
+
         return `
             <div style="background: rgba(51, 65, 85, 0.3); padding: 12px; margin-bottom: 12px; border-radius: 8px; border-left: 4px solid ${getColor(team.id)};">
-                <div style="font-weight: 600; color: #ffd700; margin-bottom: 10px;">
-                    ${team.name}
+                <div style="font-weight: 600; color: #ffd700; margin-bottom: 8px;">
+                    ${escapeHtml(team.name)} <span style="font-weight: 400; opacity: 0.6; font-size: 0.85rem;">(${players.length}/2 players)</span>
                 </div>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
-                    ${team.players.map((player, playerIndex) => {
-                        const pendingUser = pendingAppointments[team.id]?.[playerIndex];
-                        const hasAssignedPlayer = player.name && player.uid;
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    ${players.length > 0 ? players.map(player => {
+                        const isPlaceholder = !player.uid;
+                        const slotLabel = player.slotIndex === 0 ? 'Player A' : 'Player B';
+                        const borderColor = isPlaceholder ? '#f59e0b' : '#10b981';
+                        const bgColor = isPlaceholder ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)';
 
-                        // Only show slots that are empty or have pending appointments
-                        if (hasAssignedPlayer && !pendingUser) {
-                            return `
-                                <div style="background: rgba(16, 185, 129, 0.1); padding: 10px; border-radius: 5px; border: 2px solid #10b981; opacity: 0.6;">
-                                    <div style="font-size: 0.85rem; opacity: 0.8;">Slot ${playerIndex + 1}</div>
-                                    <div style="font-weight: 600; color: #10b981;">✓ ${player.name}</div>
-                                    <div style="font-size: 0.8rem; opacity: 0.8;">${player.email || 'Already assigned'}</div>
-                                </div>
-                            `;
-                        }
+                        // Show "Link" button on placeholders when a user is selected
+                        const linkBtnHtml = (isPlaceholder && selectedUserForAssignment)
+                            ? `<button onclick="replacePlayerWithUser(${team.id}, '${player.playerId}')"
+                                      style="background: #10b981; color: white; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem;">
+                                  Link ${escapeHtml(selectedUserForAssignment.displayName)}
+                              </button>`
+                            : '';
 
                         return `
-                            <div class="team-slot"
-                                 ondragover="allowDrop(event)"
-                                 ondragleave="dragLeave(event)"
-                                 ondrop="handleUserDrop(event, ${team.id}, ${playerIndex})"
-                                 style="background: rgba(15, 23, 42, 0.5); padding: 10px; border-radius: 5px; border: 2px dashed ${pendingUser ? '#10b981' : '#475569'}; min-height: 50px; display: flex; justify-content: space-between; align-items: center;">
+                            <div style="background: ${bgColor}; padding: 8px 10px; border-radius: 5px; border-left: 3px solid ${borderColor}; display: flex; justify-content: space-between; align-items: center;">
                                 <div>
-                                    <div style="font-size: 0.85rem; opacity: 0.6;">${player.name ? player.name : `Slot ${playerIndex + 1}`}</div>
-                                    ${pendingUser
-                                        ? `<div style="font-weight: 600; color: #10b981;">✓ ${pendingUser.displayName}</div><div style="font-size: 0.8rem; opacity: 0.8;">${pendingUser.email}</div>`
-                                        : `<div style="font-style: italic; opacity: 0.5;">Drop user here</div>`
-                                    }
+                                    <div style="font-weight: 600; font-size: 0.95rem;">${escapeHtml(player.name)}</div>
+                                    <div style="font-size: 0.75rem; opacity: 0.6;">
+                                        ${slotLabel} ${isPlaceholder ? '- Placeholder' : '- Linked'}
+                                    </div>
                                 </div>
-                                ${pendingUser
-                                    ? `<button onclick="removeUserAppointment('${pendingUser.uid}')" style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer;">Remove</button>`
-                                    : ''
-                                }
+                                <div style="display: flex; gap: 4px;">
+                                    ${linkBtnHtml}
+                                    <button onclick="unassignUserFromTeam(${team.id}, '${player.playerId}')"
+                                            style="background: rgba(239, 68, 68, 0.8); color: white; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem;">
+                                        Remove
+                                    </button>
+                                </div>
                             </div>
                         `;
-                    }).join('')}
+                    }).join('') : `
+                        <div style="background: rgba(71, 85, 105, 0.3); padding: 10px; border-radius: 5px; border: 2px dashed #475569; text-align: center;">
+                            <div style="font-style: italic; opacity: 0.5;">No players assigned</div>
+                        </div>
+                    `}
+                    ${assignBtnHtml}
                 </div>
             </div>
         `;
@@ -636,181 +598,234 @@ function renderTeamAssignmentSlots() {
 }
 
 /**
- * Handle dropping a user into a team slot
+ * Replace a placeholder player with a real user (in-place update).
+ * Preserves the p_xxx ID and array position so match history and
+ * pre-generated schedules stay intact.
  */
-function handleUserDrop(event, teamId, playerIndex) {
-    event.preventDefault();
-    event.currentTarget.classList.remove('drag-over');
-
-    const dragData = JSON.parse(event.dataTransfer.getData('application/json'));
-
-    if (dragData.type !== 'user') return;
-
-    const user = dragData.userData;
-
-    // Check if user is already assigned
-    for (const tId in pendingAppointments) {
-        for (const pIdx in pendingAppointments[tId]) {
-            if (pendingAppointments[tId][pIdx].uid === user.uid) {
-                if (typeof showStatus === 'function') {
-                    showStatus('User already assigned to a slot. Remove first.', 'error');
-                }
-                return;
-            }
-        }
+async function replacePlayerWithUser(teamId, playerId) {
+    if (!selectedUserForAssignment) {
+        if (typeof showStatus === 'function') showStatus('Select a user first', 'warning');
+        return;
     }
-
-    // Add to pending appointments
-    if (!pendingAppointments[teamId]) {
-        pendingAppointments[teamId] = {};
-    }
-
-    pendingAppointments[teamId][playerIndex] = user;
-
-    // Re-render both lists to update UI
-    renderUnassignedUsers();
-    renderTeamAssignmentSlots();
-
-    if (typeof showStatus === 'function') {
-        showStatus(`Assigned ${user.displayName} to slot`, 'success');
-    }
-}
-
-/**
- * Remove a user appointment
- */
-function removeUserAppointment(uid) {
-    // Find and remove from pending appointments
-    for (const teamId in pendingAppointments) {
-        for (const playerIndex in pendingAppointments[teamId]) {
-            if (pendingAppointments[teamId][playerIndex].uid === uid) {
-                delete pendingAppointments[teamId][playerIndex];
-
-                // Clean up empty objects
-                if (Object.keys(pendingAppointments[teamId]).length === 0) {
-                    delete pendingAppointments[teamId];
-                }
-
-                // Re-render both lists to update UI
-                renderUnassignedUsers();
-                renderTeamAssignmentSlots();
-
-                if (typeof showStatus === 'function') {
-                    showStatus('User appointment removed', 'success');
-                }
-                return;
-            }
-        }
-    }
-}
-
-/**
- * Save all pending user appointments to Firebase
- * Updates both user documents and tournament data
- */
-async function saveUserAppointments() {
-    if (Object.keys(pendingAppointments).length === 0) {
-        if (typeof showStatus === 'function') {
-            showStatus('No appointments to save', 'warning');
-        }
+    if (!window.gameState || !window.gameState.tournamentId) {
+        if (typeof showStatus === 'function') showStatus('No tournament loaded', 'error');
         return;
     }
 
-    if (!window.gameState || !window.gameState.gameId) {
-        if (typeof showStatus === 'function') {
-            showStatus('No tournament loaded', 'error');
-        }
+    const user = selectedUserForAssignment;
+    const team = window.gameState.teams.find(t => String(t.id) === String(teamId));
+    if (!team) {
+        if (typeof showStatus === 'function') showStatus('Team not found', 'error');
         return;
     }
+
+    const player = window.PlayerUtils?.getPlayerById(window.gameState, playerId);
+    if (!player) {
+        if (typeof showStatus === 'function') showStatus('Player not found in registry', 'error');
+        return;
+    }
+
+    if (player.uid) {
+        if (typeof showStatus === 'function') showStatus('This slot is already linked to an account', 'warning');
+        return;
+    }
+
+    // Check if user is already in the registry for this tournament
+    const registry = window.gameState.players || {};
+    for (const pid of Object.keys(registry)) {
+        if (registry[pid].uid === user.uid) {
+            if (typeof showStatus === 'function') showStatus('User is already assigned in this tournament', 'error');
+            return;
+        }
+    }
+
+    const oldName = player.name;
 
     try {
-        const batch = window.firebaseDB.batch();
+        // Update player registry in-place (same p_xxx ID, same array position)
+        window.PlayerUtils.updatePlayerInRegistry(window.gameState, playerId, {
+            name: user.displayName,
+            uid: user.uid
+        });
 
-        // Process each appointment
-        for (const teamId in pendingAppointments) {
-            for (const playerIndex in pendingAppointments[teamId]) {
-                const user = pendingAppointments[teamId][playerIndex];
-                const team = window.gameState.teams.find(t => t.id === parseInt(teamId));
-
-                if (!team) continue;
-
-                // Update user document
-                const userRef = window.firebaseDB.collection('users').doc(user.uid);
-                batch.update(userRef, {
-                    assignedGameId: window.gameState.gameId,
-                    assignedTeamId: parseInt(teamId),
-                    assignedTeamName: team.name,
-                    appointedAt: new Date().toISOString(),
-                    appointedBy: 'admin' // TODO: use actual admin UID
-                });
-
-                // Update team player name in tournament with contribution tracking
-                team.players[playerIndex].name = user.displayName;
-                team.players[playerIndex].uid = user.uid;
-                team.players[playerIndex].email = user.email;
-                team.players[playerIndex].pointsContributed = 0;
-                team.players[playerIndex].matchesParticipated = [];
-                team.players[playerIndex].joinedAt = new Date().toISOString();
-                team.players[playerIndex].pointsWhenJoined = team.points || 0;
-                team.players[playerIndex].active = true;
+        // Also update legacy players[] array
+        if (team.players && Array.isArray(team.players)) {
+            const legacyPlayer = team.players.find(p => p.id === playerId);
+            if (legacyPlayer) {
+                legacyPlayer.name = user.displayName;
+                legacyPlayer.uid = user.uid;
+                legacyPlayer.email = user.email;
+                legacyPlayer.linkedAt = new Date().toISOString();
             }
         }
 
-        // Save updated tournament data
-        const tournamentRef = window.firebaseDB.collection('tournaments').doc(window.gameState.gameId);
-        batch.update(tournamentRef, {
-            teams: window.gameState.teams,
-            lastModified: new Date().toISOString()
+        // Save to Firestore
+        const batch = window.firebaseDB.batch();
+
+        // Update user document with assignment
+        const userRef = window.firebaseDB.collection('users').doc(user.uid);
+        batch.update(userRef, {
+            assignedTournamentId: window.gameState.tournamentId,
+            assignedTeamId: team.id,
+            assignedTeamName: team.name,
+            isPlayer: true,
+            appointedAt: new Date().toISOString(),
+            appointedBy: firebase.auth().currentUser?.uid || 'admin'
         });
 
-        // Commit batch
+        // Save tournament data
+        const cleanData = JSON.parse(JSON.stringify({
+            teams: window.gameState.teams,
+            players: window.gameState.players || {},
+            lastModified: new Date().toISOString()
+        }, (_key, value) => value === undefined ? null : value));
+
+        const tournamentRef = window.firebaseDB.collection('tournaments').doc(window.gameState.tournamentId);
+        batch.update(tournamentRef, cleanData);
+
         await batch.commit();
 
         if (typeof showStatus === 'function') {
-            showStatus('All appointments saved successfully!', 'success');
-        }
-        if (typeof addLog === 'function') {
-            addLog(`✅ Saved ${Object.keys(pendingAppointments).length} user appointments`, 'success');
+            showStatus(`Linked "${oldName}" -> ${user.displayName} on ${team.name}`, 'success');
         }
 
-        // Clear pending appointments and refresh
-        pendingAppointments = {};
-        await loadUnassignedUsers();
+        console.log(`[User Management] Replaced placeholder "${oldName}" (${playerId}) with user "${user.displayName}" (${user.uid})`);
+
+        // Remove from unassigned list and clear selection
+        unassignedUsers = unassignedUsers.filter(u => u.uid !== user.uid);
+        selectedUserForAssignment = null;
+
+        renderUnassignedUsers();
         renderTeamAssignmentSlots();
-
-        // Update roster display if function exists
-        if (typeof renderTournamentRoster === 'function') {
-            renderTournamentRoster();
-        }
+        renderTournamentRoster();
 
     } catch (error) {
-        console.error('[User Appointment] Error saving appointments:', error);
+        console.error('[User Management] Error replacing player:', error);
         if (typeof showStatus === 'function') {
-            showStatus('Error saving appointments: ' + error.message, 'error');
+            showStatus('Error linking user: ' + error.message, 'error');
+        }
+    }
+}
+
+/**
+ * Assign the currently selected user to a team.
+ * Creates a player registry entry linked to the Firebase user.
+ */
+async function assignSelectedUserToTeam(teamId) {
+    if (!selectedUserForAssignment) {
+        if (typeof showStatus === 'function') showStatus('Select a user first', 'warning');
+        return;
+    }
+    if (!window.gameState || !window.gameState.tournamentId) {
+        if (typeof showStatus === 'function') showStatus('No tournament loaded', 'error');
+        return;
+    }
+
+    const user = selectedUserForAssignment;
+    const team = window.gameState.teams.find(t => String(t.id) === String(teamId));
+    if (!team) {
+        if (typeof showStatus === 'function') showStatus('Team not found', 'error');
+        return;
+    }
+
+    // Enforce 2-player limit
+    const currentPlayerIds = window.PlayerUtils
+        ? window.PlayerUtils.getTeamPlayerIds(window.gameState, team.id)
+        : (team.playerIds || []);
+    if (currentPlayerIds.length >= 2) {
+        if (typeof showStatus === 'function') showStatus('Team already has 2 players. Use "Link" to replace a placeholder.', 'warning');
+        return;
+    }
+
+    // Check if user is already in the registry for this tournament
+    const registry = window.gameState.players || {};
+    for (const pid of Object.keys(registry)) {
+        if (registry[pid].uid === user.uid) {
+            if (typeof showStatus === 'function') showStatus('User is already assigned in this tournament', 'error');
+            return;
+        }
+    }
+
+    try {
+        // Add to normalized player registry via PlayerUtils
+        const playerId = window.PlayerUtils
+            ? window.PlayerUtils.addPlayerToTeam(window.gameState, team.id, { name: user.displayName, uid: user.uid })
+            : null;
+
+        if (!playerId) {
+            if (typeof showStatus === 'function') showStatus('Error: PlayerUtils not available', 'error');
+            return;
+        }
+
+        // Also maintain legacy players[] array for backward compatibility
+        if (!team.players) team.players = [];
+        team.players.push({
+            id: playerId,
+            name: user.displayName,
+            uid: user.uid,
+            email: user.email,
+            pointsContributed: 0,
+            joinedAt: new Date().toISOString(),
+            pointsWhenJoined: team.points || 0,
+            active: true
+        });
+
+        // Update user document with assignment
+        const batch = window.firebaseDB.batch();
+        const userRef = window.firebaseDB.collection('users').doc(user.uid);
+        batch.update(userRef, {
+            assignedTournamentId: window.gameState.tournamentId,
+            assignedTeamId: team.id,
+            assignedTeamName: team.name,
+            isPlayer: true,
+            appointedAt: new Date().toISOString(),
+            appointedBy: firebase.auth().currentUser?.uid || 'admin'
+        });
+
+        // Save tournament data (players registry + teams)
+        const cleanData = JSON.parse(JSON.stringify({
+            teams: window.gameState.teams,
+            players: window.gameState.players || {},
+            lastModified: new Date().toISOString()
+        }, (_key, value) => value === undefined ? null : value));
+
+        const tournamentRef = window.firebaseDB.collection('tournaments').doc(window.gameState.tournamentId);
+        batch.update(tournamentRef, cleanData);
+
+        await batch.commit();
+
+        if (typeof showStatus === 'function') {
+            showStatus(`${user.displayName} assigned to ${team.name}`, 'success');
+        }
+
+        // Remove from unassigned list and clear selection
+        unassignedUsers = unassignedUsers.filter(u => u.uid !== user.uid);
+        selectedUserForAssignment = null;
+
+        renderUnassignedUsers();
+        renderTeamAssignmentSlots();
+        renderTournamentRoster();
+
+    } catch (error) {
+        console.error('[User Appointment] Error assigning user:', error);
+        if (typeof showStatus === 'function') {
+            showStatus('Error assigning user: ' + error.message, 'error');
         }
     }
 }
 
 /**
  * Load tournament data for user appointment system
- * Called when Teams tab is activated
  */
 async function loadTournamentForAppointment(tournamentId) {
     console.log('[User Appointment] Loading tournament:', tournamentId);
-
-    // Load unassigned users
     await loadUnassignedUsers();
-
-    // Render team slots
     renderTeamAssignmentSlots();
-
-    // Render full roster
     renderTournamentRoster();
 }
 
 /**
- * Render the complete tournament roster
- * Shows all teams and their assigned players
+ * Render the complete tournament roster using the normalized player registry
  */
 function renderTournamentRoster() {
     const container = document.getElementById('tournamentRosterDisplay');
@@ -821,17 +836,21 @@ function renderTournamentRoster() {
         return;
     }
 
-    // Use getTeamColor from god-scripts.js if available
     const getColor = (teamId) => {
-        if (typeof getTeamColor === 'function') {
-            return getTeamColor(teamId);
-        }
+        if (window.godApp?.teams) return window.godApp.teams.getTeamColor(teamId);
+        if (typeof getTeamColor === 'function') return getTeamColor(teamId);
         return '#666';
     };
 
     container.innerHTML = window.gameState.teams.map(team => {
-        const assignedPlayers = team.players.filter(p => p.name && p.uid);
-        const emptySlots = team.players.filter(p => !p.name || !p.uid).length;
+        // Use normalized registry
+        const playerIds = window.PlayerUtils
+            ? window.PlayerUtils.getTeamPlayerIds(window.gameState, team.id)
+            : (team.playerIds || []);
+        const players = playerIds.map(pid => {
+            const p = window.PlayerUtils?.getPlayerById(window.gameState, pid);
+            return p ? { ...p, playerId: pid } : null;
+        }).filter(Boolean);
 
         return `
             <div style="background: rgba(51, 65, 85, 0.3); padding: 15px; border-radius: 8px; border-left: 4px solid ${getColor(team.id)};">
@@ -840,7 +859,7 @@ function renderTournamentRoster() {
                         <div id="teamName-display-${team.id}" style="display: flex; align-items: center; gap: 8px;">
                             <span style="font-weight: 600; color: #ffd700; font-size: 1.1rem;">${team.name}</span>
                             <button onclick="startEditTeamName(${team.id})"
-                                    style="background: rgba(255, 255, 255, 0.1); border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; color: #94a3b8; font-size: 0.75rem;"
+                                    style="background: rgba(255, 255, 255, 0.1); border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; color: #9aa1ad; font-size: 0.75rem;"
                                     title="Edit team name">
                                 ✏️
                             </button>
@@ -848,7 +867,7 @@ function renderTournamentRoster() {
                         <div id="teamName-edit-${team.id}" style="display: none; margin-bottom: 8px;">
                             <div style="display: flex; gap: 6px; align-items: center;">
                                 <input type="text" id="teamName-input-${team.id}" value="${team.name}"
-                                       style="flex: 1; padding: 6px 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid #10b981; border-radius: 5px; color: white; font-size: 1rem;"
+                                       style="flex: 1; padding: 6px 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid #10b981; border-radius: 5px; color: white; font-size: 1rem;"
                                        onkeydown="handleTeamNameKeydown(event, ${team.id})">
                                 <button onclick="saveTeamName(${team.id})"
                                         style="background: #10b981; color: white; border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 0.85rem;">
@@ -863,40 +882,38 @@ function renderTournamentRoster() {
                         <div style="font-size: 0.85rem; opacity: 0.7;">${team.points || 0} points</div>
                     </div>
                     <div style="text-align: right; font-size: 0.85rem;">
-                        <div style="color: #10b981;">✓ ${assignedPlayers.length} assigned</div>
-                        ${emptySlots > 0 ? `<div style="color: #f59e0b;">⚠ ${emptySlots} empty</div>` : ''}
+                        <div style="color: #10b981;">${players.length} players</div>
                     </div>
                 </div>
 
                 <div style="display: flex; flex-direction: column; gap: 8px;">
-                    ${team.players.map((player, index) => {
-                        if (player.name && player.uid) {
-                            return `
-                                <div style="background: rgba(16, 185, 129, 0.1); padding: 10px; border-radius: 5px; border-left: 3px solid #10b981; display: flex; justify-content: space-between; align-items: center;">
-                                    <div>
-                                        <div style="font-weight: 600;">${player.name}</div>
-                                        <div style="font-size: 0.8rem; opacity: 0.8;">${player.email || ''}</div>
-                                        ${player.pointsContributed ? `<div style="font-size: 0.75rem; color: #10b981; margin-top: 4px;">📊 ${player.pointsContributed} points contributed</div>` : ''}
-                                    </div>
-                                    <button onclick="unassignUserFromTeam(${team.id}, ${index})"
-                                            style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 0.85rem;">
-                                        Remove
-                                    </button>
+                    ${players.length > 0 ? players.map((player, idx) => {
+                        const isPlaceholder = !player.uid;
+                        const slotLabel = idx === 0 ? 'Player A' : 'Player B';
+                        const borderColor = isPlaceholder ? '#f59e0b' : '#10b981';
+                        const bgColor = isPlaceholder ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)';
+                        return `
+                            <div style="background: ${bgColor}; padding: 10px; border-radius: 5px; border-left: 3px solid ${borderColor}; display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-weight: 600;">${escapeHtml(player.name)}</div>
+                                    <div style="font-size: 0.75rem; opacity: 0.6;">${slotLabel} ${isPlaceholder ? '- Placeholder' : '- Linked'}</div>
                                 </div>
-                            `;
-                        } else {
-                            return `
-                                <div style="background: rgba(71, 85, 105, 0.3); padding: 10px; border-radius: 5px; border: 2px dashed #475569;">
-                                    <div style="font-style: italic; opacity: 0.5;">Slot ${index + 1}: Empty</div>
-                                </div>
-                            `;
-                        }
-                    }).join('')}
+                                <button onclick="unassignUserFromTeam(${team.id}, '${player.playerId}')"
+                                        style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 0.85rem;">
+                                    Remove
+                                </button>
+                            </div>
+                        `;
+                    }).join('') : `
+                        <div style="background: rgba(71, 85, 105, 0.3); padding: 10px; border-radius: 5px; border: 2px dashed #475569;">
+                            <div style="font-style: italic; opacity: 0.5;">No players assigned yet</div>
+                        </div>
+                    `}
                 </div>
 
                 ${team.formerPlayers && team.formerPlayers.length > 0 ? `
                     <details style="margin-top: 12px;">
-                        <summary style="cursor: pointer; opacity: 0.7; font-size: 0.85rem;">📜 Former Players (${team.formerPlayers.length})</summary>
+                        <summary style="cursor: pointer; opacity: 0.7; font-size: 0.85rem;">Former Players (${team.formerPlayers.length})</summary>
                         <div style="margin-top: 8px; padding-left: 10px;">
                             ${team.formerPlayers.map(fp => `
                                 <div style="font-size: 0.8rem; opacity: 0.6; margin: 4px 0;">
@@ -912,118 +929,94 @@ function renderTournamentRoster() {
 }
 
 /**
- * Unassign a user from a team (removes from roster)
- * Updates both the tournament document and the user document
+ * Unassign a user from a team.
+ * Removes from player registry and clears user doc assignment.
+ * @param {number} teamId
+ * @param {string} playerId - Normalized player ID (p_xxxx)
  */
-async function unassignUserFromTeam(teamId, playerIndex) {
-    if (!window.gameState || !window.gameState.gameId) {
-        if (typeof showStatus === 'function') {
-            showStatus('No tournament loaded', 'error');
-        }
+async function unassignUserFromTeam(teamId, playerId) {
+    if (!window.gameState || !window.gameState.tournamentId) {
+        if (typeof showStatus === 'function') showStatus('No tournament loaded', 'error');
         return;
     }
 
-    const team = window.gameState.teams.find(t => t.id === teamId);
-    if (!team || !team.players[playerIndex]) {
-        if (typeof showStatus === 'function') {
-            showStatus('Team or player not found', 'error');
-        }
+    const team = window.gameState.teams.find(t => String(t.id) === String(teamId));
+    if (!team) {
+        if (typeof showStatus === 'function') showStatus('Team not found', 'error');
         return;
     }
 
-    const playerName = team.players[playerIndex].name;
+    const player = window.PlayerUtils?.getPlayerById(window.gameState, playerId);
+    if (!player) {
+        if (typeof showStatus === 'function') showStatus('Player not found in registry', 'error');
+        return;
+    }
 
-    if (!confirm(`Remove "${playerName}" from ${team.name}?\n\nThey will return to the unassigned users list.`)) {
+    if (!confirm(`Remove "${player.name}" from ${team.name}?\n\nThey will return to the available users list.`)) {
         return;
     }
 
     try {
         const batch = window.firebaseDB.batch();
 
-        const player = team.players[playerIndex];
-
-        // Move to former players (preserve history)
+        // Preserve in formerPlayers history
         if (!team.formerPlayers) team.formerPlayers = [];
-
-        // Check if this player is already in formerPlayers
-        const existingIndex = team.formerPlayers.findIndex(fp => fp.uid === player.uid);
-
-        const formerPlayerData = {
+        const existingIdx = team.formerPlayers.findIndex(fp => fp.uid === player.uid);
+        const formerData = {
             uid: player.uid || null,
+            playerId: playerId,
             name: player.name || '',
-            email: player.email || '',
-            pointsContributed: player.pointsContributed || 0,
-            matchesParticipated: player.matchesParticipated || [],
-            joinedAt: player.joinedAt || null,
-            pointsWhenJoined: player.pointsWhenJoined || 0,
             leftAt: new Date().toISOString(),
             pointsWhenLeft: team.points || 0,
             removalCount: 1
         };
-
-        if (existingIndex !== -1) {
-            // Player was removed before - update their entry and increment removal count
-            const existing = team.formerPlayers[existingIndex];
-            formerPlayerData.removalCount = (existing.removalCount || 1) + 1;
-            formerPlayerData.firstJoinedAt = existing.firstJoinedAt || existing.joinedAt;
-            team.formerPlayers[existingIndex] = formerPlayerData;
+        if (existingIdx !== -1) {
+            formerData.removalCount = (team.formerPlayers[existingIdx].removalCount || 1) + 1;
+            team.formerPlayers[existingIdx] = formerData;
         } else {
-            // First time removing this player
-            formerPlayerData.firstJoinedAt = player.joinedAt || null;
-            team.formerPlayers.push(formerPlayerData);
+            team.formerPlayers.push(formerData);
         }
 
-        // Clear player slot in team
-        team.players[playerIndex] = {
-            name: '',
-            uid: null,
-            email: '',
-            pointsContributed: 0,
-            matchesParticipated: [],
-            active: false
-        };
+        // Remove from normalized registry
+        window.PlayerUtils.removePlayerFromTeam(window.gameState, team.id, playerId);
 
-        // Clean up undefined values in teams before saving
-        const cleanTeams = JSON.parse(JSON.stringify(window.gameState.teams, (_key, value) => {
-            return value === undefined ? null : value;
-        }));
+        // Also remove from legacy players[] array
+        if (team.players && Array.isArray(team.players)) {
+            team.players = team.players.filter(p => p.id !== playerId);
+        }
 
-        // Update tournament document
-        const tournamentRef = window.firebaseDB.collection('tournaments').doc(window.gameState.gameId);
-        batch.update(tournamentRef, {
-            teams: cleanTeams,
+        // Save tournament data
+        const cleanData = JSON.parse(JSON.stringify({
+            teams: window.gameState.teams,
+            players: window.gameState.players || {},
             lastModified: new Date().toISOString()
-        });
+        }, (_key, value) => value === undefined ? null : value));
 
-        // Update user document - remove assignment (only if player has a UID)
+        const tournamentRef = window.firebaseDB.collection('tournaments').doc(window.gameState.tournamentId);
+        batch.update(tournamentRef, cleanData);
+
+        // Clear user doc assignment if player had a linked uid
         if (player.uid) {
             const userRef = window.firebaseDB.collection('users').doc(player.uid);
             batch.update(userRef, {
-                assignedGameId: null,
+                assignedTournamentId: null,
                 assignedTeamId: null,
                 assignedTeamName: null,
                 unassignedAt: new Date().toISOString(),
-                unassignedBy: 'admin' // TODO: use actual admin UID
+                unassignedBy: firebase.auth().currentUser?.uid || 'admin'
             });
         }
 
-        // Commit changes
         await batch.commit();
 
         if (typeof showStatus === 'function') {
-            showStatus(`${playerName} removed from ${team.name}`, 'success');
-        }
-        if (typeof addLog === 'function') {
-            addLog(`🔄 Unassigned ${playerName} from ${team.name}`, 'info');
+            showStatus(`${player.name} removed from ${team.name}`, 'success');
         }
 
-        // Refresh all displays
+        // Refresh displays
         await loadUnassignedUsers();
         renderTeamAssignmentSlots();
-
-        if (typeof renderTournamentRoster === 'function') {
-            renderTournamentRoster();
-        }
+        renderTournamentRoster();
 
     } catch (error) {
         console.error('[User Appointment] Error unassigning user:', error);
@@ -1096,7 +1089,7 @@ function handleTeamNameKeydown(event, teamId) {
  * @param {number} teamId - Team ID
  */
 async function saveTeamName(teamId) {
-    if (!window.gameState || !window.gameState.gameId) {
+    if (!window.gameState || !window.gameState.tournamentId) {
         if (typeof showStatus === 'function') {
             showStatus('No tournament loaded', 'error');
         }
@@ -1147,7 +1140,7 @@ async function saveTeamName(teamId) {
         team.name = newName;
 
         // Save to Firebase
-        const tournamentRef = window.firebaseDB.collection('tournaments').doc(window.gameState.gameId);
+        const tournamentRef = window.firebaseDB.collection('tournaments').doc(window.gameState.tournamentId);
         await tournamentRef.update({
             teams: window.gameState.teams,
             lastModified: new Date().toISOString()
@@ -1211,6 +1204,11 @@ document.addEventListener('firebase-ready', function() {
 window.loadUsers = loadAllUsers;
 window.loadAllUsers = loadAllUsers;
 window.loadUnassignedUsers = loadUnassignedUsers;
+window.filterUnassignedUsers = filterUnassignedUsers;
+window.selectUserForAssignment = selectUserForAssignment;
+window.assignSelectedUserToTeam = assignSelectedUserToTeam;
+window.replacePlayerWithUser = replacePlayerWithUser;
+window.unassignUserFromTeam = unassignUserFromTeam;
 window.renderTeamAssignmentSlots = renderTeamAssignmentSlots;
 window.renderTournamentRoster = renderTournamentRoster;
 
