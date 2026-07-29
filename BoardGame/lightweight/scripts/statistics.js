@@ -46,7 +46,8 @@ document.addEventListener('firebase-ready', async () => {
     // Tournament context comes from the navbar switcher: URL param first,
     // falling back to the shared storage contract it maintains.
     const urlParams = new URLSearchParams(window.location.search);
-    const tournamentId = urlParams.get('tournamentId') || urlParams.get('tournament') ||
+    const tournamentId = urlParams.get('tournament') || urlParams.get('tournamentId') ||
+        urlParams.get('gameId') || urlParams.get('game') ||
         sessionStorage.getItem('currentTournamentId') ||
         localStorage.getItem('currentTournamentId');
 

@@ -163,32 +163,6 @@ body::before {
     gap: 12px;
 }
 
-.tournament-selector label {
-    font-weight: 600;
-    color: var(--gold);
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.tournament-selector select {
-    min-width: 280px;
-    padding: 10px 14px;
-    background: rgba(5, 7, 16, 0.8);
-    border: 1px solid var(--border-gold);
-    border-radius: var(--radius-md);
-    color: var(--text-bright);
-    font-family: var(--font-secondary);
-    font-size: 0.85rem;
-    transition: all var(--transition-base);
-}
-
-.tournament-selector select:focus {
-    outline: none;
-    border-color: var(--gold);
-    box-shadow: 0 0 0 3px var(--gold-dim);
-}
-
 .tournament-meta {
     display: flex;
     align-items: center;

@@ -216,19 +216,6 @@ h1, h2, h3, h4, h5, h6 {
     flex-shrink: 0;
 }
 
-.tournament-selector label {
-    font-family: 'Quantico', sans-serif;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 2px;
-}
-
-.tournament-selector select {
-    min-width: 220px;
-}
-
 /* Tournament state button */
 .tournament-state-btn {
     text-transform: uppercase;
