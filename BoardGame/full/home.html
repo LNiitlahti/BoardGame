@@ -1353,16 +1353,17 @@
 
         // Find user's team in this tournament
         let userTeamName = null;
+        let userTeamId = null;
         if (tournament.teams && Array.isArray(tournament.teams) && currentUser) {
           const userTeam = tournament.teams.find(team =>
             team.players && team.players.some(player => player.uid === currentUser.uid)
           );
           if (userTeam) {
             userTeamName = userTeam.name;
+            userTeamId = userTeam.id;
           }
         }
 
-        const isActive = currentActiveTournament === tournamentId;
         const escapedName = (tournament.name || tournamentId).replace(/'/g, "\\'");
 
         // Compact info line
@@ -1373,20 +1374,16 @@
         const infoLine = infoParts.length > 0 ? infoParts.join(' · ') : createdDate;
 
         return `
-          <div class="tournament-card fade-in ${isActive ? 'active-tournament' : ''}" id="tcard-${tournamentId}" style="animation-delay: ${index * 0.06}s;">
+          <div class="tournament-card fade-in" id="tcard-${tournamentId}" style="animation-delay: ${index * 0.06}s;">
             <div class="tournament-header">
               <h4>${tournament.name || tournamentId}</h4>
-              <div style="display: flex; gap: 6px; align-items: center;">
-                <span class="active-badge">Active</span>
-                <span class="tournament-status ${status}">${status}</span>
-              </div>
+              <span class="tournament-status ${status}">${status}</span>
             </div>
             <div class="tournament-info">
               <div>${infoLine}</div>
             </div>
             <div class="tournament-actions">
-              <button class="btn-small ${isActive ? 'btn-secondary' : 'btn-enter'}" onclick="enterTournament('${tournamentId}', '${escapedName}')">${isActive ? 'Selected' : 'Select Active'}</button>
-              <button class="btn-small btn-secondary" onclick="viewTournament('${tournamentId}')">View</button>
+              <button class="btn-small btn-enter" onclick="enterTournament('${tournamentId}', '${escapedName}', ${userTeamId !== null ? `'${userTeamId}'` : 'null'})">Enter</button>
             </div>
           </div>
         `;
@@ -1426,10 +1423,6 @@
     }
 
     // Global functions for buttons
-    window.viewTournament = function(tournamentId) {
-      window.location.href = `view.html?tournamentId=${tournamentId}`;
-    };
-
     window.manageTournament = function(tournamentId) {
       window.location.href = `god.html?tournament=${tournamentId}`;
     };
@@ -1443,32 +1436,27 @@
 
     // ── Enter / clear active tournament ──
 
-    window.enterTournament = function(tournamentId, tournamentName) {
-      // Store as active tournament
+    window.enterTournament = function(tournamentId, tournamentName, teamId) {
       currentActiveTournament = tournamentId;
       sessionStorage.setItem('currentTournamentId', tournamentId);
       localStorage.setItem('currentTournamentId', tournamentId);
       sessionStorage.setItem('currentTournamentName', tournamentName);
       localStorage.setItem('currentTournamentName', tournamentName);
 
-      // Update card highlighting
-      document.querySelectorAll('.tournament-card').forEach(card => {
-        card.classList.remove('active-tournament');
-        const btn = card.querySelector('.btn-enter');
-        if (btn) btn.textContent = 'Enter';
-      });
-      const activeCard = document.getElementById('tcard-' + tournamentId);
-      if (activeCard) {
-        activeCard.classList.add('active-tournament');
-        const btn = activeCard.querySelector('.btn-enter');
-        if (btn) btn.textContent = 'Active';
+      if (teamId) {
+        sessionStorage.setItem('currentTeamId', teamId);
+        localStorage.setItem('currentTeamId', teamId);
       }
 
-      // Show banner
-      updateActiveBanner(tournamentName);
-
-      // Re-init navbar so links get updated tournament param
-      if (window.initNavbar) window.initNavbar();
+      if (userRole === 'god') {
+        window.location.href = `god.html?tournament=${tournamentId}`;
+      } else if (userRole === 'admin') {
+        window.location.href = `admin.html?tournamentId=${tournamentId}`;
+      } else if (teamId) {
+        window.location.href = `team.html?tournamentId=${tournamentId}&teamId=${teamId}`;
+      } else {
+        window.location.href = `view.html?tournamentId=${tournamentId}`;
+      }
     };
 
     window.clearActiveTournament = function() {
