@@ -280,7 +280,7 @@
             const status = t.status || 'setup';
             const name = t.name || t.id;
             return `
-                <button type="button" class="navbar-tournament-item" data-tournament-id="${t.id}" data-tournament-name="${escapeHtml(name)}">
+                <button type="button" class="navbar-tournament-item" data-tournament-id="${escapeHtml(t.id)}" data-tournament-name="${escapeHtml(name)}">
                     <span class="navbar-tournament-item-status ${escapeHtml(status)}"></span>
                     <span class="navbar-tournament-item-name">${escapeHtml(name)}</span>
                 </button>
