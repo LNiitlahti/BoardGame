@@ -314,25 +314,6 @@
     }
     .tournament-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
-    /* ── Active tournament card ── */
-    .tournament-card.active-tournament {
-      border-color: rgba(200,179,126,0.5);
-      box-shadow: 0 0 20px rgba(200,179,126,0.15), inset 0 0 30px rgba(200,179,126,0.03);
-    }
-    .tournament-card .active-badge {
-      display: none;
-      padding: 3px 10px;
-      border-radius: 12px;
-      font-size: 0.65rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      font-family: 'Quantico', sans-serif;
-      background: linear-gradient(135deg, #e8d8a8, #c8b37e);
-      color: #050710;
-      letter-spacing: 0.04em;
-    }
-    .tournament-card.active-tournament .active-badge { display: inline-block; }
-
     .btn-enter {
       background: linear-gradient(135deg, #e8d8a8, #c8b37e);
       color: #050710;
@@ -343,12 +324,6 @@
     .btn-enter:hover {
       box-shadow: 0 0 18px rgba(200,179,126,0.4);
     }
-    .tournament-card.active-tournament .btn-enter {
-      background: rgba(200,179,126,0.15);
-      color: #c8b37e;
-      box-shadow: none;
-    }
-
     /* ── Active tournament banner ── */
     .active-tournament-banner {
       background: linear-gradient(180deg, rgba(30,32,42,0.7), rgba(14,16,22,0.85));
@@ -1467,13 +1442,6 @@
       localStorage.removeItem('currentTournamentName');
       sessionStorage.removeItem('currentTeamId');
       localStorage.removeItem('currentTeamId');
-
-      // Remove highlighting
-      document.querySelectorAll('.tournament-card').forEach(card => {
-        card.classList.remove('active-tournament');
-        const btn = card.querySelector('.btn-enter');
-        if (btn) btn.textContent = 'Enter';
-      });
 
       // Hide banner
       updateActiveBanner(null);
