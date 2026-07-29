@@ -100,6 +100,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     line-height: 1.2;
+    text-transform: none;
 }
 
 .navbar-tournament-name.empty {
@@ -372,17 +373,25 @@ body.has-navbar {
     align-items: center;
     gap: 4px;
     padding: 0;
-    font: inherit;
     color: var(--nav-gold);
+    min-width: 0;
 }
 
 .navbar-tournament-name.clickable:hover {
     color: var(--nav-gold-bright);
 }
 
+.navbar-tournament-name-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
 .navbar-tournament-chevron {
     font-size: 0.6rem;
     opacity: 0.7;
+    flex-shrink: 0;
 }
 
 .navbar-tournament-dropdown {
