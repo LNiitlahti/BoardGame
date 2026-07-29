@@ -64,11 +64,7 @@
         <!-- Top Bar -->
         <div class="top-bar">
             <div class="tournament-selector">
-                <label for="tournamentSelect">Tournament:</label>
-                <select id="tournamentSelect" onchange="onTournamentSelect(this.value)">
-                    <option value="">Select a tournament...</option>
-                </select>
-                <button class="btn secondary" id="refreshBtn" onclick="refreshTournaments()">Refresh</button>
+                <button class="btn secondary" id="refreshBtn" onclick="refreshCurrentTournament()">Refresh</button>
             </div>
 
             <div class="tournament-meta" id="tournamentMeta">

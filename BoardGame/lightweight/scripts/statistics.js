@@ -13,7 +13,6 @@
 // =============================================================================
 
 let gameState = null;
-let tournamentsList = [];
 let pointsChart = null;
 let currentFilters = {
     team: '',
@@ -44,14 +43,14 @@ document.addEventListener('firebase-ready', async () => {
     console.log('Firebase ready');
     updateConnectionStatus('connected');
 
-    await loadTournamentsList(true); // bypass cooldown on initial load
-
-    // Check URL for tournament ID
+    // Tournament context comes from the navbar switcher: URL param first,
+    // falling back to the shared storage contract it maintains.
     const urlParams = new URLSearchParams(window.location.search);
-    const tournamentId = urlParams.get('tournamentId') || urlParams.get('tournament');
+    const tournamentId = urlParams.get('tournamentId') || urlParams.get('tournament') ||
+        sessionStorage.getItem('currentTournamentId') ||
+        localStorage.getItem('currentTournamentId');
 
     if (tournamentId) {
-        document.getElementById('tournamentSelect').value = tournamentId;
         await loadTournament(tournamentId);
 
         // Check for player param — auto-select player and switch to Players tab
@@ -70,85 +69,21 @@ document.addEventListener('firebase-ready', async () => {
 // TOURNAMENT LOADING
 // =============================================================================
 
-/**
- * Load list of all tournaments for the selector
- */
-async function loadTournamentsList(bypassCooldown = false) {
+async function refreshCurrentTournament() {
+    const tournamentId = gameState?.tournamentId;
+    if (!tournamentId) {
+        showToast('No tournament selected', 'warning');
+        return;
+    }
     const now = Date.now();
-    if (!bypassCooldown && now - lastListFetchAt < LIST_COOLDOWN_MS) {
+    if (now - lastListFetchAt < LIST_COOLDOWN_MS) {
         const remaining = Math.ceil((LIST_COOLDOWN_MS - (now - lastListFetchAt)) / 1000);
         showToast(`Please wait ${remaining}s before refreshing`, 'warning');
         return;
     }
-
     lastListFetchAt = now;
-
-    try {
-        const db = window.firebaseDB;
-        const snapshot = await db.collection('tournaments')
-            .orderBy('createdAt', 'desc')
-            .get();
-
-        tournamentsList = [];
-        snapshot.forEach(doc => {
-            tournamentsList.push({
-                id: doc.id,
-                ...doc.data()
-            });
-        });
-
-        renderTournamentSelector();
-        startRefreshCooldown();
-    } catch (error) {
-        console.error('Error loading tournaments:', error);
-    }
-}
-
-/**
- * Render tournament dropdown options
- */
-function renderTournamentSelector() {
-    const select = document.getElementById('tournamentSelect');
-    const currentValue = select.value;
-
-    select.innerHTML = '<option value="">Select a tournament...</option>';
-
-    tournamentsList.forEach(tournament => {
-        const option = document.createElement('option');
-        option.value = tournament.id;
-
-        const status = tournament.status || 'unknown';
-        const statusIcon = status === 'finished' ? ' [Finished]' :
-                          status === 'playing' ? ' [Active]' :
-                          status === 'archived' ? ' [Archived]' : '';
-
-        option.textContent = `${tournament.name || tournament.gameId || tournament.id}${statusIcon}`;
-        select.appendChild(option);
-    });
-
-    // Restore selection if any
-    if (currentValue) {
-        select.value = currentValue;
-    }
-}
-
-/**
- * Handle tournament selection change
- */
-async function onTournamentSelect(tournamentId) {
-    if (!tournamentId) {
-        gameState = null;
-        window.gameState = null;
-        clearAllDisplays();
-        return;
-    }
-
     await loadTournament(tournamentId);
-
-    // Update URL without reload
-    const url = new URL(window.location);
-    url.searchParams.set('tournamentId', tournamentId);
-    window.history.pushState({}, '', url);
+    startRefreshCooldown();
 }
 
 /**
@@ -208,13 +143,6 @@ async function loadTournament(tournamentId) {
         console.error('Error loading tournament:', error);
         document.getElementById('loadingOverlay').classList.add('hidden');
     }
-}
-
-/**
- * Refresh tournament list
- */
-async function refreshTournaments() {
-    await loadTournamentsList();
 }
 
 /**

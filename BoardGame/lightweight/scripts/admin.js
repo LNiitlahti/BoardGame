@@ -190,15 +190,14 @@ document.addEventListener('firebase-ready', async function() {
             // Monitor Firebase connection status
             initConnectionMonitor();
 
-            // Load tournaments
-            await loadTournamentsList();
-
-            // Check URL for tournament ID
+            // Tournament context comes from the navbar switcher: URL param first,
+            // falling back to the shared storage contract it maintains.
             const urlParams = new URLSearchParams(window.location.search);
-            const tournamentId = urlParams.get('tournamentId');
+            const tournamentId = urlParams.get('tournamentId') ||
+                sessionStorage.getItem('currentTournamentId') ||
+                localStorage.getItem('currentTournamentId');
 
             if (tournamentId) {
-                document.getElementById('tournamentSelect').value = tournamentId;
                 await loadTournament(tournamentId);
             }
 
@@ -306,43 +305,14 @@ function initEffectsPanel() {
 // TOURNAMENT LOADING
 // =============================================================================
 
-async function loadTournamentsList() {
-    try {
-        const tournamentsRef = window.firebaseDB.collection('tournaments');
-        const snapshot = await tournamentsRef.get();
-
-        const select = document.getElementById('tournamentSelect');
-        select.innerHTML = '<option value="">Select a tournament...</option>';
-
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const option = document.createElement('option');
-            option.value = doc.id;
-            option.textContent = `${data.name || doc.id} (${data.status || 'unknown'})`;
-            select.appendChild(option);
-        });
-
-    } catch (error) {
-        console.error('Error loading tournaments:', error);
-        showStatus('Error loading tournaments list', 'error');
+async function refreshCurrentTournament() {
+    if (!currentTournamentId) {
+        showStatus('No tournament selected', 'error');
+        return;
     }
-}
-
-async function refreshTournaments() {
-    showStatus('Refreshing tournaments...', 'info');
-    await loadTournamentsList();
-    showStatus('Tournaments refreshed', 'success');
-}
-
-function onTournamentSelect(tournamentId) {
-    if (tournamentId) {
-        loadTournament(tournamentId);
-
-        // Update URL
-        const url = new URL(window.location);
-        url.searchParams.set('tournamentId', tournamentId);
-        window.history.pushState({}, '', url);
-    }
+    showStatus('Refreshing tournament...', 'info');
+    await loadTournament(currentTournamentId);
+    showStatus('Tournament refreshed', 'success');
 }
 
 async function loadTournament(tournamentId) {
@@ -511,9 +481,6 @@ async function confirmStateChange(newState) {
     updateTournamentStateButton();
     closeStateChangeModal();
     showStatus(`Tournament state changed to ${newState}`, 'success');
-
-    // Refresh the tournament list to update the status label in dropdown
-    loadTournamentsList();
 }
 
 // =============================================================================

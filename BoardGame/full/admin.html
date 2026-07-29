@@ -119,14 +119,10 @@
     <div class="admin-container">
         <!-- Top Bar -->
         <div class="top-bar">
-            <!-- Left: Tournament selector -->
+            <!-- Left: Tournament state + refresh (switching now happens via the navbar) -->
             <div class="tournament-selector">
-                <label for="tournamentSelect">Tournament</label>
-                <select id="tournamentSelect" onchange="onTournamentSelect(this.value)">
-                    <option value="">Select a tournament...</option>
-                </select>
                 <button class="btn-small tournament-state-btn" id="tournamentStateBtn" onclick="openStateChangeModal()" title="Change tournament state">setup</button>
-                <button class="btn secondary" onclick="refreshTournaments()">Refresh</button>
+                <button class="btn secondary" onclick="refreshCurrentTournament()">Refresh</button>
             </div>
 
             <!-- Center: Gold stat badges -->
