@@ -54,6 +54,14 @@
     }
 
     /**
+     * Escape a string for safe interpolation into innerHTML
+     */
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    /**
      * Check if user has required role level
      */
     function hasRoleLevel(userRole, requiredRole) {
@@ -172,8 +180,8 @@
         const tournamentCtxHTML = canSwitch
             ? `
                 <div class="navbar-tournament-switcher" id="navTournamentSwitcher">
-                    <button type="button" class="navbar-tournament-name clickable ${hasTournament ? '' : 'empty'}" id="navTournamentLabel" title="${labelTitle}">
-                        <span class="navbar-tournament-name-text">${labelText}</span>
+                    <button type="button" class="navbar-tournament-name clickable ${hasTournament ? '' : 'empty'}" id="navTournamentLabel" title="${escapeHtml(labelTitle)}">
+                        <span class="navbar-tournament-name-text">${escapeHtml(labelText)}</span>
                         <span class="navbar-tournament-chevron">&#9662;</span>
                     </button>
                     <div class="navbar-tournament-dropdown" id="navTournamentDropdown" hidden>
@@ -183,7 +191,7 @@
                     </div>
                 </div>
               `
-            : `<span class="navbar-tournament-name ${hasTournament ? '' : 'empty'}" id="navTournamentLabel" title="${labelTitle}">${labelText}</span>`;
+            : `<span class="navbar-tournament-name ${hasTournament ? '' : 'empty'}" id="navTournamentLabel" title="${escapeHtml(labelTitle)}">${escapeHtml(labelText)}</span>`;
 
         return `
             <nav class="unified-navbar" id="unifiedNavbar">
@@ -272,9 +280,9 @@
             const status = t.status || 'setup';
             const name = t.name || t.id;
             return `
-                <button type="button" class="navbar-tournament-item" data-tournament-id="${t.id}" data-tournament-name="${name.replace(/"/g, '&quot;')}">
-                    <span class="navbar-tournament-item-status ${status}"></span>
-                    <span class="navbar-tournament-item-name">${name}</span>
+                <button type="button" class="navbar-tournament-item" data-tournament-id="${t.id}" data-tournament-name="${escapeHtml(name)}">
+                    <span class="navbar-tournament-item-status ${escapeHtml(status)}"></span>
+                    <span class="navbar-tournament-item-name">${escapeHtml(name)}</span>
                 </button>
             `;
         }).join('');
