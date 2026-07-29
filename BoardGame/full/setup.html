@@ -581,11 +581,7 @@
                 <span class="progress-label">Loitsut</span>
             </div>
             <div class="progress-step" data-step="4">
-                <div class="progress-circle" id="circle4">📅</div>
-                <span class="progress-label">Aikataulu</span>
-            </div>
-            <div class="progress-step" data-step="5">
-                <div class="progress-circle" id="circle5">🚀</div>
+                <div class="progress-circle" id="circle4">🚀</div>
                 <span class="progress-label">Käynnistä</span>
             </div>
         </div>
@@ -658,35 +654,8 @@
                 </div>
             </div>
 
-            <!-- Step 4: Match Schedule -->
+            <!-- Step 4: Summary & Upload -->
             <div class="step" id="step4">
-                <h2 class="step-title">
-                    <span>📅</span>
-                    Peli-aikataulu
-                </h2>
-                
-                <div class="form-group" style="max-width: 400px; margin-bottom: 20px;">
-                    <label>Kokonaismäärä Pelejä</label>
-                    <input type="number" id="totalMatches" min="5" max="100" value="15" placeholder="esim. 15">
-                </div>
-
-                <div style="margin-bottom: 20px;">
-                    <button class="btn" onclick="generateMatches()">
-                        Luo Aikataulu
-                    </button>
-                </div>
-
-                <div class="match-list" id="matchList">
-                    <p style="text-align:center;color:rgba(247, 240, 227, 0.6);">Klikkaa "Luo Aikataulu" luodaksesi ottelut</p>
-                </div>
-
-                <div class="error-message" id="error4">
-                    Luo ensin ottelut
-                </div>
-            </div>
-
-            <!-- Step 5: Summary & Upload -->
-            <div class="step" id="step5">
                 <h2 class="step-title">
                     <span>🚀</span>
                     Käynnistä Turnaus
@@ -947,99 +916,10 @@
             `).join('');
         }
 
-        function generateMatches() {
-        if (selectedGames.length === 0) {
-            alert('Valitse vähintään yksi peli');
-            return;
-        }
-
-        if (teams.length < 3) {
-            alert('Tarvitaan vähintään 3 tiimiä');
-            return;
-        }
-
-        const totalMatchesInput = parseInt(document.getElementById('totalMatches').value) || 15;
-        
-        // Prepare games with format info
-        const gamesWithFormat = selectedGames.map(id => {
-            const game = games.find(g => g.id === id);
-            return {
-                name: game.name,
-                format: game.format || '5v5',
-                icon: game.icon
-            };
-        });
-
-        try {
-            const scheduler = new MatchScheduler(teams, gamesWithFormat);
-            matches = scheduler.generateMatchTemplates({
-                totalMatches: totalMatchesInput,
-                maxConsecutiveGames: 3
-            });
-
-            const validation = scheduler.validate();
-            if (!validation.valid) {
-                alert('Aikataulun validointi epäonnistui: ' + validation.errors.join(', '));
-                return;
-            }
-
-            renderMatches();
-            console.log(scheduler.previewSchedule());
-
-        } catch (error) {
-            alert('Virhe otteluiden luomisessa: ' + error.message);
-            console.error(error);
-        }
-    }
-
-        function renderMatches() {
-    const list = document.getElementById('matchList');
-    if (matches.length === 0) {
-        list.innerHTML = '<p style="text-align:center;color:rgba(247, 240, 227, 0.6);">Klikkaa "Luo Aikataulu" luodaksesi ottelut</p>';
-        return;
-    }
-    
-    const firstThreeRounds = [...new Set(matches.map(m => m.round))].slice(0, 3);
-    
-    list.innerHTML = firstThreeRounds.map(round => {
-        const roundMatches = matches.filter(m => m.round === round);
-        return `
-            <div style="margin-bottom: 30px;">
-                <h3 style="color: #2278a3; margin-bottom: 15px;">Kierros ${round}</h3>
-                ${roundMatches.map(match => {
-                    const subMatch = match.subMatch ? ` (${match.subMatch})` : '';
-                    return `
-                        <div class="match-item">
-                            <div class="match-header">
-                                <span class="match-game">${match.gameIcon} ${match.game} (${match.format})${subMatch}</span>
-                                <span class="match-id">Template #${match.id}</span>
-                            </div>
-                            <div style="background: rgba(255, 215, 0, 0.1); padding: 10px; border-radius: 5px; margin-top: 10px;">
-                                <strong>📋 Tämä on pohja</strong><br>
-                                Admin valitsee pelaajat god.html:ssä<br>
-                                ${match.suggestedPlayers?.note ? `💡 ${match.suggestedPlayers.note}` : ''}
-                            </div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        `;
-    }).join('');
-
-    const totalRounds = [...new Set(matches.map(m => m.round))].length;
-    if (totalRounds > 3) {
-        const shownMatches = matches.filter(m => firstThreeRounds.includes(m.round)).length;
-        list.innerHTML += `
-            <p style="text-align: center; color: rgba(247, 240, 227, 0.5); margin-top: 20px;">
-                ... ja ${totalRounds - 3} kierrosta lisää (${matches.length - shownMatches} ottelua)
-            </p>
-        `;
-    }
-}
         function nextStep() {
             if (!validateStep()) return;
-            
-            if (currentStep < 5) {
+
+            if (currentStep < 4) {
                 currentStep++;
                 updateStepDisplay();
                 updateProgress();
@@ -1074,12 +954,6 @@
                 case 3:
                     return true;
                 case 4:
-                    if (matches.length === 0) {
-                        if (errorEl) errorEl.classList.add('show');
-                        return false;
-                    }
-                    break;
-                case 5:
                     return true;
             }
             return true;
@@ -1089,20 +963,20 @@
             document.querySelectorAll('.step').forEach((step, idx) => {
                 step.classList.toggle('active', idx + 1 === currentStep);
             });
-            
+
             document.getElementById('prevBtn').style.display = currentStep === 1 ? 'none' : 'block';
-            document.getElementById('nextBtn').style.display = currentStep === 5 ? 'none' : 'block';
-            
-            if (currentStep === 5) {
+            document.getElementById('nextBtn').style.display = currentStep === 4 ? 'none' : 'block';
+
+            if (currentStep === 4) {
                 updateSummary();
             }
         }
 
         function updateProgress() {
-            const progressWidth = ((currentStep - 1) / 4) * 100;
+            const progressWidth = ((currentStep - 1) / 3) * 100;
             document.getElementById('progressFill').style.width = `calc(${progressWidth}% - 100px)`;
-            
-            for (let i = 1; i <= 5; i++) {
+
+            for (let i = 1; i <= 4; i++) {
                 const circle = document.getElementById(`circle${i}`);
                 circle.classList.toggle('active', i === currentStep);
                 circle.classList.toggle('completed', i < currentStep);
