@@ -165,9 +165,25 @@
         const tournamentName = sessionStorage.getItem('currentTournamentName') || localStorage.getItem('currentTournamentName');
         const tournamentId = sessionStorage.getItem('currentTournamentId') || localStorage.getItem('currentTournamentId');
         const hasTournament = tournamentId && tournamentName;
-        const tournamentCtxHTML = hasTournament
-            ? `<span class="navbar-tournament-name" id="navTournamentLabel" title="${tournamentName}">${tournamentName}</span>`
-            : `<span class="navbar-tournament-name empty" id="navTournamentLabel" title="No tournament selected">No tournament</span>`;
+        const canSwitch = hasRoleLevel(userRole, 'admin');
+        const labelText = hasTournament ? tournamentName : 'No tournament';
+        const labelTitle = hasTournament ? tournamentName : 'No tournament selected';
+
+        const tournamentCtxHTML = canSwitch
+            ? `
+                <div class="navbar-tournament-switcher" id="navTournamentSwitcher">
+                    <button type="button" class="navbar-tournament-name clickable ${hasTournament ? '' : 'empty'}" id="navTournamentLabel" title="${labelTitle}">
+                        <span class="navbar-tournament-name-text">${labelText}</span>
+                        <span class="navbar-tournament-chevron">&#9662;</span>
+                    </button>
+                    <div class="navbar-tournament-dropdown" id="navTournamentDropdown" hidden>
+                        <input type="text" class="navbar-tournament-search" id="navTournamentSearch" placeholder="Search tournaments...">
+                        <div class="navbar-tournament-list" id="navTournamentList"><div class="navbar-tournament-list-empty">Loading...</div></div>
+                        <button type="button" class="navbar-tournament-create" id="navTournamentCreate">+ Create new tournament</button>
+                    </div>
+                </div>
+              `
+            : `<span class="navbar-tournament-name ${hasTournament ? '' : 'empty'}" id="navTournamentLabel" title="${labelTitle}">${labelText}</span>`;
 
         return `
             <nav class="unified-navbar" id="unifiedNavbar">
@@ -212,6 +228,143 @@
     }
 
     /**
+     * Tournament switcher state
+     */
+    let tournamentListCache = null;
+    let tournamentListFetchedAt = 0;
+    const TOURNAMENT_LIST_TTL_MS = 60000;
+    let documentSwitcherListenersAttached = false;
+
+    function getUrlTournamentParamName() {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('tournament')) return 'tournament';
+        if (params.has('gameId')) return 'gameId';
+        if (params.has('game')) return 'game';
+        return 'tournamentId';
+    }
+
+    async function fetchTournamentList(forceRefresh) {
+        const now = Date.now();
+        if (!forceRefresh && tournamentListCache && (now - tournamentListFetchedAt) < TOURNAMENT_LIST_TTL_MS) {
+            return tournamentListCache;
+        }
+        const db = firebase.firestore();
+        const snapshot = await db.collection('tournaments').get();
+        tournamentListCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        tournamentListFetchedAt = now;
+        return tournamentListCache;
+    }
+
+    function renderTournamentDropdownList(tournaments, filterText) {
+        const listEl = document.getElementById('navTournamentList');
+        if (!listEl) return;
+
+        const filtered = filterText
+            ? tournaments.filter(t => (t.name || t.id).toLowerCase().includes(filterText.toLowerCase()))
+            : tournaments;
+
+        if (filtered.length === 0) {
+            listEl.innerHTML = '<div class="navbar-tournament-list-empty">No tournaments found</div>';
+            return;
+        }
+
+        listEl.innerHTML = filtered.map(t => {
+            const status = t.status || 'setup';
+            const name = t.name || t.id;
+            return `
+                <button type="button" class="navbar-tournament-item" data-tournament-id="${t.id}" data-tournament-name="${name.replace(/"/g, '&quot;')}">
+                    <span class="navbar-tournament-item-status ${status}"></span>
+                    <span class="navbar-tournament-item-name">${name}</span>
+                </button>
+            `;
+        }).join('');
+    }
+
+    function closeTournamentDropdown() {
+        const dropdown = document.getElementById('navTournamentDropdown');
+        if (dropdown) dropdown.hidden = true;
+    }
+
+    async function openTournamentDropdown() {
+        const dropdown = document.getElementById('navTournamentDropdown');
+        if (!dropdown) return;
+        dropdown.hidden = false;
+
+        const searchInput = document.getElementById('navTournamentSearch');
+        if (searchInput) {
+            searchInput.value = '';
+            searchInput.focus();
+        }
+
+        try {
+            const tournaments = await fetchTournamentList(false);
+            renderTournamentDropdownList(tournaments, '');
+        } catch (error) {
+            console.error('Error loading tournament list for switcher:', error);
+            const listEl = document.getElementById('navTournamentList');
+            if (listEl) listEl.innerHTML = '<div class="navbar-tournament-list-empty">Error loading tournaments</div>';
+        }
+    }
+
+    function selectTournament(tournamentId, tournamentName) {
+        localStorage.setItem('currentTournamentId', tournamentId);
+        sessionStorage.setItem('currentTournamentId', tournamentId);
+        localStorage.setItem('currentTournamentName', tournamentName);
+        sessionStorage.setItem('currentTournamentName', tournamentName);
+
+        const url = new URL(window.location.href);
+        url.searchParams.set(getUrlTournamentParamName(), tournamentId);
+        window.location.href = url.toString();
+    }
+
+    function wireTournamentSwitcher() {
+        const switcherEl = document.getElementById('navTournamentSwitcher');
+        if (!switcherEl) return;
+
+        const labelBtn = document.getElementById('navTournamentLabel');
+        const searchInput = document.getElementById('navTournamentSearch');
+        const listEl = document.getElementById('navTournamentList');
+        const createBtn = document.getElementById('navTournamentCreate');
+
+        labelBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const dropdown = document.getElementById('navTournamentDropdown');
+            if (dropdown.hidden) {
+                openTournamentDropdown();
+            } else {
+                closeTournamentDropdown();
+            }
+        });
+
+        searchInput.addEventListener('input', () => {
+            if (tournamentListCache) {
+                renderTournamentDropdownList(tournamentListCache, searchInput.value);
+            }
+        });
+
+        listEl.addEventListener('click', (e) => {
+            const item = e.target.closest('.navbar-tournament-item');
+            if (!item) return;
+            selectTournament(item.dataset.tournamentId, item.dataset.tournamentName);
+        });
+
+        createBtn.addEventListener('click', () => {
+            window.location.href = getFullBasePath() + '/setup.html';
+        });
+
+        if (!documentSwitcherListenersAttached) {
+            documentSwitcherListenersAttached = true;
+            document.addEventListener('click', (e) => {
+                const el = document.getElementById('navTournamentSwitcher');
+                if (el && !el.contains(e.target)) closeTournamentDropdown();
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeTournamentDropdown();
+            });
+        }
+    }
+
+    /**
      * Insert navbar HTML into the page
      */
     function insertNavbar(html) {
@@ -223,6 +376,7 @@
         }
         container.innerHTML = html;
         document.body.style.paddingTop = '60px';
+        wireTournamentSwitcher();
     }
 
     /**

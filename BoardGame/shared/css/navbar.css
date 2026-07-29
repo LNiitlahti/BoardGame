@@ -358,3 +358,120 @@
 body.has-navbar {
     padding-top: 60px;
 }
+
+/* ==================== TOURNAMENT SWITCHER ==================== */
+.navbar-tournament-switcher {
+    position: relative;
+}
+
+.navbar-tournament-name.clickable {
+    cursor: pointer;
+    background: none;
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    font: inherit;
+    color: var(--nav-gold);
+}
+
+.navbar-tournament-name.clickable:hover {
+    color: var(--nav-gold-bright);
+}
+
+.navbar-tournament-chevron {
+    font-size: 0.6rem;
+    opacity: 0.7;
+}
+
+.navbar-tournament-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: 260px;
+    background: var(--nav-bg-active);
+    border: 1px solid var(--nav-border);
+    border-radius: 8px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+    padding: 10px;
+    z-index: 1100;
+}
+
+.navbar-tournament-search {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 10px;
+    margin-bottom: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--nav-border);
+    border-radius: 6px;
+    color: var(--nav-text);
+    font-family: 'Quantico', sans-serif;
+    font-size: 0.85rem;
+}
+
+.navbar-tournament-list {
+    max-height: 240px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.navbar-tournament-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+    padding: 7px 8px;
+    background: none;
+    border: none;
+    border-radius: 5px;
+    color: var(--nav-text);
+    font-family: 'Quantico', sans-serif;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.navbar-tournament-item:hover {
+    background: var(--nav-gold-dim);
+}
+
+.navbar-tournament-item-status {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--nav-text-muted);
+    flex-shrink: 0;
+}
+
+.navbar-tournament-item-status.playing { background: var(--nav-live); }
+.navbar-tournament-item-status.finished { background: #5898cc; }
+.navbar-tournament-item-status.archived { background: var(--nav-text-muted); }
+
+.navbar-tournament-list-empty {
+    padding: 10px 8px;
+    color: var(--nav-text-muted);
+    font-size: 0.8rem;
+    text-align: center;
+}
+
+.navbar-tournament-create {
+    width: 100%;
+    margin-top: 8px;
+    padding: 7px 8px;
+    background: var(--nav-gold-dim);
+    border: 1px solid var(--nav-border);
+    border-radius: 6px;
+    color: var(--nav-gold);
+    font-family: 'Quantico', sans-serif;
+    font-weight: 600;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.navbar-tournament-create:hover {
+    background: var(--nav-gold-glow);
+}
