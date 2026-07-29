@@ -48,6 +48,18 @@
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 1px var(--nav-gold-dim);
 }
 
+/*
+ * This file is meant to be self-contained (see file header), but some pages
+ * also load theme stylesheets with generic `button {}` resets (e.g.
+ * fantasy-mountain-theme.css sets text-transform: uppercase on every
+ * button). Reset that here so every button inside the navbar — including
+ * ones added later — renders consistently regardless of what else the
+ * hosting page loads.
+ */
+.unified-navbar button {
+    text-transform: none;
+}
+
 .navbar-container {
     max-width: 1600px;
     margin: 0 auto;
