@@ -79,9 +79,9 @@
     --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
     --shadow-lg: 0 10px 30px rgba(0,0,0,0.6);
 
-    /* Fonts */
-    --font-primary: 'Orbitron', 'Russo One', sans-serif;
-    --font-secondary: 'Inter', 'Quantico', sans-serif;
+    /* Fonts (match admin.html) */
+    --font-primary: 'Russo One', sans-serif;
+    --font-secondary: 'Quantico', sans-serif;
 }
 
 /* ============================================================

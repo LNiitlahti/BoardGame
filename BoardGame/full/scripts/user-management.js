@@ -668,6 +668,7 @@ async function replacePlayerWithUser(teamId, playerId) {
             assignedTournamentId: window.gameState.tournamentId,
             assignedTeamId: team.id,
             assignedTeamName: team.name,
+            assignedPlayerId: playerId,
             isPlayer: true,
             appointedAt: new Date().toISOString(),
             appointedBy: firebase.auth().currentUser?.uid || 'admin'

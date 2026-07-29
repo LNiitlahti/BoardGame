@@ -1,0 +1,70 @@
+/**
+ * ============================================================================
+ * VOID / GOLD THEME — variable overrides
+ * ============================================================================
+ * Matches lightweight/css/admin.css's "Dark Void / Gold Accent" palette.
+ * Load AFTER brand-theme.css (and fantasy-mountain-theme.css) so these
+ * values win the cascade for the legacy brand-theme variable names.
+ * Variables-only — no selectors/components, so it can't collide with
+ * page-specific CSS.
+ * ============================================================================
+ */
+:root {
+    /* brand-theme.css compatibility overrides */
+    --bg-primary:   #050710;
+    --bg-secondary: rgba(10, 13, 22, 0.94);
+    --bg-tertiary:  rgba(16, 20, 32, 0.8);
+    --bg-elevated:  rgba(24, 28, 44, 0.9);
+
+    --text-primary: #c8ccd6;
+    --text-secondary: #8a8fa0;
+    --text-tertiary: #6a7088;
+    --text-disabled: #2a2f42;
+    --text-bright:  #f2f4f7;
+    --text-muted:   #6a7088;
+
+    --accent-primary: #c8b37e;
+    --accent-success: #00e080;
+    --accent-warning: #f7ba32;
+    --accent-danger:  #d84040;
+
+    --success: #00e080;
+    --warning: #f7ba32;
+    --error:   #d84040;
+    --info:    #5898cc;
+
+    --border-color: rgba(200,179,126,0.12);
+    --border-color-hover: rgba(200,179,126,0.3);
+    --divider-color: rgba(255,255,255,0.05);
+
+    --team-1-color: #de392c;
+    --team-2-color: #2278a3;
+    --team-3-color: #2e9158;
+    --team-4-color: #f7ba32;
+    --team-5-color: #7a4fbf;
+    --team-1-alpha: rgba(222,57,44,0.5);
+    --team-2-alpha: rgba(34,120,163,0.5);
+    --team-3-alpha: rgba(46,145,88,0.5);
+    --team-4-alpha: rgba(247,186,50,0.5);
+    --team-5-alpha: rgba(122,79,191,0.5);
+
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 10px;
+    --radius-xl: 16px;
+
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
+    --shadow-lg: 0 10px 30px rgba(0,0,0,0.6);
+    --shadow-xl: 0 10px 30px rgba(0,0,0,0.6);
+
+    /* Fonts (match admin.html) */
+    --font-primary: 'Russo One', sans-serif;
+    --font-secondary: 'Quantico', sans-serif;
+
+    /* Gold accent aliases (match admin.css naming) */
+    --gold:         #c8b37e;
+    --gold-bright:  #e8d8a8;
+    --gold-glow:    rgba(200,179,126,0.3);
+    --gold-dim:     rgba(200,179,126,0.1);
+}

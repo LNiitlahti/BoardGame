@@ -139,14 +139,12 @@ For detailed instructions, see the [Setup Guide](BoardGame/docs/guides/SETUP_GUI
 
 ## Project Status
 
-This project is in **active development** and is being deployed at its first live LAN event in February 2026.
-
-The current focus is the **lightweight version** — a streamlined interface optimized for running tournaments from a single admin screen with a separate TV display for spectators. A full-featured version with richer UI, animations, and mobile support is planned as the next phase.
+This project is in **active development**. The lightweight version ran its first live LAN event successfully in February 2026. A full-featured version with the OOP module stack (phases, spells, undo/backup, replay, ceremony, and player-facing pages) has since been built and is undergoing verification ahead of convergence into a single admin surface.
 
 | Version | Status |
 |---------|--------|
-| Lightweight | In development — core features working, first live event deployment |
-| Full | Planned |
+| Lightweight | Battle-tested — proven at the Feb 2026 event; currently the version used to run live events |
+| Full | Built, undergoing end-to-end verification before replacing Lightweight |
 
 ## License
 
@@ -159,7 +157,7 @@ Free to use for non-profit purposes. For commercial use, contact the maintainer.
 
 ```
 BoardGame/
-├── lightweight/           # Current focus
+├── lightweight/           # v1 — battle-tested, used to run live events
 │   ├── admin.html         # Tournament admin dashboard
 │   ├── setup.html         # Tournament creation wizard
 │   ├── view.html          # Spectator display (1920×1080)
@@ -169,11 +167,12 @@ BoardGame/
 │   ├── css/               # Lightweight-specific styles
 │   └── scripts/           # Lightweight-specific logic
 │
-├── full/                  # Planned full version
-│   ├── app.html           # SPA router
-│   ├── modules/           # Feature modules (undo/redo, spells, etc.)
+├── full/                  # v2 — OOP module stack, in verification
+│   ├── god.html            # Superadmin dashboard
+│   ├── admin.html           # Admin dashboard (built on lightweight/admin.js core)
+│   ├── team.html / view.html / home.html / profile.html / setup.html / replay.html
 │   ├── css/
-│   └── scripts/
+│   └── scripts/            # OOP managers (phase, board, spell, undo, backup, etc.)
 │
 ├── shared/                # Shared across both versions
 │   ├── scripts/           # Firebase, board engine, match scheduling, utilities

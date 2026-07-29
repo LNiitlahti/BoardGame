@@ -138,6 +138,7 @@ function renderTournamentSelector() {
 async function onTournamentSelect(tournamentId) {
     if (!tournamentId) {
         gameState = null;
+        window.gameState = null;
         clearAllDisplays();
         return;
     }
@@ -184,9 +185,14 @@ async function loadTournament(tournamentId) {
             };
         }
 
-        // Update navbar
-        document.getElementById('navTournamentName').textContent =
-            gameState.name || gameState.tournamentId || 'Tournament';
+        // Expose gameState globally for pdf-generator.js and other shared scripts
+        window.gameState = gameState;
+
+        // Update navbar (element may not exist if navbar.js hasn't rendered yet)
+        const navTournamentName = document.getElementById('navTournamentName');
+        if (navTournamentName) {
+            navTournamentName.textContent = gameState.name || gameState.tournamentId || 'Tournament';
+        }
 
         // Update meta info
         updateMetaInfo();
@@ -260,7 +266,8 @@ function updateConnectionStatus(status) {
 }
 
 function clearAllDisplays() {
-    document.getElementById('navTournamentName').textContent = 'No Tournament';
+    const navTournamentName = document.getElementById('navTournamentName');
+    if (navTournamentName) navTournamentName.textContent = 'No Tournament';
     document.getElementById('metaStatus').textContent = '--';
     document.getElementById('metaRounds').textContent = '--';
     document.getElementById('metaGames').textContent = '--';

@@ -741,6 +741,15 @@
       function dismissNotice() { document.getElementById('homeNotice').style.display = 'none'; }
     </script>
 
+    <!-- New team-assignment banner (checked against Firestore on load) -->
+    <div id="newAssignmentBanner" class="home-notice" style="display: none; background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.35); color: #5dd39e;">
+      <span id="newAssignmentText"></span>
+      <div style="display: flex; gap: 10px; align-items: center; flex-shrink: 0;">
+        <button class="btn-small btn-primary" id="newAssignmentBtn">Start Onboarding &rarr;</button>
+        <button class="home-notice-close" onclick="dismissNewAssignmentBanner()">&times;</button>
+      </div>
+    </div>
+
     <!-- Active tournament banner -->
     <div id="activeTournamentBanner" class="active-tournament-banner">
       <span class="banner-icon">🏆</span>
@@ -832,6 +841,14 @@
           <div class="action-buttons">
             <button class="btn-small btn-primary" onclick="generateReferralCode()">Generate Code</button>
             <button class="btn-small btn-secondary" onclick="viewReferralCodes()">View All</button>
+          </div>
+        </div>
+
+        <div class="dashboard-card">
+          <h3><span class="card-icon">🗺️</span> Dev Tools & Sitemap</h3>
+          <div class="stat-label">Every page, incl. dev-only tools (spell generator, board test, match scheduler)</div>
+          <div class="action-buttons">
+            <button class="btn-small btn-secondary" onclick="goToPage('../development-landing-page.html')">Open Sitemap</button>
           </div>
         </div>
       </div>
@@ -927,6 +944,16 @@
       </div>
     </div>
 
+    <!-- Resources (shown for all roles) -->
+    <div class="board-preview" style="margin-top: 30px;">
+      <h3>Resources</h3>
+      <div class="action-buttons" style="flex-wrap: wrap; margin-top: 12px;">
+        <button class="btn-small btn-secondary" onclick="goToPage('../rulebook.html')">📖 Rulebook</button>
+        <button class="btn-small btn-secondary" onclick="goToPage('../lightweight/statistics.html')">📊 Statistics</button>
+        <button class="btn-small btn-secondary" onclick="goToPage('../lightweight/onboarding.html')">🧭 Player Onboarding</button>
+      </div>
+    </div>
+
   </div>
 
   <script type="module">
@@ -1012,12 +1039,56 @@
             showRoleSection(firestoreRole);
             loadRoleData(firestoreRole);
           }
+
+          checkNewAssignment(userData);
         }
       } catch (error) {
         console.error('[Home] Error loading profile:', error);
         errorHandler.handleFirebaseError(error, 'loadUserProfile');
       }
     }
+
+    // Show a "you've been added to a team" banner once per new appointment.
+    // appointedAt is stamped every time a god links/assigns this account to a
+    // team (see full/scripts/user-management.js); onboardingPromptSeenAt
+    // tracks whether the player has already been shown the banner for that
+    // specific appointment.
+    function checkNewAssignment(userData) {
+      if (!userData.assignedTeamId || !userData.assignedTournamentId || !userData.assignedPlayerId || !userData.appointedAt) {
+        return;
+      }
+      const seenAt = userData.onboardingPromptSeenAt;
+      const isNew = !seenAt || new Date(seenAt) < new Date(userData.appointedAt);
+      if (!isNew) return;
+
+      const banner = document.getElementById('newAssignmentBanner');
+      const text = document.getElementById('newAssignmentText');
+      const btn = document.getElementById('newAssignmentBtn');
+      text.textContent = `You've been added to ${userData.assignedTeamName}! Start onboarding to get set up.`;
+
+      const onboardUrl = `../lightweight/onboarding.html?tournamentId=${encodeURIComponent(userData.assignedTournamentId)}&player=${encodeURIComponent(userData.assignedPlayerId)}`;
+      btn.onclick = async () => {
+        await markAssignmentSeen();
+        window.location.href = onboardUrl;
+      };
+
+      banner.style.display = 'flex';
+    }
+
+    async function markAssignmentSeen() {
+      if (!currentUser) return;
+      try {
+        await db.collection('users').doc(currentUser.uid).update({ onboardingPromptSeenAt: new Date().toISOString() });
+      } catch (e) {
+        console.warn('[Home] Could not mark assignment banner as seen:', e);
+      }
+    }
+
+    function dismissNewAssignmentBanner() {
+      document.getElementById('newAssignmentBanner').style.display = 'none';
+      markAssignmentSeen();
+    }
+    window.dismissNewAssignmentBanner = dismissNewAssignmentBanner;
 
     function showRoleSection(role) {
       // Hide all sections
@@ -1100,18 +1171,27 @@
     }
 
     async function loadPlayerData() {
-      const userProfile = appState.get('userProfile');
-      if (userProfile && userProfile.teamId) {
-        // Load team data
-        const teamDoc = await db.collection('teams').doc(userProfile.teamId).get();
-        if (teamDoc.exists) {
-          const teamData = teamDoc.data();
-          document.getElementById('playerTeamName').textContent = teamData.name || 'Unknown';
-          document.getElementById('playerTeamPoints').textContent = `${teamData.points || 0} points`;
-          document.getElementById('playerSpellCards').textContent = teamData.spellCards?.length || 0;
-          document.getElementById('playerWins').textContent = teamData.gamesWon || 0;
+      // Fetch independently rather than reading appState — this runs in
+      // parallel with loadUserProfile() via Promise.all, so appState may
+      // not be populated yet when this executes.
+      const userDoc = await db.collection('users').doc(currentUser.uid).get();
+      const userProfile = userDoc.exists ? userDoc.data() : null;
+      if (userProfile && userProfile.assignedTournamentId && userProfile.assignedTeamId) {
+        // Teams live embedded in the tournament doc, not a top-level 'teams' collection
+        const tournamentDoc = await db.collection('tournaments').doc(userProfile.assignedTournamentId).get();
+        if (tournamentDoc.exists) {
+          const tournamentData = tournamentDoc.data();
+          const teamData = tournamentData.teams?.find(t => String(t.id) === String(userProfile.assignedTeamId));
+          if (teamData) {
+            document.getElementById('playerTeamName').textContent = teamData.name || 'Unknown';
+            document.getElementById('playerTeamPoints').textContent = `${teamData.points || 0} points`;
+            document.getElementById('playerSpellCards').textContent = tournamentData.spellPiles?.[teamData.id]?.hand?.length || 0;
+            document.getElementById('playerWins').textContent = teamData.gamesWon || 0;
+            return;
+          }
         }
       }
+      document.getElementById('playerTeamName').textContent = 'No team assigned';
     }
 
     async function loadSeasonStats() {

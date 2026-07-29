@@ -28,6 +28,7 @@ let onboardingUnsubscribe = null;
 let urlSecret = null;
 let secretValidated = false;
 let onboardingReady = false;
+let profilePlatformIds = null; // cross-tournament platformIds from users/{uid}, when known
 
 // =============================================================================
 // INITIALIZATION
@@ -148,6 +149,11 @@ async function renderCurrentView() {
         return; // validateSecretAccess calls renderCurrentView again on success
     }
 
+    // Load cross-tournament platform IDs once we know who the player really is
+    if (!isAdminView && profilePlatformIds === null) {
+        await loadProfilePlatformIds();
+    }
+
     // Show appropriate view
     hideLoading();
     if (isAdminView) {
@@ -159,12 +165,103 @@ async function renderCurrentView() {
     }
 }
 
+function getPlayerUid(playerId) {
+    const teams = gameState?.teams || [];
+    for (const team of teams) {
+        const player = (team.players || []).find(p => p.id === playerId);
+        if (player) return player.uid || null;
+    }
+    return null;
+}
+
+// True when the browser is authenticated (non-anonymously) as the real
+// account linked to this player record — i.e. we can safely read/write
+// their cross-tournament user profile.
+function isAuthedOwner(playerId) {
+    const currentUser = firebase.auth().currentUser;
+    if (!currentUser || currentUser.isAnonymous) return false;
+    const playerUid = getPlayerUid(playerId);
+    return !!playerUid && playerUid === currentUser.uid;
+}
+
+// Platform IDs (Steam/BattleTag/Xbox/Discord) rarely change, so — only when
+// we know who the player really is — we mirror them onto users/{uid} and
+// pre-fill from there for a returning player in a later tournament. Friend
+// and game-test checklists deliberately stay per-tournament.
+async function loadProfilePlatformIds() {
+    if (!isAuthedOwner(currentPlayerId)) {
+        profilePlatformIds = null;
+        return;
+    }
+    try {
+        const uid = firebase.auth().currentUser.uid;
+        const userDoc = await window.firebaseDB.collection('users').doc(uid).get();
+        profilePlatformIds = userDoc.exists ? (userDoc.data().platformIds || {}) : {};
+        await carryForwardProfilePlatformIds();
+    } catch (error) {
+        console.error('Failed to load profile platform IDs:', error);
+        profilePlatformIds = null;
+    }
+}
+
+// Copy any profile-level platform IDs the player hasn't already set for THIS
+// tournament into the tournament's onboarding record, so returning players
+// show up to teammates immediately without re-typing anything.
+async function carryForwardProfilePlatformIds() {
+    if (!profilePlatformIds || Object.keys(profilePlatformIds).length === 0) return;
+    const playerData = onboardingState?.players?.[currentPlayerId];
+    if (!playerData) return;
+    const existing = playerData.platformIds || {};
+
+    const updates = {};
+    for (const [key, value] of Object.entries(profilePlatformIds)) {
+        if (value && !existing[key]) {
+            updates[`players.${currentPlayerId}.platformIds.${key}`] = value;
+            existing[key] = value;
+        }
+    }
+    if (Object.keys(updates).length === 0) return;
+
+    playerData.platformIds = existing;
+    updates[`players.${currentPlayerId}.lastUpdated`] = new Date().toISOString();
+    try {
+        await getOnboardingRef().update(updates);
+    } catch (error) {
+        console.error('Failed to carry forward platform IDs:', error);
+    }
+}
+
+async function saveProfilePlatformId(platformKey, value) {
+    if (!isAuthedOwner(currentPlayerId)) return;
+    try {
+        const uid = firebase.auth().currentUser.uid;
+        await window.firebaseDB.collection('users').doc(uid).update({
+            [`platformIds.${platformKey}`]: value
+        });
+    } catch (error) {
+        console.error('Failed to save profile platform ID:', error);
+    }
+}
+
 async function validateSecretAccess() {
     const storedHash = onboardingState?.secretHash || '';
     const legacySecret = onboardingState?.secret || '';
 
     // Admin view doesn't need secret validation
     if (!isAdminView && (storedHash || legacySecret)) {
+        // Authenticated-owner bypass: a logged-in (non-anonymous) user whose uid
+        // matches this player's linked account can reach their own onboarding
+        // page without the shared secret.
+        const currentUser = firebase.auth().currentUser;
+        if (currentUser && !currentUser.isAnonymous) {
+            const playerUid = getPlayerUid(currentPlayerId);
+            if (playerUid && playerUid === currentUser.uid) {
+                secretValidated = true;
+                renderCurrentView();
+                return;
+            }
+        }
+
         const urlSecretHash = await hashSecret(urlSecret);
         const validHash = storedHash && urlSecretHash === storedHash;
         const validLegacy = legacySecret && urlSecret === legacySecret;
@@ -1091,6 +1188,8 @@ async function savePlatformId(platformKey, value) {
         if (row) {
             row.classList.toggle('has-value', trimmedValue.length > 0);
         }
+
+        await saveProfilePlatformId(platformKey, trimmedValue);
     } catch (error) {
         console.error('Failed to save platform ID:', error);
         showToast('Failed to save. Please try again.', 'error');
@@ -1121,6 +1220,11 @@ async function saveAllPlatformIds() {
             const row = document.getElementById(`platform-${platform.id}`)?.closest('.platform-id-row');
             if (row) row.classList.toggle('has-value', !!playerData.platformIds[platform.id]);
         }
+
+        if (isAuthedOwner(currentPlayerId)) {
+            await Promise.all(activePlatforms.map(p => saveProfilePlatformId(p.id, playerData.platformIds[p.id])));
+        }
+
         showToast('All platform IDs saved!', 'success');
     } catch (error) {
         console.error('Failed to save platform IDs:', error);

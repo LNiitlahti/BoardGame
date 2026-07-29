@@ -107,9 +107,9 @@
           console.error('[Router] Error loading profile:', error);
           updateStatus('Error loading profile...');
 
-          // On error, default to app page (it will handle the error)
+          // On error, default to landing page (it will handle the error)
           setTimeout(() => {
-            window.location.href = 'full/app.html';
+            window.location.href = 'development-landing-page.html';
           }, 1000);
         }
       });
@@ -150,9 +150,11 @@
     function routeUser(role, userData) {
       updateStatus(`Welcome, ${userData.displayName || 'User'}!`);
 
-      // All users go to development landing page first (software under development)
+      // Route everyone to the real hub (role-gated sections inside).
+      // The old dev sitemap (development-landing-page.html) is still reachable
+      // from the God section of home.html, but is no longer the forced landing page.
       updateStatus('Loading...');
-      setTimeout(() => window.location.href = 'development-landing-page.html', 500);
+      setTimeout(() => window.location.href = 'full/home.html', 500);
     }
 
     /**

@@ -60,6 +60,38 @@
   box-shadow: 0 0 12px rgba(200, 179, 126, 0.2);
 }
 
+/* Deprioritized tabs (Teams / Stats / Activity Log) — not actively
+   maintained in god.html; hazard-striped to signal "may be removed". */
+.god-nav-tab-deprioritized {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(247, 186, 50, 0.1),
+    rgba(247, 186, 50, 0.1) 8px,
+    rgba(247, 186, 50, 0.22) 8px,
+    rgba(247, 186, 50, 0.22) 16px
+  );
+  border-color: rgba(247, 186, 50, 0.25);
+  opacity: 0.75;
+}
+
+.god-nav-tab-deprioritized:hover {
+  opacity: 1;
+  border-color: rgba(247, 186, 50, 0.5);
+}
+
+.god-nav-tab-deprioritized.active {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(247, 186, 50, 0.16),
+    rgba(247, 186, 50, 0.16) 8px,
+    rgba(247, 186, 50, 0.3) 8px,
+    rgba(247, 186, 50, 0.3) 16px
+  );
+  color: #f7ba32;
+  border-color: rgba(247, 186, 50, 0.5);
+  box-shadow: 0 0 12px rgba(247, 186, 50, 0.2);
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }

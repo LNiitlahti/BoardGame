@@ -15,14 +15,14 @@
     <!-- Fonts (same as admin.html, view.html, etc.) -->
     <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
 
-    <!-- Unified Theme System -->
+    <!-- Unified Theme System (Dark Void / Gold Accent — matches admin.html) -->
     <link rel="stylesheet" href="../shared/css/brand-theme.css">
     <link rel="stylesheet" href="../shared/css/fantasy-mountain-theme.css">
+    <link rel="stylesheet" href="../shared/css/void-gold-theme.css">
     <link rel="stylesheet" href="../shared/css/navbar.css">
     <link rel="stylesheet" href="css/god-modern.css">
     <link rel="stylesheet" href="css/ceremony.css">
     <link rel="stylesheet" href="../shared/css/toast.css">
-    <link rel="stylesheet" href="../shared/css/theme-toggle-button.css">
 </head>
 <body>
     <!-- Navbar container - populated by navbar.js (includes connection status) -->
@@ -37,7 +37,7 @@
             <button class="god-nav-tab active" data-tab="tournaments" onclick="switchGodTab('tournaments')">
                 🏆 Tournaments
             </button>
-            <button class="god-nav-tab" data-tab="matches" onclick="switchGodTab('matches')">
+            <button class="god-nav-tab god-nav-tab-deprioritized" data-tab="matches" onclick="switchGodTab('matches')" title="Match management is done in Lightweight admin — not actively maintained here">
                 🎮 Matches
             </button>
             <button class="god-nav-tab" data-tab="board" data-role="god" onclick="switchGodTab('board')">
@@ -52,10 +52,10 @@
             <button class="god-nav-tab" data-tab="spells" data-role="god" onclick="switchGodTab('spells')">
                 🔮 Spells
             </button>
-            <button class="god-nav-tab" data-tab="stats" onclick="switchGodTab('stats')">
+            <button class="god-nav-tab god-nav-tab-deprioritized" data-tab="stats" onclick="switchGodTab('stats')" title="Not actively maintained — may be removed">
                 📊 Stats
             </button>
-            <button class="god-nav-tab" data-tab="activityLog" data-role="god" onclick="switchGodTab('activityLog')">
+            <button class="god-nav-tab god-nav-tab-deprioritized" data-tab="activityLog" data-role="god" onclick="switchGodTab('activityLog')" title="Not actively maintained — may be removed">
                 📋 Activity Log
             </button>
             <button class="god-nav-tab" data-tab="seasons" data-role="god" onclick="switchGodTab('seasons')">
@@ -1136,9 +1136,7 @@
         </div>
     </div>
 
-    <!-- Theme toggle -->
     <script>window.BOARDGAME_BASE = '..';</script>
-    <script src="../shared/scripts/theme-toggle.js"></script>
 
     <!-- Shared dependencies -->
     <script src="../shared/scripts/firebase-loader.js"></script>
@@ -1155,8 +1153,8 @@
     <script src="../shared/scripts/pdf-generator.js"></script>
 
     <!-- Full-version shared deps -->
-    <script src="scripts/balance-optimizer.js"></script>
-    <script src="scripts/smart-match-generator.js"></script>
+    <script src="../shared/scripts/balance-optimizer.js"></script>
+    <script src="../shared/scripts/smart-match-generator.js"></script>
     <script src="../shared/scripts/navbar.js"></script>
 
     <!-- OOP modules (leaf → complex → orchestrator) -->

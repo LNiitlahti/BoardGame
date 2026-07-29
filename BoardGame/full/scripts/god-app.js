@@ -19,6 +19,7 @@ class GodApp {
         this._boardModule = null;
         this._boardRenderer = null;
         this._suppressLoadToast = false;
+        this._allTournaments = [];
 
         // Action logger (created in init)
         this.actionLogger = null;
@@ -321,21 +322,52 @@ class GodApp {
 
     filterTournaments() {
         const searchInput = document.getElementById('tournamentSearch');
-        const statusFilter = document.getElementById('tournamentStatusFilter');
-        const searchTerm = (searchInput?.value || '').toLowerCase();
+        const statusFilter = document.getElementById('statusFilter');
+        const searchTerm = (searchInput?.value || '').toLowerCase().trim();
         const statusValue = statusFilter?.value || 'all';
 
-        const select = document.getElementById('tournamentSelect');
-        if (!select) return;
-
-        const options = select.querySelectorAll('option');
-        options.forEach(opt => {
-            if (!opt.value) return; // Skip placeholder
-            const text = opt.textContent.toLowerCase();
-            const matchesSearch = !searchTerm || text.includes(searchTerm);
-            const matchesStatus = statusValue === 'all' || text.includes(`(${statusValue})`);
-            opt.style.display = (matchesSearch && matchesStatus) ? '' : 'none';
+        const filtered = this._allTournaments.filter(t => {
+            const matchesSearch = !searchTerm
+                || t.id?.toLowerCase().includes(searchTerm)
+                || t.name?.toLowerCase().includes(searchTerm);
+            const status = t.status || 'setup';
+            const matchesStatus = statusValue === 'all' || status === statusValue;
+            return matchesSearch && matchesStatus;
         });
+
+        this.renderTournamentList(filtered);
+    }
+
+    renderTournamentList(tournaments) {
+        const container = document.getElementById('tournamentList');
+        if (!container) return;
+
+        if (tournaments.length === 0) {
+            container.innerHTML = '<p style="text-align: center; opacity: 0.7; padding: 40px 20px;">No tournaments found</p>';
+            return;
+        }
+
+        const statusEmoji = { setup: '⚙️', playing: '🎮', finished: '🏆', archived: '📦' };
+
+        container.innerHTML = tournaments.map(t => {
+            const status = t.status || 'setup';
+            const emoji = statusEmoji[status] || '📋';
+            const teamCount = t.teams?.length || 0;
+            const matchCount = t.gameHistory?.length || 0;
+            return `
+                <div class="tournament-card ${status}">
+                    <div class="tournament-title">${emoji} ${escapeHtml(t.name || t.id)}</div>
+                    <div class="tournament-meta">
+                        Status: ${escapeHtml(status)} | Teams: ${teamCount} |
+                        Round: ${t.currentRound || 0} | Matches played: ${matchCount}
+                    </div>
+                    <div class="tournament-actions">
+                        <button class="btn-load" onclick="loadTournamentFromList('${t.id}')">📂 Load</button>
+                        <button class="btn-view" onclick="window.open('view.html?tournamentId=${encodeURIComponent(t.id)}', '_blank')">👁️ View</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
     async createNewTournament() {
@@ -375,11 +407,7 @@ class GodApp {
             await this.loadTournamentsList();
 
             // Auto-select the new tournament
-            const select = document.getElementById('tournamentSelect');
-            if (select) {
-                select.value = tournamentRef.id;
-                this.onTournamentSelect(tournamentRef.id);
-            }
+            this.onTournamentSelect(tournamentRef.id);
         } catch (error) {
             console.error('Error creating tournament:', error);
             this.ui.showStatus('Error creating tournament', 'error');
@@ -395,17 +423,23 @@ class GodApp {
             const tournamentsRef = window.firebaseDB.collection('tournaments');
             const snapshot = await tournamentsRef.get();
 
-            const select = document.getElementById('tournamentSelect');
-            if (!select) return;
-            select.innerHTML = '<option value="">Select a tournament...</option>';
-
+            this._allTournaments = [];
             snapshot.forEach(doc => {
-                const data = doc.data();
-                const option = document.createElement('option');
-                option.value = doc.id;
-                option.textContent = `${data.name || doc.id} (${data.status || 'unknown'})`;
-                select.appendChild(option);
+                this._allTournaments.push({ id: doc.id, ...doc.data() });
             });
+            this._allTournaments.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+            const total = this._allTournaments.length;
+            const active = this._allTournaments.filter(t => t.status === 'playing').length;
+            const finished = this._allTournaments.filter(t => t.status === 'finished').length;
+            const totalEl = document.getElementById('totalTournaments');
+            const activeEl = document.getElementById('activeTournaments');
+            const finishedEl = document.getElementById('finishedTournaments');
+            if (totalEl) totalEl.textContent = total;
+            if (activeEl) activeEl.textContent = active;
+            if (finishedEl) finishedEl.textContent = finished;
+
+            this.filterTournaments();
         } catch (error) {
             console.error('Error loading tournaments:', error);
             this.ui.showStatus('Error loading tournaments list', 'error');
@@ -422,6 +456,7 @@ class GodApp {
         if (tournamentId) {
             this.loadTournament(tournamentId);
             const url = new URL(window.location);
+            url.searchParams.delete('tournament'); // legacy alias (see init())
             url.searchParams.set('tournamentId', tournamentId);
             window.history.pushState({}, '', url);
         }
@@ -448,6 +483,13 @@ class GodApp {
             this._activeListener = window.firebaseOnSnapshot(tournamentRef, async (docSnapshot) => {
                 if (docSnapshot.exists) {
                     this._onFirebaseSnapshot(docSnapshot, tournamentId);
+
+                    // Persist for navbar tournament-name display (matches admin.js convention)
+                    const tName = this.gameState.name || tournamentId;
+                    sessionStorage.setItem('currentTournamentId', tournamentId);
+                    sessionStorage.setItem('currentTournamentName', tName);
+                    localStorage.setItem('currentTournamentId', tournamentId);
+                    localStorage.setItem('currentTournamentName', tName);
 
                     // Check if migration needed
                     if (window.PlayerUtils && window.PlayerUtils.needsPlayerMigration(this.gameState)) {
@@ -605,8 +647,12 @@ class GodApp {
             this._boardModule.setRoomHexes(this.gameState.rooms);
         }
 
-        const navName = document.getElementById('navTournamentName');
-        if (navName) navName.textContent = this.gameState.name || 'Tournament';
+        const navName = document.getElementById('navTournamentLabel');
+        if (navName) {
+            navName.textContent = this.gameState.name || 'Tournament';
+            navName.classList.remove('empty');
+            navName.title = this.gameState.name || 'Tournament';
+        }
 
         this.updateTournamentStateButton();
 
@@ -1112,11 +1158,14 @@ class GodApp {
 
         // Tournament management (old god-scripts.js names)
         window.loadGame = () => {
-            const select = document.getElementById('tournamentSelect');
-            if (select?.value) app.onTournamentSelect(select.value);
+            const input = document.getElementById('tournamentIdInput');
+            const tournamentId = input?.value?.trim();
+            if (tournamentId) app.onTournamentSelect(tournamentId);
+            else app.ui.showStatus('Enter a tournament ID first', 'warning');
         };
         window.filterTournaments = () => app.filterTournaments();
         window.createNewTournament = () => app.createNewTournament();
+        window.loadTournamentFromList = (tournamentId) => app.onTournamentSelect(tournamentId);
         window.closeEditModal = () => {
             document.getElementById('editTournamentModal')?.classList.remove('active');
         };
@@ -1296,8 +1345,6 @@ document.addEventListener('firebase-ready', async function () {
             const urlParams = new URLSearchParams(window.location.search);
             const tournamentId = urlParams.get('tournament') || urlParams.get('tournamentId');
             if (tournamentId) {
-                const select = document.getElementById('tournamentSelect');
-                if (select) select.value = tournamentId;
                 await godApp.loadTournament(tournamentId);
             }
 
