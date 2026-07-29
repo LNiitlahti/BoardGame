@@ -649,7 +649,8 @@ class GodApp {
 
         const navName = document.getElementById('navTournamentLabel');
         if (navName) {
-            navName.textContent = this.gameState.name || 'Tournament';
+            const navNameText = navName.querySelector('.navbar-tournament-name-text') || navName;
+            navNameText.textContent = this.gameState.name || 'Tournament';
             navName.classList.remove('empty');
             navName.title = this.gameState.name || 'Tournament';
         }

@@ -362,7 +362,8 @@ async function loadTournament(tournamentId) {
                 localStorage.setItem('currentTournamentName', tName);
                 const navLabel = document.getElementById('navTournamentLabel');
                 if (navLabel) {
-                    navLabel.textContent = tName;
+                    const navLabelText = navLabel.querySelector('.navbar-tournament-name-text') || navLabel;
+                    navLabelText.textContent = tName;
                     navLabel.title = tName;
                     navLabel.classList.remove('empty');
                 }
@@ -2831,7 +2832,7 @@ function openMatchQueuePage() {
         showStatus('No tournament selected', 'warning');
         return;
     }
-    const url = `match-queue.html?tournamentId=${encodeURIComponent(currentTournamentId)}`;
+    const url = `${getLightweightBase()}/match-queue.html?tournamentId=${encodeURIComponent(currentTournamentId)}`;
     window.open(url, '_blank');
 }
 
@@ -5125,6 +5126,20 @@ function logout() {
 // =============================================================================
 
 /**
+ * Base path to lightweight/ from the current page — this script is shared by
+ * both full/admin.html and lightweight/admin.html, but statistics.html,
+ * match-queue.html, onboarding.html, and view-onboarding-layout.html only
+ * exist under lightweight/, so relative URLs to them need this prefix when
+ * loaded from full/admin.html.
+ */
+function getLightweightBase() {
+    const path = window.location.pathname.replace(/\\/g, '/');
+    if (path.includes('/lightweight/')) return '.';
+    if (path.includes('/full/')) return '../lightweight';
+    return 'lightweight';
+}
+
+/**
  * Open view.html in a new window with the current tournament
  */
 function openViewWindow() {
@@ -5146,7 +5161,7 @@ function openStatsWindow() {
         return;
     }
 
-    const statsUrl = `statistics.html?tournamentId=${encodeURIComponent(currentTournamentId)}`;
+    const statsUrl = `${getLightweightBase()}/statistics.html?tournamentId=${encodeURIComponent(currentTournamentId)}`;
     window.open(statsUrl, '_blank');
 }
 
@@ -5159,7 +5174,7 @@ function openOnboardingWindow() {
         return;
     }
 
-    const onboardingUrl = `onboarding.html?tournamentId=${encodeURIComponent(currentTournamentId)}&view=true`;
+    const onboardingUrl = `${getLightweightBase()}/onboarding.html?tournamentId=${encodeURIComponent(currentTournamentId)}&view=true`;
     window.open(onboardingUrl, '_blank');
 }
 
@@ -5172,7 +5187,7 @@ function openOnboardingViewWindow() {
         return;
     }
 
-    const url = `view-onboarding-layout.html?tournamentId=${encodeURIComponent(currentTournamentId)}`;
+    const url = `${getLightweightBase()}/view-onboarding-layout.html?tournamentId=${encodeURIComponent(currentTournamentId)}`;
     window.open(url, '_blank');
 }
 
