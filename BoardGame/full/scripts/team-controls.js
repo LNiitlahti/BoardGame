@@ -124,7 +124,7 @@ async function loadTournamentData() {
 
             // Tournament + team chat — mount once; later snapshots just update gameData
             if (window.ChatModule && !window._chatModule) {
-                window._chatModule = new ChatModule({ tournamentId: currentTournamentId, teamId: currentTeamId });
+                window._chatModule = new ChatModule({ tournamentId: currentTournamentId, teamId: String(currentTeamId) });
                 window._chatModule.mount();
             }
 
