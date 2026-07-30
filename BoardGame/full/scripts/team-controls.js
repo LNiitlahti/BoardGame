@@ -345,9 +345,16 @@ function _getTeamMatchInfo() {
  * Render spell cards sidebar (uses new spellPiles data model)
  */
 function renderSpellCards() {
+    const section = document.getElementById('spellCardsSection');
     const container = document.getElementById('spellCardsList');
     const countDisplay = document.getElementById('spellCardsCount');
     if (!container || !countDisplay) return;
+
+    if (!gameData?.spellsActive) {
+        if (section) section.style.display = 'none';
+        return;
+    }
+    if (section) section.style.display = '';
 
     // New data model: spellPiles per team
     const pile = gameData?.spellPiles?.[String(currentTeamId)];
