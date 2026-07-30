@@ -952,10 +952,7 @@
             canvas.width = canvasSize;
             canvas.height = canvasSize;
             const ctx = canvas.getContext('2d');
-
-            // White background
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvasSize, canvasSize);
+            // Transparent background (canvas is transparent by default — nothing to fill)
 
             ctx.fillStyle = '#999999';
             ctx.font = '10px sans-serif';
@@ -964,14 +961,9 @@
 
             const hexBoxes = computeHexBoxes(canvasSize, canvasSize);
             hexBoxes.forEach(box => {
-                // Thin rectangle: the actual crop boundary (includes corners that get clipped)
-                ctx.strokeStyle = '#cccccc';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(box.x, box.y, box.w, box.h);
-
-                // Bold hexagon: the true visible shape in-game — draw your art to fill this
+                // Thin hexagon: the true visible shape in-game — draw your art to fill this
                 ctx.strokeStyle = '#000000';
-                ctx.lineWidth = 2;
+                ctx.lineWidth = 1;
                 traceHexPath(ctx, box.x, box.y, box.w, box.h);
                 ctx.stroke();
 
