@@ -94,6 +94,18 @@ flowchart TD
         end
     end
 
+    subgraph "chatTournament/{messageId}"
+        CT_R["read: isAuthenticated"]
+        CT_C["create: isAuthenticated, !isAnonymous, senderId==self"]
+        CT_UD["update/delete: never — immutable log"]
+    end
+
+    subgraph "chatTeams/{teamId}/messages/{messageId}"
+        CTeam_R["read: isAdmin OR own assignedTeamId"]
+        CTeam_C["create: isAdmin OR own assignedTeamId, !isAnonymous, senderId==self"]
+        CTeam_UD["update/delete: never — immutable log"]
+    end
+
     style O_NOTE fill:#ffffcc
 ```
 
@@ -148,6 +160,8 @@ tournaments             |   -    |    R      |    R         | CRU   | CRUD
   onboarding            |   -    |   CRU     |   CRU        | CRUD  | CRUD
   matches               |   -    |     -     |    -         | CRUD  | CRUD
     actions             |   -    |     -     |    -         | CRUD  | CRUD
+  chatTournament          |   -    |    R      |    R         | CR    | CR
+  chatTeams (own team)    |   -    |     -     |    R C       | R C†  | CRUD
 referralCodes (get)     |  R**   |    R      |    R         | R     | CRUD
 referralCodes (list)    |   -    |     -     |    -         |  -    | R
 referralCodes (update)  |   -    |   U***    |   U***       | -     | CRUD
@@ -156,6 +170,7 @@ actionLog               |   -    |     -     |    -         | CRU   | CRUD
 *   Admin blocked from: isGod, isAdmin, isSuperAdmin, email, uid, createdAt, referralCode
 **  Get only (single doc by ID) — list denied
 *** Registration update only: used false→true, assignedTo==self, no extra fields
+†   Admin/God bypass the assignedTeamId check and can read/post in any team's chat.
 ```
 
 ## 7. Known Trade-offs
