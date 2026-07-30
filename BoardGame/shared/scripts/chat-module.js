@@ -12,7 +12,7 @@
  *   <script>
  *     document.addEventListener('firebase-ready', () => {
  *       const chat = new ChatModule({
- *         gameId: new URLSearchParams(location.search).get('gameId'),
+ *         tournamentId: new URLSearchParams(location.search).get('tournamentId'),
  *         teamId: new URLSearchParams(location.search).get('teamId') // null on admin/god pages is fine
  *       });
  *       chat.mount();
@@ -23,12 +23,12 @@
 class ChatModule {
     /**
      * @param {Object} opts
-     * @param {string} opts.gameId - required, id of the tournament/game document
+     * @param {string} opts.tournamentId - required, id of the tournament document
      * @param {string|null} opts.teamId - optional, if present a "Team chat" tab is shown
      * @param {number} opts.messageLimit - how many recent messages to load (default 100)
      */
     constructor(opts = {}) {
-        this.gameId = opts.gameId;
+        this.tournamentId = opts.tournamentId;
         this.teamId = opts.teamId || null;
         this.messageLimit = opts.messageLimit || 100;
 
@@ -46,8 +46,8 @@ class ChatModule {
     /** Call this once Firebase is ready. Builds the DOM and starts listening. */
     mount() {
         if (this._mounted) return;
-        if (!this.gameId) {
-            console.error('ChatModule: gameId is required, chat will not be shown.');
+        if (!this.tournamentId) {
+            console.error('ChatModule: tournamentId is required, chat will not be shown.');
             return;
         }
         if (!window.firebaseDB) {
@@ -62,15 +62,31 @@ class ChatModule {
         // Keep currentUser fresh (in case chat mounts before auth resolves)
         this.auth.onAuthStateChanged(user => {
             this.currentUser = user;
+            this._updateInputState();
         });
 
         this._injectStyles();
         this._buildDom();
         this._attachEvents();
+        this._updateInputState();
         this._listenToRoom('tournament');
         if (this.teamId) this._listenToRoom('team');
 
         this._mounted = true;
+    }
+
+    /**
+     * Anonymous sessions (spectator/onboarding pages) can read chat but not
+     * post — enforced server-side by the Firestore rules; this just keeps
+     * the UI from offering a send button that will always fail.
+     */
+    _updateInputState() {
+        if (!this.input) return;
+        const isAnon = this.currentUser?.isAnonymous === true;
+        this.input.disabled = isAnon;
+        this.input.placeholder = isAnon ? 'Sign in to chat' : 'Type a message…';
+        const sendBtn = this.form?.querySelector('.chat-send');
+        if (sendBtn) sendBtn.disabled = isAnon;
     }
 
     /** Stop all Firestore listeners (call on page unload if you want to be tidy). */
@@ -84,21 +100,21 @@ class ChatModule {
     /**
      * Call this whenever the nav dropdown switches the active tournament
      * WITHOUT a page reload. Tears down old listeners and re-subscribes
-     * to the new gameId/teamId. Safe to call even if chat panel is open.
+     * to the new tournamentId/teamId. Safe to call even if chat panel is open.
      *
-     * @param {string} newGameId
+     * @param {string} newTournamentId
      * @param {string|null} newTeamId
      */
-    switchGame(newGameId, newTeamId = null) {
-        if (!newGameId) {
-            console.error('ChatModule.switchGame: newGameId is required');
+    switchTournament(newTournamentId, newTeamId = null) {
+        if (!newTournamentId) {
+            console.error('ChatModule.switchTournament: newTournamentId is required');
             return;
         }
 
         Object.values(this.unsubscribers).forEach(unsub => unsub && unsub());
         this.unsubscribers = {};
 
-        this.gameId = newGameId;
+        this.tournamentId = newTournamentId;
         this.teamId = newTeamId;
         this.messagesByRoom = { tournament: [], team: [] };
         this.activeRoom = 'tournament';
@@ -128,12 +144,12 @@ class ChatModule {
     // ---------- Firestore paths ----------
 
     _tournamentRoomRef() {
-        return this.db.collection('games').doc(this.gameId)
+        return this.db.collection('tournaments').doc(this.tournamentId)
             .collection('chatTournament');
     }
 
     _teamRoomRef() {
-        return this.db.collection('games').doc(this.gameId)
+        return this.db.collection('tournaments').doc(this.tournamentId)
             .collection('chatTeams').doc(String(this.teamId))
             .collection('messages');
     }
@@ -164,7 +180,7 @@ class ChatModule {
     async _sendMessage(text) {
         text = text.trim();
         if (!text) return;
-        if (!this.currentUser) {
+        if (!this.currentUser || this.currentUser.isAnonymous) {
             alert('You need to be signed in to chat.');
             return;
         }
