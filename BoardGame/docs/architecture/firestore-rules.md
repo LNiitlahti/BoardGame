@@ -96,13 +96,13 @@ flowchart TD
 
     subgraph "chatTournament/{messageId}"
         CT_R["read: isAuthenticated"]
-        CT_C["create: isAuthenticated, !isAnonymous, senderId==self"]
+        CT_C["create: isAuthenticated, !isAnonymous, senderId==self, senderName==auth token"]
         CT_UD["update/delete: never — immutable log"]
     end
 
     subgraph "chatTeams/{teamId}/messages/{messageId}"
         CTeam_R["read: isAdmin OR own assignedTeamId"]
-        CTeam_C["create: isAdmin OR own assignedTeamId, !isAnonymous, senderId==self"]
+        CTeam_C["create: isAdmin OR own assignedTeamId, !isAnonymous, senderId==self, senderName==auth token"]
         CTeam_UD["update/delete: never — immutable log"]
     end
 
@@ -161,7 +161,7 @@ tournaments             |   -    |    R      |    R         | CRU   | CRUD
   matches               |   -    |     -     |    -         | CRUD  | CRUD
     actions             |   -    |     -     |    -         | CRUD  | CRUD
   chatTournament          |   -    |    R      |    R         | CR    | CR
-  chatTeams (own team)    |   -    |     -     |    R C       | R C†  | CRUD
+  chatTeams (own team)    |   -    |     -     |    R C       | R C†  | R C
 referralCodes (get)     |  R**   |    R      |    R         | R     | CRUD
 referralCodes (list)    |   -    |     -     |    -         |  -    | R
 referralCodes (update)  |   -    |   U***    |   U***       | -     | CRUD

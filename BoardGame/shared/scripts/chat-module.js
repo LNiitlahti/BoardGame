@@ -29,7 +29,7 @@ class ChatModule {
      */
     constructor(opts = {}) {
         this.tournamentId = opts.tournamentId;
-        this.teamId = opts.teamId || null;
+        this.teamId = opts.teamId != null ? String(opts.teamId) : null;
         this.messageLimit = opts.messageLimit || 100;
 
         this.db = null;
@@ -115,7 +115,7 @@ class ChatModule {
         this.unsubscribers = {};
 
         this.tournamentId = newTournamentId;
-        this.teamId = newTeamId;
+        this.teamId = newTeamId != null ? String(newTeamId) : null;
         this.messagesByRoom = { tournament: [], team: [] };
         this.activeRoom = 'tournament';
 
