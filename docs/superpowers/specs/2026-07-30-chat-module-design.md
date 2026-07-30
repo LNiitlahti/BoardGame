@@ -13,6 +13,17 @@ not match the app's actual schema (`tournaments/{tournamentId}/...`, per
 This spec fixes the schema mismatch, adds the missing security rules, and
 wires the module into four pages so it's actually usable.
 
+**Note on `gameId` terminology:** the codebase has two unrelated existing uses
+of "gameId" — (1) a legacy URL-param alias for a tournament id, still honored
+as a fallback (e.g. `team-controls.js`: `urlParams.get('tournamentId') ||
+urlParams.get('gameId')`), never primary; and (2) the board-game-catalog id
+(`cs2`, `cod`, etc. — which game a match is playing), a fully separate and
+still-active concept via `GAMES_CONFIG`. `chat-module.js`'s `gameId` field
+was neither — it was the module author using the name by loose analogy while
+pointing at a Firestore collection (`games`) that doesn't exist. The rename to
+`tournamentId` below fixes that mistake; it does not touch either of the two
+existing `gameId` usages elsewhere in the app.
+
 ## Data model
 
 Two new subcollections under the existing `tournaments/{tournamentId}` document:
