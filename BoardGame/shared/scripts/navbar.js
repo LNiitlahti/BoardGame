@@ -167,6 +167,7 @@
 
         const base = window.BOARDGAME_BASE || '.';
         const logoPath = base + '/shared/images/favicon/android-chrome-192x192.png';
+        const defaultAvatarPath = base + '/shared/images/default_avatar.png';
         const brandName = window.NAVBAR_BRAND_NAME || 'Board Game';
 
         // Active tournament context
@@ -213,10 +214,7 @@
                     <!-- User Section -->
                     <div class="navbar-user">
                         <div class="navbar-connection-status" id="connectionStatus" title="Firebase: Connecting..."></div>
-                        ${avatarUrl
-                            ? `<img class="navbar-avatar" id="navbarAvatar" src="${avatarUrl}" alt="Avatar" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'navbar-avatar-placeholder',id:'navbarAvatar',textContent:'${(userName || 'U').charAt(0).toUpperCase()}'}))">`
-                            : `<span class="navbar-avatar-placeholder" id="navbarAvatar">${(userName || 'U').charAt(0).toUpperCase()}</span>`
-                        }
+                        <img class="navbar-avatar" id="navbarAvatar" src="${avatarUrl || defaultAvatarPath}" alt="Avatar" onerror="this.onerror=null;this.src='${defaultAvatarPath}';">
                         <span class="navbar-role-badge ${roleClass}" id="roleBadge">${roleBadge}</span>
                         <div class="navbar-user-info">
                             <span class="navbar-user-name" id="userName">${userName || 'User'}</span>

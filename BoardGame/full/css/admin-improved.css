@@ -1,0 +1,418 @@
+/**
+ * Admin Improved — experimental overrides
+ *
+ * Loaded LAST on full/admin_improved.html only.
+ * Fixes the viewport overflow (flow panel + admin container now share
+ * the viewport via flexbox instead of overflowing it), compacts the
+ * flow panel, and styles the guided NEXT STEP prompt.
+ */
+
+/* ==================== LAYOUT SHELL ====================
+   Old bug: .admin-container was hard-sized to calc(100vh - 60px) while
+   #flowPanel sat above it as a sibling, pushing the page ~190px past the
+   viewport with body overflow hidden — the bottom of every column was
+   clipped. Fix: body becomes a flex column; the flow panel is a natural-
+   height row and the container flexes into whatever height remains. */
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+.flow-panel {
+    flex-shrink: 0;
+    margin: 8px 12px 0;
+}
+
+.admin-container {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+    width: 100%;
+}
+
+/* ==================== COMPACT FLOW PANEL ==================== */
+
+.flow-timeline {
+    padding: 5px 14px;
+}
+
+.flow-body {
+    padding: 10px 16px;
+    gap: 18px;
+    align-items: center;
+}
+
+.flow-current {
+    min-width: 170px;
+    max-width: 230px;
+}
+
+.flow-phase-name {
+    font-size: 0.9rem;
+}
+
+/* ==================== NEXT STEP PROMPT ==================== */
+
+.flow-next-step {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.next-step-label {
+    font-size: 0.55rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--accent-steel, #8f98a6);
+    font-family: 'Quantico', var(--font-secondary, sans-serif);
+}
+
+.next-step-text {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.35;
+    color: var(--text-primary, #e8e2d5);
+    font-family: 'Quantico', var(--font-secondary, sans-serif);
+}
+
+.next-step-text strong {
+    color: var(--accent-gold, #c8b37e);
+}
+
+.flow-next-step .flow-actions {
+    margin-top: 2px;
+}
+
+/* ==================== CONTROLS ==================== */
+
+.flow-primary-btn {
+    min-width: 210px;
+    padding: 10px 18px;
+    font-size: 0.95rem;
+    white-space: nowrap;
+}
+
+.flow-primary-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.flow-controls {
+    max-width: 340px;
+}
+
+.flow-controls-secondary {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 4px;
+}
+
+/* Broadcast toggle lights up while a broadcast message is live */
+#broadcastToggleBtn.active {
+    color: #58c4f0;
+    border-color: rgba(0, 168, 232, 0.5);
+    background: rgba(0, 168, 232, 0.08);
+}
+
+/* ==================== NEXT-UP QUEUE HIGHLIGHT ==================== */
+
+#matchQueue .queue-item.next-up {
+    border-color: var(--gold, #c8b37e);
+    background: rgba(200, 179, 126, 0.06);
+    position: relative;
+    overflow: visible;
+}
+
+#matchQueue .queue-item.next-up::before {
+    content: 'NEXT';
+    position: absolute;
+    top: -7px;
+    right: 10px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: var(--bg-void, #05070f);
+    background: var(--gold, #c8b37e);
+    padding: 1px 7px;
+    border-radius: 8px;
+    z-index: 3;
+    font-family: 'Quantico', var(--font-secondary, sans-serif);
+    pointer-events: none;
+}
+
+/* ==================== WIN CONDITION BADGE ==================== */
+
+.stat-badge-editable {
+    cursor: pointer;
+    position: relative;
+    transition: background 0.15s ease;
+}
+
+.stat-badge-editable:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 6px;
+}
+
+.stat-edit-icon {
+    font-size: 0.65rem;
+    opacity: 0.4;
+    margin-left: 2px;
+}
+
+.stat-badge-editable:hover .stat-edit-icon {
+    opacity: 0.8;
+}
+
+.stat-badge-editable.win-reached .stat-value {
+    color: #5dd39e;
+}
+
+.stat-badge-editable.win-reached {
+    animation: winPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes winPulse {
+    0%, 100% { box-shadow: 0 0 0 rgba(93, 211, 158, 0); }
+    50% { box-shadow: 0 0 10px rgba(93, 211, 158, 0.5); }
+}
+
+/* ==================== PLAYER VOTES (Result Confirm popup) ==================== */
+
+.confirm-votes-block {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.confirm-votes-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent-steel, #8f98a6);
+    font-family: 'Quantico', var(--font-secondary, sans-serif);
+    margin-bottom: 8px;
+}
+
+.vote-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    text-transform: uppercase;
+}
+
+.vote-badge.consensus {
+    background: rgba(46, 145, 88, 0.18);
+    color: #5dd39e;
+}
+
+.vote-badge.leading {
+    background: rgba(247, 186, 50, 0.15);
+    color: var(--accent-warning, #f7ba32);
+}
+
+.vote-badge.disputed {
+    background: rgba(222, 57, 44, 0.15);
+    color: #ff6b5e;
+}
+
+.vote-row {
+    display: grid;
+    grid-template-columns: 110px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 0.8rem;
+    font-family: 'Quantico', var(--font-secondary, sans-serif);
+    color: var(--text-secondary, #9aa1ad);
+}
+
+.vote-row.favored {
+    color: var(--accent-gold, #c8b37e);
+    font-weight: 700;
+}
+
+.vote-row-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vote-row-bar {
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+    display: block;
+}
+
+.vote-row-bar > span {
+    display: block;
+    height: 100%;
+    background: var(--accent-gold, #c8b37e);
+    border-radius: 3px;
+}
+
+.vote-row.favored .vote-row-bar > span {
+    background: #5dd39e;
+}
+
+.vote-row-count {
+    white-space: nowrap;
+    font-size: 0.75rem;
+    color: var(--text-tertiary, #6f7684);
+}
+
+.vote-row-names {
+    grid-column: 1 / -1;
+    font-size: 0.68rem;
+    color: var(--text-tertiary, #6f7684);
+    margin-top: -2px;
+    margin-bottom: 2px;
+}
+
+/* Highlight on the team card the players picked as likely winner */
+.confirm-team.vote-favored {
+    box-shadow: 0 0 0 2px rgba(93, 211, 158, 0.4);
+    position: relative;
+}
+
+.vote-favored-badge {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #5dd39e;
+    background: rgba(93, 211, 158, 0.12);
+    border-radius: 6px;
+    padding: 2px 6px;
+    margin-bottom: 6px;
+    display: inline-block;
+}
+
+/* ==================== HEX PLACEMENT POPUP ==================== */
+
+.hex-pending-info {
+    background: rgba(247, 186, 50, 0.08);
+    border: 1px solid rgba(247, 186, 50, 0.25);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    font-size: 0.8rem;
+    font-family: 'Quantico', var(--font-secondary, sans-serif);
+    color: var(--text-secondary, #9aa1ad);
+}
+
+.hex-pending-row + .hex-pending-row {
+    margin-top: 4px;
+}
+
+.hex-pending-row strong {
+    color: var(--accent-gold, #c8b37e);
+}
+
+.team-picker-btn.team-picker-pending {
+    box-shadow: 0 0 0 2px rgba(93, 211, 158, 0.4);
+    position: relative;
+}
+
+.pending-badge {
+    display: inline-block;
+    margin-left: 8px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #5dd39e;
+    background: rgba(93, 211, 158, 0.12);
+    border-radius: 6px;
+    padding: 1px 6px;
+}
+
+/* ==================== LIVE MATCH CONTROLS ==================== */
+
+/* ⚙ edit + ⏪ revert injected onto ongoing matches by the adapter */
+#matchQueue .queue-item.ongoing .live-edit-btn,
+#matchQueue .queue-item.ongoing .live-revert-btn {
+    opacity: 0.85;
+}
+
+#ongoingMatchesList .live-edit-btn {
+    margin-left: 6px;
+    padding: 2px 8px;
+    flex-shrink: 0;
+}
+
+/* ==================== FLOW CONFIRM MODAL ==================== */
+
+.flow-confirm-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+
+#flowConfirmBody p {
+    color: var(--text-secondary, #9aa1ad);
+    font-size: 0.9rem;
+    line-height: 1.45;
+    margin: 0 0 10px;
+}
+
+#flowConfirmBody strong {
+    color: var(--accent-gold, #c8b37e);
+}
+
+#flowConfirmBody .modal-warning-line {
+    color: var(--accent-warning, #f7ba32);
+    font-size: 0.85rem;
+}
+
+/* Points preview rows (scoring_hex confirmation) */
+.points-preview-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    font-size: 0.9rem;
+    font-family: 'Quantico', var(--font-secondary, sans-serif);
+    color: var(--text-primary, #e8e2d5);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.points-preview-row:last-child {
+    border-bottom: none;
+}
+
+.points-preview-row .team-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.points-preview-row .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.points-preview-row .pts {
+    color: var(--accent-gold, #c8b37e);
+    font-weight: 700;
+}
+
+.points-preview-row .pts.zero {
+    color: var(--text-dim, #666);
+    font-weight: 400;
+}

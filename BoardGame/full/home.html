@@ -70,20 +70,6 @@
       border: 2px solid rgba(200,179,126,0.3);
       flex-shrink: 0;
     }
-    .home-avatar-placeholder {
-      width: 52px; height: 52px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(135deg, rgba(30,32,42,0.9), rgba(14,16,22,0.95));
-      color: #c8b37e;
-      font-family: 'Russo One', sans-serif;
-      font-size: 1.4rem;
-      border: 2px solid rgba(200,179,126,0.3);
-      flex-shrink: 0;
-    }
-
     .header-left h1 {
       font-family: 'Russo One', sans-serif;
       font-size: 1.5rem;
@@ -738,7 +724,7 @@
     <!-- Header -->
     <div class="header">
       <div class="header-left" style="display: flex; align-items: center; gap: 16px;">
-        <span class="home-avatar-placeholder" id="homeAvatar">?</span>
+        <img class="home-avatar" id="homeAvatar" src="../shared/images/default_avatar.png" alt="Avatar" onerror="this.onerror=null;this.src='../shared/images/default_avatar.png';">
         <div>
           <h1 style="margin: 0;">Welcome Back, <span id="homeUserName">...</span></h1>
           <p id="roleDescription" style="margin: 5px 0 0 0;">Connecting...</p>
@@ -925,8 +911,8 @@
       <h3>Resources</h3>
       <div class="action-buttons" style="flex-wrap: wrap; margin-top: 12px;">
         <button class="btn-small btn-secondary" onclick="goToPage('../rulebook.html')">📖 Rulebook</button>
-        <button class="btn-small btn-secondary" onclick="goToPage('../lightweight/statistics.html')">📊 Statistics</button>
-        <button class="btn-small btn-secondary" onclick="goToPage('../lightweight/onboarding.html')">🧭 Player Onboarding</button>
+        <button class="btn-small btn-secondary" onclick="goToPage('statistics.html')">📊 Statistics</button>
+        <button class="btn-small btn-secondary" onclick="goToPage('onboarding.html')">🧭 Player Onboarding</button>
       </div>
     </div>
 
@@ -991,16 +977,7 @@
           nameEl.classList.add('fade-in');
 
           // Avatar
-          const avatarEl = document.getElementById('homeAvatar');
-          if (userData.avatarUrl) {
-            const img = document.createElement('img');
-            img.src = userData.avatarUrl;
-            img.alt = 'Avatar';
-            img.className = 'home-avatar';
-            avatarEl.replaceWith(img);
-          } else {
-            avatarEl.textContent = displayName.charAt(0).toUpperCase();
-          }
+          document.getElementById('homeAvatar').src = userData.avatarUrl || '../shared/images/default_avatar.png';
 
           // Store in app state
           appState.set('currentUser', currentUser);
@@ -1042,7 +1019,7 @@
       const btn = document.getElementById('newAssignmentBtn');
       text.textContent = `You've been added to ${userData.assignedTeamName}! Start onboarding to get set up.`;
 
-      const onboardUrl = `../lightweight/onboarding.html?tournamentId=${encodeURIComponent(userData.assignedTournamentId)}&player=${encodeURIComponent(userData.assignedPlayerId)}`;
+      const onboardUrl = `onboarding.html?tournamentId=${encodeURIComponent(userData.assignedTournamentId)}&player=${encodeURIComponent(userData.assignedPlayerId)}`;
       btn.onclick = async () => {
         await markAssignmentSeen();
         window.location.href = onboardUrl;
@@ -1262,12 +1239,12 @@
     }
 
     window.goToSeasonStats = function() {
-      // Navigate to statistics page (lightweight version has full stats)
+      // Navigate to statistics page
       const tid = currentActiveTournament;
       if (tid) {
-        window.location.href = `../lightweight/statistics.html?tournamentId=${tid}`;
+        window.location.href = `statistics.html?tournamentId=${tid}`;
       } else {
-        window.location.href = '../lightweight/statistics.html';
+        window.location.href = 'statistics.html';
       }
     };
 
@@ -1580,7 +1557,7 @@
 
     window.viewSchedule = function() {
       if (currentActiveTournament) {
-        window.open('../lightweight/match-queue.html?tournamentId=' + encodeURIComponent(currentActiveTournament), '_blank');
+        window.open('match-queue.html?tournamentId=' + encodeURIComponent(currentActiveTournament), '_blank');
       } else {
         errorHandler.showInfo('No active tournament selected');
       }

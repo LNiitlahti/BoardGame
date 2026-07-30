@@ -1,0 +1,2027 @@
+/**
+ * admin-improved-adapter.js  (EXPERIMENTAL)
+ *
+ * Fork of admin-phase-adapter.js for full/admin_improved.html.
+ * The original adapter and admin.html stay untouched.
+ *
+ * Bridges lightweight admin.js with OOP PhaseManager + ActionLogger,
+ * and renders a GUIDED Flow Panel:
+ *
+ *   - "NEXT STEP" prompt with ONE contextual primary action per phase
+ *     (Begin Tournament, Award Points, Open Lobby, Start Match #N,
+ *     Skip Spells, End Break, ...). Next Phase / Force / Break remain
+ *     as secondary controls.
+ *   - Points preview + confirmation before territory points are awarded
+ *     when leaving scoring_hex (the original awarded them silently).
+ *   - Warning modals when starting a queue match would skip the
+ *     Lobby Ready check or a Spell Window, or would desync the flow.
+ *   - "Skip to Board Check" escape for rounds with no challenges
+ *     (previously required repeated Force presses).
+ *   - Next-up highlight on the first queued match.
+ *   - Broadcast bar collapsed behind a toggle; the duplicate top-bar
+ *     "Next Round" button is hidden while the phase system is active.
+ *
+ * Loaded AFTER admin.js, phase-manager.js, and action-logger.js.
+ */
+
+(function () {
+    'use strict';
+
+    let _actionLogger = null;
+    let _phaseManager = null;
+    let _initialized = false;
+    let _primaryAction = null;
+    let _broadcastOpen = false;
+    let _flowConfirmAction = null;
+
+    // ── Phase constants (mirror phase-manager.js for timeline) ──
+
+    /** Phases shown in the admin timeline track (simplified view) */
+    const ADMIN_PHASE_ORDER = [
+        'scoring_vp',
+        'hex_placement_1',
+        'challenges',
+        'challenge_game',
+        'board_resolved',
+        'match_1_playing',
+        'match_2_playing'
+    ];
+
+    const PHASE_LABELS = {
+        pre_game_setup:   'Setup',
+        scoring_vp:       'VP Scoring',
+        scoring_hex:      'Hex Scoring',
+        hex_placement_1:  'Hex 1',
+        spell_window_1:   'Spells',
+        hex_placement_2:  'Hex 2',
+        challenges:       'Challenges',
+        spell_window_2:   'Spells',
+        challenge_game:   'Challenge Game',
+        spell_window_3:   'Spells',
+        board_resolved:   'Board Check',
+        spell_window_4:   'Spells',
+        match_1_setup:    'Match 1 Setup',
+        match_1_lobby:    'Lobby 1',
+        match_1_playing:  'Match 1',
+        match_2_setup:    'Match 2 Setup',
+        match_2_lobby:    'Lobby 2',
+        match_2_playing:  'Match 2',
+        round_advance:    'Round End',
+        break:            'Break',
+        tournament_end:   'Finished'
+    };
+
+    const PHASE_ICONS = {
+        pre_game_setup:   '⚙',
+        scoring_vp:       '\u{1F3C6}',
+        scoring_hex:      '⬢',
+        hex_placement_1:  '\u{1F5FA}',
+        spell_window_1:   '✨',
+        hex_placement_2:  '\u{1F5FA}',
+        challenges:       '⚔',
+        spell_window_2:   '✨',
+        challenge_game:   '\u{1F3AE}',
+        spell_window_3:   '✨',
+        board_resolved:   '\u{1F6E1}',
+        spell_window_4:   '✨',
+        match_1_setup:    '\u{1F3DF}',
+        match_1_lobby:    '\u{1F3AE}',
+        match_1_playing:  '\u{1F3AE}',
+        match_2_setup:    '\u{1F3DF}',
+        match_2_lobby:    '\u{1F3AE}',
+        match_2_playing:  '\u{1F3AE}',
+        round_advance:    '⏭',
+        break:            '⏸',
+        tournament_end:   '\u{1F3C6}'
+    };
+
+    const SETUP_PHASES = ['challenges', 'match_1_setup', 'match_2_setup'];
+    const LOBBY_PHASES = ['match_1_lobby', 'match_2_lobby'];
+    const PLAYING_PHASES = ['challenge_game', 'match_1_playing', 'match_2_playing'];
+
+    // ── Minimal UIManager shim (PhaseManager only uses showStatus) ──
+
+    const _uiShim = {
+        showStatus(msg, type) {
+            if (typeof showStatus === 'function') showStatus(msg, type);
+        }
+    };
+
+    // ── Minimal TeamManager shim ──
+
+    const _teamShim = {};
+
+    // ── Lazy initialization ──
+
+    function _initPhaseAdapter() {
+        if (_initialized) return;
+        if (!gameState || !gameState.teams) return;
+        _initialized = true;
+
+        // ActionLogger
+        _actionLogger = new ActionLogger({
+            getFirebaseDB: () => window.firebaseDB,
+            getTournamentId: () => currentTournamentId,
+            getCurrentUser: () => currentUser,
+            getCurrentUserRole: () => currentUserRole,
+            getGameState: () => gameState
+        });
+
+        const logAction = (actionType, category, payload, previousState) =>
+            _actionLogger?.logAction(actionType, category, payload, previousState);
+
+        // PhaseManager
+        _phaseManager = new PhaseManager(gameState, {
+            uiManager: _uiShim,
+            teamManager: _teamShim,
+            saveCallback: (btn) => saveGameState(btn),
+            logActionCallback: logAction,
+            onDisplayRefresh: () => {
+                if (typeof updateDisplay === 'function') updateDisplay();
+            }
+        });
+
+        // Wire pending hex count (used by phase requirements)
+        _phaseManager._getPendingHexCount = () => (pendingHexWins || []).length;
+
+        // Migrate old phase names if tournament was mid-game with old flow
+        if (_phaseManager.migratePhaseIfNeeded()) {
+            saveGameState();
+        }
+
+        // Wire hex territory points award when leaving scoring_hex
+        _phaseManager._onAwardPoints = () => {
+            _awardPointsForRound();
+        };
+
+        // Patch phase requirements: the stock implementation counted EVERY
+        // pending queue item, so challenge_game jammed whenever the round's
+        // scheduled matches were already queued (and vice versa), and the
+        // challenges phase demanded a challenge match even when no team
+        // requested one. Challenges are optional and admin-created — the
+        // phases must pass through cleanly when none exist.
+        const origCalcReqs = _phaseManager._calculateRequirements.bind(_phaseManager);
+        _phaseManager._calculateRequirements = function (phaseName) {
+            const queue = gameState.gameQueue || [];
+
+            switch (phaseName) {
+
+                // Optional: zero challenges is a valid state (phase gets skipped)
+                case 'challenges': {
+                    const pendingCh = _pendingChallengeMatches();
+                    return [{
+                        label: pendingCh.length > 0
+                            ? `${pendingCh.length} challenge${pendingCh.length !== 1 ? 's' : ''} queued`
+                            : 'No challenges requested',
+                        met: true
+                    }];
+                }
+
+                // Only challenge matches gate this phase
+                case 'challenge_game': {
+                    const ongoingCh = _ongoingChallengeMatches();
+                    const pendingCh = _pendingChallengeMatches();
+                    const completedCh = queue.some(m => !m.isBreak && m.isChallenge === true && m.status === 'completed');
+                    const reqs = [];
+                    if (ongoingCh.length > 0) {
+                        reqs.push({ label: `${ongoingCh.length} challenge${ongoingCh.length !== 1 ? 's' : ''} still playing`, met: false });
+                    }
+                    if (pendingCh.length > 0) {
+                        reqs.push({ label: `${pendingCh.length} challenge${pendingCh.length !== 1 ? 's' : ''} not started`, met: false });
+                    }
+                    if (reqs.length === 0) {
+                        reqs.push(completedCh
+                            ? { label: 'All challenge results confirmed', met: true }
+                            : { label: 'No challenge games — continue', met: true });
+                    }
+                    return reqs;
+                }
+
+                // Only regular (non-challenge) matches count toward the slots
+                case 'match_1_setup':
+                case 'match_2_setup': {
+                    const slot = phaseName === 'match_1_setup' ? 1 : 2;
+                    const pendingSlot = _pendingSlotMatches(slot);
+                    return [{
+                        label: pendingSlot.length > 0
+                            ? `${pendingSlot.length} match${pendingSlot.length !== 1 ? 'es' : ''} queued (Slot ${slot})`
+                            : `Create matches for Slot ${slot}`,
+                        met: pendingSlot.length > 0
+                    }];
+                }
+
+                // Slot 1: started matches must finish, but queued matches don't
+                // block (they may belong to Slot 2). Slot 2 ends the round, so
+                // everything left must be played out.
+                case 'match_1_playing':
+                case 'match_2_playing': {
+                    const slot = phaseName === 'match_1_playing' ? 1 : 2;
+                    const ongoingSlot = _ongoingSlotMatches(slot);
+                    const pendingSlot = _pendingSlotMatches(slot);
+                    const hasStarted = queue.some(m => !m.isBreak && m.isChallenge !== true &&
+                        (m.status === 'ongoing' || m.status === 'completed'));
+
+                    if (!hasStarted) {
+                        return [{ label: 'Start matches first', met: false }];
+                    }
+                    const reqs = [];
+                    if (ongoingSlot.length > 0) {
+                        reqs.push({ label: `${ongoingSlot.length} match${ongoingSlot.length !== 1 ? 'es' : ''} still playing`, met: false });
+                    }
+                    if (phaseName === 'match_2_playing' && pendingSlot.length > 0) {
+                        reqs.push({ label: `${pendingSlot.length} match${pendingSlot.length !== 1 ? 'es' : ''} not started`, met: false });
+                    }
+                    if (reqs.length === 0) {
+                        reqs.push({
+                            label: 'All started matches confirmed' +
+                                (phaseName === 'match_1_playing' && pendingSlot.length > 0
+                                    ? ` — ${pendingSlot.length} queued for Slot 2` : ''),
+                            met: true
+                        });
+                    }
+                    return reqs;
+                }
+
+                // Only THIS round's slot-specific hex win(s) gate each phase —
+                // previously both shared the same global pendingHexWins count,
+                // so hex_placement_1 silently required BOTH matches' winners
+                // to place before advancing, and hex_placement_2 had nothing
+                // left to actually gate.
+                case 'hex_placement_1':
+                case 'hex_placement_2': {
+                    const slotLabel = phaseName === 'hex_placement_1' ? 'Match 1' : 'Match 2';
+                    const relevant = _relevantPendingWinsForPhase(phaseName);
+                    const count = relevant.reduce((sum, w) => sum + w.teamIds.length, 0);
+                    if (count === 0) {
+                        return [{ label: `${slotLabel} hex placed`, met: true }];
+                    }
+                    return [{
+                        label: `${count} team${count !== 1 ? 's' : ''} (${slotLabel}) need to place plates`,
+                        met: false
+                    }];
+                }
+
+                default:
+                    return origCalcReqs(phaseName);
+            }
+        };
+
+        console.log('[admin-improved-adapter] PhaseManager + Guided Flow Panel initialized');
+    }
+
+    // ── Escape HTML ──
+
+    function _esc(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    // ── Queue helpers ──
+
+    function _queuePending() {
+        return (gameState.gameQueue || []).filter(m =>
+            m.status === 'pending' || m.status === undefined || m.status === 'queued');
+    }
+
+    function _queuePendingMatches() {
+        return _queuePending().filter(m => !m.isBreak);
+    }
+
+    function _queueOngoingMatches() {
+        return (gameState.gameQueue || []).filter(m => !m.isBreak && m.status === 'ongoing');
+    }
+
+    function _matchShortLabel(game) {
+        if (game.isBreak === true) return 'Break';
+        const gameName = (typeof getGameDisplayName === 'function')
+            ? getGameDisplayName(game.game || game.gameType)
+            : (game.game || 'match');
+        return (game.matchNumber ? `#${game.matchNumber} ` : '') + gameName;
+    }
+
+    // Challenge matches and regular (slot) matches are tracked separately:
+    // challenge phases must never be blocked by queued slot matches & vice versa
+    function _pendingChallengeMatches() {
+        return _queuePendingMatches().filter(m => m.isChallenge === true);
+    }
+
+    function _ongoingChallengeMatches() {
+        return _queueOngoingMatches().filter(m => m.isChallenge === true);
+    }
+
+    /**
+     * Regular (non-challenge) pending matches, optionally narrowed to one
+     * round slot (1 or 2). Matches tagged with `slot` by _tagNewQueueEntries
+     * are filtered precisely; untagged matches (created before this feature
+     * existed, or created outside a recognizable match/setup phase) always
+     * count for either slot — safer than silently hiding a real match.
+     */
+    function _pendingSlotMatches(slot) {
+        const all = _queuePendingMatches().filter(m => m.isChallenge !== true);
+        if (slot === undefined) return all;
+        return all.filter(m => m.slot === undefined || m.slot === slot);
+    }
+
+    function _ongoingSlotMatches(slot) {
+        const all = _queueOngoingMatches().filter(m => m.isChallenge !== true);
+        if (slot === undefined) return all;
+        return all.filter(m => m.slot === undefined || m.slot === slot);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  ROUND + SLOT TAGGING
+    // ══════════════════════════════════════════════════════════════
+    //
+    // Queue items previously carried no association with "Slot 1" vs
+    // "Slot 2" of a round, so match_1_setup/match_2_setup (and the hex
+    // placement phases below) couldn't tell which pending match or which
+    // pending hex win belonged to which slot. This tags every match with
+    // {roundNumber, slot} at creation time, based on whatever phase the
+    // admin was in when they created it.
+
+    /** slot: 1, 2, 'challenge', or null (created outside a recognizable phase) */
+    function _computeCurrentSlot() {
+        const phase = _phaseManager?.getCurrentPhase() || null;
+        const roundNumber = gameState.currentPhase?.roundNumber || 0;
+        let slot = null;
+        if (phase === 'challenges' || phase === 'challenge_game' ||
+            phase === 'spell_window_2' || phase === 'spell_window_3') {
+            slot = 'challenge';
+        } else if (phase && phase.startsWith('match_1')) {
+            slot = 1;
+        } else if (phase && phase.startsWith('match_2')) {
+            slot = 2;
+        }
+        return { roundNumber, slot };
+    }
+
+    /** Snapshot of queue entry ids, taken right before calling a creation function. */
+    function _snapshotQueueIds() {
+        return new Set((gameState.gameQueue || []).map(e => e.id));
+    }
+
+    /**
+     * Stamp round/slot ONLY onto entries added since `beforeIds` was taken —
+     * i.e. exactly the match(es) this specific creation call just added.
+     *
+     * Originally this tagged every untagged entry in the whole queue on
+     * every call, which is wrong: this tournament has been used for testing
+     * throughout the whole build-out, so the queue likely already has a
+     * backlog of old leftover pending matches from before slot-tagging
+     * existed. Sweeping ALL of them in on the next match creation stamped
+     * that entire backlog as "this round's Slot 2," and since Slot 2 has no
+     * escape hatch (by design — it's the last phase before the round ends),
+     * the Start button just kept working through that backlog one at a
+     * time, looking like it would never reach scoring.
+     */
+    async function _tagNewQueueEntries(beforeIds) {
+        const { roundNumber, slot } = _computeCurrentSlot();
+        if (slot === null) return; // ambiguous phase — leave untagged, treated as "always relevant"
+
+        let changed = false;
+        (gameState.gameQueue || []).forEach(entry => {
+            if (entry.isBreak) return;
+            if (entry.roundNumber === undefined && !beforeIds.has(entry.id)) {
+                entry.roundNumber = roundNumber;
+                entry.slot = entry.isChallenge ? 'challenge' : slot;
+                changed = true;
+            }
+        });
+        if (changed) await saveGameState();
+    }
+
+    /**
+     * Tag a MASS-IMPORTED batch by sequence, not by "whatever phase is active
+     * right now." Mass Import (via the Match Scheduler dev tool's exported
+     * JSON) typically brings in matches for MANY future rounds in one go —
+     * tagging the whole batch with the current phase's slot would repeat the
+     * exact "Slot 2 never runs out" bug, just via a different door.
+     *
+     * The exported format has no round number, but it does preserve
+     * matchNumber order and linkedMatch/isSimultaneous for split-format
+     * pairs (AoE4/WC3 3v3+2v2) — enough to alternate Slot 1 / Slot 2 per
+     * round, treating a linked pair as ONE slot (they play simultaneously).
+     */
+    async function _tagImportedBatch(beforeIds) {
+        const newEntries = (gameState.gameQueue || [])
+            .filter(e => !e.isBreak && !beforeIds.has(e.id))
+            .sort((a, b) => (a.matchNumber || 0) - (b.matchNumber || 0));
+        if (newEntries.length === 0) return;
+
+        let slotCursor = 1;
+        let roundCursor = (gameState.currentPhase?.roundNumber || 0) + 1;
+        const handled = new Set();
+
+        newEntries.forEach(entry => {
+            if (handled.has(entry.id) || entry.roundNumber !== undefined) return;
+
+            entry.roundNumber = roundCursor;
+            entry.slot = entry.isChallenge ? 'challenge' : slotCursor;
+            handled.add(entry.id);
+
+            // A linked split-format pair (3v3+2v2 playing simultaneously) is
+            // ONE slot, not two — tag the partner match to match.
+            if (entry.linkedMatch !== undefined && entry.linkedMatch !== null) {
+                const partner = newEntries.find(e => e.matchNumber === entry.linkedMatch);
+                if (partner && !handled.has(partner.id)) {
+                    partner.roundNumber = entry.roundNumber;
+                    partner.slot = entry.slot;
+                    handled.add(partner.id);
+                }
+            }
+
+            if (!entry.isChallenge) {
+                slotCursor = slotCursor === 1 ? 2 : 1;
+                if (slotCursor === 1) roundCursor++;
+            }
+        });
+
+        await saveGameState();
+    }
+
+    /**
+     * Pending hex wins relevant to a given phase, with teams already fully
+     * placed filtered out. During hex_placement_1/2, narrows to that slot
+     * so Match 1's placement no longer blocks on (or gets confused with)
+     * Match 2's — untagged entries (created before this feature existed)
+     * always count as relevant.
+     *
+     * Deliberately NOT filtered by roundNumber: a win is tagged with the
+     * round it was created in (e.g. round N, during match_1_playing), but
+     * by the time hex_placement_1/2 consumes it, round_advance has already
+     * incremented gameState.currentPhase.roundNumber to N+1 — comparing
+     * against the *current* round would never match and silently drop
+     * every real entry. Slot alone is enough: hex_placement phases only
+     * ever hold the immediately-preceding round's leftover wins, since
+     * they gate on clearing before the round can advance again.
+     */
+    function _relevantPendingWinsForPhase(phaseName) {
+        const all = (pendingHexWins || []).filter(w => w.teamIds.length > 0);
+
+        if (phaseName === 'hex_placement_1' || phaseName === 'hex_placement_2') {
+            const slot = phaseName === 'hex_placement_1' ? 1 : 2;
+            return all.filter(w => w.slot === undefined || w.slot === slot);
+        }
+        return all;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  FLOW PANEL RENDERER
+    // ══════════════════════════════════════════════════════════════
+
+    function _renderFlowPanel() {
+        const panel = document.getElementById('flowPanel');
+        if (!panel) return;
+
+        const phase = _phaseManager.getCurrentPhase();
+
+        if (!phase || !gameState.teams) {
+            panel.style.display = 'none';
+            return;
+        }
+
+        panel.style.display = '';
+        panel.classList.toggle('phase-break', phase === 'break');
+        panel.classList.toggle('phase-ended', phase === 'tournament_end');
+
+        // If the init prompt replaced the panel DOM (e.g. phases were
+        // initialized from another client), rebuild it before rendering
+        if (!document.getElementById('flowTimeline')) {
+            _restoreFlowPanelDOM();
+        }
+
+        const step = _computeNextStep(phase);
+
+        _renderTimeline(phase);
+        _renderPhaseHeader(phase);
+        _renderNextStepText(step);
+        _renderActionItems(phase);
+        _renderControls(phase, step);
+        _renderBroadcastBar();
+    }
+
+    // ── Timeline Track ──
+
+    /**
+     * Map any phase to its position in the simplified admin timeline.
+     * Spell windows and sub-phases map to the nearest main phase.
+     */
+    function _getTimelineIndex(phase) {
+        // Direct match
+        const directIdx = ADMIN_PHASE_ORDER.indexOf(phase);
+        if (directIdx >= 0) return directIdx;
+
+        // Map sub-phases to their parent timeline step
+        const mapping = {
+            scoring_hex: 0,         // part of scoring block
+            spell_window_1: 1,      // between hex1 and hex2
+            hex_placement_2: 1,     // part of hex block
+            spell_window_2: 2,      // part of challenges block
+            spell_window_3: 3,      // after challenge_game
+            spell_window_4: 4,      // after board_resolved
+            match_1_setup: 5,       // part of match 1
+            match_1_lobby: 5,       // part of match 1
+            match_2_setup: 6,       // part of match 2
+            match_2_lobby: 6,       // part of match 2
+            round_advance: 7        // past end
+        };
+        return mapping[phase] ?? -1;
+    }
+
+    function _renderTimeline(currentPhase) {
+        const container = document.getElementById('flowTimeline');
+        if (!container) return;
+
+        // For pre_game_setup and tournament_end, show simplified timeline
+        if (currentPhase === 'pre_game_setup') {
+            container.innerHTML = '<span class="flow-tl-step active"><span class="flow-tl-dot"></span><span class="flow-tl-label">Setup</span></span>';
+            return;
+        }
+        if (currentPhase === 'tournament_end') {
+            container.innerHTML = '<span class="flow-tl-step active"><span class="flow-tl-dot"></span><span class="flow-tl-label">Tournament Complete</span></span>';
+            return;
+        }
+
+        // Break: show break step highlighted
+        if (currentPhase === 'break') {
+            let html = '';
+            ADMIN_PHASE_ORDER.forEach((p, i) => {
+                if (i > 0) html += '<span class="flow-tl-connector done"></span>';
+                html += `<span class="flow-tl-step done"><span class="flow-tl-dot"></span><span class="flow-tl-label">${PHASE_LABELS[p] || p}</span></span>`;
+            });
+            html = '<span class="flow-tl-step active"><span class="flow-tl-dot"></span><span class="flow-tl-label">⏸ Break</span></span>' +
+                   '<span class="flow-tl-connector"></span>' + html;
+            container.innerHTML = html;
+            return;
+        }
+
+        const effectiveIdx = _getTimelineIndex(currentPhase);
+
+        let html = '';
+        ADMIN_PHASE_ORDER.forEach((p, i) => {
+            if (i > 0) {
+                const connDone = i <= effectiveIdx;
+                html += `<span class="flow-tl-connector${connDone ? ' done' : ''}"></span>`;
+            }
+
+            let state = 'future';
+            if (i < effectiveIdx) state = 'done';
+            else if (i === effectiveIdx || p === currentPhase) state = 'active';
+
+            html += `<span class="flow-tl-step ${state}">` +
+                    `<span class="flow-tl-dot"></span>` +
+                    `<span class="flow-tl-label">${PHASE_LABELS[p] || p}</span>` +
+                    `</span>`;
+        });
+
+        container.innerHTML = html;
+    }
+
+    // ── Phase Header (icon + name + round) ──
+
+    function _renderPhaseHeader(phase) {
+        const iconEl = document.getElementById('flowPhaseIcon');
+        const nameEl = document.getElementById('flowPhaseName');
+        const roundEl = document.getElementById('flowRoundBadge');
+
+        if (iconEl) iconEl.textContent = PHASE_ICONS[phase] || '';
+        if (nameEl) nameEl.textContent = PHASE_LABELS[phase] || phase;
+
+        if (roundEl) {
+            const round = gameState.currentPhase?.roundNumber || 0;
+            roundEl.textContent = round > 0 ? `Round ${round}` : '';
+            roundEl.style.display = round > 0 ? '' : 'none';
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  NEXT STEP — one contextual prompt + primary action per phase
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * Compute the guided next step for the current phase.
+     * @returns {{
+     *   text: string,                       // HTML guidance shown in the prompt
+     *   primary: {label, action, disabled, title}|null,  // the ONE primary button
+     *   primaryIsAdvance: boolean           // true → hide the small Next Phase button
+     * }}
+     */
+    function _computeNextStep(phase) {
+        const gs = gameState;
+        const reqs = _phaseManager.getPhaseRequirements();
+        const round = gs.currentPhase?.roundNumber || 0;
+        const advance = () => window.advancePhase();
+
+        switch (phase) {
+
+            case 'pre_game_setup':
+                return {
+                    text: 'Mark room hexes on the board and give every team at least 2 players. Then begin the tournament.',
+                    primary: {
+                        label: 'Begin Tournament ▶',
+                        action: advance,
+                        disabled: !reqs.allMet,
+                        title: reqs.allMet ? '' : 'Complete the setup requirements first'
+                    },
+                    primaryIsAdvance: true
+                };
+
+            case 'scoring_vp':
+                return {
+                    text: round <= 1
+                        ? 'First round — no victory points to review yet.'
+                        : 'Review victory points from last round’s match wins (VPs were granted when results were confirmed).',
+                    primary: { label: 'Continue ▶', action: advance },
+                    primaryIsAdvance: true
+                };
+
+            case 'scoring_hex': {
+                if (round <= 1) {
+                    return {
+                        text: 'First round — no territory points yet.',
+                        primary: { label: 'Continue ▶', action: advance },
+                        primaryIsAdvance: true
+                    };
+                }
+                const alreadyAwarded = (gs.pointsHistory || []).some(e => e.round === round);
+                if (alreadyAwarded) {
+                    return {
+                        text: 'Territory points for this round are already awarded.',
+                        primary: { label: 'Continue ▶', action: advance },
+                        primaryIsAdvance: true
+                    };
+                }
+                const preview = _computeRoundPointsPreview();
+                if (preview.total <= 0) {
+                    return {
+                        text: 'No heart hexes are controlled — no territory points this round.',
+                        primary: { label: 'Continue ▶', action: advance },
+                        primaryIsAdvance: true
+                    };
+                }
+                return {
+                    text: `Heart-hex territory points are ready: <strong>${preview.total}</strong> pts total.` +
+                          (preview.frozenCount > 0 ? ` (${preview.frozenCount} contested hex(es) frozen.)` : '') +
+                          ' You’ll see a preview before anything is committed.',
+                    primary: { label: 'Award Points ▶', action: () => window.confirmScoringHexAdvance() },
+                    primaryIsAdvance: true
+                };
+            }
+
+            case 'hex_placement_1':
+            case 'hex_placement_2': {
+                const slotLabel = phase === 'hex_placement_1' ? 'Match 1' : 'Match 2';
+                const relevant = _relevantPendingWinsForPhase(phase);
+                const hexCount = relevant.reduce((sum, w) => sum + w.teamIds.length, 0);
+                if (hexCount > 0) {
+                    const names = relevant.flatMap(w => w.teamNames || []).join(', ');
+                    return {
+                        text: `<strong>${hexCount}</strong> team${hexCount !== 1 ? 's' : ''} (${slotLabel}: <strong>${_esc(names)}</strong>) must place hex plates — click hexes on the board to assign them.`,
+                        primary: { label: 'Waiting for placements…', action: null, disabled: true },
+                        primaryIsAdvance: true
+                    };
+                }
+                return {
+                    text: `${slotLabel} hex placed.`,
+                    primary: { label: 'Continue ▶', action: advance },
+                    primaryIsAdvance: true
+                };
+            }
+
+            case 'spell_window_1':
+            case 'spell_window_2':
+            case 'spell_window_3':
+            case 'spell_window_4': {
+                const sp = gs.spellPhase;
+                let extra = '';
+                if (phase === 'spell_window_3') {
+                    const gamesPlayed = gs.currentPhase?.challengeGamesPlayed || 0;
+                    extra = ` Challenge games this round: <strong>${gamesPlayed}</strong>/7.`;
+                }
+                if (sp?.isActive) {
+                    const done = sp.teamsCompleted?.length || 0;
+                    const total = sp.turnOrder?.length || 0;
+                    const allDone = total > 0 && done >= total;
+                    if (allDone) {
+                        return {
+                            text: 'All teams finished casting spells.' + extra,
+                            primary: { label: 'Continue ▶', action: advance },
+                            primaryIsAdvance: true
+                        };
+                    }
+                    return {
+                        text: `Spell phase active — <strong>${done}/${total}</strong> teams done.` + extra,
+                        primary: { label: `Spells ${done}/${total}…`, action: null, disabled: true },
+                        primaryIsAdvance: true
+                    };
+                }
+                return {
+                    text: 'Optional spell window — begin spells, or skip ahead.' + extra,
+                    primary: { label: 'Skip Spells ▶', action: advance },
+                    primaryIsAdvance: true
+                };
+            }
+
+            case 'challenges': {
+                const pendingCh = _pendingChallengeMatches();
+                if (pendingCh.length > 0) {
+                    return {
+                        text: `<strong>${pendingCh.length}</strong> challenge match${pendingCh.length !== 1 ? 'es' : ''} queued. Continue to play ${pendingCh.length !== 1 ? 'them' : 'it'}.`,
+                        primary: { label: 'Continue ▶', action: advance },
+                        primaryIsAdvance: true
+                    };
+                }
+                return {
+                    text: 'Challenges are optional — create one if a team requests a heart-hex dispute (⚔ button). Otherwise continue and the challenge step is skipped this round.',
+                    primary: { label: 'Continue — No Challenges ▶', action: advance },
+                    primaryIsAdvance: true
+                };
+            }
+
+            case 'challenge_game': {
+                const ongoingCh = _ongoingChallengeMatches();
+                const pendingCh = _pendingChallengeMatches();
+                const queueCg = gs.gameQueue || [];
+
+                if (ongoingCh.length > 0) {
+                    return {
+                        text: 'Challenge game live — click the match card to record the result.' +
+                              (pendingCh.length > 0 ? ` <strong>${pendingCh.length}</strong> more challenge${pendingCh.length !== 1 ? 's' : ''} waiting.` : ''),
+                        primary: { label: 'Waiting for result…', action: null, disabled: true },
+                        primaryIsAdvance: true
+                    };
+                }
+                if (pendingCh.length > 0) {
+                    const next = pendingCh[0];
+                    const label = _matchShortLabel(next);
+                    return {
+                        text: `Next challenge: <strong>${_esc(label)}</strong>. Challenges play one at a time, before other board changes.`,
+                        primary: { label: `▶ Start ${label}`, action: () => window.startMatch(next.id) },
+                        primaryIsAdvance: false
+                    };
+                }
+                const completedCh = queueCg.some(m => !m.isBreak && m.isChallenge === true && m.status === 'completed');
+                return {
+                    text: completedCh ? 'All challenge results confirmed.' : 'No challenge games pending.',
+                    primary: { label: 'Continue ▶', action: advance },
+                    primaryIsAdvance: true
+                };
+            }
+
+            case 'match_1_playing':
+            case 'match_2_playing': {
+                const slot = phase === 'match_1_playing' ? 1 : 2;
+                const ongoingSlot = _ongoingSlotMatches(slot);
+                const pendingSlot = _pendingSlotMatches(slot);
+                const queueMp = gs.gameQueue || [];
+                const hasStarted = queueMp.some(m => !m.isBreak && m.isChallenge !== true &&
+                    (m.status === 'ongoing' || m.status === 'completed'));
+
+                if (ongoingSlot.length > 0) {
+                    let text = `<strong>${ongoingSlot.length}</strong> match${ongoingSlot.length !== 1 ? 'es' : ''} live — click a card to record results.`;
+                    if (pendingSlot.length > 0) {
+                        text += ' Use ▶ in the queue to start a parallel match if it belongs to this slot.';
+                    }
+                    return {
+                        text,
+                        primary: { label: 'Waiting for results…', action: null, disabled: true },
+                        primaryIsAdvance: true
+                    };
+                }
+
+                // Slot 1: queued matches may belong to Slot 2, so once every
+                // started match is confirmed, continuing is the default.
+                if (slot === 1 && hasStarted) {
+                    return {
+                        text: 'Slot 1 results confirmed.' +
+                              (pendingSlot.length > 0
+                                  ? ` <strong>${pendingSlot.length}</strong> queued match${pendingSlot.length !== 1 ? 'es carry' : ' carries'} over to Slot 2.`
+                                  : ''),
+                        primary: { label: 'Continue ▶', action: advance },
+                        primaryIsAdvance: true
+                    };
+                }
+
+                if (pendingSlot.length > 0) {
+                    const next = pendingSlot[0];
+                    const label = _matchShortLabel(next);
+                    return {
+                        text: `Next up: <strong>${_esc(label)}</strong>.`,
+                        primary: { label: `▶ Start ${label}`, action: () => window.startMatch(next.id) },
+                        primaryIsAdvance: false
+                    };
+                }
+
+                if (hasStarted) {
+                    return {
+                        text: 'All match results confirmed.',
+                        primary: { label: 'Continue ▶', action: advance },
+                        primaryIsAdvance: true
+                    };
+                }
+
+                return {
+                    text: `No matches queued for Slot ${slot} — create matches, or force-advance past it.`,
+                    primary: { label: 'No matches queued', action: null, disabled: true },
+                    primaryIsAdvance: true
+                };
+            }
+
+            case 'board_resolved':
+                return {
+                    text: 'Check that hex control on the board matches reality. Resolve any disputes before continuing.',
+                    primary: { label: 'Board Verified ▶', action: advance },
+                    primaryIsAdvance: true
+                };
+
+            case 'match_1_setup':
+            case 'match_2_setup': {
+                const slot = phase === 'match_1_setup' ? 1 : 2;
+                const pendingMatches = _pendingSlotMatches(slot);
+                if (pendingMatches.length === 0) {
+                    return {
+                        text: `Create matches for Slot ${slot} — drag players into sides, or auto-generate from rotation.`,
+                        primary: { label: '⚡ Auto-Generate', action: () => window.generateSuggestedMatches() },
+                        primaryIsAdvance: false
+                    };
+                }
+                return {
+                    text: `<strong>${pendingMatches.length}</strong> match${pendingMatches.length !== 1 ? 'es' : ''} queued for Slot ${slot}. Open the lobby when the lineup is final.`,
+                    primary: { label: 'Open Lobby ▶', action: advance },
+                    primaryIsAdvance: true
+                };
+            }
+
+            case 'match_1_lobby':
+            case 'match_2_lobby':
+                return {
+                    text: 'Players are confirming game lobby + Discord. Advances automatically when everyone is ready.',
+                    primary: { label: 'Waiting for players…', action: null, disabled: true },
+                    primaryIsAdvance: true
+                };
+
+            case 'round_advance':
+                return {
+                    text: 'Round complete. Advancing…',
+                    primary: null,
+                    primaryIsAdvance: true
+                };
+
+            case 'break': {
+                const returnTo = gs.currentPhase?.returnToPhase;
+                const returnLabel = returnTo ? (PHASE_LABELS[returnTo] || returnTo) : null;
+                return {
+                    text: 'Break in progress.' + (returnLabel ? ` Ends back at <strong>${_esc(returnLabel)}</strong>.` : ''),
+                    primary: { label: 'End Break ▶', action: () => window.endBreak() },
+                    primaryIsAdvance: true
+                };
+            }
+
+            case 'tournament_end':
+                return {
+                    text: 'Tournament complete! View final standings on the View and Stats pages.',
+                    primary: null,
+                    primaryIsAdvance: true
+                };
+
+            default:
+                return {
+                    text: '',
+                    primary: { label: 'Continue ▶', action: advance, disabled: !reqs.allMet },
+                    primaryIsAdvance: true
+                };
+        }
+    }
+
+    function _renderNextStepText(step) {
+        const el = document.getElementById('flowGuidance');
+        if (el) el.innerHTML = step.text || '';
+    }
+
+    // ── Action Items (requirements + pending hex + voted matches) ──
+
+    function _renderActionItems(phase) {
+        const container = document.getElementById('flowActions');
+        if (!container) return;
+
+        let html = '';
+
+        // 1) Phase requirements from PhaseManager
+        const reqs = _phaseManager.getPhaseRequirements();
+        reqs.items.forEach(r => {
+            const cls = r.met ? 'req-met' : 'req-unmet';
+            const icon = r.met ? '✓' : '✗';
+            html += `<span class="flow-action-item ${cls}">` +
+                    `<span class="flow-action-icon">${icon}</span> ${_esc(r.label)}</span>`;
+        });
+
+        // 2) Pending hex placements (scoped to this phase's slot, if applicable)
+        const pendingHex = _relevantPendingWinsForPhase(phase);
+        pendingHex.forEach(win => {
+            const matchLabel = win.matchNumber ? `#${win.matchNumber}` : '';
+            win.teamIds.forEach((teamId, idx) => {
+                const teamName = win.teamNames[idx] || `Team ${teamId}`;
+                const team = gameState?.teams?.find(t => String(t.id) === String(teamId));
+                const color = team?.color || 'var(--accent-warning)';
+                html += `<span class="flow-action-item action-pending" title="Match ${matchLabel}: ${teamName} needs to place a hex plate">` +
+                        `<span class="flow-action-icon">⬢</span> ` +
+                        `<span class="flow-action-team" style="color: ${color}">${_esc(teamName)}</span> hex</span>`;
+            });
+        });
+
+        // 3) Voted matches awaiting admin confirmation
+        // (votes currently arrive on completed matches — don't filter to ongoing
+        // like the original adapter did, or the pills never show)
+        const queue = gameState.gameQueue || [];
+        const votedMatches = queue.filter(m => !m.isBreak && m.votes && m.votes.length > 0 && !m.adminConfirmed);
+        votedMatches.forEach(m => {
+            const gameName = (typeof getGameDisplayName === 'function') ? getGameDisplayName(m.gameId) : (m.gameId || 'Match');
+            html += `<span class="flow-action-item action-vote" title="Players voted on result for ${gameName}">` +
+                    `<span class="flow-action-icon">\u{1F5F3}</span> Vote: ${_esc(gameName)}</span>`;
+        });
+
+        container.innerHTML = html;
+    }
+
+    // ── Controls (primary action + Next Phase, Force, Break, Spells, Loop) ──
+
+    function _renderControls(phase, step) {
+        const primaryBtn = document.getElementById('flowPrimaryBtn');
+        const advBtn = document.getElementById('advancePhaseBtn');
+        const forceBtn = document.getElementById('forceAdvanceBtn');
+        const breakBtn = document.getElementById('insertBreakBtn');
+        const lobbyControls = document.getElementById('lobbyAdminControls');
+        const breakBadge = document.getElementById('breakIntervalBadge');
+        const extraControls = document.getElementById('phaseExtraControls');
+
+        const reqs = _phaseManager.getPhaseRequirements();
+
+        // Primary contextual action
+        if (primaryBtn) {
+            if (!step.primary) {
+                primaryBtn.style.display = 'none';
+                _primaryAction = null;
+            } else {
+                primaryBtn.style.display = '';
+                primaryBtn.textContent = step.primary.label;
+                primaryBtn.disabled = !!step.primary.disabled;
+                primaryBtn.title = step.primary.title || '';
+                _primaryAction = step.primary.disabled ? null : step.primary.action;
+            }
+        }
+
+        // Small Next Phase button — only when the primary action is NOT advancement
+        if (advBtn) {
+            const show = !step.primaryIsAdvance &&
+                         phase !== 'break' && phase !== 'tournament_end' && phase !== 'round_advance';
+            advBtn.style.display = show ? '' : 'none';
+            advBtn.textContent = 'Next Phase ▶';
+            advBtn.disabled = !reqs.allMet;
+            advBtn.onclick = () => window.advancePhase();
+        }
+
+        if (forceBtn) {
+            forceBtn.style.display = (phase === 'tournament_end' || phase === 'break' || phase === 'pre_game_setup') ? 'none' : '';
+        }
+
+        if (breakBtn) {
+            breakBtn.style.display = (phase === 'break' || phase === 'tournament_end' || phase === 'pre_game_setup') ? 'none' : '';
+        }
+
+        // Phase-specific extra controls (Create Challenge shortcut)
+        if (extraControls) {
+            if (phase === 'challenges') {
+                extraControls.style.display = '';
+                extraControls.innerHTML =
+                    '<button class="btn-small challenge" onclick="addChallengeToQueue()" title="Create a challenge match (heart-hex dispute)">⚔ Challenge</button>';
+            } else {
+                extraControls.style.display = 'none';
+                extraControls.innerHTML = '';
+            }
+        }
+
+        // Lobby ready admin controls
+        if (lobbyControls) {
+            if (_phaseManager.isLobbyPhase(phase)) {
+                lobbyControls.style.display = '';
+                lobbyControls.innerHTML =
+                    '<button class="btn-small secondary" onclick="forceAllReady()" title="Mark all players as ready">Force All Ready</button>';
+            } else {
+                lobbyControls.style.display = 'none';
+                lobbyControls.innerHTML = '';
+            }
+        }
+
+        // Spell window controls (Begin Spells + Loop)
+        _renderSpellWindowControls(phase);
+
+        // Break interval badge
+        if (breakBadge) {
+            const bs = gameState.breakSettings;
+            if (bs && bs.intervalRounds > 0 && phase !== 'break' && phase !== 'tournament_end' && phase !== 'pre_game_setup') {
+                const since = bs.roundsSinceLastBreak || 0;
+                const interval = bs.intervalRounds;
+                breakBadge.textContent = `⏸ ${since}/${interval}`;
+                breakBadge.style.display = '';
+                breakBadge.className = 'break-interval-badge' + (since >= interval ? ' break-due' : '');
+            } else {
+                breakBadge.style.display = 'none';
+            }
+        }
+    }
+
+    function _renderSpellWindowControls(phase) {
+        const container = document.getElementById('spellWindowControls');
+        if (!container) return;
+
+        if (!_phaseManager.isSpellWindow(phase)) {
+            container.style.display = 'none';
+            container.innerHTML = '';
+            return;
+        }
+
+        container.style.display = '';
+        let html = '';
+
+        const sp = gameState.spellPhase;
+        if (!sp?.isActive) {
+            html += '<button class="btn-small primary" onclick="beginSpells()" title="Start spell casting phase">✨ Begin Spells</button> ';
+        }
+
+        const loopInfo = _phaseManager.getLoopInfo();
+        if (loopInfo.canLoop) {
+            html += `<button class="btn-small secondary" onclick="loopBack()" title="${_esc(loopInfo.label)}">${_esc(loopInfo.label)}</button>`;
+        } else if (loopInfo.target && !loopInfo.canLoop) {
+            html += `<span style="font-size: 0.75rem; color: var(--text-tertiary);">${_esc(loopInfo.label)}</span>`;
+        }
+
+        container.innerHTML = html;
+    }
+
+    // ── Broadcast Bar (collapsed behind the 📢 toggle) ──
+
+    function _renderBroadcastBar() {
+        const bar = document.getElementById('broadcastBar');
+        const toggle = document.getElementById('broadcastToggleBtn');
+        if (!bar) return;
+
+        const hasMessage = !!gameState.broadcastMessage?.text;
+        if (toggle) toggle.classList.toggle('active', hasMessage);
+
+        bar.style.display = _broadcastOpen ? 'flex' : 'none';
+
+        const broadcastInput = document.getElementById('broadcastInput');
+        if (broadcastInput && hasMessage && !broadcastInput.value) {
+            broadcastInput.value = gameState.broadcastMessage.text;
+        }
+    }
+
+    // ── Next-up queue highlight ──
+
+    /**
+     * Highlight the match the flow expects next: during challenge phases the
+     * first pending challenge, during match phases the first pending regular
+     * match, otherwise the first pending queue item.
+     */
+    function _highlightNextQueueItem() {
+        const phase = _phaseManager?.getCurrentPhase() || '';
+        let target = null;
+        if (phase === 'challenges' || phase === 'challenge_game' ||
+            phase === 'spell_window_2' || phase === 'spell_window_3') {
+            target = _pendingChallengeMatches()[0];
+        } else if (phase.startsWith('match_1')) {
+            target = _pendingSlotMatches(1)[0];
+        } else if (phase.startsWith('match_2')) {
+            target = _pendingSlotMatches(2)[0];
+        }
+        if (!target) target = _queuePending()[0];
+
+        const items = document.querySelectorAll('#matchQueue .queue-item');
+        items.forEach(el => {
+            el.classList.toggle('next-up',
+                !!target && String(el.dataset.queueId) === String(target.id) &&
+                !el.classList.contains('ongoing'));
+        });
+    }
+
+    // ── Show "Initialize Phases" prompt when currentPhase is missing ──
+
+    function _renderPhaseInitPrompt() {
+        const panel = document.getElementById('flowPanel');
+        if (!panel) return;
+
+        if (!gameState.teams) {
+            panel.style.display = 'none';
+            return;
+        }
+
+        if (gameState.currentPhase) return; // Phase system already active
+
+        panel.style.display = '';
+        panel.innerHTML =
+            '<div class="flow-body" style="justify-content: center; padding: 18px 24px;">' +
+                '<div class="flow-current" style="max-width: none;">' +
+                    '<div class="flow-phase-header">' +
+                        '<span class="flow-phase-icon">⚙</span>' +
+                        '<div class="flow-phase-info">' +
+                            '<span class="flow-phase-label">TOURNAMENT FLOW</span>' +
+                            '<span class="flow-phase-name">Not initialized</span>' +
+                        '</div>' +
+                    '</div>' +
+                    '<p class="flow-guidance">Initialize the phase system to guide tournament flow step by step.</p>' +
+                '</div>' +
+                '<div class="flow-controls">' +
+                    '<button class="btn primary" onclick="initializePhaseSystem()">Initialize Flow</button>' +
+                '</div>' +
+            '</div>';
+    }
+
+    // ── Restore full Flow Panel DOM after init prompt replaced innerHTML ──
+
+    function _restoreFlowPanelDOM() {
+        const panel = document.getElementById('flowPanel');
+        if (!panel) return;
+        panel.innerHTML =
+            '<!-- Phase Timeline Track -->' +
+            '<div class="flow-timeline" id="flowTimeline"></div>' +
+            '<!-- Main Flow Content -->' +
+            '<div class="flow-body">' +
+                '<div class="flow-current">' +
+                    '<div class="flow-phase-header">' +
+                        '<span id="flowPhaseIcon" class="flow-phase-icon"></span>' +
+                        '<div class="flow-phase-info">' +
+                            '<span class="flow-phase-label">CURRENT PHASE</span>' +
+                            '<span id="flowPhaseName" class="flow-phase-name">---</span>' +
+                        '</div>' +
+                        '<span id="flowRoundBadge" class="flow-round-badge" style="display: none;"></span>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="flow-next-step">' +
+                    '<span class="next-step-label">Next Step</span>' +
+                    '<p id="flowGuidance" class="next-step-text"></p>' +
+                    '<div class="flow-actions" id="flowActions"></div>' +
+                '</div>' +
+                '<div class="flow-controls">' +
+                    '<button class="btn primary flow-primary-btn" id="flowPrimaryBtn" onclick="runFlowPrimaryAction()" disabled>---</button>' +
+                    '<div class="flow-controls-secondary">' +
+                        '<button class="btn-small secondary" id="advancePhaseBtn" onclick="advancePhase()" disabled>Next Phase ▶</button>' +
+                        '<span id="phaseExtraControls" style="display: none;"></span>' +
+                        '<span id="lobbyAdminControls" style="display: none;"></span>' +
+                        '<span id="spellWindowControls" style="display: none;"></span>' +
+                        '<button class="btn-small secondary" id="forceAdvanceBtn" onclick="forceAdvancePhase()" title="Force advance (skip requirements)">⚠ Force</button>' +
+                        '<button class="btn-small secondary" id="insertBreakBtn" onclick="insertBreak()" title="Insert break">⏸ Break</button>' +
+                        '<button class="btn-small secondary" id="broadcastToggleBtn" onclick="toggleBroadcastBar()" title="Broadcast a message to view screens">\u{1F4E2}</button>' +
+                        '<span id="breakIntervalBadge" class="break-interval-badge" onclick="openBreakSettings()" title="Break interval settings" style="display: none;"></span>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div class="broadcast-bar" id="broadcastBar" style="display: none;">' +
+                '<span style="font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;">Broadcast</span>' +
+                '<input type="text" id="broadcastInput" placeholder="Message shown on view page..." maxlength="200" ' +
+                    'style="flex: 1; padding: 6px 12px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 6px; color: white; font-size: 0.85rem;">' +
+                '<button class="btn-small primary" onclick="setBroadcastMessage()">Send</button>' +
+                '<button class="btn-small secondary" onclick="clearBroadcastMessage()">Clear</button>' +
+            '</div>';
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  FLOW CONFIRM MODAL (generic guided-flow prompt)
+    // ══════════════════════════════════════════════════════════════
+
+    function _openFlowConfirm({ title, bodyHtml, confirmLabel, danger, onConfirm }) {
+        const modal = document.getElementById('flowConfirmModal');
+        if (!modal) {
+            // Fallback: never block the admin if the modal is missing
+            if (onConfirm) onConfirm();
+            return;
+        }
+        const titleEl = document.getElementById('flowConfirmTitle');
+        const bodyEl = document.getElementById('flowConfirmBody');
+        const btn = document.getElementById('flowConfirmBtn');
+
+        if (titleEl) titleEl.textContent = title || 'Confirm';
+        if (bodyEl) bodyEl.innerHTML = bodyHtml || '';
+        if (btn) {
+            btn.textContent = confirmLabel || 'Confirm';
+            btn.className = danger ? 'btn danger' : 'btn primary';
+            btn.onclick = () => {
+                const fn = _flowConfirmAction;
+                window.closeFlowConfirm();
+                if (fn) fn();
+            };
+        }
+        _flowConfirmAction = onConfirm || null;
+        modal.style.display = 'flex';
+    }
+
+    window.closeFlowConfirm = () => {
+        const modal = document.getElementById('flowConfirmModal');
+        if (modal) modal.style.display = 'none';
+        _flowConfirmAction = null;
+    };
+
+    // ══════════════════════════════════════════════════════════════
+    //  POINTS PREVIEW (scoring_hex confirmation)
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * Compute the territory points each team would receive right now.
+     * Mirrors awardRoundPoints() in admin.js, INCLUDING the contested-hex
+     * freeze (the legacy Next Round preview ignored it — this one doesn't).
+     */
+    function _computeRoundPointsPreview() {
+        const contested = new Set();
+        (gameState.gameQueue || []).forEach(m => {
+            if (m.isChallenge && m.challengeHexCoord &&
+                (m.status === 'pending' || m.status === 'ongoing')) {
+                contested.add(m.challengeHexCoord);
+            }
+        });
+
+        const rows = [];
+        let frozenCount = 0;
+        let total = 0;
+
+        (gameState.teams || []).forEach(team => {
+            let pts = 0;
+            Object.entries(gameState.heartHexControl || {}).forEach(([coord, ownerId]) => {
+                if (ownerId !== team.id) return;
+                if (contested.has(coord)) { frozenCount++; return; }
+                const m = coord.match(/q(-?\d+)r(-?\d+)/);
+                if (!m || !boardModule) return;
+                const hexType = boardModule.getHexType(parseInt(m[1]), parseInt(m[2]));
+                if (hexType === 'mountain-heart') pts += 2;
+                else if (hexType === 'side-heart') pts += 1;
+            });
+            total += pts;
+            rows.push({ team, pts });
+        });
+
+        return { rows, frozenCount, total };
+    }
+
+    window.confirmScoringHexAdvance = () => {
+        const { rows, frozenCount } = _computeRoundPointsPreview();
+        const round = gameState.currentPhase?.roundNumber || 0;
+
+        let body = '<p>Territory points from controlled heart hexes will be added to team totals. <strong>This cannot be undone.</strong></p>';
+        body += rows.map(({ team, pts }) => {
+            const color = team.color || '#888';
+            return `<div class="points-preview-row">` +
+                   `<span class="team-cell"><span class="dot" style="background:${color}"></span>${_esc(team.name || ('Team ' + team.id))}</span>` +
+                   `<span class="pts ${pts > 0 ? '' : 'zero'}">+${pts}</span>` +
+                   `</div>`;
+        }).join('');
+        if (frozenCount > 0) {
+            body += `<p class="modal-warning-line" style="margin-top:10px;">⚠ ${frozenCount} contested hex(es) frozen by active challenges — not scored.</p>`;
+        }
+
+        _openFlowConfirm({
+            title: `Award Round ${round} Points`,
+            bodyHtml: body,
+            confirmLabel: 'Award & Continue ▶',
+            onConfirm: () => window.advancePhase()
+        });
+    };
+
+    // ══════════════════════════════════════════════════════════════
+    //  SKIP CHALLENGES (no-challenge rounds no longer need Force spam)
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * Jump from `challenges` directly to `board_resolved`, skipping the
+     * challenge-game phases entirely. Called automatically by advancePhase()
+     * when no team requested a challenge — no modal, this IS the normal path.
+     */
+    async function _skipChallengePhases() {
+        if (_phaseManager?.getCurrentPhase() !== 'challenges') return;
+        const gs = gameState;
+        const prev = { ...gs.currentPhase };
+        gs.currentPhase = {
+            name: 'board_resolved',
+            roundNumber: prev.roundNumber || 0,
+            startedAt: new Date().toISOString(),
+            challengeGamesPlayed: 0
+        };
+        await saveGameState();
+        _actionLogger?.logAction('phase_advanced', 'phase', {
+            fromPhase: prev.name,
+            toPhase: 'board_resolved',
+            skippedChallenges: true,
+            roundNumber: gs.currentPhase.roundNumber
+        }, { currentPhase: prev });
+        _uiShim.showStatus('No challenges this round — continuing to Board Check.', 'info');
+        _phaseManager.recheckRequirements();
+        if (typeof updateDisplay === 'function') updateDisplay();
+    }
+
+    window.skipChallenges = () => {
+        _skipChallengePhases();
+    };
+
+    // ══════════════════════════════════════════════════════════════
+    //  HOOK INTO ADMIN.JS DISPLAY UPDATE CYCLE
+    // ══════════════════════════════════════════════════════════════
+
+    window._onAdminDisplayUpdate = function () {
+        // Win condition badge/check doesn't depend on the phase system being
+        // initialized — render it regardless so it's visible from pre_game_setup
+        if (gameState?.teams) {
+            _renderWinConditionBadge();
+            _checkWinCondition();
+        }
+
+        if (!_initialized) _initPhaseAdapter();
+        if (!_phaseManager) return;
+
+        // The Flow Panel owns advancement — hide the duplicate top-bar button
+        // (it silently mapped to advancePhase anyway, with a misleading label)
+        const legacyBtn = document.getElementById('legacyNextRoundBtn');
+        if (legacyBtn) legacyBtn.style.display = gameState.currentPhase ? 'none' : '';
+
+        if (!gameState.currentPhase) {
+            _renderPhaseInitPrompt();
+            return;
+        }
+
+        // Keep gameState.currentRound in sync with phase system roundNumber
+        const phaseRound = gameState.currentPhase.roundNumber || 0;
+        if (gameState.currentRound !== phaseRound) {
+            gameState.currentRound = phaseRound;
+        }
+
+        _phaseManager.recheckRequirements();
+        _renderFlowPanel();
+        _highlightNextQueueItem();
+        _injectLiveMatchControls();
+
+        // Suppress the old pendingHexBanner (Flow Panel handles it now)
+        const oldBanner = document.getElementById('pendingHexBanner');
+        if (oldBanner) oldBanner.remove();
+    };
+
+    // ══════════════════════════════════════════════════════════════
+    //  WINDOW GLOBALS FOR ONCLICK HANDLERS
+    // ══════════════════════════════════════════════════════════════
+
+    window.runFlowPrimaryAction = () => {
+        if (_primaryAction) _primaryAction();
+    };
+
+    window.toggleBroadcastBar = () => {
+        _broadcastOpen = !_broadcastOpen;
+        _renderBroadcastBar();
+        if (_broadcastOpen) {
+            document.getElementById('broadcastInput')?.focus();
+        }
+    };
+
+    window.initializePhaseSystem = async () => {
+        _initPhaseAdapter();
+        if (!_phaseManager) return;
+        _phaseManager.initializePhase();
+        await saveGameState();
+        showStatus('Phase system initialized! Starting at Pre-Game Setup.', 'success');
+        _restoreFlowPanelDOM();
+        if (typeof updateDisplay === 'function') updateDisplay();
+    };
+
+    window.advancePhase = async () => {
+        _initPhaseAdapter();
+        if (!_phaseManager) return;
+        // Challenges are optional: advancing with none queued skips the
+        // challenge-game phases entirely instead of walking into them
+        if (_phaseManager.getCurrentPhase() === 'challenges' &&
+            _pendingChallengeMatches().length === 0 &&
+            _ongoingChallengeMatches().length === 0) {
+            await _skipChallengePhases();
+            return;
+        }
+        _phaseManager.advancePhase(false);
+    };
+
+    window.forceAdvancePhase = () => {
+        _initPhaseAdapter();
+        _phaseManager?.openForceAdvanceModal();
+    };
+
+    window.confirmForceAdvance = async () => {
+        await _phaseManager?.advancePhase(true);
+        _phaseManager?.closeForceAdvanceModal();
+    };
+
+    window.closeForceAdvanceModal = () => {
+        _phaseManager?.closeForceAdvanceModal();
+    };
+
+    window.insertBreak = () => {
+        _phaseManager?.insertBreak();
+    };
+
+    window.endBreak = () => {
+        _phaseManager?.endBreak();
+    };
+
+    window.openBreakSettings = () => {
+        _phaseManager?.openBreakSettings();
+    };
+
+    window.closeBreakSettings = () => {
+        _phaseManager?.closeBreakSettings();
+    };
+
+    window.saveBreakSettings = (btn) => {
+        _phaseManager?.saveBreakSettings(btn);
+    };
+
+    window.resetBreakCounter = () => {
+        _phaseManager?.resetBreakCounter();
+    };
+
+    window.skipNextBreak = () => {
+        _phaseManager?.skipNextBreak();
+    };
+
+    window.forceAllReady = async () => {
+        _phaseManager?.forceAllReady();
+        await saveGameState();
+        if (typeof updateDisplay === 'function') updateDisplay();
+    };
+
+    window.beginSpells = async () => {
+        _phaseManager?.beginSpells();
+    };
+
+    window.loopBack = async () => {
+        _phaseManager?.loopBack();
+    };
+
+    // ── Broadcast message handlers ──
+
+    window.setBroadcastMessage = async () => {
+        const input = document.getElementById('broadcastInput');
+        const text = input?.value?.trim();
+        if (!text) return;
+        gameState.broadcastMessage = {
+            text: text,
+            sentAt: new Date().toISOString(),
+            sentBy: 'admin'
+        };
+        await saveGameState();
+        showStatus('Broadcast message sent.', 'success');
+        _renderBroadcastBar();
+    };
+
+    window.clearBroadcastMessage = async () => {
+        gameState.broadcastMessage = null;
+        const input = document.getElementById('broadcastInput');
+        if (input) input.value = '';
+        await saveGameState();
+        showStatus('Broadcast message cleared.', 'success');
+        _renderBroadcastBar();
+    };
+
+    // ── Award round points and record history (used by phase advancement) ──
+
+    function _awardPointsForRound() {
+        const roundNumber = gameState.currentPhase?.roundNumber || 0;
+        const history = gameState.pointsHistory || [];
+
+        // Don't double-award
+        if (history.some(e => e.round === roundNumber)) return;
+
+        const pointsAwarded = (typeof awardRoundPoints === 'function')
+            ? awardRoundPoints()
+            : {};
+
+        gameState.pointsHistory = history;
+        gameState.pointsHistory.push({
+            round: roundNumber,
+            pointsAwarded: pointsAwarded,
+            timestamp: new Date().toISOString()
+        });
+
+        // No explicit save — advancePhase() saves after all hooks run
+
+        const msg = Object.entries(pointsAwarded)
+            .map(([team, pts]) => `${team}: +${pts}`)
+            .join(', ') || 'No points awarded';
+        showStatus(`Round ${roundNumber} points: ${msg}`, 'success');
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  START MATCH OVERRIDE — with skip warnings instead of silence
+    // ══════════════════════════════════════════════════════════════
+
+    const _origStartMatch = window.startMatch;
+
+    async function _startMatchThenAdvance(gameId) {
+        await _origStartMatch(gameId);
+        if (!_phaseManager || !gameState.currentPhase) return;
+        showStatus('Match started — advancing to playing phase...', 'success');
+        // Advance until we reach a playing phase, break, or tournament end
+        let safety = 10;
+        while (safety-- > 0 &&
+               !PLAYING_PHASES.includes(_phaseManager.getCurrentPhase()) &&
+               _phaseManager.getCurrentPhase() !== 'break' &&
+               _phaseManager.getCurrentPhase() !== 'tournament_end') {
+            await _phaseManager.advancePhase(true);
+        }
+    }
+
+    window.startMatch = async function (gameId, skipPlacementCheck) {
+        if (!_initialized) _initPhaseAdapter();
+        const game = (gameState?.gameQueue || []).find(g => g.id === gameId);
+
+        // Queue breaks and non-phase tournaments keep the original behavior
+        if (!game || game.isBreak === true || !_phaseManager || !gameState.currentPhase) {
+            return _origStartMatch(gameId);
+        }
+
+        // "Things done accordingly": hex tiles from earlier results should be
+        // placed before the next match starts (warn + confirm, not a block)
+        const pendingPlacements = (pendingHexWins || []).length;
+        if (pendingPlacements > 0 && !skipPlacementCheck) {
+            _openFlowConfirm({
+                title: 'Hex Tiles Not Placed',
+                bodyHtml: `<p><strong>${pendingPlacements}</strong> hex placement${pendingPlacements !== 1 ? 's are' : ' is'} still pending from earlier results — teams should place their tiles before the next match starts.</p>`,
+                confirmLabel: 'Start Anyway ▶',
+                danger: true,
+                onConfirm: () => window.startMatch(gameId, true)
+            });
+            return;
+        }
+
+        const phase = _phaseManager.getCurrentPhase();
+
+        // Playing phases: this is the expected place to start matches
+        if (PLAYING_PHASES.includes(phase)) {
+            return _origStartMatch(gameId);
+        }
+
+        const phaseLabel = PHASE_LABELS[phase] || phase;
+        const matchLabel = _matchShortLabel(game);
+
+        // Setup phases: starting now jumps ahead — tell the admin what gets skipped
+        if (SETUP_PHASES.includes(phase)) {
+            const skips = phase === 'challenges'
+                ? 'the <strong>Spell Window</strong>'
+                : 'the <strong>Lobby Ready</strong> check (players confirming game lobby + Discord)';
+            _openFlowConfirm({
+                title: 'Start Match Early?',
+                bodyHtml: `<p>You are in <strong>${_esc(phaseLabel)}</strong>. Starting <strong>${_esc(matchLabel)}</strong> now skips ${skips} and jumps straight to the playing phase.</p>`,
+                confirmLabel: 'Start & Skip ▶',
+                onConfirm: () => _startMatchThenAdvance(gameId)
+            });
+            return;
+        }
+
+        // Lobby phases: show readiness status before skipping the wait
+        if (LOBBY_PHASES.includes(phase)) {
+            const reqs = _phaseManager.getPhaseRequirements();
+            const summary = reqs.items.map(r => _esc(r.label)).join(' · ');
+            _openFlowConfirm({
+                title: 'Players Not Ready Yet',
+                bodyHtml: `<p>Lobby status: <strong>${summary || 'unknown'}</strong>.</p>` +
+                          `<p>Start <strong>${_esc(matchLabel)}</strong> anyway? The remaining ready checks will be skipped.</p>`,
+                confirmLabel: 'Start Anyway ▶',
+                onConfirm: () => _startMatchThenAdvance(gameId)
+            });
+            return;
+        }
+
+        // Any other phase (scoring, hex placement, spell window, board check, break):
+        // starting a match here desyncs the flow — warn, and do NOT auto-advance.
+        _openFlowConfirm({
+            title: 'Out-of-Flow Match Start',
+            bodyHtml: `<p>The tournament is in <strong>${_esc(phaseLabel)}</strong> — matches normally start during a playing phase.</p>` +
+                      `<p><strong>${_esc(matchLabel)}</strong> will start, but the phase will <strong>not</strong> advance. The Flow Panel may no longer match reality.</p>`,
+            confirmLabel: 'Start Anyway',
+            danger: true,
+            onConfirm: () => _origStartMatch(gameId)
+        });
+    };
+
+    // ══════════════════════════════════════════════════════════════
+    //  WIN CONDITION — editable after setup (experimental)
+    // ══════════════════════════════════════════════════════════════
+    //
+    // setup.html writes gameState.winCondition once and nothing in the
+    // full/admin.html + phase-manager flow ever reads it again — the only
+    // code that checks it (board-manager.js) is loaded by god.html, not by
+    // admin.html. So today it's a number nobody can see or change after
+    // setup, and nothing enforces it in this flow either. This adds an
+    // editable "Win At" badge plus a lightweight leader-vs-target check.
+
+    function _renderWinConditionBadge() {
+        const el = document.getElementById('winConditionValue');
+        if (el) el.textContent = gameState?.winCondition ?? 50;
+    }
+
+    window.openWinConditionModal = () => {
+        const modal = document.getElementById('winConditionModal');
+        if (!modal) return;
+        const input = document.getElementById('winConditionInput');
+        if (input) input.value = gameState?.winCondition ?? 50;
+
+        const note = document.getElementById('winConditionLeaderNote');
+        if (note) {
+            const teams = gameState?.teams || [];
+            const leader = teams.reduce((a, b) => ((b?.points || 0) > (a?.points || 0) ? b : a), teams[0]);
+            note.textContent = leader
+                ? `Current leader: ${leader.name || 'Team ' + leader.id} with ${leader.points || 0} points.`
+                : '';
+        }
+        modal.style.display = 'flex';
+    };
+
+    window.closeWinConditionModal = () => {
+        const modal = document.getElementById('winConditionModal');
+        if (modal) modal.style.display = 'none';
+    };
+
+    window.saveWinCondition = async (triggerBtn) => {
+        const input = document.getElementById('winConditionInput');
+        const value = parseInt(input?.value, 10);
+        if (!value || value < 1) {
+            showStatus('Enter a valid win condition.', 'warning');
+            return;
+        }
+        const prev = gameState.winCondition;
+        gameState.winCondition = value;
+        await saveGameState(triggerBtn);
+        _actionLogger?.logAction('win_condition_changed', 'admin', {
+            newValue: value, previousValue: prev
+        }, { winCondition: prev });
+        showStatus(`Win condition set to ${value} points.`, 'success');
+        window.closeWinConditionModal();
+        _renderWinConditionBadge();
+        _checkWinCondition();
+    };
+
+    /**
+     * Lightweight win-condition check — the modern phase flow has no
+     * equivalent to god.html's checkWinCondition(), so a team could sail
+     * past the target with nothing but the Win At badge changing color.
+     * This only surfaces a one-time banner; it does NOT auto-end the
+     * tournament (that stays a deliberate admin action via the state
+     * change modal / phase system, matching how tournament_end works).
+     */
+    let _winConditionAlertShown = false;
+    function _checkWinCondition() {
+        const target = gameState?.winCondition;
+        if (!target || !gameState?.teams) return;
+        const winner = gameState.teams.find(t => (t.points || 0) >= target);
+        const badge = document.getElementById('winConditionValue')?.closest('.stat-badge');
+
+        if (winner) {
+            if (badge) badge.classList.add('win-reached');
+            if (!_winConditionAlertShown) {
+                _winConditionAlertShown = true;
+                showStatus(`${winner.name || 'A team'} reached ${target} points — win condition met!`, 'success');
+            }
+        } else {
+            if (badge) badge.classList.remove('win-reached');
+            _winConditionAlertShown = false;
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  HEX PLACEMENT POPUP — show which match it's for, gate the wrong team
+    // ══════════════════════════════════════════════════════════════
+    //
+    // The stock popup (admin.js handleHexClick) renders one identical button
+    // per team with zero reference to pendingHexWins — an admin at 3am can
+    // place a hex for any team with no indication of who actually won the
+    // match. This augments the already-rendered popup in place: adds a
+    // "who's owed a placement" banner, badges the correct team button(s),
+    // and gates every OTHER team behind a skippable warning.
+
+    function _pendingTeamIdsSet(pending) {
+        const ids = new Set();
+        pending.forEach(win => {
+            (win.teamIds || []).forEach(id => ids.add(String(id)));
+        });
+        return ids;
+    }
+
+    function _augmentTeamPicker(coord) {
+        const container = document.getElementById('teamPickerOptions');
+        if (!container) return;
+
+        // Scoped to the current phase's slot during hex_placement_1/2, so
+        // Match 2's still-pending winner doesn't show up (or get badged) as
+        // "owed" while the admin is specifically placing Match 1's hex, and
+        // vice versa. Outside those phases, every outstanding win is relevant.
+        const phase = _phaseManager?.getCurrentPhase() || '';
+        const pending = _relevantPendingWinsForPhase(phase);
+
+        // Remove a stale banner from a previous popup open
+        const oldInfo = container.querySelector('.hex-pending-info');
+        if (oldInfo) oldInfo.remove();
+
+        if (pending.length > 0) {
+            const rows = pending.map(win => {
+                const label = win.matchNumber ? `Match #${win.matchNumber}` : 'A match';
+                const names = (win.teamNames || []).join(', ') || 'a team';
+                return `<div class="hex-pending-row">${_esc(label)}: <strong>${_esc(names)}</strong> still needs to place a hex</div>`;
+            }).join('');
+            const info = document.createElement('div');
+            info.className = 'hex-pending-info';
+            info.innerHTML = rows;
+            container.insertBefore(info, container.firstChild);
+        }
+
+        const pendingIds = _pendingTeamIdsSet(pending);
+        if (pendingIds.size === 0) return; // no outstanding win — free-form editing, no gating
+
+        container.querySelectorAll('.team-picker-btn').forEach(btn => {
+            const onclickAttr = btn.getAttribute('onclick') || '';
+            const m = onclickAttr.match(/assignTeamToHex\('([^']*)',\s*(-?\d+|null)\)/);
+            if (!m) return; // room toggle button etc — leave untouched
+            const btnCoord = m[1];
+            const teamIdStr = m[2];
+            if (teamIdStr === 'null') return; // "Clear Hex" button — leave untouched
+
+            if (pendingIds.has(teamIdStr)) {
+                btn.classList.add('team-picker-pending');
+                const badge = document.createElement('span');
+                badge.className = 'pending-badge';
+                badge.textContent = '⏳ owed';
+                btn.appendChild(badge);
+                return;
+            }
+
+            // Not the team that won — allow it, but make the admin confirm first
+            btn.onclick = (e) => {
+                e.preventDefault();
+                const team = gameState?.teams?.find(t => String(t.id) === teamIdStr);
+                const teamName = team?.name || `Team ${teamIdStr}`;
+                const owedNames = pending.flatMap(w => w.teamNames || []).join(', ') || 'another team';
+                _openFlowConfirm({
+                    title: 'Wrong Team?',
+                    bodyHtml: `<p><strong>${_esc(owedNames)}</strong> still owe${
+                        pending.length === 1 && (pending[0].teamNames || []).length === 1 ? 's' : ''
+                    } a hex placement from a recent match win. Assign this hex to <strong>${_esc(teamName)}</strong> instead?</p>`,
+                    confirmLabel: 'Assign Anyway',
+                    danger: true,
+                    onConfirm: () => window.assignTeamToHex(btnCoord, parseInt(teamIdStr, 10))
+                });
+            };
+        });
+    }
+
+    const _origHandleHexClick = window.handleHexClick;
+    window.handleHexClick = function (coord) {
+        _origHandleHexClick(coord);
+        _augmentTeamPicker(coord);
+    };
+
+    // ══════════════════════════════════════════════════════════════
+    //  PLAYER VOTES IN RESULT CONFIRM — who voted what, highlighted
+    // ══════════════════════════════════════════════════════════════
+
+    const _origOpenQuickConfirm = window.openQuickConfirm;
+    window.openQuickConfirm = function (gameId) {
+        _origOpenQuickConfirm(gameId);
+        _injectVoteInfoIntoConfirm(gameId);
+    };
+
+    /**
+     * Augment the stock result-confirm popup with the player vote tally:
+     * per-option rows (count, percentage, voter names) plus a highlight on
+     * the team card the players consider the likely winner.
+     */
+    function _injectVoteInfoIntoConfirm(gameId) {
+        const game = (gameState?.gameQueue || []).find(g => g.id === gameId);
+        if (!game || game.isBreak === true) return;
+        const votes = game.votes || [];
+        if (votes.length === 0) return;
+        const content = document.getElementById('resultConfirmContent');
+        if (!content || content.querySelector('.confirm-votes-block')) return;
+
+        const SIDE_LETTERS = ['A', 'B', 'C', 'D', 'E'];
+        const counts = {};
+        votes.forEach(v => { counts[v.result] = (counts[v.result] || 0) + 1; });
+        const total = votes.length;
+        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        const [bestResult, bestCount] = sorted[0];
+        const bestPct = Math.round((bestCount / total) * 100);
+        const isTie = sorted.filter(([, c]) => c === bestCount).length > 1;
+
+        const labelFor = (result) => {
+            const m = result.match(/side_(\d+)_won/);
+            if (m) return `Side ${SIDE_LETTERS[parseInt(m[1])] || m[1]} wins`;
+            return result === 'draw' ? 'Draw' : result;
+        };
+
+        const rowsHtml = sorted.map(([result, count]) => {
+            const pct = Math.round((count / total) * 100);
+            const names = votes.filter(v => v.result === result)
+                .map(v => _esc(v.playerName || 'Player')).join(', ');
+            const favored = !isTie && result === bestResult;
+            return `<div class="vote-row${favored ? ' favored' : ''}">` +
+                   `<span class="vote-row-label">${labelFor(result)}</span>` +
+                   `<span class="vote-row-bar"><span style="width:${pct}%"></span></span>` +
+                   `<span class="vote-row-count">${count}/${total} &middot; ${pct}%</span>` +
+                   `<div class="vote-row-names">${names}</div>` +
+                   `</div>`;
+        }).join('');
+
+        const badge = isTie
+            ? '<span class="vote-badge disputed">SPLIT VOTE</span>'
+            : (game.voteConsensus?.passedThreshold
+                ? '<span class="vote-badge consensus">CONSENSUS</span>'
+                : `<span class="vote-badge leading">LEADING ${bestPct}%</span>`);
+
+        const block = document.createElement('div');
+        block.className = 'confirm-votes-block';
+        block.innerHTML = `<div class="confirm-votes-title">Player votes ${badge}</div>${rowsHtml}`;
+
+        const actions = content.querySelector('.confirm-actions');
+        if (actions) content.insertBefore(block, actions);
+        else content.appendChild(block);
+
+        // Highlight the team card the players picked as the likely winner
+        if (!isTie) {
+            const m = bestResult.match(/side_(\d+)_won/);
+            if (m) {
+                const card = content.querySelectorAll('.confirm-team')[parseInt(m[1])];
+                if (card) {
+                    card.classList.add('vote-favored');
+                    const pick = document.createElement('div');
+                    pick.className = 'vote-favored-badge';
+                    pick.textContent = `PLAYERS' PICK · ${bestPct}%`;
+                    card.insertBefore(pick, card.firstChild);
+                }
+            }
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  LIVE MATCH EDITING — change players/game on an ongoing match
+    // ══════════════════════════════════════════════════════════════
+    //
+    // The stock openEditMatchModal refuses ongoing matches, but at a LAN
+    // matches change mid-flight (player swap on a restart, broken game
+    // replaced). saveMatchEdits() is status-agnostic, so editing live is
+    // safe — we re-implement the modal init without the "ongoing" block.
+
+    const _origOpenEditMatchModal = window.openEditMatchModal;
+    window.openEditMatchModal = function (gameId) {
+        const game = (gameState?.gameQueue || []).find(g => g.id === gameId);
+        if (!game || game.status !== 'ongoing') {
+            return _origOpenEditMatchModal(gameId);
+        }
+
+        // Same init as the original, minus the ongoing rejection
+        editMatchState.gameId = gameId;
+        editMatchState.game = game.game || game.gameType || '';
+        editMatchState.isChallenge = game.isChallenge || false;
+        const teams = game.teams || game.sides || [];
+        editMatchState.sides = teams.map(team => getMatchTeamPlayers(team));
+        while (editMatchState.sides.length < 2) {
+            editMatchState.sides.push([]);
+        }
+
+        const numEl = document.getElementById('editMatchNumber');
+        if (numEl) numEl.textContent = (game.matchNumber ? `#${game.matchNumber}` : '') + ' — LIVE';
+
+        populateEditGameTypeDropdown();
+        renderEditMatchModal();
+        document.getElementById('editMatchModal').classList.add('active');
+    };
+
+    /** Send a mis-started match back to the queue as not started. */
+    window.revertMatchToQueue = function (gameId) {
+        const game = (gameState?.gameQueue || []).find(g => g.id === gameId);
+        if (!game || game.status !== 'ongoing') return;
+        _openFlowConfirm({
+            title: 'Move Match Back to Queue',
+            bodyHtml: `<p><strong>${_esc(_matchShortLabel(game))}</strong> will return to the queue as not started. Use this when a match was started by mistake or needs a full restart.</p>`,
+            confirmLabel: 'Back to Queue ⏪',
+            onConfirm: async () => {
+                game.status = 'pending';
+                delete game.startedAt;
+                await saveGameState();
+                showStatus('Match moved back to queue.', 'info');
+            }
+        });
+    };
+
+    /**
+     * The shared renderers omit edit controls on ongoing matches — inject
+     * ⚙ (edit live) and ⏪ (back to queue) after every display update.
+     */
+    function _injectLiveMatchControls() {
+        // Ongoing entries in the queue list (have data-queue-id)
+        document.querySelectorAll('#matchQueue .queue-item.ongoing').forEach(el => {
+            const actions = el.querySelector('.match-actions');
+            if (!actions || actions.querySelector('.live-edit-btn')) return;
+            const game = (gameState?.gameQueue || []).find(g => String(g.id) === String(el.dataset.queueId));
+            if (!game || game.isBreak === true) return;
+
+            const editBtn = document.createElement('button');
+            editBtn.className = 'edit-btn live-edit-btn';
+            editBtn.title = 'Edit live match (players / game)';
+            editBtn.textContent = '⚙';
+            editBtn.onclick = (e) => { e.stopPropagation(); window.openEditMatchModal(game.id); };
+
+            const revertBtn = document.createElement('button');
+            revertBtn.className = 'move-top-btn live-revert-btn';
+            revertBtn.title = 'Move back to queue (undo start)';
+            revertBtn.textContent = '⏪';
+            revertBtn.onclick = (e) => { e.stopPropagation(); window.revertMatchToQueue(game.id); };
+
+            actions.insertBefore(revertBtn, actions.firstChild);
+            actions.insertBefore(editBtn, actions.firstChild);
+        });
+
+        // Ongoing match cards above the queue (id only available via onclick attr)
+        document.querySelectorAll('#ongoingMatchesList .ongoing-match').forEach(el => {
+            if (el.querySelector('.live-edit-btn')) return;
+            const m = (el.getAttribute('onclick') || '').match(/openQuickConfirm\((\d+)\)/);
+            if (!m) return;
+            const game = (gameState?.gameQueue || []).find(g => g.id === parseInt(m[1]));
+            if (!game || game.isBreak === true) return;
+            const actions = el.querySelector('.ongoing-actions');
+            if (!actions) return;
+
+            const editBtn = document.createElement('button');
+            editBtn.className = 'btn-small secondary live-edit-btn';
+            editBtn.title = 'Edit live match (players / game)';
+            editBtn.textContent = '⚙';
+            editBtn.onclick = (e) => { e.stopPropagation(); window.openEditMatchModal(game.id); };
+            actions.appendChild(editBtn);
+        });
+    }
+
+    // ── Override old advanceRound to use phase system when available ──
+
+    const _origAdvanceRound = window.advanceRound;
+    window.advanceRound = async function () {
+        if (_phaseManager && gameState.currentPhase) {
+            await window.advancePhase();
+            return;
+        }
+        if (_origAdvanceRound) _origAdvanceRound();
+    };
+
+    // ── Tag every match-creation entry point with round/slot metadata ──
+    // All four are top-level async function declarations in admin.js, so
+    // window.X already exists for each — same override pattern as startMatch.
+
+    const _origAddMatchToQueue = window.addMatchToQueue;
+    window.addMatchToQueue = async function (triggerBtn) {
+        const beforeIds = _snapshotQueueIds();
+        await _origAddMatchToQueue(triggerBtn);
+        await _tagNewQueueEntries(beforeIds);
+    };
+
+    const _origConfirmChallengeSetup = window.confirmChallengeSetup;
+    window.confirmChallengeSetup = async function (triggerBtn) {
+        const beforeIds = _snapshotQueueIds();
+        await _origConfirmChallengeSetup(triggerBtn);
+        await _tagNewQueueEntries(beforeIds);
+    };
+
+    const _origConfirmMassImport = window.confirmMassImport;
+    window.confirmMassImport = async function (triggerBtn) {
+        const beforeIds = _snapshotQueueIds();
+        await _origConfirmMassImport(triggerBtn);
+        await _tagImportedBatch(beforeIds); // sequence-based — see comment above
+    };
+
+    const _origConfirmAutoMatch = window.confirmAutoMatch;
+    window.confirmAutoMatch = async function () {
+        const beforeIds = _snapshotQueueIds();
+        await _origConfirmAutoMatch();
+        await _tagNewQueueEntries(beforeIds);
+    };
+
+    // ── Carry the match's round/slot tag onto its pendingHexWins entry ──
+    // confirmResult() (called by both quickConfirmResult and acceptVotedResult)
+    // is where pendingHexWins.push() happens, deep inside a large function —
+    // wrapping it here is simpler than duplicating that logic.
+
+    const _origConfirmResult = window.confirmResult;
+    window.confirmResult = async function (winnerIndex) {
+        const game = selectedQueuedGame; // capture before the original may clear related state
+        const matchNumber = game?.matchNumber;
+        const roundNumber = game?.roundNumber;
+        const slot = game?.slot;
+
+        await _origConfirmResult(winnerIndex);
+
+        if (matchNumber !== undefined && roundNumber !== undefined) {
+            const win = (pendingHexWins || []).find(w =>
+                w.matchNumber === matchNumber && w.roundNumber === undefined);
+            if (win) {
+                win.roundNumber = roundNumber;
+                win.slot = slot;
+            }
+        }
+    };
+
+})();

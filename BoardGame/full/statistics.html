@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+    ============================================================================
+    STATISTICS.HTML (full) - TOURNAMENT STATISTICS & ANALYSIS
+    ============================================================================
+
+    PURPOSE:
+    Comprehensive statistics view for completed or ongoing tournaments.
+    Displays detailed analytics, match history, team comparisons, and charts.
+
+    FEATURES:
+    - Tournament selector (shows finished and playing tournaments)
+    - Team standings with win/loss records
+    - Match history with filtering
+    - Head-to-head comparison matrix
+    - Progress charts (points, wins over time)
+    - Game type breakdown
+    - Export functionality
+
+    USAGE:
+    - URL parameter: full/statistics.html?tournamentId=xxx
+    - Or select tournament from dropdown
+
+    ACCESS:
+    Public - no authentication required.
+    ============================================================================
+-->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tournament Statistics</title>
+
+    <!-- Favicons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="../shared/images/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../shared/images/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../shared/images/favicon/favicon-16x16.png">
+    <link rel="shortcut icon" href="../shared/images/favicon/favicon.ico">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="../shared/css/brand-theme.css">
+    <link rel="stylesheet" href="../shared/css/navbar.css">
+    <link rel="stylesheet" href="../shared/css/toast.css">
+    <link rel="stylesheet" href="../shared/css/void-gold-theme.css">
+    <link rel="stylesheet" href="css/statistics.css">
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <div>Loading tournament data...</div>
+        </div>
+    </div>
+
+    <!-- Navbar (populated by shared navbar.js) -->
+    <div id="navbar-container"></div>
+    <script src="../shared/scripts/navbar.js"></script>
+
+    <div class="stats-container">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="tournament-selector">
+                <button class="btn secondary" id="refreshBtn" onclick="refreshCurrentTournament()">Refresh</button>
+            </div>
+
+            <div class="tournament-meta" id="tournamentMeta">
+                <span class="meta-item">Status: <strong id="metaStatus">--</strong></span>
+                <span class="meta-item">Rounds: <strong id="metaRounds">--</strong></span>
+                <span class="meta-item">Games: <strong id="metaGames">--</strong></span>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+            <button class="tab-btn" data-tab="leaderboards" onclick="switchTab('leaderboards')">Leaderboards</button>
+            <button class="tab-btn" data-tab="players" onclick="switchTab('players')">Players</button>
+            <button class="tab-btn" data-tab="matches" onclick="switchTab('matches')">Match History</button>
+            <button class="tab-btn" data-tab="headtohead" onclick="switchTab('headtohead')">Head-to-Head</button>
+            <button class="tab-btn" data-tab="games" onclick="switchTab('games')">Game Analysis</button>
+            <div class="action-buttons" style="margin-left: auto;">
+                <button class="btn primary" onclick="generatePDF()">Export PDF</button>
+            </div>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content">
+            <!-- Overview Tab -->
+            <div class="tab-pane active" id="tab-overview">
+                <div class="overview-grid">
+                    <!-- Team Standings -->
+                    <section class="stats-card standings-card">
+                        <h3>Team Standings</h3>
+                        <div class="standings-table" id="standingsTable">
+                            <p class="no-data">Select a tournament to view standings</p>
+                        </div>
+                    </section>
+
+                    <!-- Tournament Summary -->
+                    <section class="stats-card summary-card">
+                        <h3>Tournament Summary</h3>
+                        <div class="summary-stats" id="summaryStats">
+                            <div class="summary-item">
+                                <span class="summary-label">Total Matches</span>
+                                <span class="summary-value" id="summaryMatches">--</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Total Rounds</span>
+                                <span class="summary-value" id="summaryRounds">--</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Avg Match Duration</span>
+                                <span class="summary-value" id="summaryAvgDuration">--</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Challenges Played</span>
+                                <span class="summary-value" id="summaryChallenges">--</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Win Streaks -->
+                    <section class="stats-card streaks-card">
+                        <h3>Notable Streaks</h3>
+                        <div class="streaks-list" id="streaksList">
+                            <p class="no-data">No streak data available</p>
+                        </div>
+                    </section>
+
+                    <!-- Points Progress Chart -->
+                    <section class="stats-card chart-card">
+                        <h3>Points Progress</h3>
+                        <div class="chart-container" id="pointsChartContainer">
+                            <canvas id="pointsChart"></canvas>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Leaderboards Tab -->
+            <div class="tab-pane" id="tab-leaderboards">
+                <section class="stats-card player-leaderboards-card">
+                    <h3>Player Leaderboards</h3>
+                    <div class="leaderboard-tabs">
+                        <button class="leaderboard-tab active" data-leaderboard="wins" onclick="switchLeaderboard('wins')">Most Wins</button>
+                        <button class="leaderboard-tab" data-leaderboard="winrate" onclick="switchLeaderboard('winrate')">Win Rate</button>
+                        <button class="leaderboard-tab" data-leaderboard="games" onclick="switchLeaderboard('games')">Most Games</button>
+                        <button class="leaderboard-tab" data-leaderboard="streak" onclick="switchLeaderboard('streak')">Best Streak</button>
+                    </div>
+                    <div class="leaderboard-content" id="leaderboardContent">
+                        <p class="no-data">Select a tournament to view player leaderboards</p>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Players Tab -->
+            <div class="tab-pane" id="tab-players">
+                <div class="player-stats-grid">
+                    <!-- Player Selector & Stats -->
+                    <section class="stats-card player-detail-card">
+                        <h3>Player Details</h3>
+                        <div class="player-selector">
+                            <select id="playerSelect" onchange="onPlayerSelect(this.value)">
+                                <option value="">Select a player...</option>
+                            </select>
+                        </div>
+                        <div class="player-detail-content" id="playerDetailContent">
+                            <p class="no-data">Select a player to view detailed statistics</p>
+                        </div>
+                    </section>
+
+                    <!-- Player Game Performance -->
+                    <section class="stats-card player-games-card">
+                        <h3>Performance by Game</h3>
+                        <div class="player-game-stats" id="playerGameStats">
+                            <p class="no-data">Select a player</p>
+                        </div>
+                    </section>
+
+                    <!-- Player Format Performance -->
+                    <section class="stats-card player-format-card">
+                        <h3>Performance by Format</h3>
+                        <div class="player-format-stats" id="playerFormatStats">
+                            <p class="no-data">Select a player</p>
+                        </div>
+                    </section>
+
+                    <!-- Player Recent Form -->
+                    <section class="stats-card player-form-card">
+                        <h3>Recent Form (Last 10)</h3>
+                        <div class="player-recent-form" id="playerRecentForm">
+                            <p class="no-data">Select a player</p>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Player Head-to-Head Matrix -->
+                <section class="stats-card player-h2h-card">
+                    <h3>Player Head-to-Head</h3>
+                    <div class="player-h2h-info">Win rate when playing against each opponent</div>
+                    <div class="player-h2h-matrix" id="playerH2HMatrix">
+                        <p class="no-data">Select a player to see head-to-head records</p>
+                    </div>
+                </section>
+
+                <!-- Teammate Synergy -->
+                <section class="stats-card teammate-synergy-card">
+                    <h3>Teammate Synergy</h3>
+                    <div class="teammate-synergy-info">Win rate when playing with each teammate</div>
+                    <div class="teammate-synergy-content" id="teammateSynergyContent">
+                        <p class="no-data">Select a player to see teammate synergy</p>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Match History Tab -->
+            <div class="tab-pane" id="tab-matches">
+                <div class="matches-filters">
+                    <select id="filterTeam" onchange="filterMatches()">
+                        <option value="">All Teams</option>
+                    </select>
+                    <select id="filterGame" onchange="filterMatches()">
+                        <option value="">All Games</option>
+                    </select>
+                    <select id="filterResult" onchange="filterMatches()">
+                        <option value="">All Results</option>
+                        <option value="won">Wins Only</option>
+                        <option value="lost">Losses Only</option>
+                    </select>
+                    <input type="search" id="filterSearch" placeholder="Search player names..." oninput="filterMatches()">
+                </div>
+                <div class="matches-list" id="matchesList">
+                    <p class="no-data">Select a tournament to view match history</p>
+                </div>
+            </div>
+
+            <!-- Head-to-Head Tab -->
+            <div class="tab-pane" id="tab-headtohead">
+                <div class="h2h-matrix-container" id="h2hMatrixContainer">
+                    <p class="no-data">Select a tournament to view head-to-head records</p>
+                </div>
+                <div class="h2h-detail" id="h2hDetail">
+                    <p class="h2h-hint">Click a cell in the matrix to see detailed matchup history</p>
+                </div>
+            </div>
+
+            <!-- Game Analysis Tab -->
+            <div class="tab-pane" id="tab-games">
+                <div class="games-grid">
+                    <section class="stats-card game-breakdown-card">
+                        <h3>Games Breakdown</h3>
+                        <div class="game-breakdown" id="gameBreakdown">
+                            <p class="no-data">No game data available</p>
+                        </div>
+                    </section>
+
+                    <section class="stats-card team-game-stats-card">
+                        <h3>Team Performance by Game</h3>
+                        <div class="team-game-stats" id="teamGameStats">
+                            <p class="no-data">No data available</p>
+                        </div>
+                    </section>
+
+                    <section class="stats-card format-breakdown-card">
+                        <h3>Format Breakdown</h3>
+                        <div class="format-breakdown" id="formatBreakdown">
+                            <p class="no-data">No format data available</p>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF Generation Overlay -->
+    <div id="pdfOverlay" class="pdf-overlay hidden">
+        <div class="pdf-progress">
+            <div class="spinner"></div>
+            <div>Generating PDF...</div>
+            <div class="pdf-progress-text" id="pdfProgressText">Preparing tournament data</div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script>window.BOARDGAME_BASE = '..';</script>
+    <script src="../shared/scripts/firebase-loader.js"></script>
+    <script src="../shared/scripts/config.js"></script>
+    <script src="../shared/scripts/player-utils.js"></script>
+    <script src="../shared/scripts/games-config.js"></script>
+    <script src="../shared/vendor/chart.min.js"></script>
+    <script src="../shared/vendor/jspdf.umd.min.js"></script>
+    <script src="../shared/vendor/jspdf.plugin.autotable.min.js"></script>
+    <script src="../shared/scripts/toast.js"></script>
+    <script src="../shared/scripts/pdf-generator.js"></script>
+    <script src="scripts/statistics.js"></script>
+</body>
+</html>

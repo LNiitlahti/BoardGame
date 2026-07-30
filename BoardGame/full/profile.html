@@ -92,18 +92,6 @@
       display: block;
     }
 
-    .avatar-placeholder {
-      width: 100%; height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(135deg, rgba(30,32,42,0.9), rgba(14,16,22,0.95));
-      color: #c8b37e;
-      font-family: 'Russo One', sans-serif;
-      font-size: 1.6rem;
-      letter-spacing: 0.05em;
-    }
-
     .avatar-overlay {
       position: absolute;
       inset: 0;
@@ -613,8 +601,7 @@
     <div class="profile-header">
       <div style="display: flex; align-items: center; gap: 16px;">
         <div class="avatar-container" id="avatarContainer" onclick="triggerAvatarUpload()" title="Click to change avatar">
-          <div class="avatar-placeholder" id="avatarPlaceholder">?</div>
-          <img class="avatar-img" id="avatarImg" style="display: none;" alt="Avatar">
+          <img class="avatar-img" id="avatarImg" src="../shared/images/default_avatar.png" alt="Avatar" onerror="this.onerror=null;this.src='../shared/images/default_avatar.png';">
           <div class="avatar-overlay" id="avatarOverlay">Change</div>
         </div>
         <div>
@@ -654,6 +641,12 @@
           <button class="btn-small btn-secondary" onclick="editDisplayName()" style="margin-left: 10px; padding: 4px 10px; font-size: 0.7rem;">Edit</button>
         </div>
 
+        <div class="info-label">Full Name:</div>
+        <div class="info-value">
+          <span id="fullNameValue">Loading...</span>
+          <button class="btn-small btn-secondary" onclick="editFullName()" style="margin-left: 10px; padding: 4px 10px; font-size: 0.7rem;">Edit</button>
+        </div>
+
         <div class="info-label">Email:</div>
         <div class="info-value" id="emailValue">Loading...</div>
 
@@ -681,6 +674,18 @@
           <input type="text" id="newDisplayName" placeholder="Enter new display name">
           <button class="btn-small btn-primary" onclick="updateDisplayName()" style="white-space: nowrap;">Update Name</button>
         </div>
+      </div>
+
+      <div class="form-group">
+        <label>Change Full Name</label>
+        <div style="display: flex; gap: 10px;">
+          <input type="text" id="newFirstName" placeholder="First name">
+          <input type="text" id="newLastName" placeholder="Last name">
+          <button class="btn-small btn-primary" onclick="updateFullName()" style="white-space: nowrap;">Update Name</button>
+        </div>
+        <small>
+          Helps tournament organizers identify players.
+        </small>
       </div>
 
       <div class="form-group">
@@ -792,6 +797,14 @@
           document.getElementById('displayNameValue').textContent = displayName;
           document.getElementById('newDisplayName').value = displayName;
 
+          // Full name
+          const firstName = userProfile.firstName || '';
+          const lastName = userProfile.lastName || '';
+          const fullName = `${firstName} ${lastName}`.trim();
+          document.getElementById('fullNameValue').textContent = fullName || 'Not set';
+          document.getElementById('newFirstName').value = firstName;
+          document.getElementById('newLastName').value = lastName;
+
           // Avatar
           loadAvatar(displayName);
 
@@ -829,18 +842,7 @@
 
     function loadAvatar(displayName) {
       const img = document.getElementById('avatarImg');
-      const placeholder = document.getElementById('avatarPlaceholder');
-
-      if (userProfile.avatarUrl) {
-        img.src = userProfile.avatarUrl;
-        img.style.display = 'block';
-        placeholder.style.display = 'none';
-      } else {
-        img.style.display = 'none';
-        placeholder.style.display = 'flex';
-        const initials = (displayName || '?').charAt(0).toUpperCase();
-        placeholder.textContent = initials;
-      }
+      img.src = userProfile.avatarUrl || '../shared/images/default_avatar.png';
     }
 
     // ── Crop Modal State ──
@@ -1081,10 +1083,7 @@
 
         // Update UI
         const img = document.getElementById('avatarImg');
-        const placeholder = document.getElementById('avatarPlaceholder');
         img.src = avatarUrl;
-        img.style.display = 'block';
-        placeholder.style.display = 'none';
 
         if (userProfile) userProfile.avatarUrl = avatarUrl;
 
@@ -1459,6 +1458,10 @@
       document.getElementById('newDisplayName').focus();
     };
 
+    window.editFullName = function() {
+      document.getElementById('newFirstName').focus();
+    };
+
     window.updateDisplayName = async function() {
       const newName = document.getElementById('newDisplayName').value.trim();
 
@@ -1479,6 +1482,26 @@
       } catch (error) {
         console.error('[Profile] Error updating display name:', error);
         errorHandler.handleFirebaseError(error, 'updateDisplayName');
+      }
+    };
+
+    window.updateFullName = async function() {
+      const firstName = document.getElementById('newFirstName').value.trim();
+      const lastName = document.getElementById('newLastName').value.trim();
+
+      try {
+        await db.collection('users').doc(currentUser.uid).update({
+          firstName: firstName,
+          lastName: lastName,
+          updatedAt: new Date().toISOString()
+        });
+
+        document.getElementById('fullNameValue').textContent = `${firstName} ${lastName}`.trim() || 'Not set';
+        errorHandler.showSuccess('Full name updated successfully!');
+        await loadUserProfile();
+      } catch (error) {
+        console.error('[Profile] Error updating full name:', error);
+        errorHandler.handleFirebaseError(error, 'updateFullName');
       }
     };
 

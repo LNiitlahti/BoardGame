@@ -207,21 +207,6 @@
     flex-shrink: 0;
 }
 
-.navbar-avatar-placeholder {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(30, 32, 42, 0.8);
-    color: var(--nav-gold, #c8b37e);
-    font-family: 'Russo One', sans-serif;
-    font-size: 0.75rem;
-    border: 1.5px solid rgba(200, 179, 126, 0.3);
-    flex-shrink: 0;
-}
-
 /* Role Badges */
 .navbar-role-badge {
     padding: 4px 10px;

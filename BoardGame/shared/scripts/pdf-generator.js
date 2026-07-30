@@ -3,7 +3,7 @@
  * PDF GENERATOR (Shared)
  * ====================================
  * Generates comprehensive tournament PDF reports.
- * Used by both lightweight/statistics.html and full/god.html.
+ * Used by statistics.html (lightweight and full) and full/god.html.
  *
  * Dependencies:
  *   - window.gameState (tournament data)

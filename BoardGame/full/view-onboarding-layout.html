@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+    ============================================================================
+    VIEW-ONBOARDING-LAYOUT.HTML (full) - ROOM SEATING ONBOARDING VIEW
+    ============================================================================
+
+    PURPOSE:
+    Read-only room layout view showing player onboarding progress.
+    Shows physical seating arrangement with live progress data from Firebase.
+
+    USAGE:
+    Open with tournament ID: full/view-onboarding-layout.html?tournamentId=xxx
+
+    ============================================================================
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>Onboarding Layout</title>
+
+<!-- Favicons -->
+<link rel="apple-touch-icon" sizes="180x180" href="../shared/images/favicon/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="../shared/images/favicon/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="../shared/images/favicon/favicon-16x16.png">
+<link rel="shortcut icon" href="../shared/images/favicon/favicon.ico">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/css/fantasy-mountain-theme.css">
+
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-void: #050710;
+    --bg-deep: #080b14;
+    --bg-panel: rgba(10, 13, 22, 0.94);
+    --bg-glass: rgba(16, 20, 32, 0.8);
+    --gold: #c8b37e;
+    --gold-bright: #e8d8a8;
+    --gold-glow: rgba(200, 179, 126, 0.3);
+    --gold-dim: rgba(200, 179, 126, 0.1);
+    --text-bright: #f2f4f7;
+    --text-primary: #c8ccd6;
+    --text-muted: #6a7088;
+    --text-dim: #3a3f52;
+    --border-faint: rgba(255, 255, 255, 0.05);
+    --border-gold: rgba(200, 179, 126, 0.2);
+    --live: #00e080;
+    --live-glow: rgba(0, 224, 128, 0.25);
+    --danger: #d84040;
+    --warning: #e8a020;
+
+    /* Team colors (overridden by Firebase data) */
+    --t1: #de392c;
+    --t2: #2278a3;
+    --t3: #2e9158;
+    --t4: #f7ba32;
+    --t5: #7a4fbf;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 1920px;
+    height: 1080px;
+    font-family: 'Quantico', sans-serif;
+    color: var(--text-primary);
+    overflow: hidden;
+    transform-origin: top left;
+  }
+
+  #mainContent {
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+  }
+
+  /* ── Status indicator (top-right corner) ── */
+  .status-corner {
+    position: fixed;
+    top: 16px;
+    right: 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 50;
+  }
+
+  .info-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--danger);
+  }
+
+  .info-dot.connected {
+    background: var(--live);
+    box-shadow: 0 0 8px var(--live);
+    animation: pulse 6s ease-in-out infinite;
+  }
+
+  .info-clock {
+    font-family: 'Quantico', sans-serif;
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  /* ── Page title ── */
+  .page-title {
+    font-family: 'Russo One', sans-serif;
+    font-size: 48px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--gold-bright);
+    text-shadow: 0 0 40px var(--gold-glow);
+    margin-bottom: 14px;
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    width: 100%;
+  }
+
+  .page-title::after {
+    content: '';
+    display: block;
+    width: 50%;
+    height: 1px;
+    margin: 10px auto 0;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+
+  /* ── Mountain silhouette background ── */
+  .mountain-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .mountain-bg::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: -5%;
+    width: 110%;
+    height: 55%;
+    background:
+      linear-gradient(135deg, transparent 42%, rgba(20, 22, 32, 0.9) 42.5%, rgba(20, 22, 32, 0.9) 43%, transparent 43.5%),
+      linear-gradient(128deg, transparent 30%, rgba(15, 17, 26, 0.95) 30.5%, rgba(15, 17, 26, 0.95) 31%, transparent 31.5%),
+      linear-gradient(52deg, transparent 30%, rgba(15, 17, 26, 0.95) 30.5%, rgba(15, 17, 26, 0.95) 31%, transparent 31.5%),
+      linear-gradient(145deg, transparent 38%, rgba(18, 20, 30, 0.85) 38.5%, rgba(18, 20, 30, 0.85) 39%, transparent 39.5%),
+      linear-gradient(35deg, transparent 38%, rgba(18, 20, 30, 0.85) 38.5%, rgba(18, 20, 30, 0.85) 39%, transparent 39.5%);
+  }
+
+  .mountain-bg::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 30%;
+    background: linear-gradient(to top, var(--bg-void) 20%, transparent);
+  }
+
+  /* Stars effect */
+  .stars {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(1px 1px at 15% 12%, rgba(255,255,255,0.4), transparent),
+      radial-gradient(1px 1px at 35% 8%, rgba(255,255,255,0.3), transparent),
+      radial-gradient(1.5px 1.5px at 55% 18%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1px 1px at 72% 6%, rgba(255,255,255,0.35), transparent),
+      radial-gradient(1px 1px at 88% 15%, rgba(255,255,255,0.3), transparent),
+      radial-gradient(1.5px 1.5px at 25% 25%, rgba(255,255,255,0.25), transparent),
+      radial-gradient(1px 1px at 48% 5%, rgba(255,255,255,0.4), transparent),
+      radial-gradient(1px 1px at 65% 22%, rgba(255,255,255,0.3), transparent),
+      radial-gradient(1.5px 1.5px at 82% 10%, rgba(255,255,255,0.35), transparent),
+      radial-gradient(1px 1px at 10% 30%, rgba(255,255,255,0.2), transparent),
+      radial-gradient(1px 1px at 42% 28%, rgba(255,255,255,0.25), transparent),
+      radial-gradient(1px 1px at 95% 20%, rgba(255,255,255,0.3), transparent);
+  }
+
+  /* Atmospheric glow */
+  .atmo {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% 30%, rgba(200, 179, 126, 0.04), transparent 60%),
+      radial-gradient(ellipse 60% 40% at 50% 70%, rgba(80, 100, 140, 0.06), transparent 50%);
+  }
+
+  /* ── Room container ── */
+  .room {
+    position: relative;
+    z-index: 2;
+    width: 1700px;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    justify-content: space-between;
+
+    background:
+      linear-gradient(180deg, rgba(30, 32, 42, 0.6), rgba(14, 16, 22, 0.7));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+
+    border: 2px solid var(--border-gold);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+
+    box-shadow:
+      0 25px 60px rgba(0, 0, 0, 0.7),
+      0 0 80px rgba(200, 179, 126, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  /* ── Walls ── */
+  .wall {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+  }
+
+  .wall-left {
+    border-right: 1px solid var(--border-gold);
+    width: 480px;
+  }
+
+  .wall-right {
+    border-left: 1px solid var(--border-gold);
+    width: 480px;
+  }
+
+  .wall-label {
+    font-family: 'Russo One', sans-serif;
+    font-size: 18px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--gold);
+    text-align: center;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--gold-dim);
+    margin-bottom: 4px;
+  }
+
+  /* ── Player seats ── */
+  .player {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    padding: 14px 20px;
+    gap: 8px;
+    flex: 1;
+    min-height: 0;
+    position: relative;
+
+    font-family: 'Quantico', sans-serif;
+    color: var(--text-primary);
+
+    background:
+      linear-gradient(180deg, rgba(40, 42, 55, 0.7), rgba(20, 22, 32, 0.8));
+    border: 1px solid var(--border-faint);
+    border-radius: 6px;
+
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+
+  .player.complete {
+    border-color: rgba(0, 224, 128, 0.3);
+    box-shadow:
+      0 0 15px rgba(0, 224, 128, 0.15),
+      0 4px 12px rgba(0, 0, 0, 0.4),
+      inset 0 0 20px rgba(0, 224, 128, 0.03);
+    animation: complete-glow 4s ease-in-out infinite;
+  }
+
+  .player.complete::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(0, 224, 128, 0.06) 0%, transparent 60%);
+    pointer-events: none;
+    border-radius: 4px;
+  }
+
+  .player-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .player-name {
+    font-size: 26px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    color: var(--text-bright);
+  }
+
+  .player-status {
+    font-size: 22px;
+    flex-shrink: 0;
+    min-width: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .player-pct {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .player-pct.done {
+    color: var(--live);
+  }
+
+  .player-bar-bg {
+    width: 100%;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border-faint);
+  }
+
+  .player-bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 2s cubic-bezier(0.22, 1, 0.36, 1);
+    width: 0%;
+  }
+
+  .player-bar-fill.low { background: linear-gradient(90deg, var(--danger), rgba(216,64,64,0.6)); }
+  .player-bar-fill.mid { background: linear-gradient(90deg, var(--warning), rgba(232,160,32,0.6)); }
+  .player-bar-fill.high { background: linear-gradient(90deg, var(--gold), rgba(200,179,126,0.6)); }
+  .player-bar-fill.done { background: linear-gradient(90deg, var(--live), rgba(0,224,128,0.6)); box-shadow: 0 0 6px var(--live-glow); }
+
+  .player-stats-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+  }
+
+  .player-stat-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+  }
+
+  .stat-dots {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .stat-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: background 0.5s, border-color 0.5s, box-shadow 0.5s;
+  }
+
+  .stat-dot.filled {
+    background: var(--gold);
+    border-color: rgba(200, 179, 126, 0.5);
+    box-shadow: 0 0 6px var(--gold-glow);
+  }
+
+  .stat-dots.all-complete .stat-dot.filled {
+    background: var(--live);
+    border-color: rgba(0, 224, 128, 0.5);
+    box-shadow: 0 0 6px var(--live-glow);
+  }
+
+  .stat-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+
+  .stat-count {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+
+  .stat-dots.all-complete + .stat-meta .stat-count {
+    color: var(--live);
+  }
+
+  /* ── Team colors on player cards ── */
+  .player.team-1 { border-left: 4px solid var(--t1); }
+  .player.team-2 { border-left: 4px solid var(--t2); }
+  .player.team-3 { border-left: 4px solid var(--t3); }
+  .player.team-4 { border-left: 4px solid var(--t4); }
+  .player.team-5 { border-left: 4px solid var(--t5); }
+
+  .wall-right .player.team-1 { border-left: none; border-right: 4px solid var(--t1); }
+  .wall-right .player.team-2 { border-left: none; border-right: 4px solid var(--t2); }
+  .wall-right .player.team-3 { border-left: none; border-right: 4px solid var(--t3); }
+  .wall-right .player.team-4 { border-left: none; border-right: 4px solid var(--t4); }
+  .wall-right .player.team-5 { border-left: none; border-right: 4px solid var(--t5); }
+
+  /* ── Seat numbers ── */
+  .seat-num {
+    display: inline-block;
+    font-size: 16px;
+    color: var(--gold);
+    opacity: 0.5;
+    margin-right: 8px;
+    font-family: 'Quantico', sans-serif;
+    flex-shrink: 0;
+  }
+
+  /* ── Middle / door area ── */
+  .middle {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 16px 32px;
+    position: relative;
+    gap: 20px;
+  }
+
+  .middle-stats {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .overall-pct {
+    font-family: 'Russo One', sans-serif;
+    font-size: 100px;
+    color: var(--gold-bright);
+    text-shadow: 0 0 50px var(--gold-glow);
+    letter-spacing: 2px;
+    line-height: 1;
+  }
+
+  .overall-pct.all-done {
+    color: var(--live);
+    text-shadow: 0 0 50px var(--live-glow);
+  }
+
+  .overall-label {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 4px;
+  }
+
+  .overall-ready {
+    font-family: 'Russo One', sans-serif;
+    font-size: 34px;
+    color: var(--text-muted);
+    letter-spacing: 3px;
+  }
+
+  .overall-ready.all-ready {
+    color: var(--live);
+    text-shadow: 0 0 16px var(--live-glow);
+  }
+
+  /* ── Games grid (middle area) ── */
+  .middle-games {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    width: 100%;
+    padding: 0 8px;
+  }
+
+  .game-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 10px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-faint);
+    border-radius: 6px;
+    transition: border-color 0.5s, box-shadow 0.5s;
+  }
+
+  .game-cell-logo {
+    width: 48px;
+    height: 48px;
+    border-radius: 6px;
+    object-fit: cover;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .game-cell-logo-fallback {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+  }
+
+  .game-cell.all-tested {
+    border-color: rgba(0, 224, 128, 0.25);
+    box-shadow: 0 0 12px rgba(0, 224, 128, 0.1);
+  }
+
+  .game-cell-name {
+    font-family: 'Russo One', sans-serif;
+    font-size: 13px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    text-align: center;
+  }
+
+  .game-cell.all-tested .game-cell-name {
+    color: var(--live);
+  }
+
+  .game-cell-dots {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+  }
+
+  .game-cell-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: background 0.5s, border-color 0.5s, box-shadow 0.5s;
+  }
+
+  .game-cell-dot.filled {
+    background: var(--gold);
+    border-color: rgba(200, 179, 126, 0.5);
+    box-shadow: 0 0 4px var(--gold-glow);
+  }
+
+  .game-cell.all-tested .game-cell-dot.filled {
+    background: var(--live);
+    border-color: rgba(0, 224, 128, 0.5);
+    box-shadow: 0 0 4px var(--live-glow);
+  }
+
+  .game-cell-count {
+    font-family: 'Quantico', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dim);
+  }
+
+  .game-cell.all-tested .game-cell-count {
+    color: var(--live);
+  }
+
+  .door-label {
+    font-family: 'Russo One', sans-serif;
+    font-size: 20px;
+    color: var(--gold);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    opacity: 0.7;
+    margin-top: auto;
+  }
+
+  /* Side walls extending down for the door opening */
+  .room::before, .room::after {
+    content: '';
+    position: absolute;
+    bottom: -20px;
+    width: 2px;
+    height: 20px;
+    background: linear-gradient(to bottom, var(--gold), transparent);
+  }
+
+  .room::before { left: -2px; }
+  .room::after  { right: -2px; }
+
+  /* Door opening floor line */
+  .door-floor {
+    position: relative;
+    z-index: 2;
+    width: 1704px;
+    display: flex;
+    justify-content: center;
+    padding-top: 24px;
+  }
+
+  .door-floor::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+      var(--gold),
+      transparent 30%,
+      transparent 70%,
+      var(--gold)
+    );
+  }
+
+  /* ── Loading ── */
+  .loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-void);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    z-index: 100;
+    transition: opacity 0.5s ease;
+  }
+
+  .loading-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 3px solid var(--border-faint);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .loading-text {
+    font-family: 'Russo One', sans-serif;
+    font-size: 14px;
+    color: var(--text-dim);
+    letter-spacing: 3px;
+  }
+
+  .error-container {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-void);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+
+  .error-message {
+    text-align: center;
+    color: var(--danger);
+    font-family: 'Russo One', sans-serif;
+    font-size: 18px;
+    letter-spacing: 3px;
+  }
+
+  /* ── Animations ── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+  @keyframes complete-glow {
+    0%, 100% { box-shadow: 0 0 15px rgba(0, 224, 128, 0.15), 0 4px 12px rgba(0, 0, 0, 0.4); }
+    50% { box-shadow: 0 0 30px rgba(0, 224, 128, 0.3), 0 4px 12px rgba(0, 0, 0, 0.4); }
+  }
+
+  /* ── Completion overlay ── */
+  .completion-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .completion-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .completion-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(5, 7, 16, 0.6);
+    animation: overlay-fade-in 2s ease forwards;
+  }
+
+  @keyframes overlay-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  body.onboarding-complete #mainContent,
+  body.onboarding-complete .stars,
+  body.onboarding-complete .mountain-bg,
+  body.onboarding-complete .atmo,
+  body.onboarding-complete .status-corner,
+  body.onboarding-complete .page-title {
+    transition: filter 3s ease;
+    filter: blur(12px);
+  }
+
+  .completion-text {
+    position: relative;
+    z-index: 1;
+    font-family: 'Russo One', sans-serif;
+    color: var(--live);
+    text-transform: uppercase;
+    letter-spacing: 0.3em;
+    white-space: nowrap;
+    text-align: center;
+    font-size: 20px;
+    width: 90%;
+    animation: text-grow 4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    text-shadow:
+      0 0 60px rgba(0, 224, 128, 0.6),
+      0 0 120px rgba(0, 224, 128, 0.3);
+  }
+
+  @keyframes text-grow {
+    0%   { font-size: 20px; opacity: 0; letter-spacing: 0.3em; }
+    15%  { opacity: 1; }
+    100% { font-size: 90px; letter-spacing: 0.15em; }
+  }
+
+  .completion-countdown {
+    position: fixed;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 201;
+    font-family: 'Quantico', sans-serif;
+    font-size: 16px;
+    color: var(--text-muted);
+    letter-spacing: 3px;
+    opacity: 0;
+    animation: fade-in-delayed 1s 4s ease forwards;
+  }
+
+  @keyframes fade-in-delayed {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* ── Dev controls ── */
+  .dev-controls {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    padding: 8px 0;
+  }
+
+  .dev-controls button {
+    background: none;
+    border: 1px solid var(--border-gold);
+    color: var(--text-dim);
+    font-family: 'Quantico', sans-serif;
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+  }
+
+  .dev-controls button:hover {
+    color: var(--gold);
+    border-color: var(--gold);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="stars"></div>
+<div class="mountain-bg"></div>
+<div class="atmo"></div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Loading onboarding data...</div>
+</div>
+
+<!-- Error Container -->
+<div id="errorContainer" class="error-container" style="display: none;">
+    <div class="error-message" id="errorText">Something went wrong.</div>
+</div>
+
+<!-- Status indicator (top-right) -->
+<div class="status-corner">
+    <div class="info-dot" id="connectionDot"></div>
+    <span class="info-clock" id="clock">00:00</span>
+</div>
+
+<!-- Main content (hidden until data loads) -->
+<div id="mainContent" style="display: none;">
+    <h1 class="page-title" id="pageTitle">Loading...</h1>
+
+    <div class="room">
+      <div class="wall wall-left" id="wallLeft"></div>
+
+      <div class="middle">
+        <div class="middle-stats">
+          <div class="overall-pct" id="overallPercent">0%</div>
+          <div class="overall-label">Overall Progress</div>
+          <div class="overall-ready" id="readyCount">0/10 Ready</div>
+        </div>
+        <div class="middle-games" id="gamesGrid"></div>
+        <div class="dev-controls" id="devControls">
+          <button onclick="triggerCompletion()">Complete</button>
+          <button onclick="resetCompletion()">Reset</button>
+        </div>
+        <div class="door-label">&#8595; Door &#8595;</div>
+      </div>
+
+      <div class="wall wall-right" id="wallRight"></div>
+    </div>
+
+    <div class="door-floor"></div>
+</div>
+
+<!-- Completion Overlay -->
+<div class="completion-overlay" id="completionOverlay">
+    <div class="completion-text">Onboarding Complete</div>
+</div>
+<div class="completion-countdown" id="completionCountdown"></div>
+
+<!-- Scripts -->
+<script>window.BOARDGAME_BASE = '..';</script>
+<script>
+    function applyScale() {
+        const sx = window.innerWidth / 1920;
+        const sy = window.innerHeight / 1080;
+        const scale = Math.min(sx, sy);
+        document.body.style.transform = `scale(${scale})`;
+    }
+    window.addEventListener('resize', applyScale);
+    window.addEventListener('load', applyScale);
+    applyScale();
+</script>
+<script src="../shared/scripts/firebase-loader.js"></script>
+<script src="../shared/scripts/games-config.js"></script>
+
+<script>
+    // =================================================================
+    // STATE
+    // =================================================================
+
+    const STATUS_EMOJIS = { eating: '🍔', smoking: '🚬', wc: '🚽', sleeping: '😴', alert: '❗', question: '❓' };
+
+    let gameState = null;
+    let onboardingState = null;
+    let tournamentId = null;
+    let unsubscribe = null;
+    let onboardingUnsubscribe = null;
+    let isFirstRender = true;
+    let prevGameIds = null;
+    let prevSeatingOrder = null;
+    let completionTriggered = false;
+    let redirectTimer = null;
+
+    // =================================================================
+    // INITIALIZATION
+    // =================================================================
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        tournamentId = urlParams.get('tournamentId') || urlParams.get('tournament');
+
+        if (!tournamentId) {
+            showError('No tournament ID specified. Use ?tournamentId=xxx');
+            return;
+        }
+
+        updateClock();
+        setInterval(updateClock, 1000);
+    });
+
+    document.addEventListener('firebase-ready', function() {
+        if (!tournamentId) return;
+        setupListener();
+    });
+
+    // Clean up Firebase listeners on page unload
+    window.addEventListener('beforeunload', function() {
+        if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+        if (onboardingUnsubscribe) { onboardingUnsubscribe(); onboardingUnsubscribe = null; }
+    });
+
+    // =================================================================
+    // FIREBASE LISTENER
+    // =================================================================
+
+    function setupListener() {
+        const db = window.firebaseDB;
+        const tournamentRef = db.collection('tournaments').doc(tournamentId);
+
+        // Listen to main tournament document
+        unsubscribe = window.firebaseOnSnapshot(tournamentRef, (docSnapshot) => {
+            if (docSnapshot.exists) {
+                gameState = docSnapshot.data();
+                gameState.id = tournamentId;
+
+                document.getElementById('connectionDot').classList.add('connected');
+                tryRender();
+            } else {
+                showError('Tournament not found: ' + tournamentId);
+            }
+        }, (error) => {
+            console.error('Firebase listener error:', error);
+            document.getElementById('connectionDot').classList.remove('connected');
+        });
+
+        // Listen to onboarding subcollection
+        const onboardingRef = db.collection('tournaments').doc(tournamentId)
+            .collection('onboarding').doc('state');
+
+        onboardingUnsubscribe = window.firebaseOnSnapshot(onboardingRef, (docSnapshot) => {
+            if (docSnapshot.exists) {
+                onboardingState = docSnapshot.data();
+            } else {
+                // Fallback: check main doc for legacy data
+                onboardingState = gameState?.onboarding || null;
+            }
+            tryRender();
+        }, (error) => {
+            console.error('Onboarding listener error:', error);
+        });
+    }
+
+    function tryRender() {
+        if (!gameState || !onboardingState) return;
+        hideLoading();
+        document.getElementById('mainContent').style.display = 'flex';
+        render();
+    }
+
+    // =================================================================
+    // DATA HELPERS
+    // =================================================================
+
+    function getAllPlayerIds() {
+        const ids = [];
+        const teams = gameState?.teams || [];
+        for (const team of teams) {
+            for (const player of (team.players || [])) {
+                if (player.id) ids.push(player.id);
+            }
+        }
+        return ids;
+    }
+
+    function getPlayerMapping() {
+        const teams = gameState?.teams || [];
+
+        // Build logical player list (same iteration order as admin)
+        const logicalPlayers = [];
+        for (const team of teams) {
+            for (const player of (team.players || [])) {
+                if (!player.id) continue;
+                logicalPlayers.push({
+                    playerId: player.id,
+                    name: player.name || player.id,
+                    teamId: team.id,
+                    teamName: team.name || 'Team ' + team.id,
+                    teamColor: team.color || '#666666'
+                });
+            }
+        }
+
+        // Apply seating order
+        const seatingOrder = gameState?.seatingOrder;
+        const playerCount = logicalPlayers.length;
+        const hasCustomSeating = Array.isArray(seatingOrder) && seatingOrder.length === playerCount;
+
+        const mapping = {};
+        for (let seat = 1; seat <= playerCount; seat++) {
+            const logicalIndex = hasCustomSeating
+                ? (seatingOrder[seat - 1] - 1)
+                : (seat - 1);
+            mapping[seat] = logicalPlayers[logicalIndex] || logicalPlayers[seat - 1];
+        }
+
+        return mapping;
+    }
+
+    function getSelectedGames() {
+        const selectedGames = gameState?.selectedGames || [];
+        return selectedGames.map(gameId => {
+            if (typeof GAMES_CONFIG !== 'undefined') {
+                const game = GAMES_CONFIG.getGame(gameId);
+                if (game) return { id: gameId, ...game };
+            }
+            if (gameState?.gameDefinitions?.[gameId]) {
+                return { id: gameId, ...gameState.gameDefinitions[gameId] };
+            }
+            return { id: gameId, name: gameId, icon: '🎮' };
+        });
+    }
+
+    function getPlayerProgress(playerId) {
+        const playerData = onboardingState?.players?.[playerId] || {};
+        const games = getSelectedGames();
+        const allIds = getAllPlayerIds();
+        const otherIds = allIds.filter(id => id !== playerId);
+        const totalFriends = otherIds.length;
+        const totalGames = games.length;
+        const totalTasks = totalFriends + totalGames;
+
+        let friendsComplete = 0;
+        for (const otherId of otherIds) {
+            if (playerData.friendsAdded?.[otherId]) {
+                friendsComplete++;
+            }
+        }
+
+        let gamesComplete = 0;
+        for (const game of games) {
+            if (playerData.gamesTested?.[game.id]) {
+                gamesComplete++;
+            }
+        }
+
+        const completed = friendsComplete + gamesComplete;
+        const percent = totalTasks > 0 ? Math.round((completed / totalTasks) * 100) : 0;
+
+        return {
+            friendsComplete,
+            friendsTotal: totalFriends,
+            gamesComplete,
+            gamesTotal: totalGames,
+            percent,
+            isComplete: percent === 100
+        };
+    }
+
+    // =================================================================
+    // RENDERING
+    // =================================================================
+
+    function render() {
+        const playerMapping = getPlayerMapping();
+        const games = getSelectedGames();
+        const teams = gameState?.teams || [];
+        const allIds = getAllPlayerIds();
+        const playerCount = allIds.length;
+        const totalSeats = Object.keys(playerMapping).length;
+
+        // Title
+        document.getElementById('pageTitle').textContent = gameState.name || 'Tournament';
+
+        // Apply team colors as CSS variables
+        teams.forEach(team => {
+            if (team.color) {
+                document.documentElement.style.setProperty('--t' + team.id, team.color);
+            }
+        });
+
+        // Calculate overall stats
+        let totalReady = 0;
+        let totalPercent = 0;
+        for (const playerId of allIds) {
+            const progress = getPlayerProgress(playerId);
+            if (progress.isComplete) totalReady++;
+            totalPercent += progress.percent;
+        }
+        const avgPercent = playerCount > 0 ? Math.round(totalPercent / playerCount) : 0;
+
+        // Middle area stats
+        const overallPctEl = document.getElementById('overallPercent');
+        overallPctEl.textContent = avgPercent + '%';
+        overallPctEl.classList.toggle('all-done', totalReady === playerCount);
+
+        const readyEl = document.getElementById('readyCount');
+        readyEl.textContent = totalReady + '/' + playerCount + ' Ready';
+        readyEl.classList.toggle('all-ready', totalReady === playerCount);
+
+        // Trigger completion sequence when all players are done
+        if (playerCount > 0 && totalReady === playerCount && !completionTriggered) {
+            triggerCompletion();
+        }
+
+        // Force rebuild if game list changed
+        const currentGameIds = games.map(g => g.id).join(',');
+        if (prevGameIds !== null && prevGameIds !== currentGameIds) {
+            isFirstRender = true;
+        }
+        prevGameIds = currentGameIds;
+
+        // Force rebuild if seating order changed
+        const currentSeatingStr = JSON.stringify(gameState?.seatingOrder || null);
+        if (prevSeatingOrder !== null && prevSeatingOrder !== currentSeatingStr) {
+            isFirstRender = true;
+        }
+        prevSeatingOrder = currentSeatingStr;
+
+        if (isFirstRender) {
+            buildWalls(playerMapping);
+            buildGamesGrid(games, playerCount);
+            isFirstRender = false;
+        }
+
+        // Update all player cards
+        for (let i = 1; i <= totalSeats; i++) {
+            updatePlayerCard(i);
+        }
+        updateGamesGrid(games, playerCount);
+    }
+
+    // ----- Build DOM once (first render) -----
+
+    function buildWalls(playerMapping) {
+        const leftWall = document.getElementById('wallLeft');
+        const rightWall = document.getElementById('wallRight');
+        const totalSeats = Object.keys(playerMapping).length;
+        const halfPoint = Math.ceil(totalSeats / 2);
+
+        let leftHtml = '';
+        for (let i = 1; i <= halfPoint; i++) {
+            leftHtml += buildPlayerHTML(i, playerMapping);
+        }
+        leftWall.innerHTML = leftHtml;
+
+        let rightHtml = '';
+        for (let i = halfPoint + 1; i <= totalSeats; i++) {
+            rightHtml += buildPlayerHTML(i, playerMapping);
+        }
+        rightWall.innerHTML = rightHtml;
+    }
+
+    function buildPlayerHTML(seatNum, playerMapping) {
+        const info = playerMapping[seatNum];
+        if (!info) return '';
+        const playerId = info.playerId;
+        const teamClass = 'team-' + info.teamId;
+        const games = getSelectedGames();
+        const allIds = getAllPlayerIds();
+        const otherCount = allIds.length - 1;
+
+        let html = '<div class="player ' + teamClass + '" data-player="' + seatNum + '" data-player-id="' + playerId + '">';
+        html += '<div class="player-top">';
+        html += '<span class="seat-num">' + seatNum + '</span>';
+        html += '<span class="player-name">' + escapeHtml(info.name) + '</span>';
+        html += '<span class="player-status" data-status="' + seatNum + '"></span>';
+        html += '<span class="player-pct" data-percent="' + seatNum + '">0%</span>';
+        html += '</div>';
+        html += '<div class="player-bar-bg"><div class="player-bar-fill" data-bar="' + seatNum + '"></div></div>';
+
+        html += '<div class="player-stats-row">';
+
+        // Friends dots
+        html += '<div class="player-stat-group">';
+        html += '<div class="stat-dots" data-friends-dots="' + seatNum + '">';
+        for (let i = 0; i < otherCount; i++) {
+            html += '<span class="stat-dot"></span>';
+        }
+        html += '</div>';
+        html += '<div class="stat-meta"><span class="stat-label">Friends</span><span class="stat-count" data-friends="' + seatNum + '">0/' + otherCount + '</span></div>';
+        html += '</div>';
+
+        // Games dots
+        html += '<div class="player-stat-group">';
+        html += '<div class="stat-dots" data-games-dots="' + seatNum + '">';
+        for (let i = 0; i < games.length; i++) {
+            html += '<span class="stat-dot"></span>';
+        }
+        html += '</div>';
+        html += '<div class="stat-meta"><span class="stat-label">Games</span><span class="stat-count" data-games="' + seatNum + '">0/' + games.length + '</span></div>';
+        html += '</div>';
+
+        html += '</div>';
+        html += '</div>';
+
+        return html;
+    }
+
+    function buildGamesGrid(games, playerCount) {
+        const container = document.getElementById('gamesGrid');
+        if (games.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        const allIds = getAllPlayerIds();
+        const count = playerCount || allIds.length;
+
+        let html = '';
+        for (const game of games) {
+            html += '<div class="game-cell" data-game-cell="' + game.id + '">';
+
+            if (game.image) {
+                var resolvedImg = (window.BOARDGAME_BASE || '.') + '/' + game.image;
+                html += '<img src="' + resolvedImg + '" alt="' + escapeHtml(game.name) + '" class="game-cell-logo" onerror="this.outerHTML=\'<div class=game-cell-logo-fallback>' + (game.icon || '🎮') + '</div>\'">';
+            } else {
+                html += '<div class="game-cell-logo-fallback">' + (game.icon || '🎮') + '</div>';
+            }
+
+            html += '<div class="game-cell-name">' + escapeHtml(game.shortName || game.name) + '</div>';
+            html += '<div class="game-cell-dots" data-game-dots="' + game.id + '">';
+            for (let i = 0; i < count; i++) {
+                html += '<span class="game-cell-dot"></span>';
+            }
+            html += '</div>';
+            html += '<div class="game-cell-count" data-game-count="' + game.id + '">0/' + count + '</div>';
+            html += '</div>';
+        }
+
+        container.innerHTML = html;
+    }
+
+    function updateGamesGrid(games, playerCount) {
+        const allIds = getAllPlayerIds();
+        const count = playerCount || allIds.length;
+
+        for (const game of games) {
+            let testedCount = 0;
+            const dotsContainer = document.querySelector('[data-game-dots="' + game.id + '"]');
+
+            if (dotsContainer) {
+                const dots = dotsContainer.querySelectorAll('.game-cell-dot');
+                let dotIdx = 0;
+                for (const playerId of allIds) {
+                    const playerData = onboardingState?.players?.[playerId] || {};
+                    const isTested = !!playerData.gamesTested?.[game.id];
+                    if (dotIdx < dots.length) {
+                        dots[dotIdx].classList.toggle('filled', isTested);
+                    }
+                    if (isTested) testedCount++;
+                    dotIdx++;
+                }
+            }
+
+            const allTested = testedCount === count;
+
+            const cellEl = document.querySelector('[data-game-cell="' + game.id + '"]');
+            if (cellEl) {
+                cellEl.classList.toggle('all-tested', allTested);
+            }
+
+            const countEl = document.querySelector('[data-game-count="' + game.id + '"]');
+            if (countEl) {
+                countEl.textContent = testedCount + '/' + count;
+            }
+        }
+    }
+
+    // ----- Surgical updates (every render after first) -----
+
+    function updatePlayerCard(seatNum) {
+        const card = document.querySelector('[data-player="' + seatNum + '"]');
+        if (!card) return;
+
+        // Use real player ID for onboarding data lookup
+        const playerId = card.dataset.playerId;
+        if (!playerId) return;
+        const progress = getPlayerProgress(playerId);
+
+        card.classList.toggle('complete', progress.isComplete);
+
+        const bar = document.querySelector('[data-bar="' + seatNum + '"]');
+        if (bar) {
+            const barClass = progress.percent === 100 ? 'done'
+                : progress.percent >= 70 ? 'high'
+                : progress.percent >= 30 ? 'mid' : 'low';
+            bar.className = 'player-bar-fill ' + barClass;
+            bar.style.width = progress.percent + '%';
+        }
+
+        const pctEl = document.querySelector('[data-percent="' + seatNum + '"]');
+        if (pctEl) {
+            pctEl.textContent = progress.percent + '%';
+            pctEl.classList.toggle('done', progress.isComplete);
+        }
+
+        const playerData = onboardingState?.players?.[playerId] || {};
+
+        // Status emoji
+        const statusEl = document.querySelector('[data-status="' + seatNum + '"]');
+        if (statusEl) {
+            const statuses = playerData.statuses || {};
+            let emoji = '';
+            for (const [key, icon] of Object.entries(STATUS_EMOJIS)) {
+                if (statuses[key]) { emoji = icon; break; }
+            }
+            statusEl.textContent = emoji;
+        }
+
+        // Friend dots
+        const friendsDots = document.querySelector('[data-friends-dots="' + seatNum + '"]');
+        if (friendsDots) {
+            const dots = friendsDots.querySelectorAll('.stat-dot');
+            const allIds = getAllPlayerIds();
+            let dotIndex = 0;
+            for (const otherId of allIds) {
+                if (otherId === playerId) continue;
+                if (dotIndex < dots.length) {
+                    dots[dotIndex].classList.toggle('filled', !!playerData.friendsAdded?.[otherId]);
+                    dotIndex++;
+                }
+            }
+            friendsDots.classList.toggle('all-complete', progress.friendsComplete >= progress.friendsTotal);
+        }
+
+        const friendsCountEl = document.querySelector('[data-friends="' + seatNum + '"]');
+        if (friendsCountEl) {
+            friendsCountEl.textContent = progress.friendsComplete + '/' + progress.friendsTotal;
+        }
+
+        // Game dots
+        const gamesDots = document.querySelector('[data-games-dots="' + seatNum + '"]');
+        if (gamesDots) {
+            const dots = gamesDots.querySelectorAll('.stat-dot');
+            const games = getSelectedGames();
+            for (let i = 0; i < games.length && i < dots.length; i++) {
+                dots[i].classList.toggle('filled', !!playerData.gamesTested?.[games[i].id]);
+            }
+            gamesDots.classList.toggle('all-complete', progress.gamesComplete >= progress.gamesTotal);
+        }
+
+        const gamesCountEl = document.querySelector('[data-games="' + seatNum + '"]');
+        if (gamesCountEl) {
+            gamesCountEl.textContent = progress.gamesComplete + '/' + progress.gamesTotal;
+        }
+    }
+
+    // =================================================================
+    // COMPLETION SEQUENCE
+    // =================================================================
+
+    function triggerCompletion() {
+        completionTriggered = true;
+
+        // Blur the background content
+        document.body.classList.add('onboarding-complete');
+
+        // Show the overlay with growing text
+        const overlay = document.getElementById('completionOverlay');
+        overlay.classList.add('active');
+
+        // Start countdown to redirect
+        const countdownEl = document.getElementById('completionCountdown');
+        let secondsLeft = 60;
+
+        countdownEl.textContent = 'Redirecting to tournament view in ' + secondsLeft + 's';
+
+        redirectTimer = setInterval(() => {
+            secondsLeft--;
+            if (secondsLeft <= 0) {
+                clearInterval(redirectTimer);
+                window.location.href = 'view.html?tournamentId=' + encodeURIComponent(tournamentId);
+            } else {
+                countdownEl.textContent = 'Redirecting to tournament view in ' + secondsLeft + 's';
+            }
+        }, 1000);
+    }
+
+    function resetCompletion() {
+        completionTriggered = false;
+        if (redirectTimer) { clearInterval(redirectTimer); redirectTimer = null; }
+
+        document.body.classList.remove('onboarding-complete');
+
+        const overlay = document.getElementById('completionOverlay');
+        overlay.classList.remove('active');
+
+        // Re-create the text element to reset animation
+        const textEl = overlay.querySelector('.completion-text');
+        const clone = textEl.cloneNode(true);
+        textEl.replaceWith(clone);
+
+        const countdownEl = document.getElementById('completionCountdown');
+        countdownEl.textContent = '';
+        // Reset countdown fade animation
+        const countdownClone = countdownEl.cloneNode(true);
+        countdownEl.replaceWith(countdownClone);
+    }
+
+    // =================================================================
+    // UTILITIES
+    // =================================================================
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function updateClock() {
+        const el = document.getElementById('clock');
+        if (!el) return;
+        const now = new Date();
+        el.textContent =
+            String(now.getHours()).padStart(2, '0') + ':' +
+            String(now.getMinutes()).padStart(2, '0');
+    }
+
+    function hideLoading() {
+        document.getElementById('loadingOverlay').classList.add('hidden');
+    }
+
+    function showError(message) {
+        document.getElementById('loadingOverlay').classList.add('hidden');
+        document.getElementById('errorContainer').style.display = 'flex';
+        document.getElementById('errorText').textContent = message;
+    }
+</script>
+</body>
+</html>

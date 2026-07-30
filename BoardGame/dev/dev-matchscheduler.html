@@ -619,6 +619,7 @@
     <script>window.BOARDGAME_BASE = '..';</script>
     <script src="../shared/scripts/games-config.js"></script>
     <script src="../shared/scripts/balance-optimizer.js"></script>
+    <script src="../shared/scripts/firebase-loader.js"></script>
     <script>
         // =============================================================================
         // GAME DEFINITIONS - Use GAMES_CONFIG as source of truth
@@ -643,7 +644,7 @@
         // Order 2: CS2, Warcraft 3, Age of Empires IV, COD, Predecessor, Overwatch 2
         // Order 3: Age of Empires IV, Predecessor, COD, Warcraft 3, Overwatch 2, CS2
 
-        const ROTATING_ORDERS = [
+        let ROTATING_ORDERS = [
             // Order 1
             [
                 { game: 'predecessor', repeatCount: 3 },
@@ -695,6 +696,53 @@
         let currentRotatingOrderIndex = 0;
 
         let generatedMatches = [];
+
+        // =============================================================================
+        // TOURNAMENT GAME AUTO-POPULATION
+        // =============================================================================
+        // If opened with ?tournamentId=xxx (e.g. from admin.html's "Match Scheduler"
+        // link), fetch that tournament and seed the game order from its selectedGames
+        // instead of the hardcoded default above. Falls back to the default if there's
+        // no tournamentId, the fetch fails, or the tournament has no selected games.
+        // Everything stays manually editable afterward either way.
+
+        function buildOrdersFromGameIds(gameIds) {
+            const order = gameIds.map(id => ({ game: id, repeatCount: 3 }));
+            const rotations = order.map((_, i) => [...order.slice(i), ...order.slice(0, i)]);
+            return { order, rotations };
+        }
+
+        async function loadGamesFromTournament(tournamentId) {
+            try {
+                const doc = await window.firebaseDB.collection('tournaments').doc(tournamentId).get();
+                if (!doc.exists) {
+                    console.warn('Match Scheduler: tournament not found:', tournamentId);
+                    return;
+                }
+                const data = doc.data();
+                const selectedGames = (data.selectedGames || []).filter(id => GAMES[id]);
+                if (selectedGames.length === 0) {
+                    console.warn('Match Scheduler: tournament has no known selected games, keeping defaults');
+                    return;
+                }
+
+                const { order, rotations } = buildOrdersFromGameIds(selectedGames);
+                gameOrder = order;
+                ROTATING_ORDERS = rotations;
+                renderGameOrderList();
+                showStatus('configStatus', `Loaded ${selectedGames.length} games from tournament "${data.name || tournamentId}"`, 'success');
+            } catch (err) {
+                console.error('Match Scheduler: failed to load tournament games', err);
+                showStatus('configStatus', 'Could not load tournament games, using defaults', 'error');
+            }
+        }
+
+        document.addEventListener('firebase-ready', () => {
+            const tournamentId = new URLSearchParams(window.location.search).get('tournamentId');
+            if (tournamentId) {
+                loadGamesFromTournament(tournamentId);
+            }
+        });
 
         // =============================================================================
         // INITIALIZATION

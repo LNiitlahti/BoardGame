@@ -14,6 +14,9 @@
 
     <script>window.BOARDGAME_BASE = '..';</script>
     <script src="../shared/scripts/firebase-loader.js"></script>
+    <script src="../shared/scripts/board-module.js"></script>
+    <script src="../shared/scripts/board-renderer.js"></script>
+    <script src="../shared/scripts/games-config.js"></script>
     <script src="scripts/match-scheduler.js"></script>
 
     <!-- Dosis Font -->
@@ -219,6 +222,13 @@
             margin-bottom: 15px;
         }
 
+        .game-logo-img {
+            width: 64px;
+            height: 64px;
+            object-fit: contain;
+            margin-bottom: 15px;
+        }
+
         .game-name {
             font-weight: 600;
             font-size: 1.1rem;
@@ -317,6 +327,66 @@
 
         .btn-danger {
             background: #de392c;
+        }
+
+        /* Room Board (Step 3) */
+        .room-board-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .room-count-badge {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #f7ba32;
+            background: rgba(247, 186, 50, 0.1);
+            border: 1px solid rgba(247, 186, 50, 0.25);
+            border-radius: 20px;
+            padding: 8px 16px;
+            margin-left: auto;
+        }
+
+        .room-board-wrapper {
+            position: relative;
+            width: 100%;
+            height: 600px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 15px;
+            margin-bottom: 10px;
+        }
+
+        .room-board-wrapper .board-hex {
+            cursor: pointer;
+            transition: filter 0.15s ease;
+        }
+
+        .room-board-wrapper .board-hex:hover {
+            filter: brightness(1.35);
+        }
+
+        /* Bold, unambiguous highlight for room hexes - clarity over
+           matching the in-game vignette style (that requires the
+           admin.css .effect-rooms toggle machinery not present here) */
+        .room-board-wrapper .board-hex.room::before {
+            background: #ffa726 !important;
+        }
+
+        .room-board-wrapper .board-hex.mountain-heart,
+        .room-board-wrapper .board-hex.side-heart,
+        .room-board-wrapper .board-hex.starting-location {
+            cursor: not-allowed;
+        }
+
+        .room-hint {
+            color: rgba(247, 240, 227, 0.5);
+            font-size: 0.85rem;
         }
 
         /* Spell Cards */
@@ -577,11 +647,15 @@
                 <span class="progress-label">Tiimit</span>
             </div>
             <div class="progress-step" data-step="3">
-                <div class="progress-circle" id="circle3">✨</div>
-                <span class="progress-label">Loitsut</span>
+                <div class="progress-circle" id="circle3">🏠</div>
+                <span class="progress-label">Huoneet</span>
             </div>
             <div class="progress-step" data-step="4">
-                <div class="progress-circle" id="circle4">🚀</div>
+                <div class="progress-circle" id="circle4">✨</div>
+                <span class="progress-label">Loitsut</span>
+            </div>
+            <div class="progress-step" data-step="5">
+                <div class="progress-circle" id="circle5">🚀</div>
                 <span class="progress-label">Käynnistä</span>
             </div>
         </div>
@@ -636,8 +710,39 @@
                 </div>
             </div>
 
-            <!-- Step 3: Spell Cards -->
+            <!-- Step 3: Room Hexes -->
             <div class="step" id="step3">
+                <h2 class="step-title">
+                    <span>🏠</span>
+                    Huoneet
+                </h2>
+                <p style="color: rgba(247, 240, 227, 0.7); margin-bottom: 20px;">
+                    Merkitse huonehexat laudalle. Huoneet antavat loitsukortin, kun tiimi asettaa laatan niihin.
+                    Sydänhexat ja aloitusruudut eivät voi olla huoneita.
+                </p>
+
+                <div class="room-board-toolbar">
+                    <button class="btn" onclick="loadDefaultRoomsSetup()" title="Lataa viimeksi tallennettu huonepohja">
+                        📥 Lataa Oletushuoneet
+                    </button>
+                    <button class="btn btn-secondary" onclick="saveDefaultRoomsSetup()" title="Tallenna nykyinen huonepohja oletukseksi tuleville turnauksille">
+                        💾 Tallenna Oletukseksi
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearRoomsSetup()" title="Poista kaikki huoneet">
+                        🗑️ Tyhjennä
+                    </button>
+                    <span class="room-count-badge" id="roomCountBadge">0 huonetta merkitty</span>
+                </div>
+
+                <div class="room-board-wrapper">
+                    <div id="roomSetupBoard"></div>
+                </div>
+
+                <p class="room-hint">Klikkaa hexaa merkitäksesi/poistaaksesi huoneen. Suositus: 10–15 huonetta.</p>
+            </div>
+
+            <!-- Step 4: Spell Cards -->
+            <div class="step" id="step4">
                 <h2 class="step-title">
                     <span>✨</span>
                     Loitsukortit
@@ -654,8 +759,8 @@
                 </div>
             </div>
 
-            <!-- Step 4: Summary & Upload -->
-            <div class="step" id="step4">
+            <!-- Step 5: Summary & Upload -->
+            <div class="step" id="step5">
                 <h2 class="step-title">
                     <span>🚀</span>
                     Käynnistä Turnaus
@@ -713,16 +818,35 @@
         let teams = [];
         let matches = [];
         let spellCards = [];
+        let rooms = [];
         let db;
 
-        const games = [
-            { id: 'cs2', name: 'Counter-Strike 2', icon: '🎯' },
-            { id: 'sc2', name: 'StarCraft II', icon: '⚔️' },
-            { id: 'predecessor', name: 'Predecessor', icon: '🏆' },
-            { id: 'dota2', name: 'Dota 2', icon: '🐉' },
-            { id: 'lol', name: 'League of Legends', icon: '⚡' },
-            { id: 'valorant', name: 'Valorant', icon: '💥' },
-        ];
+        // Room board (Step 3)
+        let roomBoardModule = null;
+        let roomBoardRenderer = null;
+        let roomBoardInitialized = false;
+
+        // Source of truth is GAMES_CONFIG (shared/scripts/games-config.js) — the same
+        // config admin.html, view.html, and team.html use for names/icons/logos.
+        // Previously this was a separate hardcoded 6-game list with decorative emoji
+        // only (no real logos), which is why the picker never showed correct logos
+        // and could drift out of sync with the rest of the app (e.g. it listed
+        // "League of Legends", a game not in the shared config at all).
+        //
+        // Use the FULL catalog here, not getActiveGames() — "active" in the config
+        // just marks last event's default lineup, but this step IS the place an
+        // admin decides which games a given tournament uses, so every game the
+        // config knows about (SC2, Dota 2, Valorant, Hearthstone, etc.) needs to
+        // be pickable, not just the previous six.
+        const games = (typeof GAMES_CONFIG !== 'undefined')
+            ? GAMES_CONFIG.getAllGames().map(g => ({
+                id: g.id, name: g.name, icon: g.icon, image: g.image
+              }))
+            : [
+                // Fallback if games-config.js failed to load
+                { id: 'cs2', name: 'Counter-Strike 2', icon: '🎯' },
+                { id: 'predecessor', name: 'Predecessor', icon: '🏆' },
+              ];
 
         const teamColors = [
             { id: 'red', hex: '#ef4444' },
@@ -746,14 +870,27 @@
 
         function renderGames() {
             const grid = document.getElementById('gamesGrid');
-            grid.innerHTML = games.map(game => `
-                <div class="game-card ${selectedGames.includes(game.id) ? 'selected' : ''} ${game.custom ? 'custom' : ''}" 
-                     onclick="toggleGame('${game.id}')">
-                    ${game.custom ? `<button class="remove-game" onclick="event.stopPropagation(); removeGame('${game.id}')">×</button>` : ''}
-                    <div class="game-icon">${game.icon}</div>
-                    <div class="game-name">${game.name}</div>
-                </div>
-            `).join('');
+            grid.innerHTML = games.map(game => {
+                const imgSrc = game.image && typeof GAMES_CONFIG !== 'undefined'
+                    ? GAMES_CONFIG.resolveImagePath(game.image)
+                    : null;
+                // Real logo when available; fall back to the emoji icon on
+                // missing files (some catalog entries have no art yet) or
+                // when GAMES_CONFIG isn't loaded at all.
+                const iconHtml = imgSrc
+                    ? `<img src="${imgSrc}" alt="${game.name}" class="game-logo-img"
+                           onerror="this.replaceWith(Object.assign(document.createElement('div'), {className: 'game-icon', textContent: '${(game.icon || '🎮').replace(/'/g, "\\'")}'}))">`
+                    : `<div class="game-icon">${game.icon || '🎮'}</div>`;
+
+                return `
+                    <div class="game-card ${selectedGames.includes(game.id) ? 'selected' : ''} ${game.custom ? 'custom' : ''}"
+                         onclick="toggleGame('${game.id}')">
+                        ${game.custom ? `<button class="remove-game" onclick="event.stopPropagation(); removeGame('${game.id}')">×</button>` : ''}
+                        ${iconHtml}
+                        <div class="game-name">${game.name}</div>
+                    </div>
+                `;
+            }).join('');
         }
 
         function toggleGame(gameId) {
@@ -867,6 +1004,104 @@
             renderTeams();
         }
 
+        // ==================================================================
+        // Room Board (Step 3)
+        // ==================================================================
+
+        /** Lazy-init the board renderer the first time Step 3 becomes visible. */
+        function initRoomBoard() {
+            if (roomBoardInitialized) return;
+            roomBoardInitialized = true;
+
+            const container = document.getElementById('roomSetupBoard');
+            roomBoardModule = new BoardModule();
+            roomBoardRenderer = new BoardRenderer(container, roomBoardModule, {
+                responsive: true,
+                showHeartImages: false
+            });
+
+            renderRoomBoard();
+        }
+
+        function renderRoomBoard() {
+            if (!roomBoardRenderer || !roomBoardModule) return;
+
+            roomBoardModule.setRoomHexes(rooms);
+            roomBoardRenderer.render({ rooms });
+
+            // Attach click handlers (BoardRenderer only renders markup, the
+            // consumer wires interactivity - same pattern as admin.js)
+            document.querySelectorAll('#roomSetupBoard .board-hex').forEach(hex => {
+                hex.onclick = () => toggleRoomHexSetup(hex.dataset.coord);
+            });
+
+            updateRoomCountDisplay();
+        }
+
+        function toggleRoomHexSetup(coord) {
+            const matches = coord.match(/q(-?\d+)r(-?\d+)/);
+            if (!matches) return;
+            const [, q, r] = matches;
+            const hexType = roomBoardModule.getHexType(parseInt(q), parseInt(r));
+
+            // Hearts and starting squares cannot be rooms (matches board-module.js setRoomHexes validation)
+            if (hexType === 'mountain-heart' || hexType === 'side-heart' || hexType === 'starting-location') {
+                return;
+            }
+
+            const idx = rooms.indexOf(coord);
+            if (idx >= 0) {
+                rooms.splice(idx, 1);
+            } else {
+                rooms.push(coord);
+            }
+            renderRoomBoard();
+        }
+
+        function clearRoomsSetup() {
+            rooms = [];
+            renderRoomBoard();
+        }
+
+        function updateRoomCountDisplay() {
+            const badge = document.getElementById('roomCountBadge');
+            if (badge) badge.textContent = `${rooms.length} huonetta merkitty`;
+        }
+
+        /**
+         * Load the shared default room layout from Firestore config/defaultRooms.
+         * Same collection/doc god.html's board-manager.js already reads/writes,
+         * so a layout saved there previously (or via Save as Default below)
+         * is what gets loaded here.
+         */
+        async function loadDefaultRoomsSetup() {
+            try {
+                const doc = await db.collection('config').doc('defaultRooms').get();
+                if (!doc.exists || !doc.data().rooms?.length) {
+                    alert('Ei tallennettuja oletushuoneita vielä.');
+                    return;
+                }
+                rooms = [...doc.data().rooms];
+                renderRoomBoard();
+            } catch (error) {
+                console.error('Error loading default rooms:', error);
+                alert('Virhe oletushuoneiden latauksessa: ' + error.message);
+            }
+        }
+
+        async function saveDefaultRoomsSetup() {
+            try {
+                await db.collection('config').doc('defaultRooms').set({
+                    rooms: [...rooms],
+                    updatedAt: new Date().toISOString()
+                });
+                alert(`Tallennettu ${rooms.length} huonetta oletukseksi.`);
+            } catch (error) {
+                console.error('Error saving default rooms:', error);
+                alert('Virhe oletushuoneiden tallennuksessa: ' + error.message);
+            }
+        }
+
         async function loadSpellCards() {
             const container = document.getElementById('spellCardsGrid');
             
@@ -919,7 +1154,7 @@
         function nextStep() {
             if (!validateStep()) return;
 
-            if (currentStep < 4) {
+            if (currentStep < 5) {
                 currentStep++;
                 updateStepDisplay();
                 updateProgress();
@@ -955,6 +1190,8 @@
                     return true;
                 case 4:
                     return true;
+                case 5:
+                    return true;
             }
             return true;
         }
@@ -965,18 +1202,22 @@
             });
 
             document.getElementById('prevBtn').style.display = currentStep === 1 ? 'none' : 'block';
-            document.getElementById('nextBtn').style.display = currentStep === 4 ? 'none' : 'block';
+            document.getElementById('nextBtn').style.display = currentStep === 5 ? 'none' : 'block';
 
-            if (currentStep === 4) {
+            if (currentStep === 3) {
+                initRoomBoard();
+            }
+
+            if (currentStep === 5) {
                 updateSummary();
             }
         }
 
         function updateProgress() {
-            const progressWidth = ((currentStep - 1) / 3) * 100;
+            const progressWidth = ((currentStep - 1) / 4) * 100;
             document.getElementById('progressFill').style.width = `calc(${progressWidth}% - 100px)`;
 
-            for (let i = 1; i <= 4; i++) {
+            for (let i = 1; i <= 5; i++) {
                 const circle = document.getElementById(`circle${i}`);
                 circle.classList.toggle('active', i === currentStep);
                 circle.classList.toggle('completed', i < currentStep);
@@ -1013,6 +1254,9 @@
                     gameDefinitions[id] = {
                         name: game.name,
                         icon: game.icon || '🎮',
+                        image: game.image || null, // was missing entirely before — view.html/team.html/PDF exports
+                                                    // fall back to this field for any game GAMES_CONFIG doesn't know,
+                                                    // so without it their logos silently never resolved either
                         custom: game.custom || false
                     };
                 }
@@ -1031,6 +1275,7 @@
                 createdAt: new Date().toISOString(),
                 status: 'setup',
                 board: {},
+                rooms: [...rooms],
                 heartHexes: ['q2r-4', 'q4r-2', 'q2r2', 'q-2r4', 'q-4r2', 'q-2r-2'],
                 heartHexControl: {},
                 currentRound: 0,
