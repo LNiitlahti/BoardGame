@@ -323,6 +323,7 @@ class ChatModule {
                 border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);
                 display: flex; flex-direction: column; overflow: hidden;
             }
+            .chat-panel[hidden] { display: none; }
             .chat-header { display: flex; align-items: center; justify-content: space-between;
                 background: var(--brand-charcoal, #222); padding: 6px 8px; }
             .chat-tabs { display: flex; gap: 4px; }
