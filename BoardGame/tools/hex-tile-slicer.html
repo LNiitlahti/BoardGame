@@ -501,6 +501,42 @@
             return coordinates;
         }
 
+        // Compute pixel-space extraction boxes for all 91 hexes, scaled to a given canvas size.
+        // Shared by tile extraction (generateBtn) and blank template generation, so both
+        // stay pixel-identical to each other.
+        function computeHexBoxes(canvasWidth, canvasHeight) {
+            const boardSize = 750; // Native board size
+            const hexSize = 32;    // From board-module
+            const hexW = 66;       // Hex width in renderer
+            const hexH = 58;       // Hex height in renderer
+            const SQRT3 = Math.sqrt(3);
+
+            const scaleX = canvasWidth / boardSize;
+            const scaleY = canvasHeight / boardSize;
+            const centerX = canvasWidth / 2;
+            const centerY = canvasHeight / 2;
+
+            const extractW = Math.round(hexW * scaleX);
+            const extractH = Math.round(hexH * scaleY);
+
+            return generateHexCoordinates().map(hex => {
+                const x = hexSize * (3/2) * hex.q;
+                const y = hexSize * SQRT3 * (hex.r + hex.q/2);
+                const pixelX = Math.round(centerX + (x * scaleX));
+                const pixelY = Math.round(centerY + (y * scaleY));
+
+                return {
+                    q: hex.q,
+                    r: hex.r,
+                    coord: hex.coord,
+                    x: Math.round(pixelX - (extractW / 2)),
+                    y: Math.round(pixelY - (extractH / 2)),
+                    w: extractW,
+                    h: extractH
+                };
+            });
+        }
+
         // Special hex definitions
         const specialHexes = {
             'q0r0': 'mountain-heart',
@@ -650,8 +686,6 @@
             generatedTiles = [];
             tileGrid.innerHTML = '';
 
-            const hexCoords = generateHexCoordinates();
-
             // Create a canvas with the rotated image
             const srcCanvas = document.createElement('canvas');
             const srcCtx = srcCanvas.getContext('2d');
@@ -678,41 +712,10 @@
                 srcCtx.drawImage(mainImage, 0, 0);
             }
 
-            // Hex positioning logic (matching board-module.js)
-            // Board uses: hexSize=32, centerOffset={x:375, y:375} for 750px board
-            // Hex dimensions in renderer: 66x58 px
-            const boardSize = 750; // Native board size
-            const hexSize = 32;    // From board-module
-            const hexW = 66;       // Hex width in renderer
-            const hexH = 58;       // Hex height in renderer
+            const hexBoxes = computeHexBoxes(srcCanvas.width, srcCanvas.height);
 
-            // Scale factor: source image size vs native board size
-            const scaleX = srcCanvas.width / boardSize;
-            const scaleY = srcCanvas.height / boardSize;
-            const centerX = srcCanvas.width / 2;
-            const centerY = srcCanvas.height / 2;
-
-            // Hex to pixel conversion (same as board-module)
-            // Pre-compute sqrt(3) once to avoid repeated floating-point variance
-            const SQRT3 = Math.sqrt(3);
-
-            function hexToPixel(q, r) {
-                const x = hexSize * (3/2) * q;
-                const y = hexSize * SQRT3 * (r + q/2);
-                // Scale to source image and center, round to avoid sub-pixel issues
-                return [
-                    Math.round(centerX + (x * scaleX)),
-                    Math.round(centerY + (y * scaleY))
-                ];
-            }
-
-            // Scaled hex dimensions for extraction (rounded for consistent sizing)
-            const extractW = Math.round(hexW * scaleX);
-            const extractH = Math.round(hexH * scaleY);
-
-            hexCoords.forEach((hex, index) => {
-                // Get actual hex position using hex grid math
-                const [pixelX, pixelY] = hexToPixel(hex.q, hex.r);
+            hexBoxes.forEach((box, index) => {
+                const hex = { q: box.q, r: box.r, coord: box.coord };
 
                 // Create tile canvas
                 const tileCanvas = document.createElement('canvas');
@@ -720,15 +723,10 @@
                 tileCanvas.height = tileH;
                 const tileCtx = tileCanvas.getContext('2d');
 
-                // Extract from source image (centered on hex position)
-                // Round to integers to avoid sub-pixel interpolation causing position shifts
-                const srcX = Math.round(pixelX - (extractW / 2));
-                const srcY = Math.round(pixelY - (extractH / 2));
-
                 // Draw base tile (scaled to target size)
                 tileCtx.drawImage(
                     srcCanvas,
-                    srcX, srcY, extractW, extractH,
+                    box.x, box.y, box.w, box.h,
                     0, 0, tileW, tileH
                 );
 
