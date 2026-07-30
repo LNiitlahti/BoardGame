@@ -1330,6 +1330,7 @@
         if (gameState?.teams) {
             _renderWinConditionBadge();
             _checkWinCondition();
+            _renderSpellsActiveBadge();
         }
 
         if (!_initialized) _initPhaseAdapter();
@@ -1686,6 +1687,48 @@
             _winConditionAlertShown = false;
         }
     }
+
+    // ══════════════════════════════════════════════════════════════
+    //  SPELLS ACTIVE — toggle whether team.html shows digital spell UI
+    // ══════════════════════════════════════════════════════════════
+    //
+    // Spell windows (spell_window_1..4) still run in the phase flow either
+    // way — this only controls whether players see the spell cards sidebar
+    // and the spell-casting overlay on team.html. Defaults to false/off:
+    // spells are now resolved physically at the table unless an admin
+    // opts a tournament in.
+
+    function _renderSpellsActiveBadge() {
+        const el = document.getElementById('spellsActiveValue');
+        if (el) el.textContent = gameState?.spellsActive === true ? 'On' : 'Off';
+    }
+
+    window.openSpellsActiveModal = () => {
+        const modal = document.getElementById('spellsActiveModal');
+        if (!modal) return;
+        const input = document.getElementById('spellsActiveInput');
+        if (input) input.checked = gameState?.spellsActive === true;
+        modal.style.display = 'flex';
+    };
+
+    window.closeSpellsActiveModal = () => {
+        const modal = document.getElementById('spellsActiveModal');
+        if (modal) modal.style.display = 'none';
+    };
+
+    window.saveSpellsActive = async (triggerBtn) => {
+        const input = document.getElementById('spellsActiveInput');
+        const value = !!input?.checked;
+        const prev = gameState.spellsActive === true;
+        gameState.spellsActive = value;
+        await saveGameState(triggerBtn);
+        _actionLogger?.logAction('spells_active_changed', 'admin', {
+            newValue: value, previousValue: prev
+        }, { spellsActive: prev });
+        showStatus(`Spells ${value ? 'enabled' : 'disabled'} for players.`, 'success');
+        window.closeSpellsActiveModal();
+        _renderSpellsActiveBadge();
+    };
 
     // ══════════════════════════════════════════════════════════════
     //  HEX PLACEMENT POPUP — show which match it's for, gate the wrong team
