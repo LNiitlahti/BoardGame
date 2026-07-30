@@ -381,7 +381,7 @@
                     </div>
                     <div class="setting">
                         <label>Rotation (deg)</label>
-                        <input type="number" id="rotation" value="-30" step="1">
+                        <input type="number" id="rotation" value="0" step="1">
                     </div>
                 </div>
                 <p style="color: #888; font-size: 0.8rem; margin-top: 10px;">
@@ -542,6 +542,21 @@
                     h: extractH
                 };
             });
+        }
+
+        // Trace the true hexagon shape a tile is clipped to in-game (board-renderer.js
+        // uses clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)
+        // over the same box) — the four corners of the rectangular extraction box fall
+        // outside this shape and are hidden by the clip.
+        function traceHexPath(ctx, x, y, w, h) {
+            ctx.beginPath();
+            ctx.moveTo(x + 0.25 * w, y);
+            ctx.lineTo(x + 0.75 * w, y);
+            ctx.lineTo(x + w, y + 0.5 * h);
+            ctx.lineTo(x + 0.75 * w, y + h);
+            ctx.lineTo(x + 0.25 * w, y + h);
+            ctx.lineTo(x, y + 0.5 * h);
+            ctx.closePath();
         }
 
         // Special hex definitions
@@ -942,9 +957,6 @@
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, canvasSize, canvasSize);
 
-            // Hex extraction boxes, black outline
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 2;
             ctx.fillStyle = '#999999';
             ctx.font = '10px sans-serif';
             ctx.textAlign = 'center';
@@ -952,7 +964,17 @@
 
             const hexBoxes = computeHexBoxes(canvasSize, canvasSize);
             hexBoxes.forEach(box => {
+                // Thin rectangle: the actual crop boundary (includes corners that get clipped)
+                ctx.strokeStyle = '#cccccc';
+                ctx.lineWidth = 1;
                 ctx.strokeRect(box.x, box.y, box.w, box.h);
+
+                // Bold hexagon: the true visible shape in-game — draw your art to fill this
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 2;
+                traceHexPath(ctx, box.x, box.y, box.w, box.h);
+                ctx.stroke();
+
                 ctx.fillText(box.coord, box.x + box.w / 2, box.y + box.h / 2);
             });
 
