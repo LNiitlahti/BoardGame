@@ -954,11 +954,6 @@
             const ctx = canvas.getContext('2d');
             // Transparent background (canvas is transparent by default — nothing to fill)
 
-            ctx.fillStyle = '#999999';
-            ctx.font = '10px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-
             const hexBoxes = computeHexBoxes(canvasSize, canvasSize);
             hexBoxes.forEach(box => {
                 // Thin hexagon: the true visible shape in-game — draw your art to fill this
@@ -966,8 +961,6 @@
                 ctx.lineWidth = 1;
                 traceHexPath(ctx, box.x, box.y, box.w, box.h);
                 ctx.stroke();
-
-                ctx.fillText(box.coord, box.x + box.w / 2, box.y + box.h / 2);
             });
 
             const link = document.createElement('a');
