@@ -422,6 +422,14 @@ function renderSpellPhaseOverlay() {
 
     overlay.style.display = 'flex';
 
+    if (!gameData.spellsActive) {
+        document.getElementById('spellPhaseTurnStatus').textContent = 'Spell phase — resolved by the tournament admin.';
+        document.getElementById('spellHandCards').innerHTML = '';
+        document.getElementById('spellPhaseActions').style.display = 'none';
+        document.getElementById('spellTurnCompletedMsg').style.display = 'none';
+        return;
+    }
+
     const sp = gameData.spellPhase;
     if (!sp || !sp.isActive) {
         // Spell phase but no active turn order — waiting for initialization
