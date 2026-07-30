@@ -25,6 +25,7 @@
   <script>window.BOARDGAME_BASE = '..';</script>
   <script src="../shared/scripts/firebase-loader.js"></script>
   <script src="../shared/scripts/navbar.js"></script>
+  <script src="../shared/scripts/chat-module.js"></script>
   <script type="module" src="scripts/errorHandler.js"></script>
   <script type="module" src="scripts/stateManager.js"></script>
   <script type="module" src="scripts/utils.js"></script>
@@ -1110,6 +1111,16 @@
             document.getElementById('playerTeamPoints').textContent = `${teamData.points || 0} points`;
             document.getElementById('playerSpellCards').textContent = tournamentData.spellPiles?.[teamData.id]?.hand?.length || 0;
             document.getElementById('playerWins').textContent = teamData.gamesWon || 0;
+
+            // Tournament + team chat — only for players with a confirmed assignment
+            if (window.ChatModule && !window._chatModule) {
+              window._chatModule = new ChatModule({
+                tournamentId: userProfile.assignedTournamentId,
+                teamId: String(userProfile.assignedTeamId)
+              });
+              window._chatModule.mount();
+            }
+
             return;
           }
         }
