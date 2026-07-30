@@ -138,30 +138,37 @@
             clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
             pointer-events: none;
             z-index: 6;
+            mix-blend-mode: var(--team-color-blend, normal);
+            mask-image: var(--team-color-mask, none);
+            -webkit-mask-image: var(--team-color-mask, none);
+            mask-size: 100% 100%;
+            -webkit-mask-size: 100% 100%;
+            mask-repeat: no-repeat;
+            -webkit-mask-repeat: no-repeat;
         }
         /* Team 1: Red #ef4444 */
         body.effect-team-colors .board-hex.occupied[data-team="team1"]::after {
-            background: rgba(239, 68, 68, 0.5);
+            background: rgba(239, 68, 68, var(--team-color-opacity, 0.5));
         }
         /* Team 2: Blue #3b82f6 */
         body.effect-team-colors .board-hex.occupied[data-team="team2"]::after {
-            background: rgba(59, 130, 246, 0.5);
+            background: rgba(59, 130, 246, var(--team-color-opacity, 0.5));
         }
         /* Team 3: Green #10b981 */
         body.effect-team-colors .board-hex.occupied[data-team="team3"]::after {
-            background: rgba(16, 185, 129, 0.5);
+            background: rgba(16, 185, 129, var(--team-color-opacity, 0.5));
         }
         /* Team 4: Purple #a855f7 */
         body.effect-team-colors .board-hex.occupied[data-team="team4"]::after {
-            background: rgba(168, 85, 247, 0.5);
+            background: rgba(168, 85, 247, var(--team-color-opacity, 0.5));
         }
         /* Team 5: Yellow #f59e0b */
         body.effect-team-colors .board-hex.occupied[data-team="team5"]::after {
-            background: rgba(245, 158, 11, 0.5);
+            background: rgba(245, 158, 11, var(--team-color-opacity, 0.5));
         }
         /* Team 6: Pink #ec4899 (additional color) */
         body.effect-team-colors .board-hex.occupied[data-team="team6"]::after {
-            background: rgba(236, 72, 153, 0.5);
+            background: rgba(236, 72, 153, var(--team-color-opacity, 0.5));
         }
 
         /* Hide labels when team colors active (they're fallback only) */
@@ -174,6 +181,17 @@
         body.effect-rooms .board-hex.room .room-border {
             display: block;
         }
+        /* Every .board-hex has a `transform`, which makes it its own stacking context.
+           That means a high z-index on .room-border only wins WITHIN its own hex -
+           it can never out-rank a neighboring hex's box, since sibling hexes stack by
+           their own z-index/DOM order, not by anything their children request.
+           So the HEX ITSELF (not just its border child) needs to be raised above
+           every other hex effect (heart-overlay-container z-index 25, pulsing hearts
+           z-index 20, labels z-index 10) so its room border never gets clipped by an
+           adjacent hex painting on top of it. */
+        body.effect-rooms .board-hex.room {
+            z-index: 30;
+        }
         .room-border {
             display: none;
             position: absolute;
@@ -184,11 +202,23 @@
             transform: translate(-50%, -50%);
             z-index: 8;
             pointer-events: none;
+        }
+
+        /* Room Style: Solid Dark Frame (original) */
+        body.room-style-solid .room-border {
             background: rgba(0, 0, 0, 0.55);
             -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath fill-rule='evenodd' d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z M19,4.4 L47,4.4 L61,29 L47,53.6 L19,53.6 L5,29 Z' fill='white'/%3E%3C/svg%3E");
             mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath fill-rule='evenodd' d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z M19,4.4 L47,4.4 L61,29 L47,53.6 L19,53.6 L5,29 Z' fill='white'/%3E%3C/svg%3E");
             -webkit-mask-size: 100% 100%;
             mask-size: 100% 100%;
+        }
+
+        /* Room Style: Dashed Black/White "marching ants" hex outline (new, testable) */
+        /* Generated dynamically via JS (dash length + stroke width are adjustable) */
+        body.room-style-dashed .room-border {
+            background-image: var(--room-dashed-bg);
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
         }
 
         /* Effect: Hex Images - base styles (images applied via JS) */
@@ -384,6 +414,57 @@
                 <label for="effect-heart-images">Heart Images</label>
             </div>
         </div>
+        <div style="margin-top: 15px; padding: 10px 15px; background: #2c3e50; border-radius: 6px; display: flex; align-items: center; gap: 12px;">
+            <label for="team-color-opacity" style="color: #fff; font-size: 0.9rem; white-space: nowrap;">Team Color Opacity</label>
+            <input type="range" id="team-color-opacity" min="0" max="1" step="0.05" value="1" style="flex: 1;">
+            <span id="team-color-opacity-value" style="color: #fff; font-size: 0.9rem; width: 40px; text-align: right;">1.00</span>
+        </div>
+        <div style="margin-top: 10px; padding: 10px 15px; background: #2c3e50; border-radius: 6px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <label for="team-color-blend" style="color: #fff; font-size: 0.9rem; white-space: nowrap;">Blend Mode</label>
+            <select id="team-color-blend" style="flex: 1; min-width: 160px; padding: 4px 8px;">
+                <option value="normal">Normal (flat alpha)</option>
+                <option value="multiply">Multiply</option>
+                <option value="overlay">Overlay</option>
+                <option value="screen">Screen</option>
+                <option value="soft-light">Soft Light</option>
+                <option value="hard-light">Hard Light</option>
+                <option value="darken">Darken</option>
+                <option value="lighten">Lighten</option>
+                <option value="color-dodge">Color Dodge</option>
+                <option value="color-burn">Color Burn</option>
+                <option value="difference">Difference</option>
+                <option value="exclusion">Exclusion</option>
+                <option value="hue">Hue</option>
+                <option value="saturation">Saturation</option>
+                <option value="color">Color</option>
+                <option value="luminosity">Luminosity</option>
+            </select>
+        </div>
+        <div style="margin-top: 10px; padding: 10px 15px; background: #2c3e50; border-radius: 6px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <label for="team-color-shape" style="color: #fff; font-size: 0.9rem; white-space: nowrap;">Fill Shape</label>
+            <select id="team-color-shape" style="flex: 1; min-width: 160px; padding: 4px 8px;">
+                <option value="solid">Solid (full hex)</option>
+                <option value="edge-fade">Edge Fade (art shows in center)</option>
+                <option value="ring" selected>Ring Only (thin border of color)</option>
+                <option value="center-fade">Center Fade (art shows at edges)</option>
+            </select>
+            <label for="team-color-fade-amount" style="color: #fff; font-size: 0.85rem; white-space: nowrap;">Fade Amount</label>
+            <input type="range" id="team-color-fade-amount" min="10" max="90" step="5" value="40" style="width: 120px;">
+            <span id="team-color-fade-amount-value" style="color: #fff; font-size: 0.85rem; width: 32px; text-align: right;">40%</span>
+        </div>
+        <div style="margin-top: 10px; padding: 10px 15px; background: #2c3e50; border-radius: 6px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <label for="room-style" style="color: #fff; font-size: 0.9rem; white-space: nowrap;">Room Indicator Style</label>
+            <select id="room-style" style="flex: 1; min-width: 160px; padding: 4px 8px;">
+                <option value="solid">Solid Dark Frame (current)</option>
+                <option value="dashed">Dashed Black/White Border (new)</option>
+            </select>
+            <label for="room-dash-length" style="color: #fff; font-size: 0.85rem; white-space: nowrap;">Dash Length</label>
+            <input type="range" id="room-dash-length" min="2" max="12" step="1" value="5" style="width: 100px;">
+            <span id="room-dash-length-value" style="color: #fff; font-size: 0.85rem; width: 24px; text-align: right;">5</span>
+            <label for="room-stroke-width" style="color: #fff; font-size: 0.85rem; white-space: nowrap;">Stroke Width</label>
+            <input type="range" id="room-stroke-width" min="1" max="6" step="0.5" value="3" style="width: 100px;">
+            <span id="room-stroke-width-value" style="color: #fff; font-size: 0.85rem; width: 24px; text-align: right;">3</span>
+        </div>
     </div>
 
     <div class="boards-container">
@@ -543,6 +624,101 @@
                 }
             });
         });
+
+        // Team Color Opacity slider
+        const opacitySlider = document.getElementById('team-color-opacity');
+        const opacityValueLabel = document.getElementById('team-color-opacity-value');
+        opacitySlider.addEventListener('input', () => {
+            const value = opacitySlider.value;
+            document.documentElement.style.setProperty('--team-color-opacity', value);
+            opacityValueLabel.textContent = parseFloat(value).toFixed(2);
+        });
+        // Initialize to slider's starting value (0.8)
+        document.documentElement.style.setProperty('--team-color-opacity', opacitySlider.value);
+
+        // Team Color Blend Mode dropdown
+        const blendSelect = document.getElementById('team-color-blend');
+        blendSelect.addEventListener('change', () => {
+            document.documentElement.style.setProperty('--team-color-blend', blendSelect.value);
+        });
+
+        // Team Color Fill Shape (mask) controls
+        const shapeSelect = document.getElementById('team-color-shape');
+        const fadeAmountSlider = document.getElementById('team-color-fade-amount');
+        const fadeAmountValueLabel = document.getElementById('team-color-fade-amount-value');
+
+        function updateTeamColorMask() {
+            const shape = shapeSelect.value;
+            const fade = fadeAmountSlider.value; // percent
+            let mask = 'none';
+
+            if (shape === 'edge-fade') {
+                // Transparent in the middle, opaque toward the edges -> art shows through center
+                mask = `radial-gradient(circle, transparent ${100 - fade}%, black 100%)`;
+            } else if (shape === 'ring') {
+                // Thin colored ring only, near-transparent everywhere else
+                const inner = Math.max(0, 100 - fade - 15);
+                mask = `radial-gradient(circle, transparent ${inner}%, black ${100 - fade}%, black 100%)`;
+            } else if (shape === 'center-fade') {
+                // Opaque in the middle, fading out toward the edges
+                mask = `radial-gradient(circle, black ${100 - fade}%, transparent 100%)`;
+            }
+
+            document.documentElement.style.setProperty('--team-color-mask', mask);
+        }
+
+        shapeSelect.addEventListener('change', updateTeamColorMask);
+        fadeAmountSlider.addEventListener('input', () => {
+            fadeAmountValueLabel.textContent = `${fadeAmountSlider.value}%`;
+            updateTeamColorMask();
+        });
+        // Initialize mask to match the shape/fade dropdown defaults
+        updateTeamColorMask();
+
+        // Room Indicator Style controls
+        const roomStyleSelect = document.getElementById('room-style');
+        const roomDashLengthSlider = document.getElementById('room-dash-length');
+        const roomDashLengthValueLabel = document.getElementById('room-dash-length-value');
+        const roomStrokeWidthSlider = document.getElementById('room-stroke-width');
+        const roomStrokeWidthValueLabel = document.getElementById('room-stroke-width-value');
+
+        // Hex outline points, matching the .board-hex clip-path shape in a 66x58 viewBox
+        const HEX_POINTS = '16.5,0 49.5,0 66,29 49.5,58 16.5,58 0,29';
+
+        function buildDashedHexSVG(color, dashLength, strokeWidth, dashOffset) {
+            const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'>` +
+                `<polygon points='${HEX_POINTS}' fill='none' stroke='${color}' ` +
+                `stroke-width='${strokeWidth}' stroke-dasharray='${dashLength} ${dashLength}' ` +
+                `stroke-dashoffset='${dashOffset}'/></svg>`;
+            return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+        }
+
+        function updateRoomDashedStyle() {
+            const dashLength = roomDashLengthSlider.value;
+            const strokeWidth = roomStrokeWidthSlider.value;
+            // Stack a black dashed outline and a white dashed outline offset by one dash length
+            // so the gaps in one are filled by the other -> alternating "marching ants" look
+            const blackLayer = buildDashedHexSVG('black', dashLength, strokeWidth, 0);
+            const whiteLayer = buildDashedHexSVG('white', dashLength, strokeWidth, dashLength);
+            document.documentElement.style.setProperty('--room-dashed-bg', `${blackLayer}, ${whiteLayer}`);
+        }
+
+        roomStyleSelect.addEventListener('change', () => {
+            document.body.classList.remove('room-style-solid', 'room-style-dashed');
+            document.body.classList.add(`room-style-${roomStyleSelect.value}`);
+        });
+        roomDashLengthSlider.addEventListener('input', () => {
+            roomDashLengthValueLabel.textContent = roomDashLengthSlider.value;
+            updateRoomDashedStyle();
+        });
+        roomStrokeWidthSlider.addEventListener('input', () => {
+            roomStrokeWidthValueLabel.textContent = roomStrokeWidthSlider.value;
+            updateRoomDashedStyle();
+        });
+
+        // Initialize: default to current production look (solid frame), dashed bg ready if switched
+        document.body.classList.add('room-style-solid');
+        updateRoomDashedStyle();
 
         console.log('Effects panel ready');
     </script>

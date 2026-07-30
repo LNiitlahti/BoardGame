@@ -13,6 +13,34 @@
   min-height: 100vh;
 }
 
+/* .container has no rules in any stylesheet god.html links (brand-theme.css
+   only styles other pages' .container via their own page CSS) — without
+   this it renders full-bleed with no max-width, so content sits flush left
+   instead of centered, and anything a pixel too wide triggers a horizontal
+   scrollbar with dead space to its right. */
+body {
+  overflow-x: hidden;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* #statusMessage has no default display:none anywhere, so brand-theme.css's
+   `display: flex` on .status-message renders it as a padded empty bar
+   before any status is ever shown — the "blank space under the navbar".
+   ui-manager.js already toggles a .visible class when it has something to
+   say; this just makes that class control visibility as intended. */
+#statusMessage {
+  display: none;
+}
+
+#statusMessage.visible {
+  display: flex;
+}
+
 /* Main Navigation Tabs */
 .god-nav {
   display: flex;
@@ -666,6 +694,110 @@
   padding: var(--spacing-lg);
 }
 
+/* Tournament State Button + Change Modal */
+.tournament-state-btn {
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 700;
+  font-size: 0.65rem;
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.tournament-state-btn:hover { opacity: 0.85; }
+
+.tournament-state-btn.state-setup {
+  background: var(--accent-primary, #2278a3);
+  color: #000;
+  border: 1px solid var(--accent-primary, #2278a3);
+}
+
+.tournament-state-btn.state-playing {
+  background: #22c55e;
+  color: #000;
+  border: 1px solid #22c55e;
+}
+
+.tournament-state-btn.state-finished {
+  background: #6b7280;
+  color: #fff;
+  border: 1px solid #6b7280;
+}
+
+.tournament-state-btn.state-archived {
+  background: #7c3aed;
+  color: #fff;
+  border: 1px solid #7c3aed;
+}
+
+.state-change-modal {
+  max-width: 400px;
+}
+
+.modal-hint {
+  font-size: 0.8rem;
+  color: var(--text-tertiary, #9aa1ad);
+  margin-bottom: 12px;
+}
+
+.state-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.state-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.state-option:hover {
+  border-color: var(--accent-gold, #c8b37e);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.state-option.current {
+  border-color: var(--accent-gold, #c8b37e);
+  background: rgba(200, 179, 126, 0.1);
+}
+
+.state-option[data-state="archived"] {
+  border-color: rgba(222, 57, 44, 0.4);
+}
+
+.state-option[data-state="archived"]:hover {
+  border-color: rgba(222, 57, 44, 0.6);
+  background: rgba(222, 57, 44, 0.1);
+}
+
+.state-option-label {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.state-option-desc {
+  font-size: 0.7rem;
+  color: var(--text-tertiary, #9aa1ad);
+}
+
+.archived-warning {
+  color: #ff6b5e;
+  font-size: 0.75rem;
+  margin-top: 10px;
+  text-align: center;
+}
+
 /* Result Confirmation Modal */
 .result-confirm-modal {
   min-width: 400px;
@@ -809,13 +941,20 @@
   clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
   pointer-events: none;
   z-index: 6;
+  /* Ring-only fill: thin colored border, hex art visible through the center (fade amount 40%) */
+  mask-image: radial-gradient(circle, transparent 45%, black 60%, black 100%);
+  -webkit-mask-image: radial-gradient(circle, transparent 45%, black 60%, black 100%);
+  mask-size: 100% 100%;
+  -webkit-mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
 }
-.board-hex.team-1::after { background: var(--team-1-alpha, rgba(239,68,68,0.5)); }
-.board-hex.team-2::after { background: var(--team-2-alpha, rgba(59,130,246,0.5)); }
-.board-hex.team-3::after { background: var(--team-3-alpha, rgba(34,197,94,0.5)); }
-.board-hex.team-4::after { background: var(--team-4-alpha, rgba(234,179,8,0.5)); }
-.board-hex.team-5::after { background: var(--team-5-alpha, rgba(168,85,247,0.5)); }
-.board-hex.team-6::after { background: var(--team-6-alpha, rgba(236,72,153,0.5)); }
+.board-hex.team-1::after { background: var(--team-1-alpha, rgba(239,68,68,1)); }
+.board-hex.team-2::after { background: var(--team-2-alpha, rgba(59,130,246,1)); }
+.board-hex.team-3::after { background: var(--team-3-alpha, rgba(34,197,94,1)); }
+.board-hex.team-4::after { background: var(--team-4-alpha, rgba(234,179,8,1)); }
+.board-hex.team-5::after { background: var(--team-5-alpha, rgba(168,85,247,1)); }
+.board-hex.team-6::after { background: var(--team-6-alpha, rgba(236,72,153,1)); }
 
 /* Effects Panel */
 .effects-panel {
@@ -944,6 +1083,14 @@ body.effect-pulse-hearts .heart-overlay-image {
 /* Effect: Rooms */
 body.effect-rooms .board-hex.room .room-border { display: block; }
 
+/* Every .board-hex has a `transform`, making it its own stacking context - a high
+   z-index on .room-border only wins WITHIN its own hex, never against a neighboring
+   hex's box. So the room hex itself must be raised above other hex effects (heart
+   overlays z-index 25, pulsing hearts z-index 20, labels z-index 10) so its border
+   never gets clipped by an adjacent hex painting on top of it. */
+body.effect-rooms .board-hex.room { z-index: 30; }
+
+/* Dashed black/white "marching ants" hex outline (dash length 6, stroke width 3) */
 .room-border {
   display: none;
   position: absolute;
@@ -952,23 +1099,11 @@ body.effect-rooms .board-hex.room .room-border { display: block; }
   transform: translate(-50%, -50%);
   z-index: 8;
   pointer-events: none;
-  background: radial-gradient(ellipse 70% 70% at center, transparent 40%, rgba(0, 0, 0, 0.7) 100%);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z' fill='white'/%3E%3C/svg%3E");
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z' fill='white'/%3E%3C/svg%3E");
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-}
-
-.room-border::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.4);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath fill-rule='evenodd' d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z M21.5,8.8 L44.5,8.8 L56,29 L44.5,49.2 L21.5,49.2 L10,29 Z' fill='white'/%3E%3C/svg%3E");
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpath fill-rule='evenodd' d='M16.5,0 L49.5,0 L66,29 L49.5,58 L16.5,58 L0,29 Z M21.5,8.8 L44.5,8.8 L56,29 L44.5,49.2 L21.5,49.2 L10,29 Z' fill='white'/%3E%3C/svg%3E");
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpolygon points='16.5,0 49.5,0 66,29 49.5,58 16.5,58 0,29' fill='none' stroke='black' stroke-width='3' stroke-dasharray='6 6' stroke-dashoffset='0'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpolygon points='16.5,0 49.5,0 66,29 49.5,58 16.5,58 0,29' fill='none' stroke='white' stroke-width='3' stroke-dasharray='6 6' stroke-dashoffset='6'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
 }
 
 /* Effect: Hex Images */

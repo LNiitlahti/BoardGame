@@ -37,9 +37,6 @@
             <button class="god-nav-tab active" data-tab="tournaments" onclick="switchGodTab('tournaments')">
                 🏆 Tournaments
             </button>
-            <button class="god-nav-tab god-nav-tab-deprioritized" data-tab="matches" onclick="switchGodTab('matches')" title="Match management is done in Lightweight admin — not actively maintained here">
-                🎮 Matches
-            </button>
             <button class="god-nav-tab" data-tab="board" data-role="god" onclick="switchGodTab('board')">
                 🎯 Board
             </button>
@@ -52,9 +49,6 @@
             <button class="god-nav-tab" data-tab="spells" data-role="god" onclick="switchGodTab('spells')">
                 🔮 Spells
             </button>
-            <button class="god-nav-tab god-nav-tab-deprioritized" data-tab="stats" onclick="switchGodTab('stats')" title="Not actively maintained — may be removed">
-                📊 Stats
-            </button>
             <button class="god-nav-tab god-nav-tab-deprioritized" data-tab="activityLog" data-role="god" onclick="switchGodTab('activityLog')" title="Not actively maintained — may be removed">
                 📋 Activity Log
             </button>
@@ -63,41 +57,9 @@
             </button>
         </nav>
 
-        <!-- Phase Indicator Bar (visible when tournament has an active phase) -->
+        <!-- Admin Bar: Broadcast + Display Controls (visible when tournament has an active phase). -->
+        <!-- Phase advancement controls (Next Phase/Force/Break/etc.) live in admin.html's Flow Panel — that's tournament-admin territory, not global admin. -->
         <div id="phaseIndicatorBar" class="phase-indicator-bar" style="display: none;">
-            <div class="phase-indicator-content">
-                <div class="phase-indicator-left">
-                    <span class="phase-indicator-label">CURRENT PHASE</span>
-                    <span id="phaseIndicatorIcon" class="phase-indicator-icon"></span>
-                    <span id="phaseIndicatorName" class="phase-indicator-name">---</span>
-                    <span id="phaseIndicatorRound" class="phase-indicator-round" style="display: none;"></span>
-                </div>
-                <div class="phase-indicator-center" id="phaseRequirementsList">
-                    <!-- Dynamically populated requirement pills -->
-                </div>
-                <div class="phase-indicator-right">
-                    <button class="btn primary" id="advancePhaseBtn"
-                            onclick="advancePhase()" disabled>
-                        Next Phase &#x25B6;
-                    </button>
-                    <button class="btn-small secondary" id="forceAdvanceBtn"
-                            onclick="forceAdvancePhase()"
-                            title="Force advance (skip requirements)">
-                        &#x26A0;
-                    </button>
-                    <button class="btn-small secondary" id="insertBreakBtn"
-                            onclick="insertBreak()"
-                            title="Insert break">
-                        &#x23F8;
-                    </button>
-                    <span id="breakIntervalBadge" class="break-interval-badge"
-                          onclick="openBreakSettings()"
-                          title="Break interval settings (click to configure)"
-                          style="display: none;"></span>
-                    <span id="lobbyAdminControls" style="display: none;"></span>
-                    <span id="spellPhaseAdminControls" style="display: none; align-items: center; gap: 8px;"></span>
-                </div>
-            </div>
             <!-- Broadcast Message Bar (inline with phase indicator) -->
             <div class="broadcast-bar" id="broadcastBar" style="display: none;">
                 <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;">Broadcast</span>
@@ -133,14 +95,6 @@
                 </select>
                 <button class="btn-small secondary" onclick="clearDisplayOverride()">Reset</button>
             </div>
-            <!-- Ceremony Admin Panel (Phase 3) -->
-            <div class="ceremony-admin-panel" id="ceremonyAdminPanel" style="display: none;">
-                <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;">Ceremony</span>
-                <span id="ceremonyStepContent" style="flex: 1; font-size: 0.85rem;"></span>
-                <span id="ceremonyProgressText" style="font-size: 0.75rem; color: var(--text-tertiary);"></span>
-                <button class="btn-small secondary" id="ceremonyPauseBtn" onclick="pauseCeremony()">&#x23F8; Pause</button>
-                <button class="btn-small danger" onclick="skipCeremony()">Skip &#x23ED;</button>
-            </div>
         </div>
 
         <!-- Tab 1: Tournaments Panel -->
@@ -148,6 +102,13 @@
             <!-- Tournament Management Panel (moved from left sidebar) -->
             <div class="panel">
                 <h3>🏆 Tournament Management</h3>
+
+                <!-- Active Tournament (loaded via the navbar) — state control -->
+                <div id="activeTournamentBar" style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; padding: 10px 12px; background: rgba(11, 13, 16, 0.4); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08);">
+                    <span style="opacity: 0.7; font-size: 0.85rem;">Active:</span>
+                    <strong id="activeTournamentNameLabel" style="flex: 1;">—</strong>
+                    <button class="btn-small tournament-state-btn" id="tournamentStateBtn" onclick="openStateChangeModal()" title="Change tournament state" style="display: none;">setup</button>
+                </div>
 
                 <!-- Statistics -->
                 <div class="stat-cards stat-cards--3">
@@ -192,196 +153,27 @@
                 </div>
             </div>
 
-            <!-- Points Correction -->
+            <!-- Backups (scoped to the single active tournament, not the whole environment) -->
             <div class="panel" style="margin-top: 20px;">
-                <h3>Points Correction</h3>
+                <h3>Backups — <span id="backupActiveTournamentName" style="color: var(--accent-primary);">—</span></h3>
                 <p style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 12px;">
-                    Adjust team points manually. Changes are logged.
+                    Snapshots the active tournament's state to Firestore (<code>tournaments/{id}/backups</code>).
+                    Does not back up other tournaments or the environment as a whole.
                 </p>
-                <div id="pointsCorrectionPanel">
-                    <p class="queue-empty">Load a tournament to see teams</p>
-                </div>
-            </div>
-
-            <!-- Backups -->
-            <div class="panel" style="margin-top: 20px;">
-                <h3>Backups</h3>
-                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                <div style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
                     <button class="btn primary" onclick="createManualBackup()">Create Backup</button>
                     <button class="btn secondary" onclick="refreshBackups()">Refresh</button>
+                    <button class="btn" onclick="exportGameState()">Download local backup</button>
+                    <button class="btn" onclick="document.getElementById('importBackupFileInput').click()">Import from local backup</button>
+                    <input type="file" id="importBackupFileInput" accept=".json" style="display:none" onchange="importGameStateFromFile(this)">
+                    <button class="btn" onclick="saveGameState()">Save to Firebase</button>
+                    <button class="btn secondary" onclick="recalculateTeamStats()">Recalculate Stats</button>
                 </div>
                 <div id="backupPanel">
                     <p class="queue-empty">No backups yet</p>
                 </div>
             </div>
-
-            <!-- Data Management -->
-            <div class="panel" style="margin-top: 20px;">
-                <h3>Data Management</h3>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <button class="btn" onclick="exportGameState()">Export Game State</button>
-                    <button class="btn" onclick="saveGameState()">Save to Firebase</button>
-                    <button class="btn" onclick="clearLog()">Clear Game Log</button>
-                    <button class="btn secondary" onclick="recalculateTeamStats()">Recalculate Stats</button>
-                </div>
-            </div>
         </div>
-
-        <!-- Tab 2: Matches Panel -->
-        <div id="matchesPanel" class="god-tab-panel">
-            <div style="max-width: 900px; margin: 0 auto;">
-            <!-- Match Controls -->
-            <div>
-                <!-- Match Queue Manager -->
-                <div class="panel">
-                    <h3>📋 Match Queue Manager</h3>
-                    <div class="form-group">
-                        <label>Tournament ID</label>
-                        <input type="text" id="tournamentIdInput" placeholder="tournament-id">
-                        <button class="btn" onclick="loadGame()" style="margin-top: 5px;" data-tooltip="Load tournament data to manage matches">📂 Load Game</button>
-                    </div>
-
-                    <!-- Template Display -->
-                    <div id="templateDisplay" style="margin-top: 15px;">
-                        <p style="text-align: center; opacity: 0.7;">Load a game to see templates</p>
-                    </div>
-                </div>
-
-                <!-- Smart Match Suggestions -->
-                <div class="panel" id="smartSuggestionPanel" style="margin-top: 20px; display: none;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h3>🧠 Smart Match Suggestion</h3>
-                        <button class="btn" onclick="generateMatchSuggestion()" style="background: #10b981;">
-                            🔄 Get Suggestion
-                        </button>
-                    </div>
-
-                    <div id="suggestionDisplay" style="background: rgba(16, 185, 129, 0.1); padding: 15px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.3);">
-                        <p style="text-align: center; opacity: 0.7;">Click "Get Suggestion" to generate an optimal match recommendation</p>
-                    </div>
-                </div>
-
-                <div class="panel" style="margin-top: 20px;">
-                    <h3>🎯 Game Management</h3>
-                    
-                    <!-- Tab Buttons -->
-                    <div class="tab-buttons">
-                        <button class="tab-btn active" onclick="switchTab('plan')">📋 Plan Game</button>
-                        <button class="tab-btn" onclick="switchTab('confirm')">✅ Confirm Result</button>
-                    </div>
-
-                    <!-- Plan Game Tab -->
-                    <div id="planTab" class="tab-content active">
-                        <div class="form-group">
-                            <label>Game Type</label>
-                            <select id="planGameType">
-                                <option value="CS2">Counter-Strike 2</option>
-                                <option value="Dota2">Dota 2</option>
-                                <option value="Valorant">Valorant</option>
-                                <option value="StarCraft2">StarCraft 2</option>
-                                <option value="Predecessor">Predecessor</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Match Type</label>
-                            <select id="planPlayType">
-                                <option value="1v1">1v1</option>
-                                <option value="2v2">2v2</option>
-                                <option value="3v3">3v3</option>
-                                <option value="5v5">5v5</option>
-                            </select>
-                        </div>
-
-                        <label style="color: #ffd700; font-weight: 600; display: block; margin-bottom: 10px;">
-                            Build Match (drag players or whole teams)
-                        </label>
-
-                        <!-- Player-based drag and drop -->
-                        <div style="display: flex; gap: 15px; margin-bottom: 15px;">
-                            <div style="flex: 1;">
-                                <div class="player-drop-zone team-a" 
-                                     ondrop="dropPlayer(event, 'teamA')" 
-                                     ondragover="allowDrop(event)" 
-                                     ondragleave="dragLeave(event)">
-                                    <h5 style="color: #c8b37e; margin-bottom: 8px;">TEAM A</h5>
-                                    <div id="teamAPlayers" style="min-height: 60px;">
-                                        <span style="opacity: 0.6; font-size: 0.85rem;">Drop players here...</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div style="flex: 1;">
-                                <div class="player-drop-zone team-b" 
-                                     ondrop="dropPlayer(event, 'teamB')" 
-                                     ondragover="allowDrop(event)" 
-                                     ondragleave="dragLeave(event)">
-                                    <h5 style="color: #ef4444; margin-bottom: 8px;">TEAM B</h5>
-                                    <div id="teamBPlayers" style="min-height: 60px;">
-                                        <span style="opacity: 0.6; font-size: 0.85rem;">Drop players here...</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Available teams/players pool -->
-                        <div class="team-pool" style="max-height: 300px;">
-                            <h4>Available Teams & Players</h4>
-                            <div id="planTeamPool"></div>
-                        </div>
-
-                        <div class="form-group" style="margin-top: 15px;">
-                            <label>Notes (optional)</label>
-                            <input type="text" id="planNotes" placeholder="Any special notes about this game...">
-                        </div>
-                        <button class="btn primary" onclick="addGameToQueue()" data-tooltip="Add this match to the queue for play">➕ Add to Queue</button>
-                        <button class="btn" onclick="clearManualGameSetup()" data-tooltip="Clear all players from both teams">🔄 Clear</button>
-                    </div>
-
-                    <!-- Confirm Result Tab -->
-                    <div id="confirmTab" class="tab-content">
-                        <div class="form-group">
-                            <label>Select Queued Game</label>
-                            <select id="queuedGameSelect" onchange="loadQueuedGame(parseInt(this.value))">
-                                <option value="">-- Select a game to confirm --</option>
-                            </select>
-                        </div>
-
-                        <div class="confirm-container" id="confirmContainer" style="display: none;">
-                            <h4 style="color: #ffd700; margin-bottom: 10px;">Game Details</h4>
-                            <div id="confirmGameInfo"></div>
-
-                            <h4 style="color: #ffd700; margin-top: 15px; margin-bottom: 10px;">Select Winner(s)</h4>
-                            <div id="confirmTeamsDisplay"></div>
-
-                            <div class="form-group" style="margin-top: 15px;">
-                                <label>Actual Result Notes (optional)</label>
-                                <input type="text" id="confirmNotes" placeholder="Any additional notes about the result...">
-                            </div>
-
-                            <button class="btn primary" onclick="confirmGameResult()" data-tooltip="Confirm match outcome and begin tile placement phase">✅ Submit Result & Start Turn</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Disputed Matches (auto-hides when empty) -->
-                <div class="panel" style="margin-top: 20px; display: none;">
-                    <h3>🗳️ Disputed Matches</h3>
-                    <div id="disputedMatchesPanel">
-                        <p class="queue-empty">No matches with pending votes</p>
-                    </div>
-                </div>
-
-                <!-- Game Queue Display -->
-                <div class="panel" style="margin-top: 20px;">
-                    <h3>📋 Game Queue (<span id="queueCount">0</span>)</h3>
-                    <div class="queue-container" id="gameQueue">
-                        <p style="text-align: center; opacity: 0.7; font-style: italic;">No games in queue</p>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-    </div>
 
     <!-- Tab 3: Board Panel -->
     <div id="boardPanel" class="god-tab-panel">
@@ -470,128 +262,6 @@
                 <p style="text-align: center; opacity: 0.5; grid-column: 1 / -1;">Load a tournament to see roster</p>
             </div>
         </div>
-    </div>
-
-    <!-- Tab 5: Stats Panel -->
-    <div id="statsPanel" class="god-tab-panel">
-        <!-- Stats Sub-tabs -->
-        <div class="stats-sub-nav">
-            <button class="stats-sub-tab active" data-subtab="overview" onclick="switchStatsTab('overview')">Overview</button>
-            <button class="stats-sub-tab" data-subtab="matches" onclick="switchStatsTab('matches')">Match History</button>
-            <button class="stats-sub-tab" data-subtab="headtohead" onclick="switchStatsTab('headtohead')">Head-to-Head</button>
-            <button class="stats-sub-tab" data-subtab="games" onclick="switchStatsTab('games')">Game Analysis</button>
-            <button class="btn-small primary" onclick="generatePDF()" style="margin-left: auto;">Export PDF</button>
-        </div>
-
-        <!-- Overview Sub-tab -->
-        <div class="stats-sub-pane active" id="stats-overview">
-            <div class="stats-overview-grid">
-                <!-- Team Standings -->
-                <section class="stats-card stats-standings-card">
-                    <h3>Team Standings</h3>
-                    <div class="standings-table" id="statsStandingsTable">
-                        <p class="no-data">Load a tournament to view standings</p>
-                    </div>
-                </section>
-
-                <!-- Tournament Summary -->
-                <section class="stats-card stats-summary-card">
-                    <h3>Tournament Summary</h3>
-                    <div class="summary-stats" id="statsSummaryStats">
-                        <div class="summary-item">
-                            <span class="summary-label">Total Matches</span>
-                            <span class="summary-value" id="statsSummaryMatches">--</span>
-                        </div>
-                        <div class="summary-item">
-                            <span class="summary-label">Current Round</span>
-                            <span class="summary-value" id="statsSummaryRounds">--</span>
-                        </div>
-                        <div class="summary-item">
-                            <span class="summary-label">Avg Match Duration</span>
-                            <span class="summary-value" id="statsSummaryAvgDuration">--</span>
-                        </div>
-                        <div class="summary-item">
-                            <span class="summary-label">Challenges Played</span>
-                            <span class="summary-value" id="statsSummaryChallenges">--</span>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Notable Streaks -->
-                <section class="stats-card stats-streaks-card">
-                    <h3>Notable Streaks</h3>
-                    <div class="streaks-list" id="statsStreaksList">
-                        <p class="no-data">No streak data available</p>
-                    </div>
-                </section>
-
-                <!-- Points Progress Chart -->
-                <section class="stats-card stats-chart-card">
-                    <h3>Points Progress</h3>
-                    <div class="chart-container" id="statsPointsChartContainer">
-                        <canvas id="statsPointsChart"></canvas>
-                    </div>
-                </section>
-            </div>
-        </div>
-
-        <!-- Match History Sub-tab -->
-        <div class="stats-sub-pane" id="stats-matches">
-            <div class="matches-filters">
-                <select id="statsFilterTeam" onchange="filterStatsMatches()">
-                    <option value="">All Teams</option>
-                </select>
-                <select id="statsFilterGame" onchange="filterStatsMatches()">
-                    <option value="">All Games</option>
-                </select>
-                <select id="statsFilterResult" onchange="filterStatsMatches()">
-                    <option value="">All Results</option>
-                    <option value="won">Wins Only</option>
-                    <option value="lost">Losses Only</option>
-                </select>
-                <input type="search" id="statsFilterSearch" placeholder="Search player names..." oninput="filterStatsMatches()">
-            </div>
-            <div class="matches-list" id="statsMatchesList">
-                <p class="no-data">Load a tournament to view match history</p>
-            </div>
-        </div>
-
-        <!-- Head-to-Head Sub-tab -->
-        <div class="stats-sub-pane" id="stats-headtohead">
-            <div class="h2h-matrix-container" id="statsH2HMatrixContainer">
-                <p class="no-data">Load a tournament to view head-to-head records</p>
-            </div>
-            <div class="h2h-detail" id="statsH2HDetail">
-                <p class="h2h-hint">Click a cell in the matrix to see detailed matchup history</p>
-            </div>
-        </div>
-
-        <!-- Game Analysis Sub-tab -->
-        <div class="stats-sub-pane" id="stats-games">
-            <div class="games-grid">
-                <section class="stats-card game-breakdown-card">
-                    <h3>Games Breakdown</h3>
-                    <div class="game-breakdown" id="statsGameBreakdown">
-                        <p class="no-data">No game data available</p>
-                    </div>
-                </section>
-
-                <section class="stats-card team-game-stats-card">
-                    <h3>Team Performance by Game</h3>
-                    <div class="team-game-stats" id="statsTeamGameStats">
-                        <p class="no-data">No data available</p>
-                    </div>
-                </section>
-
-                <section class="stats-card format-breakdown-card">
-                    <h3>Format Breakdown</h3>
-                    <div class="format-breakdown" id="statsFormatBreakdown">
-                        <p class="no-data">No format data available</p>
-                    </div>
-                </section>
-            </div>
-        </div>
-
     </div>
 
     <!-- Tab 6: Spells Panel -->
@@ -923,31 +593,6 @@
         </div>
     </div>
 
-    <!-- Force Advance Phase Modal -->
-    <div id="forceAdvanceModal" class="modal" style="display: none;">
-        <div class="modal-content" style="max-width: 500px;">
-            <div class="modal-header">
-                <h2 style="color: var(--accent-danger, #ef4444);">&#x26A0; Force Advance Phase</h2>
-                <button onclick="closeForceAdvanceModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p style="color: var(--text-secondary); margin-bottom: 15px;">
-                    Not all requirements are met. Force advancing may lead to inconsistent state.
-                </p>
-                <p style="color: var(--text-secondary); margin-bottom: 10px; font-size: 0.9rem;">
-                    Advancing to: <strong id="forceAdvanceNextPhase" style="color: var(--accent-primary);">---</strong>
-                </p>
-                <div id="forceAdvanceRequirements" style="margin-bottom: 20px;">
-                    <!-- Populated dynamically -->
-                </div>
-                <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                    <button class="btn secondary" onclick="closeForceAdvanceModal()">Cancel</button>
-                    <button class="btn danger" onclick="confirmForceAdvance()">Force Advance</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Next Round / Award Points Modal -->
     <div id="nextRoundModal" class="modal" style="display: none;">
         <div class="modal-content" style="max-width: 500px;">
@@ -1017,37 +662,41 @@
         </div>
     </div>
 
-    <!-- Break Settings Modal -->
-    <div id="breakSettingsModal" class="modal" style="display: none;">
-        <div class="modal-content" style="max-width: 400px;">
+    <!-- Tournament State Change Modal (acts on the active tournament — the one loaded via the navbar) -->
+    <div id="stateChangeModal" class="modal" style="display: none;">
+        <div class="modal-content state-change-modal">
             <div class="modal-header">
-                <h2>Break Settings</h2>
-                <button onclick="closeBreakSettings()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+                <h2>Change Tournament State</h2>
+                <button onclick="closeStateChangeModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="form-group">
-                    <label style="color: var(--text-secondary); font-size: 0.9rem;">Break every N rounds (0 = disabled):</label>
-                    <input type="number" id="breakIntervalInput" min="0" max="20" value="2"
-                           style="width: 80px; padding: 8px 12px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 8px; color: white; font-size: 1rem; margin-top: 6px;">
+                <p class="modal-hint">Select the new state for the active tournament.</p>
+                <div class="state-options" id="stateOptions">
+                    <button class="state-option" data-state="setup" onclick="confirmStateChange('setup')">
+                        <span class="state-option-label">Setup</span>
+                        <span class="state-option-desc">Preparing teams and configuration</span>
+                    </button>
+                    <button class="state-option" data-state="playing" onclick="confirmStateChange('playing')">
+                        <span class="state-option-label">Playing</span>
+                        <span class="state-option-desc">Tournament is live and ongoing</span>
+                    </button>
+                    <button class="state-option" data-state="finished" onclick="confirmStateChange('finished')">
+                        <span class="state-option-label">Finished</span>
+                        <span class="state-option-desc">Tournament has concluded</span>
+                    </button>
+                    <button class="state-option" data-state="archived" onclick="confirmStateChange('archived')" style="display: none;">
+                        <span class="state-option-label">Archived</span>
+                        <span class="state-option-desc">Lock tournament permanently (reversible by God)</span>
+                    </button>
                 </div>
-                <p style="color: var(--text-tertiary); font-size: 0.85rem; margin: 12px 0;">
-                    Rounds since last break: <strong id="roundsSinceBreak" style="color: var(--accent-primary);">0</strong>
-                </p>
-                <div style="display: flex; gap: 8px; margin-bottom: 15px;">
-                    <button class="btn-small secondary" onclick="resetBreakCounter()">Reset Counter</button>
-                    <button class="btn-small secondary" onclick="skipNextBreak()">Skip Next Break</button>
-                </div>
-                <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                    <button class="btn secondary" onclick="closeBreakSettings()">Cancel</button>
-                    <button class="btn primary" onclick="saveBreakSettings(this)">Save</button>
-                </div>
+                <p class="archived-warning" id="archivedWarning" style="display: none;">This tournament is archived. Only God users can change its state.</p>
             </div>
         </div>
     </div>
 
-    <!-- Edit Tournament Modal -->
+    <!-- Edit Tournament Modal (name + win condition; per-tournament from the list, no need to load it first) -->
     <div id="editTournamentModal" class="modal" style="display: none;">
-        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+        <div class="modal-content" style="max-width: 480px;">
             <div class="modal-header">
                 <h2>✏️ Edit Tournament</h2>
                 <button onclick="closeEditModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">×</button>
@@ -1188,27 +837,6 @@
         }
 
         /**
-         * Stats sub-tab switching
-         */
-        function switchStatsTab(subtab) {
-            document.querySelectorAll('.stats-sub-tab').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.subtab === subtab);
-            });
-            document.querySelectorAll('.stats-sub-pane').forEach(pane => {
-                pane.classList.toggle('active', pane.id === `stats-${subtab}`);
-            });
-        }
-
-        /**
-         * Stats match filter
-         */
-        function filterStatsMatches() {
-            if (window.godApp?.stats) {
-                window.godApp.stats.renderMatchHistory();
-            }
-        }
-
-        /**
          * Toggle Game Log Footer
          */
         function toggleGameLogFooter() {
@@ -1236,13 +864,6 @@
          * Sync data across tabs when switching
          */
         function syncTabData(tabName) {
-            if (tabName === 'stats') {
-                // Render rich statistics from StatsManager
-                if (window.godApp?.stats) {
-                    window.godApp.stats.renderAllStats();
-                }
-            }
-
             if (tabName === 'teams') {
                 // Initialize Teams tab components if gameState is loaded
                 if (window.gameState?.teams) {

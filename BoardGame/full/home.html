@@ -310,45 +310,6 @@
     .btn-enter:hover {
       box-shadow: 0 0 18px rgba(200,179,126,0.4);
     }
-    /* ── Active tournament banner ── */
-    .active-tournament-banner {
-      background: linear-gradient(180deg, rgba(30,32,42,0.7), rgba(14,16,22,0.85));
-      border: 1px solid rgba(200,179,126,0.25);
-      border-radius: 10px;
-      padding: 14px 20px;
-      margin-bottom: 22px;
-      display: none;
-      align-items: center;
-      gap: 14px;
-    }
-    .active-tournament-banner.visible { display: flex; }
-    .active-tournament-banner .banner-icon { font-size: 1.3rem; }
-    .active-tournament-banner .banner-text {
-      flex: 1;
-      font-size: 0.88rem;
-      color: #d6d9df;
-    }
-    .active-tournament-banner .banner-name {
-      font-family: 'Russo One', sans-serif;
-      color: #e8d8a8;
-      letter-spacing: 0.03em;
-    }
-    .active-tournament-banner .banner-clear {
-      background: none;
-      border: 1px solid rgba(255,255,255,0.1);
-      color: #9aa1ad;
-      padding: 5px 12px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.75rem;
-      font-family: 'Quantico', sans-serif;
-      transition: all 0.2s;
-    }
-    .active-tournament-banner .banner-clear:hover {
-      border-color: rgba(216,64,64,0.4);
-      color: #d84040;
-    }
-
     .empty-state { text-align: center; padding: 40px; color: #6a7088; }
 
     /* ── Skeleton shimmer loading ── */
@@ -712,14 +673,6 @@
       </div>
     </div>
 
-    <!-- Active tournament banner -->
-    <div id="activeTournamentBanner" class="active-tournament-banner">
-      <span class="banner-icon">🏆</span>
-      <div class="banner-text">
-        Active tournament: <span class="banner-name" id="activeTournamentName">—</span>
-      </div>
-      <button class="banner-clear" onclick="clearActiveTournament()">Clear</button>
-    </div>
 
     <!-- Header -->
     <div class="header">
@@ -914,6 +867,20 @@
         <button class="btn-small btn-secondary" onclick="goToPage('statistics.html')">📊 Statistics</button>
         <button class="btn-small btn-secondary" onclick="goToPage('onboarding.html')">🧭 Player Onboarding</button>
       </div>
+
+      <!-- Dev tools (god only) -->
+      <div id="devToolsRow" style="display: none; margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06);">
+        <div style="font-size: 0.75rem; color: #9aa1ad; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px;">Dev Tools</div>
+        <div class="action-buttons" style="flex-wrap: wrap;">
+          <button class="btn-small btn-secondary" onclick="goToPage('../dev/dev-tools.html')">🛠️ Dev Tools Viewer</button>
+          <button class="btn-small btn-secondary" onclick="goToPage('../dev/board-test2.html')">🎲 Board Test</button>
+          <button class="btn-small btn-secondary" onclick="goToPage('../dev/dev-matchscheduler.html')">📅 Match Scheduler</button>
+          <button class="btn-small btn-secondary" onclick="goToPage('../tools/hex-tile-slicer.html')">🔪 Hex Tile Slicer</button>
+          <button class="btn-small btn-secondary" onclick="goToPage('../tools/spell-generator.html')">🔮 Spell Generator</button>
+          <button class="btn-small btn-secondary" onclick="goToPage('../tools/upload-spells.html')">📤 Upload Spells</button>
+          <button class="btn-small btn-secondary" onclick="goToPage('../development-landing-page.html')">🗺️ Sitemap</button>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -1072,6 +1039,9 @@
       };
       const sectionId = sectionMap[role] || 'userSection';
       document.getElementById(sectionId).classList.add('active');
+
+      // Dev tools row in Resources is god-only
+      document.getElementById('devToolsRow').style.display = role === 'god' ? 'block' : 'none';
     }
 
     async function loadRoleData(role) {
@@ -1276,7 +1246,6 @@
             const name = active.name || currentActiveTournament;
             sessionStorage.setItem('currentTournamentName', name);
             localStorage.setItem('currentTournamentName', name);
-            updateActiveBanner(name);
           }
         }
 
@@ -1410,41 +1379,6 @@
         window.location.href = `view.html?tournamentId=${tournamentId}`;
       }
     };
-
-    window.clearActiveTournament = function() {
-      currentActiveTournament = null;
-      sessionStorage.removeItem('currentTournamentId');
-      localStorage.removeItem('currentTournamentId');
-      sessionStorage.removeItem('currentTournamentName');
-      localStorage.removeItem('currentTournamentName');
-      sessionStorage.removeItem('currentTeamId');
-      localStorage.removeItem('currentTeamId');
-
-      // Hide banner
-      updateActiveBanner(null);
-
-      // Re-init navbar so links lose tournament param
-      if (window.initNavbar) window.initNavbar();
-    };
-
-    function updateActiveBanner(name) {
-      const banner = document.getElementById('activeTournamentBanner');
-      const nameEl = document.getElementById('activeTournamentName');
-      if (name) {
-        nameEl.textContent = name;
-        banner.classList.add('visible');
-      } else {
-        banner.classList.remove('visible');
-      }
-    }
-
-    // Show banner on load if a tournament is already active
-    (function() {
-      const savedName = sessionStorage.getItem('currentTournamentName') || localStorage.getItem('currentTournamentName');
-      if (currentActiveTournament && savedName) {
-        updateActiveBanner(savedName);
-      }
-    })();
 
     window.logout = async function() {
       try {
