@@ -122,6 +122,12 @@ async function loadTournamentData() {
 
             console.log('[Team Controls] Team membership verified');
 
+            // Tournament + team chat — mount once; later snapshots just update gameData
+            if (window.ChatModule && !window._chatModule) {
+                window._chatModule = new ChatModule({ tournamentId: currentTournamentId, teamId: currentTeamId });
+                window._chatModule.mount();
+            }
+
             // Dispatch teamLoaded event for theme application
             window.dispatchEvent(new CustomEvent('teamLoaded', {
                 detail: { teamId: currentTeamId }
