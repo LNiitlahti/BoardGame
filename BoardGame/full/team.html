@@ -43,6 +43,9 @@
             <!-- Populated by renderScoreStrip() -->
         </div>
 
+        <!-- Game Flow State Banner: current phase + what the player should do -->
+        <div class="phase-banner" id="phaseBanner" style="display: none;"></div>
+
         <div class="team-status-message" id="statusMessage" style="display: none;"></div>
 
         <!-- Pre-Game Instructions Overlay -->
@@ -82,6 +85,9 @@
                         <button class="btn primary lobby-ready-btn" id="readyDiscordBtn" onclick="setReadyStatus('discord')">
                             &#x1F3A7; Discord
                         </button>
+                    </div>
+                    <div id="teammateConfirmList" class="teammate-confirm-list">
+                        <!-- Dynamically populated: confirm on behalf of teammates -->
                     </div>
                     <div id="readyStatus" class="ready-status">
                         <!-- Dynamically populated: per-team two-status readiness -->
@@ -146,13 +152,33 @@
                 <div class="team-board-section">
                     <div id="hexBoard"></div>
                 </div>
-                <div class="team-board-note">
-                    Board updates in real-time during matches
-                </div>
             </div>
 
-            <!-- Right Sidebar: Current Match -->
+            <!-- Right Sidebar: Voting + Current Match -->
             <div>
+                <!-- Match Result Voting Section -->
+                <div class="voting-section" id="votingSection" style="display: none;">
+                    <h3>Match Result Voting</h3>
+                    <div id="votingMatchInfo" style="margin-bottom: 15px;">
+                        <!-- Match info will be inserted here -->
+                    </div>
+
+                    <div class="vote-options" id="voteOptions">
+                        <!-- Vote options will be inserted here -->
+                    </div>
+
+                    <button class="btn primary" onclick="submitVote()" id="submitVoteBtn" style="width: 100%; margin-top: 10px;">
+                        Submit Vote
+                    </button>
+
+                    <div class="vote-progress" id="voteProgress" style="display: none;">
+                        <h4>Voting Progress</h4>
+                        <div id="voteProgressList">
+                            <!-- Vote progress will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+
                 <div class="team-section">
                     <div class="team-section-header">Current Match</div>
                     <div id="currentMatchDisplay">
@@ -174,29 +200,6 @@
                     <div id="recentEventsList" class="scrollable-list">
                         <p class="empty-state-inline">No recent events</p>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Match Result Voting Section -->
-        <div class="voting-section" id="votingSection" style="display: none;">
-            <h3>Match Result Voting</h3>
-            <div id="votingMatchInfo" style="margin-bottom: 15px;">
-                <!-- Match info will be inserted here -->
-            </div>
-
-            <div class="vote-options" id="voteOptions">
-                <!-- Vote options will be inserted here -->
-            </div>
-
-            <button class="btn primary" onclick="submitVote()" id="submitVoteBtn" style="width: 100%; margin-top: 10px;">
-                Submit Vote
-            </button>
-
-            <div class="vote-progress" id="voteProgress" style="display: none;">
-                <h4>Voting Progress</h4>
-                <div id="voteProgressList">
-                    <!-- Vote progress will be inserted here -->
                 </div>
             </div>
         </div>

@@ -135,6 +135,7 @@ async function loadTournamentData() {
 
             // Render all sections
             renderScoreStrip();
+            renderPhaseBanner();
             renderTeammates();
             renderSpellCards();
             renderActiveConditions();
@@ -218,6 +219,111 @@ function renderScoreStrip() {
     }).join('');
 }
 
+// ==================== PHASE BANNER (game flow state) ====================
+
+/**
+ * Player-facing guide for every tournament phase: what is happening and
+ * what the player should do. `action: true` = the player must act now.
+ */
+const PHASE_GUIDE = {
+    pre_game_setup:   { icon: '⚙',       name: 'Setup',                    desc: 'The admin is preparing the round. Sit tight.' },
+    scoring_vp:       { icon: '\u{1F3C6}',    name: 'Scoring — Victory Points', desc: 'Victory points are being tallied. Watch the board!' },
+    scoring_hex:      { icon: '⬢',       name: 'Scoring — Hex Points', desc: 'Hex control points are being tallied. Watch the board!' },
+    hex_placement_1:  { icon: '\u{1F5FA}',    name: 'Hex Placement — Game 1', desc: 'Match 1 winners place their hex tiles on the board.' },
+    spell_window_1:   { icon: '✨',       name: 'Spell Window',             desc: 'Teams may cast spells.' },
+    hex_placement_2:  { icon: '\u{1F5FA}',    name: 'Hex Placement — Game 2', desc: 'Match 2 winners place their hex tiles on the board.' },
+    challenges:       { icon: '⚔',       name: 'Challenges',               desc: 'Teams may issue challenges over contested hexes.' },
+    spell_window_2:   { icon: '✨',       name: 'Spell Window',             desc: 'Teams may cast spells.' },
+    challenge_game:   { icon: '\u{1F3AE}',    name: 'Challenge Game',           desc: 'A challenge game is being played.' },
+    spell_window_3:   { icon: '✨',       name: 'Spell Window',             desc: 'Teams may cast spells.' },
+    board_resolved:   { icon: '\u{1F6E1}',    name: 'Board Resolved',           desc: 'The board is settled. Matches are up next.' },
+    spell_window_4:   { icon: '✨',       name: 'Spell Window',             desc: 'Teams may cast spells.' },
+    match_1_setup:    { icon: '\u{1F3DF}',    name: 'Match 1 — Assignments', desc: 'Review your match assignments for this round.', action: true },
+    match_1_lobby:    { icon: '\u{1F3AE}',    name: 'Match 1 — Lobby Check', desc: 'Join Discord and the game lobby, then confirm both.', action: true },
+    match_1_playing:  { icon: '\u{1F3AE}',    name: 'Match 1 — Playing',   desc: 'Matches are live!' },
+    match_2_setup:    { icon: '\u{1F3DF}',    name: 'Match 2 — Assignments', desc: 'Review your match assignments for this round.', action: true },
+    match_2_lobby:    { icon: '\u{1F3AE}',    name: 'Match 2 — Lobby Check', desc: 'Join Discord and the game lobby, then confirm both.', action: true },
+    match_2_playing:  { icon: '\u{1F3AE}',    name: 'Match 2 — Playing',   desc: 'Matches are live!' },
+    round_advance:    { icon: '⏭',       name: 'Round Advancing',          desc: 'Moving on to the next round...' },
+    break:            { icon: '⏸',       name: 'Break',                    desc: 'Take a breather — the tournament resumes shortly.' },
+    tournament_end:   { icon: '\u{1F3C6}',    name: 'Tournament Complete',      desc: 'Thanks for playing! Final results are on the board.' }
+};
+
+/**
+ * Render the game-flow banner: which phase the tournament is in and what
+ * the player should be doing right now.
+ */
+function renderPhaseBanner() {
+    const el = document.getElementById('phaseBanner');
+    if (!el) return;
+
+    const phaseName = gameData?.currentPhase?.name;
+    if (!phaseName) {
+        el.style.display = 'none';
+        return;
+    }
+
+    const guide = PHASE_GUIDE[phaseName] ||
+        { icon: 'ℹ', name: phaseName.replace(/_/g, ' '), desc: '' };
+    let desc = guide.desc;
+    let action = guide.action === true;
+
+    // Spell windows: describe whose turn it is
+    if (phaseName.startsWith('spell_window')) {
+        if (!gameData.spellsActive) {
+            desc = 'Spell phase — resolved by the tournament admin.';
+        } else {
+            const sp = gameData.spellPhase;
+            const currentTurnTeam = sp?.isActive ? sp.turnOrder?.[sp.currentTeamIndex] : null;
+            const isCompleted = (sp?.teamsCompleted || []).includes(currentTeamId);
+            if (isCompleted) {
+                desc = 'Your spell turn is done. Waiting for the other teams...';
+            } else if (currentTurnTeam === currentTeamId) {
+                desc = 'It is YOUR turn — cast a spell or pass!';
+                action = true;
+            } else if (currentTurnTeam != null) {
+                const team = gameData.teams?.find(t => t.id === currentTurnTeam);
+                desc = `${team?.name || 'Team ' + currentTurnTeam} is choosing a spell...`;
+            }
+        }
+    }
+
+    // Lobby phases: action needed until both statuses are confirmed
+    if (phaseName === 'match_1_lobby' || phaseName === 'match_2_lobby') {
+        const r = (gameData.lobbyReady || {})[currentUser?.uid] || {};
+        const confirmed = (r.gameLobby === true || r.ready === true) && (r.discord === true || r.ready === true);
+        if (confirmed) {
+            desc = 'You are confirmed. Waiting for the remaining players...';
+            action = false;
+        }
+    }
+
+    // Playing phases: point at the player's own live match if there is one
+    if (phaseName === 'match_1_playing' || phaseName === 'match_2_playing') {
+        const queue = gameData.gameQueue || [];
+        const ourLive = queue.find(m => m.status === 'ongoing' && !m.isBreak && _matchInvolvesUs(m));
+        if (ourLive) {
+            const gameName = getGameDisplayName(ourLive.gameId || ourLive.gameType || ourLive.game);
+            desc = `Your match is live — play ${gameName}! Vote on the result when it ends.`;
+            action = true;
+        } else {
+            desc = 'Matches are live. Not playing? Watch and cheer!';
+        }
+    }
+
+    const round = gameData?.currentPhase?.roundNumber || gameData?.currentRound;
+
+    el.className = 'phase-banner' + (action ? ' action-needed' : '');
+    el.innerHTML = `
+        <span class="phase-banner-icon">${guide.icon}</span>
+        ${round ? `<span class="phase-banner-round">Round ${round}</span>` : ''}
+        <span class="phase-banner-name">${guide.name}</span>
+        <span class="phase-banner-desc">${desc}</span>
+        ${action ? '<span class="phase-banner-action">Action needed</span>' : ''}
+    `;
+    el.style.display = 'flex';
+}
+
 /**
  * Render teammates list
  */
@@ -247,23 +353,24 @@ function renderTeammates() {
             const dc = r.discord === true || r.ready === true;
             const canClick = isLobbyPhase;
 
-            if (isYou) {
-                // Always show buttons for the current user; only clickable during lobby phase
-                const glDisabled = gl || !canClick;
-                const dcDisabled = dc || !canClick;
+            if (isLobbyPhase) {
+                // Clickable for yourself AND teammates — team members can
+                // confirm Discord/lobby status on each other's behalf
+                const uidArg = isYou ? '' : `, '${player.uid}'`;
+                const confirmTitle = isYou ? '' : `title="Confirm on behalf of ${playerName.replace(/"/g, '&quot;')}"`;
                 readyHTML = `
                     <div class="teammate-ready-buttons">
-                        <button class="teammate-ready-btn ${dc ? 'is-ready' : ''} ${!canClick ? 'phase-locked' : ''}" ${dcDisabled ? 'disabled' : ''}
-                                onclick="event.stopPropagation(); setReadyStatus('discord')">
+                        <button class="teammate-ready-btn ${dc ? 'is-ready' : ''}" ${dc ? 'disabled' : ''} ${confirmTitle}
+                                onclick="event.stopPropagation(); setReadyStatus('discord'${uidArg})">
                             &#x1F3A7; ${dc ? '&#x2713;' : 'Discord'}
                         </button>
-                        <button class="teammate-ready-btn ${gl ? 'is-ready' : ''} ${!canClick ? 'phase-locked' : ''}" ${glDisabled ? 'disabled' : ''}
-                                onclick="event.stopPropagation(); setReadyStatus('gameLobby')">
+                        <button class="teammate-ready-btn ${gl ? 'is-ready' : ''}" ${gl ? 'disabled' : ''} ${confirmTitle}
+                                onclick="event.stopPropagation(); setReadyStatus('gameLobby'${uidArg})">
                             &#x1F3AE; ${gl ? '&#x2713;' : 'Lobby'}
                         </button>
                     </div>`;
             } else {
-                // Always show status indicators for teammates
+                // Outside the lobby phase, show status indicators only
                 readyHTML = `
                     <div class="teammate-ready-indicators">
                         <span class="teammate-ready-icon ${dc ? 'on' : ''}">&#x1F3A7;</span>
@@ -1176,11 +1283,40 @@ function getHexColor(color) {
 }
 
 /**
- * Render recent events
+ * Format an ISO timestamp as a short relative time ("5m ago").
+ */
+function _formatTimeAgo(iso) {
+    if (!iso) return '';
+    const then = new Date(iso).getTime();
+    if (isNaN(then)) return '';
+    const mins = Math.floor((Date.now() - then) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+}
+
+/**
+ * Resolve a history player ID to a display name + team color chip.
+ */
+function _historyPlayerChip(playerId) {
+    const name = resolveCurrentPlayerName(playerId, null, 'Player');
+    let teamId = gameData.players?.[playerId]?.teamId;
+    if (!teamId && window.PlayerUtils) {
+        teamId = window.PlayerUtils.getPlayerDisplayInfo(gameData, playerId).teamId;
+    }
+    const color = teamId ? getTeamColorById(teamId) : null;
+    return { name: _escapeHtmlSafe(name), color };
+}
+
+/**
+ * Render recent events: match results with winners/losers, round,
+ * duration and relative time.
  */
 function renderRecentEvents() {
     const container = document.getElementById('recentEventsList');
-    const events = gameData.events || gameData.gameHistory || [];
+    const events = gameData.gameHistory?.length ? gameData.gameHistory : (gameData.events || []);
 
     if (events.length === 0) {
         container.innerHTML = '<p class="empty-state-inline">No recent events</p>';
@@ -1191,27 +1327,47 @@ function renderRecentEvents() {
 
     container.innerHTML = recentEvents.map(event => {
         // Game history entries → result card style
-        if (event.gameNumber || event.game) {
+        if (event.winningPlayerIds || event.gameNumber || event.game) {
             const gameName = getGameDisplayName(event.gameId || event.gameType || event.game);
-            const winners = Array.isArray(event.winner) ? event.winner : [event.winner];
-            const losers = Array.isArray(event.loser) ? event.loser : [event.loser];
 
-            const winnersHTML = winners.filter(Boolean).map(w =>
-                `<span class="rc-player rc-win">${w}</span>`
-            ).join('');
-            const losersHTML = losers.filter(Boolean).map(l =>
-                `<span class="rc-player rc-loss">${l}</span>`
-            ).join('');
+            // Modern entries store player IDs; legacy entries store names
+            let winnersHTML, losersHTML;
+            if (event.winningPlayerIds?.length || event.losingPlayerIds?.length) {
+                winnersHTML = (event.winningPlayerIds || []).map(id => {
+                    const chip = _historyPlayerChip(id);
+                    return `<span class="rc-player rc-win" ${chip.color ? `style="color: ${chip.color};"` : ''}>${chip.name}</span>`;
+                }).join('');
+                losersHTML = (event.losingPlayerIds || []).map(id => {
+                    const chip = _historyPlayerChip(id);
+                    return `<span class="rc-player rc-loss">${chip.name}</span>`;
+                }).join('');
+            } else {
+                const winners = Array.isArray(event.winner) ? event.winner : [event.winner];
+                const losers = Array.isArray(event.loser) ? event.loser : [event.loser];
+                winnersHTML = winners.filter(Boolean).map(w =>
+                    `<span class="rc-player rc-win">${_escapeHtmlSafe(w)}</span>`).join('');
+                losersHTML = losers.filter(Boolean).map(l =>
+                    `<span class="rc-player rc-loss">${_escapeHtmlSafe(l)}</span>`).join('');
+            }
+
+            // Meta line: round, challenge flag, duration, time ago
+            const metaParts = [];
+            if (event.tournamentRound) metaParts.push(`R${event.tournamentRound}`);
+            if (event.isChallenge) metaParts.push('<span class="rc-challenge">CHALLENGE</span>');
+            if (event.matchDuration?.durationMinutes) metaParts.push(`${event.matchDuration.durationMinutes} min`);
+            const timeAgo = _formatTimeAgo(event.timestamp);
+            if (timeAgo) metaParts.push(timeAgo);
 
             return `
                 <div class="rc">
                     <div class="rc-top">
                         <span class="rc-game">${gameName}</span>
+                        <span class="rc-meta">${metaParts.join(' &middot; ')}</span>
                     </div>
                     <div class="rc-matchup">
-                        <div class="rc-side">${winnersHTML}<span class="rc-badge">WIN</span></div>
+                        <div class="rc-side">${winnersHTML || '<span class="rc-player rc-win">?</span>'}<span class="rc-badge">WIN</span></div>
                         <div class="rc-vs">vs</div>
-                        <div class="rc-side rc-loser">${losersHTML}</div>
+                        <div class="rc-side rc-loser">${losersHTML || '<span class="rc-player rc-loss">?</span>'}</div>
                     </div>
                 </div>
             `;
@@ -1219,60 +1375,72 @@ function renderRecentEvents() {
 
         // Generic events
         const message = event.text || event.message || event.description || '';
-        return `<div class="rc rc-event"><div class="rc-msg">${message}</div></div>`;
+        return `<div class="rc rc-event"><div class="rc-msg">${_escapeHtmlSafe(message)}</div></div>`;
     }).join('');
+}
+
+/**
+ * Check if a match involves this player or their team.
+ * Handles both the full format (teams with playerIds) and legacy sides.
+ */
+function _matchInvolvesUs(match) {
+    const sides = match.teams || match.sides || [];
+    return sides.some(side => {
+        const players = side.players || side.playerIds || [];
+        return players.some(p => {
+            const playerId = typeof p === 'string' ? p : (p.id || p.uid);
+            const playerName = typeof p === 'string' ? '' : (p.name || '');
+            return (currentUser?.uid && playerId === currentUser.uid) ||
+                   (teamData?.players?.some(tp => tp.uid === playerId || tp.id === playerId || tp.name === playerName));
+        });
+    });
 }
 
 /**
  * Check if voting is needed for any completed match
  */
 function checkForVoting() {
+    const section = document.getElementById('votingSection');
+    if (!section) return;
+
     // Use gameQueue (full version) or selectedGames (legacy) as match source
     const matchSource = gameData.gameQueue || gameData.selectedGames || [];
-    if (matchSource.length === 0) return;
 
-    // Find completed matches that need voting
-    const matchNeedingVote = matchSource.find(match => {
-        // Must be completed
-        if (match.status !== 'completed') return false;
+    // First completed, not-yet-admin-confirmed match involving this player
+    const match = matchSource.find(m =>
+        m.status === 'completed' && !m.adminConfirmed && !m.isBreak && _matchInvolvesUs(m)
+    );
 
-        // Must involve this player (check teams array for full version, sides for legacy)
-        const teams = match.teams || match.sides || [];
-        const involvesPlayer = teams.some(side => {
-            const players = side.players || side.playerIds || [];
-            return players.some(p => {
-                const playerId = typeof p === 'string' ? p : (p.id || p.uid);
-                const playerName = typeof p === 'string' ? '' : (p.name || '');
-                return (currentUser?.uid && playerId === currentUser.uid) ||
-                       (teamData?.players?.some(tp => tp.uid === playerId || tp.name === playerName));
-            });
-        });
-        if (!involvesPlayer) return false;
+    if (!match) {
+        section.style.display = 'none';
+        return;
+    }
 
-        // Check if user already voted
-        const votes = match.votes || [];
-        const userVoted = votes.some(v => v.uid === currentUser?.uid);
-        if (userVoted) {
-            // Show progress but don't allow new vote
-            showVotingProgress(match);
-            return false;
-        }
+    const votes = match.votes || [];
+    const userVoted = votes.some(v => v.uid === currentUser?.uid);
 
-        // Check if already confirmed by admin
-        if (match.adminConfirmed) return false;
-
-        return true;
-    });
-
-    if (matchNeedingVote) {
-        showVotingSection(matchNeedingVote);
+    if (userVoted) {
+        // Already voted: show progress only, no options
+        section.style.display = 'block';
+        section.classList.add('active');
+        _currentVotingMatch = match;
+        document.getElementById('votingMatchInfo').innerHTML =
+            '<div style="color: #9aa1ad;">Your vote is in. Waiting for the other players...</div>';
+        document.getElementById('voteOptions').innerHTML = '';
+        document.getElementById('submitVoteBtn').style.display = 'none';
+        showVotingProgress(match);
     } else {
-        document.getElementById('votingSection').style.display = 'none';
+        document.getElementById('submitVoteBtn').style.display = '';
+        showVotingSection(match);
     }
 }
 
+/** Match currently displayed in the voting section (used by submitVote) */
+let _currentVotingMatch = null;
+
 /**
- * Show voting section for a match
+ * Show voting section for a match.
+ * One side must always win — there is no draw option.
  */
 function showVotingSection(match) {
     const section = document.getElementById('votingSection');
@@ -1281,42 +1449,39 @@ function showVotingSection(match) {
 
     section.style.display = 'block';
     section.classList.add('active');
+    _currentVotingMatch = match;
 
+    const gameName = getGameDisplayName(match.gameId || match.gameType || match.game);
     infoDiv.innerHTML = `
         <div style="font-size: 1.1rem; font-weight: bold; color: var(--accent-primary);">
-            Game ${match.game || match.gameNumber} - ${match.gameType || 'Match'} has finished!
+            ${gameName} has finished!
         </div>
         <div style="margin-top: 8px;">Who won this match?</div>
     `;
 
-    // Create vote options for each side
-    const sides = match.sides || [];
+    // One vote option per side (full format uses teams, legacy uses sides)
+    const sides = match.teams || match.sides || [];
     optionsDiv.innerHTML = sides.map((side, index) => {
+        const players = getMatchSidePlayers(side);
+        const names = players.map(p => p.name).join(', ') || 'Unknown players';
         const sideLabel = side.name || `Side ${String.fromCharCode(65 + index)}`;
-        const players = side.players?.map(p => p.name || 'Player').join(', ') || 'Unknown players';
 
         return `
             <div class="vote-option" onclick="selectVote('side_${index}_won', ${index})">
                 <input type="radio" name="vote" value="side_${index}_won" id="vote_${index}">
                 <label for="vote_${index}" style="cursor: pointer;">
                     <div style="font-weight: bold;">${sideLabel} Won</div>
-                    <div style="font-size: 0.85rem; opacity: 0.7; margin-top: 4px;">${players}</div>
+                    <div style="font-size: 0.85rem; opacity: 0.7; margin-top: 4px;">${names}</div>
                 </label>
             </div>
         `;
-    }).join('') + `
-        <div class="vote-option" onclick="selectVote('draw', -1)">
-            <input type="radio" name="vote" value="draw" id="vote_draw">
-            <label for="vote_draw" style="cursor: pointer;">
-                <div style="font-weight: bold;">Draw / Tie</div>
-                <div style="font-size: 0.85rem; opacity: 0.7; margin-top: 4px;">No clear winner</div>
-            </label>
-        </div>
-    `;
+    }).join('');
 
     // Show existing votes if any
     if (match.votes && match.votes.length > 0) {
         showVotingProgress(match);
+    } else {
+        document.getElementById('voteProgress').style.display = 'none';
     }
 }
 
@@ -1339,7 +1504,10 @@ function selectVote(voteValue, sideIndex) {
 }
 
 /**
- * Submit vote
+ * Submit vote.
+ * Runs in a transaction and rewrites the whole queue array: Firestore cannot
+ * address array elements with dot-notation paths, and concurrent votes from
+ * other players must not be lost.
  */
 async function submitVote() {
     if (!selectedVote) {
@@ -1347,33 +1515,15 @@ async function submitVote() {
         return;
     }
 
+    const votingMatch = _currentVotingMatch;
+    if (!votingMatch) {
+        showStatus('Match not found', 'error');
+        return;
+    }
+
     try {
         const db = firebase.firestore();
         const tournamentRef = db.collection('tournaments').doc(currentTournamentId);
-
-        // Use gameQueue (full version) or selectedGames (legacy)
-        const matchSource = gameData.gameQueue || gameData.selectedGames || [];
-        const queueField = gameData.gameQueue ? 'gameQueue' : 'selectedGames';
-
-        // Find the match index
-        const matchIndex = matchSource.findIndex(m => {
-            if (m.status !== 'completed' || m.adminConfirmed) return false;
-            const teams = m.teams || m.sides || [];
-            return teams.some(side => {
-                const players = side.players || side.playerIds || [];
-                return players.some(p => {
-                    const pid = typeof p === 'string' ? p : (p.id || p.uid);
-                    const pname = typeof p === 'string' ? '' : (p.name || '');
-                    return (currentUser?.uid && pid === currentUser.uid) ||
-                           teamData?.players?.some(tp => tp.uid === pid || tp.name === pname);
-                });
-            });
-        });
-
-        if (matchIndex === -1) {
-            showStatus('Match not found', 'error');
-            return;
-        }
 
         const vote = {
             uid: currentUser.uid,
@@ -1382,20 +1532,64 @@ async function submitVote() {
             votedAt: new Date().toISOString()
         };
 
-        // Add vote to the match
-        const match = matchSource[matchIndex];
-        const votes = match.votes || [];
-        votes.push(vote);
+        const consensusReached = await db.runTransaction(async (tx) => {
+            const snap = await tx.get(tournamentRef);
+            if (!snap.exists) throw new Error('Tournament not found');
+            const data = snap.data();
 
-        await tournamentRef.update({
-            [`${queueField}.${matchIndex}.votes`]: votes
+            const queueField = data.gameQueue ? 'gameQueue' : 'selectedGames';
+            const queue = (data[queueField] || []).map(m => ({ ...m }));
+
+            // Re-locate the displayed match in fresh data by stable identifiers
+            const matchIndex = queue.findIndex(m =>
+                (votingMatch.id != null && m.id === votingMatch.id) ||
+                (votingMatch.id == null && votingMatch.matchNumber != null && m.matchNumber === votingMatch.matchNumber) ||
+                (votingMatch.id == null && votingMatch.matchNumber == null &&
+                    (m.game === votingMatch.game && m.gameNumber === votingMatch.gameNumber))
+            );
+            if (matchIndex === -1) throw new Error('Match not found');
+
+            const match = queue[matchIndex];
+            const votes = [...(match.votes || [])];
+            if (votes.some(v => v.uid === currentUser.uid)) {
+                return { alreadyVoted: true };
+            }
+            votes.push(vote);
+            match.votes = votes;
+
+            // Consensus check (90% of match players agreeing on one result)
+            const totalPlayers = getTotalPlayersInMatch(match);
+            const voteCounts = {};
+            votes.forEach(v => { voteCounts[v.result] = (voteCounts[v.result] || 0) + 1; });
+            const maxVotes = Math.max(...Object.values(voteCounts));
+            const agreedResult = Object.keys(voteCounts).find(r => voteCounts[r] === maxVotes);
+            const percentage = totalPlayers > 0 ? (maxVotes / totalPlayers) * 100 : 0;
+
+            let consensus = false;
+            if (percentage >= 90) {
+                match.voteConsensus = {
+                    result: agreedResult,
+                    percentage: percentage,
+                    passedThreshold: true,
+                    submittedToAdmin: true,
+                    submittedAt: new Date().toISOString()
+                };
+                consensus = true;
+            }
+
+            tx.update(tournamentRef, { [queueField]: queue });
+            return { consensus };
         });
 
-        showStatus('Vote submitted successfully!', 'success');
         selectedVote = null;
 
-        // Check if consensus reached
-        calculateVoteConsensus(matchIndex);
+        if (consensusReached.alreadyVoted) {
+            showStatus('You have already voted on this match.', 'info');
+        } else if (consensusReached.consensus) {
+            showStatus('🎉 Vote consensus reached! Result submitted to admin for approval.', 'success');
+        } else {
+            showStatus('Vote submitted successfully!', 'success');
+        }
 
     } catch (error) {
         console.error('[Team Controls] Error submitting vote:', error);
@@ -1443,14 +1637,12 @@ function showVotingProgress(match) {
 }
 
 /**
- * Get total players in a match
+ * Get total players in a match (full format uses teams, legacy uses sides)
  */
 function getTotalPlayersInMatch(match) {
-    let count = 0;
-    match.sides?.forEach(side => {
-        count += side.players?.length || 0;
-    });
-    return count;
+    const sides = match.teams || match.sides || [];
+    return sides.reduce((count, side) =>
+        count + (side.players?.length || side.playerIds?.length || 0), 0);
 }
 
 /**
@@ -1463,52 +1655,6 @@ function formatVoteResult(result) {
         return `Side ${String.fromCharCode(65 + sideIndex)} Won`;
     }
     return result;
-}
-
-/**
- * Calculate vote consensus and auto-submit if threshold reached
- */
-async function calculateVoteConsensus(matchIndex) {
-    const matchSource = gameData.gameQueue || gameData.selectedGames || [];
-    const queueField = gameData.gameQueue ? 'gameQueue' : 'selectedGames';
-    const match = matchSource[matchIndex];
-    if (!match) return;
-
-    const votes = match.votes || [];
-    const totalPlayers = getTotalPlayersInMatch(match);
-
-    if (totalPlayers === 0) return;
-
-    const voteCounts = {};
-    votes.forEach(vote => {
-        voteCounts[vote.result] = (voteCounts[vote.result] || 0) + 1;
-    });
-
-    const maxVotes = Math.max(...Object.values(voteCounts));
-    const agreedResult = Object.keys(voteCounts).find(result => voteCounts[result] === maxVotes);
-    const agreementPercentage = (maxVotes / totalPlayers) * 100;
-
-    if (agreementPercentage >= 90) {
-        // Consensus reached!
-        try {
-            const db = firebase.firestore();
-            const tournamentRef = db.collection('tournaments').doc(currentTournamentId);
-
-            await tournamentRef.update({
-                [`${queueField}.${matchIndex}.voteConsensus`]: {
-                    result: agreedResult,
-                    percentage: agreementPercentage,
-                    passedThreshold: true,
-                    submittedToAdmin: true,
-                    submittedAt: new Date().toISOString()
-                }
-            });
-
-            showStatus('🎉 Vote consensus reached! Result submitted to admin for approval.', 'success');
-        } catch (error) {
-            console.error('[Team Controls] Error updating consensus:', error);
-        }
-    }
 }
 
 /**
@@ -1558,19 +1704,25 @@ async function saveTeamName() {
         showStatus('Team name updated successfully!', 'success');
         closeEditTeamNameModal();
 
-        // Also update all user documents with new team name
+        // Also update user documents with the new team name. Best-effort:
+        // players may only write their own user doc, so a rules rejection
+        // here must not surface as a rename failure.
         if (teamData.players) {
-            const batch = db.batch();
-            let hasBatchOps = false;
-            teamData.players.forEach(player => {
-                if (player.uid) {
-                    batch.update(db.collection('users').doc(player.uid), {
-                        assignedTeamName: newName
-                    });
-                    hasBatchOps = true;
-                }
-            });
-            if (hasBatchOps) await batch.commit();
+            try {
+                const batch = db.batch();
+                let hasBatchOps = false;
+                teamData.players.forEach(player => {
+                    if (player.uid) {
+                        batch.update(db.collection('users').doc(player.uid), {
+                            assignedTeamName: newName
+                        });
+                        hasBatchOps = true;
+                    }
+                });
+                if (hasBatchOps) await batch.commit();
+            } catch (batchError) {
+                console.warn('[Team Controls] Could not sync assignedTeamName to user docs:', batchError.message);
+            }
         }
 
     } catch (error) {
@@ -1708,8 +1860,47 @@ function renderLobbyReady() {
         discordBtn.disabled = discordReady;
     }
 
+    renderTeammateConfirmRow();
     renderLobbyCreatorRole();
     renderReadinessStatus();
+}
+
+/**
+ * Render per-teammate confirm buttons in the lobby overlay so team members
+ * can confirm Discord/lobby status on each other's behalf.
+ */
+function renderTeammateConfirmRow() {
+    const container = document.getElementById('teammateConfirmList');
+    if (!container) return;
+
+    const lobbyReady = gameData.lobbyReady || {};
+    const teammates = (teamData?.players || []).filter(p => p.uid && p.uid !== currentUser.uid);
+
+    if (teammates.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = teammates.map(p => {
+        const name = _escapeHtmlSafe(_resolvePlayerName(p));
+        const r = lobbyReady[p.uid] || {};
+        const gl = r.gameLobby === true || r.ready === true;
+        const dc = r.discord === true || r.ready === true;
+
+        return `
+            <div class="teammate-confirm-row">
+                <span class="teammate-confirm-name">Confirm for <strong>${name}</strong>:</span>
+                <button class="teammate-ready-btn ${dc ? 'is-ready' : ''}" ${dc ? 'disabled' : ''}
+                        onclick="setReadyStatus('discord', '${p.uid}')">
+                    &#x1F3A7; ${dc ? 'Discord &#x2713;' : 'Discord'}
+                </button>
+                <button class="teammate-ready-btn ${gl ? 'is-ready' : ''}" ${gl ? 'disabled' : ''}
+                        onclick="setReadyStatus('gameLobby', '${p.uid}')">
+                    &#x1F3AE; ${gl ? 'Lobby &#x2713;' : 'Lobby'}
+                </button>
+            </div>
+        `;
+    }).join('');
 }
 
 /**
@@ -1871,31 +2062,52 @@ function renderReadinessStatus() {
 }
 
 /**
- * Set a specific readiness status for the current player.
+ * Set a specific readiness status for the current player, or on behalf of a
+ * teammate (team members vouch for each other being in Discord / the lobby).
  * @param {'gameLobby'|'discord'} statusType
+ * @param {string} [targetUid]  Teammate's uid; defaults to the current player
  */
-async function setReadyStatus(statusType) {
+async function setReadyStatus(statusType, targetUid = null) {
     if (!currentUser || !currentTournamentId) return;
 
+    const uid = targetUid || currentUser.uid;
+    const isSelf = uid === currentUser.uid;
+
+    // Only allow confirming for players on our own team
+    const teammate = isSelf ? null : teamData?.players?.find(p => p.uid === uid);
+    if (!isSelf && !teammate) return;
+
     const lobbyReady = gameData.lobbyReady || {};
-    const existing = lobbyReady[currentUser.uid] || {};
+    const existing = lobbyReady[uid] || {};
 
     // Already set this status
     if (existing[statusType] === true) return;
+
+    const name = isSelf
+        ? (currentUser.displayName || currentUser.email || 'Player')
+        : _resolvePlayerName(teammate);
 
     try {
         const db = firebase.firestore();
         const tournamentRef = db.collection('tournaments').doc(currentTournamentId);
         const now = new Date().toISOString();
 
-        await tournamentRef.update({
-            [`lobbyReady.${currentUser.uid}.${statusType}`]: true,
-            [`lobbyReady.${currentUser.uid}.${statusType}At`]: now,
-            [`lobbyReady.${currentUser.uid}.teamId`]: currentTeamId,
-            [`lobbyReady.${currentUser.uid}.name`]: currentUser.displayName || currentUser.email || 'Player'
-        });
+        const update = {
+            [`lobbyReady.${uid}.${statusType}`]: true,
+            [`lobbyReady.${uid}.${statusType}At`]: now,
+            [`lobbyReady.${uid}.teamId`]: currentTeamId,
+            [`lobbyReady.${uid}.name`]: name
+        };
+        if (!isSelf) {
+            update[`lobbyReady.${uid}.${statusType}By`] = currentUser.uid;
+        }
 
-        console.log(`[Team Controls] Player marked ${statusType} ready`);
+        await tournamentRef.update(update);
+
+        if (!isSelf) {
+            showStatus(`Confirmed ${statusType === 'discord' ? 'Discord' : 'game lobby'} for ${name}`, 'success');
+        }
+        console.log(`[Team Controls] ${isSelf ? 'Player' : name} marked ${statusType} ready`);
     } catch (error) {
         console.error(`[Team Controls] Error setting ${statusType} ready:`, error);
         showStatus(`Error confirming ${statusType}: ` + error.message, 'error');
