@@ -353,7 +353,9 @@
             <br>
             <strong>Download options:</strong><br>
             • <strong>Download Types (4 files)</strong> - One file per type: <code>normal.png</code>, <code>mountain-heart.png</code>, <code>side-heart.png</code>, <code>starting-location.png</code><br>
-            • <strong>Download All 91</strong> - Type files + <code>coords/</code> folder with all individual tiles named by coordinate (e.g., <code>q0r0.png</code>)
+            • <strong>Download All 91</strong> - Type files + <code>coords/</code> folder with all individual tiles named by coordinate (e.g., <code>q0r0.png</code>)<br>
+            <br>
+            <strong>No artwork yet?</strong> Click <strong>Download Blank Template</strong> to get a guide image with the 91 hex extraction boxes outlined in black and labeled by coordinate. Illustrate over it in any art tool, then re-upload it as the Main Board Image (Rotation resets to 0 automatically for you).
         </div>
 
         <div class="panels">
@@ -632,12 +634,17 @@
         function drawGridOverlay() {
             if (!mainImage) return;
 
-            // Match canvas to image display size
+            // Match canvas to image display size and position
+            // (mainPreview is centered by flexbox inside .preview-container and may be
+            // smaller than the container due to max-height, so the overlay must be
+            // positioned at the image's actual offset, not just top:0/left:0)
             const rect = mainPreview.getBoundingClientRect();
             gridOverlay.width = rect.width;
             gridOverlay.height = rect.height;
             gridOverlay.style.width = rect.width + 'px';
             gridOverlay.style.height = rect.height + 'px';
+            gridOverlay.style.left = mainPreview.offsetLeft + 'px';
+            gridOverlay.style.top = mainPreview.offsetTop + 'px';
 
             const ctx = gridOverlay.getContext('2d');
             ctx.clearRect(0, 0, gridOverlay.width, gridOverlay.height);
@@ -953,6 +960,11 @@
             link.download = 'hex-template-blank.png';
             link.href = canvas.toDataURL('image/png');
             link.click();
+
+            // The template is drawn unrotated/axis-aligned. Reset Rotation to 0 so that
+            // when the illustrated version is re-uploaded, the field defaulting to -30
+            // doesn't silently shear the grid and misalign every extracted tile.
+            document.getElementById('rotation').value = 0;
         });
 
         // Handle window resize
