@@ -477,6 +477,18 @@ class GodApp {
         }
 
         this._currentTournamentId = tournamentId;
+
+        // Tournament chat — mount once, then just re-point it at the new tournament.
+        // God isn't on a team, so no teamId is passed.
+        if (window.ChatModule) {
+            if (window._chatModule) {
+                window._chatModule.switchTournament(tournamentId);
+            } else {
+                window._chatModule = new ChatModule({ tournamentId });
+                window._chatModule.mount();
+            }
+        }
+
         this.ui.showStatus('Loading tournament...', 'info');
 
         try {
