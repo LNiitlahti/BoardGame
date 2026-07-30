@@ -368,6 +368,10 @@
                     <div class="filename" id="mainFilename"></div>
                 </div>
 
+                <div class="actions" style="margin-bottom: 15px;">
+                    <button class="secondary" id="downloadBlankBtn">Download Blank Template</button>
+                </div>
+
                 <div class="settings">
                     <div class="setting">
                         <label>Output Tile Size (px)</label>
@@ -483,6 +487,7 @@
         const generateBtn = document.getElementById('generateBtn');
         const downloadBtn = document.getElementById('downloadBtn');
         const downloadAllBtn = document.getElementById('downloadAllBtn');
+        const downloadBlankBtn = document.getElementById('downloadBlankBtn');
         const resetBtn = document.getElementById('resetBtn');
         const progress = document.getElementById('progress');
         const outputPanel = document.getElementById('outputPanel');
@@ -916,6 +921,38 @@
             mountainInput.value = '';
             sideInput.value = '';
             startingInput.value = '';
+        });
+
+        // Download blank template for offline illustration
+        downloadBlankBtn.addEventListener('click', () => {
+            const canvasSize = 750; // Native board size — guarantees alignment on re-import
+            const canvas = document.createElement('canvas');
+            canvas.width = canvasSize;
+            canvas.height = canvasSize;
+            const ctx = canvas.getContext('2d');
+
+            // White background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvasSize, canvasSize);
+
+            // Hex extraction boxes, black outline
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2;
+            ctx.fillStyle = '#999999';
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            const hexBoxes = computeHexBoxes(canvasSize, canvasSize);
+            hexBoxes.forEach(box => {
+                ctx.strokeRect(box.x, box.y, box.w, box.h);
+                ctx.fillText(box.coord, box.x + box.w / 2, box.y + box.h / 2);
+            });
+
+            const link = document.createElement('a');
+            link.download = 'hex-template-blank.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
         });
 
         // Handle window resize
