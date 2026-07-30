@@ -362,8 +362,10 @@ class GodApp {
                         Round: ${t.currentRound || 0} | Matches played: ${matchCount}
                     </div>
                     <div class="tournament-actions">
-                        <button class="btn-load" onclick="loadTournamentFromList('${t.id}')">📂 Load</button>
                         <button class="btn-view" onclick="window.open('view.html?tournamentId=${encodeURIComponent(t.id)}', '_blank')">👁️ View</button>
+                        <button class="btn-small secondary" onclick="openEditTournamentModal('${t.id}')" title="Edit name / win condition">✏️ Edit</button>
+                        <button class="btn-small secondary" onclick="duplicateTournamentFromList('${t.id}')" title="Duplicate this tournament">📋 Duplicate</button>
+                        <button class="btn-small danger" onclick="deleteTournamentFromList('${t.id}')" title="Permanently delete">🗑️ Delete</button>
                     </div>
                 </div>
             `;
@@ -591,11 +593,13 @@ class GodApp {
             warningEl.style.display = (currentState === 'archived' && this._currentUserRole !== 'god') ? 'block' : 'none';
         }
 
-        document.getElementById('stateChangeModal')?.classList.add('active');
+        const modal = document.getElementById('stateChangeModal');
+        if (modal) modal.style.display = 'flex';
     }
 
     closeStateChangeModal() {
-        document.getElementById('stateChangeModal')?.classList.remove('active');
+        const modal = document.getElementById('stateChangeModal');
+        if (modal) modal.style.display = 'none';
     }
 
     async confirmStateChange(newState) {
@@ -637,6 +641,141 @@ class GodApp {
     }
 
     // ------------------------------------------------------------------
+    // Tournament list actions (edit / duplicate / delete) — operate
+    // directly on a tournament's Firestore doc by id, independent of
+    // whichever tournament is currently active/loaded.
+    // ------------------------------------------------------------------
+
+    openEditTournamentModal(tournamentId) {
+        const t = this._allTournaments.find(x => x.id === tournamentId);
+        if (!t) { this.ui.showStatus('Tournament not found', 'error'); return; }
+
+        this._editingTournamentId = tournamentId;
+        const form = document.getElementById('editTournamentForm');
+        if (!form) return;
+
+        form.innerHTML = `
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" id="editTournamentName" value="${escapeHtml(t.name || '')}" style="width: 100%; padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white;">
+            </div>
+            <div class="form-group" style="margin-top: 12px;">
+                <label>Win Condition (points)</label>
+                <input type="number" id="editTournamentWinCondition" value="${t.winCondition || 50}" min="1" max="500" style="width: 100%; padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white;">
+            </div>
+            <div class="form-group" style="margin-top: 12px;">
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="editTournamentSpellsActive" ${t.spellsActive === true ? 'checked' : ''} style="width: 18px; height: 18px;">
+                    Spells Active (players see digital spell cards on team.html)
+                </label>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end;">
+                <button class="btn secondary" onclick="closeEditModal()">Cancel</button>
+                <button class="btn primary" onclick="saveTournamentEdits()">Save Changes</button>
+            </div>
+        `;
+
+        const modal = document.getElementById('editTournamentModal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    closeEditModal() {
+        const modal = document.getElementById('editTournamentModal');
+        if (modal) modal.style.display = 'none';
+        this._editingTournamentId = null;
+    }
+
+    async saveTournamentEdits() {
+        if (!this._editingTournamentId) return;
+
+        const nameInput = document.getElementById('editTournamentName');
+        const winInput = document.getElementById('editTournamentWinCondition');
+        const spellsInput = document.getElementById('editTournamentSpellsActive');
+        const name = nameInput?.value?.trim();
+        if (!name) { this.ui.showStatus('Name cannot be empty', 'warning'); return; }
+        const winCondition = Math.max(1, parseInt(winInput?.value, 10) || 50);
+        const spellsActive = !!spellsInput?.checked;
+
+        try {
+            await window.firebaseDB.collection('tournaments').doc(this._editingTournamentId).update({
+                name, winCondition, spellsActive
+            });
+            this.ui.showStatus('Tournament updated', 'success');
+            this.closeEditModal();
+            await this.loadTournamentsList();
+        } catch (error) {
+            console.error('Error updating tournament:', error);
+            this.ui.showStatus('Error updating tournament', 'error');
+        }
+    }
+
+    async duplicateTournamentFromList(tournamentId) {
+        const t = this._allTournaments.find(x => x.id === tournamentId);
+        if (!t) { this.ui.showStatus('Tournament not found', 'error'); return; }
+
+        const newName = prompt('Name for the duplicate:', `${t.name || 'Tournament'} (copy)`);
+        if (!newName || !newName.trim()) return;
+
+        try {
+            const clone = { ...t };
+            delete clone.id;
+            Object.assign(clone, {
+                name: newName.trim(),
+                status: 'setup',
+                createdAt: new Date().toISOString(),
+                currentRound: 0,
+                gamesPlayed: 0,
+                gameHistory: [],
+                board: {},
+                matchQueue: [],
+                heartHexControl: {},
+                currentPhase: null,
+                archivedAt: null
+            });
+
+            const cleanClone = this._removeUndefined(clone);
+            const newRef = window.firebaseDB.collection('tournaments').doc();
+            await newRef.set(cleanClone);
+
+            this.ui.showStatus(`Duplicated as "${newName.trim()}"`, 'success');
+            await this.loadTournamentsList();
+        } catch (error) {
+            console.error('Error duplicating tournament:', error);
+            this.ui.showStatus('Error duplicating tournament', 'error');
+        }
+    }
+
+    async deleteTournamentFromList(tournamentId) {
+        const t = this._allTournaments.find(x => x.id === tournamentId);
+        if (!t) { this.ui.showStatus('Tournament not found', 'error'); return; }
+        const name = t.name || tournamentId;
+
+        if (!confirm(`Permanently delete "${name}"?\n\nThis cannot be undone. Teams, match history, and settings for this tournament will be lost.\n\n(Note: backup snapshots for this tournament are not automatically deleted.)`)) return;
+
+        const typed = prompt(`Type the tournament name to confirm deletion:\n"${name}"`);
+        if (typed !== name) {
+            this.ui.showStatus('Deletion cancelled — name did not match', 'warning');
+            return;
+        }
+
+        try {
+            await window.firebaseDB.collection('tournaments').doc(tournamentId).delete();
+            this.ui.showStatus(`Deleted "${name}"`, 'success');
+
+            if (tournamentId === this._currentTournamentId) {
+                if (this._activeListener) { this._activeListener(); this._activeListener = null; }
+                this._currentTournamentId = null;
+                this.gameState = {};
+            }
+
+            await this.loadTournamentsList();
+        } catch (error) {
+            console.error('Error deleting tournament:', error);
+            this.ui.showStatus('Error deleting tournament', 'error');
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Display
     // ------------------------------------------------------------------
 
@@ -654,6 +793,12 @@ class GodApp {
             navName.classList.remove('empty');
             navName.title = this.gameState.name || 'Tournament';
         }
+
+        const backupTournamentName = document.getElementById('backupActiveTournamentName');
+        if (backupTournamentName) backupTournamentName.textContent = this.gameState.name || this._currentTournamentId || '—';
+
+        const activeTournamentName = document.getElementById('activeTournamentNameLabel');
+        if (activeTournamentName) activeTournamentName.textContent = this.gameState.name || this._currentTournamentId || '—';
 
         this.updateTournamentStateButton();
 
@@ -680,9 +825,6 @@ class GodApp {
             this.phase.recheckRequirements();
             this.phase.renderPhaseIndicator();
         }
-
-        // Points correction + backup panels
-        this.stats.renderPointsCorrectionPanel();
 
         // Spell phase turn advancement (detect team.html direct writes)
         if (this.spells && this.gameState.spellPhase?.isActive) {
@@ -881,6 +1023,47 @@ class GodApp {
         this.ui.showStatus('Game state exported', 'success');
     }
 
+    async importGameStateFromFile(fileInput) {
+        const file = fileInput?.files?.[0];
+        fileInput.value = '';
+        if (!file) return;
+
+        if (!this._currentTournamentId) {
+            this.ui.showStatus('Load a tournament before importing', 'warning');
+            return;
+        }
+
+        try {
+            const text = await file.text();
+            const parsed = JSON.parse(text);
+
+            if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.teams)) {
+                this.ui.showStatus('Not a valid backup file (missing teams array)', 'error');
+                return;
+            }
+
+            if (!confirm(`Import "${file.name}" into this tournament?\nThis will overwrite the current tournament state. A pre-import backup will be created first.`)) {
+                return;
+            }
+
+            await this.backup?.createBackup('pre_import', `Auto-backup before importing ${file.name}`);
+
+            const tournamentId = this._currentTournamentId;
+            Object.keys(this.gameState).forEach(key => {
+                if (key !== 'tournamentId') delete this.gameState[key];
+            });
+            Object.assign(this.gameState, parsed, { tournamentId });
+
+            await this.saveGameState();
+            this.updateDisplay();
+
+            this.ui.showStatus(`Imported backup: ${file.name}`, 'success');
+        } catch (error) {
+            console.error('Error importing backup:', error);
+            this.ui.showStatus('Error importing backup (invalid JSON?)', 'error');
+        }
+    }
+
     logout() {
         firebase.auth().signOut().then(() => {
             window.location.href = (window.BOARDGAME_BASE || '.') + '/login.html';
@@ -923,7 +1106,6 @@ class GodApp {
         // UIManager
         window.showStatus = (m, t) => app.ui.showStatus(m, t);
         window.addLog = (m, t) => app.ui.addLog(m, t);
-        window.clearLog = () => app.ui.clearLog();
 
         // TeamManager
         window.getTeamColor = (id) => app.teams.getTeamColor(id);
@@ -1076,6 +1258,7 @@ class GodApp {
         window.confirmStateChange = (s) => app.confirmStateChange(s);
         window.saveGameState = (btn) => app.saveGameState(btn);
         window.exportGameState = () => app.exportGameState();
+        window.importGameStateFromFile = (fileInput) => app.importGameStateFromFile(fileInput);
         window.logout = () => app.logout();
         window.openViewWindow = () => app.openViewWindow();
         window.openStatsWindow = () => app.openStatsWindow();
@@ -1158,18 +1341,13 @@ class GodApp {
         // ---- Compatibility aliases for HTML onclick handlers ----
 
         // Tournament management (old god-scripts.js names)
-        window.loadGame = () => {
-            const input = document.getElementById('tournamentIdInput');
-            const tournamentId = input?.value?.trim();
-            if (tournamentId) app.onTournamentSelect(tournamentId);
-            else app.ui.showStatus('Enter a tournament ID first', 'warning');
-        };
         window.filterTournaments = () => app.filterTournaments();
         window.createNewTournament = () => app.createNewTournament();
-        window.loadTournamentFromList = (tournamentId) => app.onTournamentSelect(tournamentId);
-        window.closeEditModal = () => {
-            document.getElementById('editTournamentModal')?.classList.remove('active');
-        };
+        window.openEditTournamentModal = (id) => app.openEditTournamentModal(id);
+        window.closeEditModal = () => app.closeEditModal();
+        window.saveTournamentEdits = () => app.saveTournamentEdits();
+        window.duplicateTournamentFromList = (id) => app.duplicateTournamentFromList(id);
+        window.deleteTournamentFromList = (id) => app.deleteTournamentFromList(id);
 
         // Match creation (old god-scripts.js → new MatchCreationManager)
         window.addGameToQueue = (btn) => app.creation?.addMatchToQueue(btn);
