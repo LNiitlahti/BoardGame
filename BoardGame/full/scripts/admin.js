@@ -331,6 +331,17 @@ async function loadTournament(tournamentId) {
     sessionStorage.setItem('currentTournamentId', tournamentId);
     localStorage.setItem('currentTournamentId', tournamentId);
 
+    // Tournament chat — mount once, then just re-point it at the new tournament.
+    // Admins aren't on a team, so no teamId is passed.
+    if (window.ChatModule) {
+        if (window._chatModule) {
+            window._chatModule.switchTournament(tournamentId);
+        } else {
+            window._chatModule = new ChatModule({ tournamentId });
+            window._chatModule.mount();
+        }
+    }
+
     showStatus('Loading tournament...', 'info');
 
     try {
