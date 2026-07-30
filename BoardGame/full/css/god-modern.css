@@ -896,6 +896,125 @@ body {
 
 .confirm-actions .btn { width: 100%; }
 
+/* Player votes, shown inline in the result confirm popup — informational
+   only, no separate accept/dispute UI. */
+.confirm-votes-block {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.confirm-votes-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-steel, #8f98a6);
+  font-family: 'Quantico', var(--font-secondary);
+  margin-bottom: 8px;
+}
+
+.vote-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  text-transform: uppercase;
+}
+
+.vote-badge.consensus {
+  background: rgba(46, 145, 88, 0.18);
+  color: #5dd39e;
+}
+
+.vote-badge.leading {
+  background: rgba(247, 186, 50, 0.15);
+  color: var(--accent-warning, #f7ba32);
+}
+
+.vote-badge.disputed {
+  background: rgba(143, 152, 166, 0.15);
+  color: var(--accent-steel, #8f98a6);
+}
+
+.vote-row {
+  display: grid;
+  grid-template-columns: 110px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 0.8rem;
+  font-family: 'Quantico', var(--font-secondary);
+  color: var(--text-secondary, #9aa1ad);
+}
+
+.vote-row.favored {
+  color: var(--accent-gold, #c8b37e);
+  font-weight: 700;
+}
+
+.vote-row-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vote-row-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  display: block;
+}
+
+.vote-row-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent-gold, #c8b37e);
+  border-radius: 3px;
+}
+
+.vote-row.favored .vote-row-bar > span {
+  background: #5dd39e;
+}
+
+.vote-row-count {
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: var(--text-tertiary, #6f7684);
+}
+
+.vote-row-names {
+  grid-column: 1 / -1;
+  font-size: 0.68rem;
+  color: var(--text-tertiary, #6f7684);
+  margin-top: -2px;
+  margin-bottom: 2px;
+}
+
+/* Highlight on the team card the players picked as likely winner */
+.confirm-team.vote-favored {
+  box-shadow: 0 0 0 2px rgba(93, 211, 158, 0.4);
+  position: relative;
+}
+
+.vote-favored-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #5dd39e;
+  background: rgba(93, 211, 158, 0.12);
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin-bottom: 6px;
+  display: inline-block;
+}
+
 .modal-body .form-group {
   margin-bottom: var(--spacing-md);
 }

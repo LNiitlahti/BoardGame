@@ -829,7 +829,6 @@ class GodApp {
         this.queue.renderMatchQueue();
         this.queue.renderOngoingMatches();
         this.queue.renderMatchHistory();
-        this.result.renderVotingPanel();
         this.creation.renderMatchCreationZones();
 
         // Phase indicator
@@ -1237,8 +1236,6 @@ class GodApp {
         window.closeResultConfirm = () => app.result.closeResultConfirm();
         window.quickConfirmResult = (id, idx) => app.result.quickConfirmResult(id, idx);
         window.dismissPendingHexBanner = () => app.result.dismissPendingHexBanner();
-        window.acceptVotedResult = (id) => app.result.acceptVotedResult(id);
-        window.overrideVotedResult = (id) => app.result.overrideVotedResult(id);
         window.openCorrectResultModal = (id) => app.result.openCorrectResultModal(id);
         window.closeCorrectResultModal = () => app.result.closeCorrectResultModal();
         window.selectCorrectedWinner = (id, idx) => app.result.selectCorrectedWinner(id, idx);

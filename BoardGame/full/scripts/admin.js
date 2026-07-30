@@ -539,9 +539,6 @@ function updateDisplay() {
     // Update queue
     renderMatchQueue();
 
-    // Render voted matches panel (player voting results)
-    renderVotedMatches();
-
     // Render match creation zones (in case sides changed)
     renderMatchCreationZones();
 
@@ -3906,107 +3903,6 @@ function renderOngoingMatches() {
 }
 
 /**
- * Render voted matches panel — shows matches where players have voted
- * Admin can accept consensus or override disputed results
- */
-function renderVotedMatches() {
-    const container = document.getElementById('votedMatchesPanel');
-    if (!container) return;
-
-    const queue = gameState?.gameQueue || [];
-    const votedMatches = queue.filter(m =>
-        m.votes && m.votes.length > 0 && !m.adminConfirmed && !m.isBreak
-    );
-
-    if (votedMatches.length === 0) {
-        container.style.display = 'none';
-        container.innerHTML = '';
-        return;
-    }
-
-    container.style.display = 'block';
-
-    const SIDE_LABELS_VOTE = ['A', 'B', 'C', 'D', 'E'];
-
-    container.innerHTML = '<div class="voted-panel-title">Player Votes</div>' +
-        votedMatches.map(match => {
-            const gameName = getGameDisplayName(match.game || match.gameType);
-            const matchNum = match.matchNumber ? `#${match.matchNumber} ` : '';
-            const votes = match.votes || [];
-            const consensus = match.voteConsensus;
-
-            // Tally votes
-            const voteCounts = {};
-            votes.forEach(v => { voteCounts[v.result] = (voteCounts[v.result] || 0) + 1; });
-            const votesSummary = Object.entries(voteCounts).map(([result, count]) => {
-                if (result === 'draw') return `Draw: ${count}`;
-                const sideMatch = result.match(/side_(\d+)_won/);
-                if (sideMatch) {
-                    const idx = parseInt(sideMatch[1]);
-                    return `${SIDE_LABELS_VOTE[idx] || idx} Won: ${count}`;
-                }
-                return `${result}: ${count}`;
-            }).join(', ');
-
-            const hasConsensus = consensus?.passedThreshold;
-            const badgeClass = hasConsensus ? 'consensus' : 'disputed';
-            const badgeText = hasConsensus ? 'CONSENSUS' : 'DISPUTED';
-
-            const acceptBtn = hasConsensus
-                ? `<button class="btn-small primary" onclick="event.stopPropagation(); acceptVotedResult(${match.id})">Accept</button>`
-                : '';
-
-            return `
-                <div class="voted-match" onclick="openQuickConfirm(${match.id})">
-                    <div class="voted-match-header">
-                        <span class="voted-match-title">${matchNum}${gameName}</span>
-                        <span class="voted-match-badge ${badgeClass}">${badgeText}</span>
-                    </div>
-                    <div class="voted-match-votes">${votes.length} votes: ${votesSummary}</div>
-                    <div class="voted-match-actions">
-                        ${acceptBtn}
-                        <button class="btn-small secondary" onclick="event.stopPropagation(); openQuickConfirm(${match.id})">Override</button>
-                    </div>
-                </div>
-            `;
-        }).join('');
-}
-
-/**
- * Accept a consensus vote result — confirms the winner from player votes
- */
-async function acceptVotedResult(gameId) {
-    if (_asyncBusy) return;
-    _asyncBusy = true;
-    try {
-        const game = (gameState?.gameQueue || []).find(g => g.id === gameId);
-        if (!game || !game.voteConsensus?.result) {
-            showStatus('No consensus result to accept', 'warning');
-            return;
-        }
-
-        const result = game.voteConsensus.result;
-        const sideMatch = result.match(/side_(\d+)_won/);
-        if (!sideMatch) {
-            showStatus('Cannot parse vote result — use Override instead', 'warning');
-            return;
-        }
-
-        const winnerIndex = parseInt(sideMatch[1]);
-
-        // Mark as admin-confirmed
-        game.adminConfirmed = true;
-        game.adminConfirmedAt = new Date().toISOString();
-
-        // Use existing confirmResult flow
-        selectedQueuedGame = game;
-        await confirmResult(winnerIndex);
-
-        showStatus('Vote accepted — result confirmed!', 'success');
-    } finally { _asyncBusy = false; }
-}
-
-/**
  * Start a match (move from queue to ongoing)
  */
 async function startMatch(gameId) {
@@ -4358,13 +4254,17 @@ async function confirmResult(winnerIndex) {
     gameState.gameHistory = gameState.gameHistory || [];
     gameState.gameHistory.push(historyEntry);
 
-    // Mark queue entry as completed
+    // Mark queue entry as completed. adminConfirmed is stamped here too —
+    // any player votes attached to this match are now settled and should
+    // not surface as "pending" again.
     const queueEntry = gameState.gameQueue.find(g => g.id === selectedQueuedGame.id);
     if (queueEntry) {
         queueEntry.status = 'completed';
         queueEntry.completedAt = new Date().toISOString();
         queueEntry.winningSide = winningSideLabel;
         queueEntry.winnerIndex = winnerIndex;
+        queueEntry.adminConfirmed = true;
+        queueEntry.adminConfirmedAt = new Date().toISOString();
     }
 
     // Update games played

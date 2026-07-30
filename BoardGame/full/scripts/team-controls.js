@@ -1410,7 +1410,7 @@ function _matchInvolvesUs(match) {
 }
 
 /**
- * Check if voting is needed for any completed match
+ * Check if voting is available for any of this player's ongoing matches.
  */
 function checkForVoting() {
     const section = document.getElementById('votingSection');
@@ -1419,9 +1419,11 @@ function checkForVoting() {
     // Use gameQueue (full version) or selectedGames (legacy) as match source
     const matchSource = gameData.gameQueue || gameData.selectedGames || [];
 
-    // First completed, not-yet-admin-confirmed match involving this player
+    // First live (ongoing) match involving this player. Voting only makes
+    // sense before the admin records a result — once the match is completed
+    // or admin-confirmed there is nothing left to vote on.
     const match = matchSource.find(m =>
-        m.status === 'completed' && !m.adminConfirmed && !m.isBreak && _matchInvolvesUs(m)
+        m.status === 'ongoing' && !m.adminConfirmed && !m.isBreak && _matchInvolvesUs(m)
     );
 
     if (!match) {
@@ -1467,9 +1469,9 @@ function showVotingSection(match) {
     const gameName = getGameDisplayName(match.gameId || match.gameType || match.game);
     infoDiv.innerHTML = `
         <div style="font-size: 1.1rem; font-weight: bold; color: var(--accent-primary);">
-            ${gameName} has finished!
+            ${gameName}
         </div>
-        <div style="margin-top: 8px;">Who won this match?</div>
+        <div style="margin-top: 8px;">Match over? Report who won:</div>
     `;
 
     // One vote option per side (full format uses teams, legacy uses sides)
@@ -1563,6 +1565,10 @@ async function submitVote() {
             if (matchIndex === -1) throw new Error('Match not found');
 
             const match = queue[matchIndex];
+            if (match.adminConfirmed || match.status !== 'ongoing') {
+                return { alreadyConfirmed: true };
+            }
+
             const votes = [...(match.votes || [])];
             if (votes.some(v => v.uid === currentUser.uid)) {
                 return { alreadyVoted: true };
@@ -1596,7 +1602,9 @@ async function submitVote() {
 
         selectedVote = null;
 
-        if (consensusReached.alreadyVoted) {
+        if (consensusReached.alreadyConfirmed) {
+            showStatus('The admin already confirmed this result — thanks anyway!', 'info');
+        } else if (consensusReached.alreadyVoted) {
             showStatus('You have already voted on this match.', 'info');
         } else if (consensusReached.consensus) {
             showStatus('🎉 Vote consensus reached! Result submitted to admin for approval.', 'success');

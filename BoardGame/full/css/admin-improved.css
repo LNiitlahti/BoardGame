@@ -221,8 +221,8 @@ body {
 }
 
 .vote-badge.disputed {
-    background: rgba(222, 57, 44, 0.15);
-    color: #ff6b5e;
+    background: rgba(143, 152, 166, 0.15);
+    color: var(--accent-steel, #8f98a6);
 }
 
 .vote-row {

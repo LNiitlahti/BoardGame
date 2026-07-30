@@ -2044,8 +2044,8 @@
     };
 
     // ── Carry the match's round/slot tag onto its pendingHexWins entry ──
-    // confirmResult() (called by both quickConfirmResult and acceptVotedResult)
-    // is where pendingHexWins.push() happens, deep inside a large function —
+    // confirmResult() (called by quickConfirmResult) is where
+    // pendingHexWins.push() happens, deep inside a large function —
     // wrapping it here is simpler than duplicating that logic.
 
     const _origConfirmResult = window.confirmResult;

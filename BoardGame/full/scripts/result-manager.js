@@ -199,6 +199,78 @@ class ResultManager {
         `;
 
         modal.style.display = 'flex';
+
+        // Player votes — informational only. The admin still picks the
+        // winner themselves via the team buttons above; this just shows
+        // what the players reported so the admin isn't picking blind.
+        this._injectVoteInfo(game, content);
+    }
+
+    /**
+     * Show what the players voted, inline in the result confirm popup.
+     * No-op if nobody has voted. Purely informational: it never blocks or
+     * pre-selects a winner, it only highlights the team card the votes
+     * currently favor so the admin can compare it against what they saw.
+     */
+    _injectVoteInfo(game, content) {
+        const votes = game.votes || [];
+        if (votes.length === 0 || content.querySelector('.confirm-votes-block')) return;
+
+        const esc = (s) => this._teams.escapeHtml(s || '');
+        const counts = {};
+        votes.forEach(v => { counts[v.result] = (counts[v.result] || 0) + 1; });
+        const total = votes.length;
+        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        const [bestResult, bestCount] = sorted[0];
+        const bestPct = Math.round((bestCount / total) * 100);
+        const isTie = sorted.filter(([, c]) => c === bestCount).length > 1;
+
+        const labelFor = (result) => {
+            const m = result.match(/side_(\d+)_won/);
+            return m ? `Side ${SIDE_LABELS_RM[parseInt(m[1])] || m[1]} wins` : result;
+        };
+
+        const rowsHtml = sorted.map(([result, count]) => {
+            const pct = Math.round((count / total) * 100);
+            const names = votes.filter(v => v.result === result)
+                .map(v => esc(v.playerName || 'Player')).join(', ');
+            const favored = !isTie && result === bestResult;
+            return `<div class="vote-row${favored ? ' favored' : ''}">` +
+                   `<span class="vote-row-label">${labelFor(result)}</span>` +
+                   `<span class="vote-row-bar"><span style="width:${pct}%"></span></span>` +
+                   `<span class="vote-row-count">${count}/${total} &middot; ${pct}%</span>` +
+                   `<div class="vote-row-names">${names}</div>` +
+                   `</div>`;
+        }).join('');
+
+        const badge = isTie
+            ? '<span class="vote-badge disputed">SPLIT VOTE</span>'
+            : (game.voteConsensus?.passedThreshold
+                ? '<span class="vote-badge consensus">CONSENSUS</span>'
+                : `<span class="vote-badge leading">LEADING ${bestPct}%</span>`);
+
+        const block = document.createElement('div');
+        block.className = 'confirm-votes-block';
+        block.innerHTML = `<div class="confirm-votes-title">Player votes ${badge}</div>${rowsHtml}`;
+
+        const actions = content.querySelector('.confirm-actions');
+        if (actions) content.insertBefore(block, actions);
+        else content.appendChild(block);
+
+        // Highlight the team card the players picked as the likely winner
+        if (!isTie) {
+            const m = bestResult.match(/side_(\d+)_won/);
+            if (m) {
+                const card = content.querySelectorAll('.confirm-team')[parseInt(m[1])];
+                if (card) {
+                    card.classList.add('vote-favored');
+                    const pick = document.createElement('div');
+                    pick.className = 'vote-favored-badge';
+                    pick.textContent = `PLAYERS' PICK · ${bestPct}%`;
+                    card.insertBefore(pick, card.firstChild);
+                }
+            }
+        }
     }
 
     /**
@@ -674,127 +746,6 @@ class ResultManager {
     dismissPendingHexBanner() {
         this._pendingHexWins = [];
         this.updatePendingHexNotification();
-    }
-
-    // ------------------------------------------------------------------
-    // Voting / Disputed Matches
-    // ------------------------------------------------------------------
-
-    /**
-     * Get matches that have votes but no admin confirmation.
-     * Includes both consensus (ready to accept) and disputed (disagreement).
-     */
-    getDisputedMatches() {
-        const queue = this._gameState?.gameQueue || [];
-        return queue.filter(m =>
-            m.status === 'completed' &&
-            m.votes && m.votes.length > 0 &&
-            !m.adminConfirmed
-        );
-    }
-
-    /**
-     * Render the voting/disputed matches panel in god.html.
-     */
-    renderVotingPanel(containerId = 'disputedMatchesPanel') {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-
-        const disputed = this.getDisputedMatches();
-
-        // Auto-hide the panel if no disputed matches
-        const panel = container.closest('.panel');
-        if (panel) panel.style.display = disputed.length > 0 ? 'block' : 'none';
-
-        if (disputed.length === 0) {
-            container.innerHTML = '<p class="queue-empty">No matches with pending votes</p>';
-            return;
-        }
-
-        container.innerHTML = disputed.map(match => {
-            const gameName = this._teams.getGameDisplayName(match.game || 'Unknown');
-            const matchNum = match.matchNumber ? `#${match.matchNumber}` : '';
-            const votes = match.votes || [];
-            const consensus = match.voteConsensus;
-
-            // Vote summary
-            const voteCounts = {};
-            votes.forEach(v => { voteCounts[v.result] = (voteCounts[v.result] || 0) + 1; });
-            const votesSummary = Object.entries(voteCounts).map(([result, count]) => {
-                const label = result.startsWith('side_') ? `Side ${result.charAt(5).toUpperCase()} Won` : result;
-                return `${label}: ${count}`;
-            }).join(', ');
-
-            const consensusBadge = consensus?.passedThreshold
-                ? `<span class="history-status completed">CONSENSUS: ${consensus.result}</span>`
-                : `<span class="history-status ongoing">DISPUTED</span>`;
-
-            return `
-                <div class="history-item ${consensus?.passedThreshold ? 'completed' : 'corrected'}">
-                    <div class="history-item-header">
-                        <div class="history-item-title">
-                            <span class="history-match-num">${matchNum}</span>
-                            <span class="history-game-name">${gameName}</span>
-                            ${consensusBadge}
-                        </div>
-                        <div class="history-item-actions">
-                            ${consensus?.passedThreshold
-                                ? `<button class="btn-small primary" onclick="acceptVotedResult(${match.id})">Accept</button>`
-                                : ''}
-                            <button class="btn-small secondary" onclick="overrideVotedResult(${match.id})">Override</button>
-                        </div>
-                    </div>
-                    <div style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 4px;">
-                        ${votes.length} votes: ${votesSummary}
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    /**
-     * Accept a consensus vote result.
-     */
-    async acceptVotedResult(matchId) {
-        const queueEntry = (this._gameState.gameQueue || []).find(g => g.id === matchId);
-        if (!queueEntry || !queueEntry.voteConsensus?.result) {
-            this._ui.showStatus('No consensus result to accept', 'warning');
-            return;
-        }
-
-        // Parse the vote result to determine winner index
-        const result = queueEntry.voteConsensus.result;
-        const sideMatch = result.match(/side_(\d+)_won/);
-        if (!sideMatch) {
-            this._ui.showStatus('Cannot parse vote result', 'error');
-            return;
-        }
-        const winnerIndex = parseInt(sideMatch[1]);
-
-        // Mark as admin-confirmed
-        queueEntry.adminConfirmed = true;
-        queueEntry.adminConfirmedAt = new Date().toISOString();
-
-        await this._save();
-
-        this._logAction('vote_accepted', 'match', {
-            matchId, matchNumber: queueEntry.matchNumber,
-            voteResult: result, winnerIndex
-        }, { voteConsensus: queueEntry.voteConsensus });
-
-        this._ui.showStatus(`Vote accepted for match ${queueEntry.matchNumber ? '#' + queueEntry.matchNumber : ''}`, 'success');
-    }
-
-    /**
-     * Admin override of a voted/disputed match — opens the quick confirm popup.
-     */
-    overrideVotedResult(matchId) {
-        const queueEntry = (this._gameState.gameQueue || []).find(g => g.id === matchId);
-        if (!queueEntry) return;
-
-        // Mark as admin override and open the quick confirm
-        queueEntry.adminOverride = true;
-        this.openQuickConfirm(matchId);
     }
 
     // ------------------------------------------------------------------
