@@ -1380,6 +1380,19 @@ function renderRecentEvents() {
 }
 
 /**
+ * Resolve a player's game nick from their auth uid by searching the team
+ * rosters. Falls back to the given value (e.g. a name stored on an old
+ * vote), never to an email address.
+ */
+function _nickForUid(uid, fallback) {
+    for (const team of (gameData?.teams || [])) {
+        const p = (team.players || []).find(tp => tp.uid === uid);
+        if (p) return _resolvePlayerName(p);
+    }
+    return (fallback && !fallback.includes('@')) ? fallback : 'Player';
+}
+
+/**
  * Check if a match involves this player or their team.
  * Handles both the full format (teams with playerIds) and legacy sides.
  */
@@ -1527,7 +1540,7 @@ async function submitVote() {
 
         const vote = {
             uid: currentUser.uid,
-            playerName: currentUser.displayName || currentUser.email,
+            playerName: _nickForUid(currentUser.uid, currentUser.displayName),
             result: selectedVote,
             votedAt: new Date().toISOString()
         };
@@ -1629,7 +1642,7 @@ function showVotingProgress(match) {
         </div>
         ${votes.map(vote => `
             <div class="vote-item">
-                <span>${vote.playerName}</span>
+                <span>${_escapeHtmlSafe(_nickForUid(vote.uid, vote.playerName))}</span>
                 <span style="color: var(--accent-primary);">${formatVoteResult(vote.result)}</span>
             </div>
         `).join('')}
@@ -2084,7 +2097,7 @@ async function setReadyStatus(statusType, targetUid = null) {
     if (existing[statusType] === true) return;
 
     const name = isSelf
-        ? (currentUser.displayName || currentUser.email || 'Player')
+        ? _nickForUid(currentUser.uid, currentUser.displayName)
         : _resolvePlayerName(teammate);
 
     try {
