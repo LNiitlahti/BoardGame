@@ -6,31 +6,6 @@ BoardGame is a real-time tournament management system that adds a hex-grid terri
 
 Designed for LAN events. Runs in any browser. Syncs across every screen in real time.
 
-<!--
-==========================================================================
-  SCREENSHOT INSTRUCTIONS
-
-  Take these screenshots and save them in BoardGame/docs/images/:
-
-  1. hero-board.png     — The hex board view (view.html) during a tournament
-                          with several tiles claimed by different teams.
-                          This is the money shot — make it look exciting.
-                          Ideal: 1920x1080 full screen capture.
-
-  2. admin-panel.png    — The admin dashboard with a tournament loaded.
-                          Show the match queue, team cards, and board visible.
-                          Crop to highlight the key controls.
-
-  3. stats-page.png     — The statistics page with charts populated.
-                          Show win rates, match history, or player leaderboards.
-
-  4. onboarding.png     — The onboarding screen showing players being
-                          assigned to seats/teams.
-
-  After taking screenshots, uncomment the image lines below and update paths.
-==========================================================================
--->
-
 ![Hero screenshot of the hex board during a live tournament](BoardGame/docs/images/hero-board.png)
 
 ## The Concept
@@ -41,7 +16,7 @@ At a LAN tournament, an admin queues matches from a central dashboard. Teams pla
 
 ## Key Features
 
-**Tournament Control** — Create tournaments, manage teams and players, queue matches, confirm results. One admin runs the entire event from a single tabbed dashboard.
+**Tournament Control** — Create tournaments, manage teams and players, queue matches, confirm results. One admin runs the entire event from a single guided dashboard that surfaces the next action to take, with safety-rail confirmations before points are awarded or matches are started out of order.
 
 **Smart Match Scheduling** — A built-in algorithm generates balanced matchups by minimizing variance in how often players are paired together or against each other. No manual scheduling needed.
 
@@ -73,17 +48,15 @@ At a LAN tournament, an admin queues matches from a central dashboard. Teams pla
 
 ## Screenshots
 
-<!-- Replace these with actual screenshots once taken -->
-
 | Admin Dashboard | Spectator Board | Statistics |
 |:-:|:-:|:-:|
 | ![Admin panel](BoardGame/docs/images/admin-panel.png) | ![Hex board](BoardGame/docs/images/hero-board.png) | ![Stats](BoardGame/docs/images/stats-page.png) |
 | Manage matches, teams, and the board | Live TV display (1920x1080) | Charts, leaderboards, and export |
 
-| Player Onboarding | Room Layout |
-|:-:|:-:|
-| ![Onboarding](BoardGame/docs/images/onboarding.png) | ![Room layout](BoardGame/docs/images/room-layout.png) |
-| Players join and get assigned | Seating arrangement overview |
+| Player Onboarding | Room Layout | Login |
+|:-:|:-:|:-:|
+| ![Onboarding](BoardGame/docs/images/onboarding.png) | ![Room layout](BoardGame/docs/images/room-layout.png) | ![Login screen](BoardGame/docs/images/login-screen.png) |
+| Players join and get assigned | Seating arrangement overview | Authentication page |
 
 ## Use Cases
 
@@ -139,12 +112,12 @@ For detailed instructions, see the [Setup Guide](BoardGame/docs/guides/SETUP_GUI
 
 ## Project Status
 
-This project is in **active development**. The lightweight version ran its first live LAN event successfully in February 2026. A full-featured version with the OOP module stack (phases, spells, undo/backup, replay, ceremony, and player-facing pages) has since been built and is undergoing verification ahead of convergence into a single admin surface.
+This project is in **active development**. The lightweight version ran its first live LAN event successfully in February 2026 and proved the concept. Since then, a full-featured version with the OOP module stack (phases, spells, undo/backup, replay, ceremony, and player-facing pages) plus a guided admin flow has taken over as the primary version.
 
 | Version | Status |
 |---------|--------|
-| Lightweight | Battle-tested — proven at the Feb 2026 event; currently the version used to run live events |
-| Full | Built, undergoing end-to-end verification before replacing Lightweight |
+| Full | **Primary** — the OOP module stack with a guided admin dashboard (next-step prompts, phase gating, safety-rail confirmations) is now the version used to run live events |
+| Lightweight | Legacy — superseded by Full; kept for reference under `lightweight_legacy/` |
 
 ## License
 
@@ -157,22 +130,23 @@ Free to use for non-profit purposes. For commercial use, contact the maintainer.
 
 ```
 BoardGame/
-├── lightweight/           # v1 — battle-tested, used to run live events
-│   ├── admin.html         # Tournament admin dashboard
-│   ├── setup.html         # Tournament creation wizard
-│   ├── view.html          # Spectator display (1920×1080)
-│   ├── statistics.html    # Analytics & data export
-│   ├── onboarding.html    # Player onboarding flow
-│   ├── match-queue.html   # Match queue TV display
-│   ├── css/               # Lightweight-specific styles
-│   └── scripts/           # Lightweight-specific logic
-│
-├── full/                  # v2 — OOP module stack, in verification
+├── full/                  # v2 — primary version, OOP module stack + guided admin
 │   ├── god.html            # Superadmin dashboard
-│   ├── admin.html           # Admin dashboard (built on lightweight/admin.js core)
-│   ├── team.html / view.html / home.html / profile.html / setup.html / replay.html
+│   ├── admin.html           # Guided tournament admin dashboard (next-step flow, safety rails)
+│   ├── admin_old.html       # Prior non-guided admin dashboard, kept for reference
+│   ├── setup.html           # Tournament creation wizard (incl. Room Hexes step)
+│   ├── view.html            # Spectator display (1920×1080)
+│   ├── statistics.html      # Analytics & data export
+│   ├── onboarding.html / onboarding-status.html / view-onboarding.html / view-onboarding-layout.html
+│   ├── match-queue.html     # Match queue TV display
+│   ├── team.html / home.html / profile.html / replay.html
+│   ├── css/                 # Full-version styles (admin, onboarding, statistics, themes, etc.)
+│   └── scripts/             # OOP managers (phase, board, spell, undo, backup, onboarding, etc.)
+│
+├── lightweight_legacy/    # v1 — superseded by full/, kept for reference
+│   ├── admin.html / setup.html / view.html / statistics.html / onboarding.html / match-queue.html
 │   ├── css/
-│   └── scripts/            # OOP managers (phase, board, spell, undo, backup, etc.)
+│   └── scripts/
 │
 ├── shared/                # Shared across both versions
 │   ├── scripts/           # Firebase, board engine, match scheduling, utilities
@@ -181,6 +155,7 @@ BoardGame/
 │
 ├── docs/                  # Documentation
 │   ├── architecture/      # System design diagrams
+│   ├── images/            # README screenshots
 │   └── guides/            # Setup, testing, and reference guides
 │
 ├── dev/                   # Dev tools & test pages

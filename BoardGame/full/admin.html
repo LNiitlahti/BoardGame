@@ -2,37 +2,49 @@
 <html lang="en">
 <!--
     ============================================================================
-    ADMIN V2 (full) — MODERN TOURNAMENT MANAGEMENT
+    ADMIN IMPROVED (full) — EXPERIMENTAL GUIDED TOURNAMENT MANAGEMENT
     ============================================================================
 
     PURPOSE:
-    Full-version copy of lightweight/admin.html.
-    Reuses the same scripts and styles from lightweight/ with adjusted paths.
+    Experimental fork of full/admin.html. The original stays untouched.
+    Tests three improvements before they graduate to admin.html:
+
+      1. LAYOUT FIX — body is a flex column; the Flow Panel is a fixed-height
+         row and .admin-container flexes into the remaining viewport height.
+         The old version overflowed by the Flow Panel's height (~190px)
+         because .admin-container was hard-sized to calc(100vh - 60px).
+
+      2. GUIDED FLOW — the Flow Panel centers on a "NEXT STEP" prompt with
+         ONE contextual primary action per phase (Award Points, Open Lobby,
+         Start Match #N, End Break...). Next Phase/Force/Break remain as
+         secondary controls.
+
+      3. SAFETY RAILS — confirmation previews before points are awarded,
+         warnings when starting a match would skip the lobby-ready check or
+         a spell window, next-up highlight on the queue, and the duplicate
+         top-bar "Next Round" button hidden while the phase system is active.
 
     LAYOUT:
     ┌──────────────────────────────────────────────────────┐
     │  NAVBAR — Logo, tournament name, connection, user    │
     ├──────────────────────────────────────────────────────┤
-    │  TOP BAR — Selector | Stats | Actions               │
+    │  FLOW PANEL — timeline / phase / NEXT STEP / actions │
+    ├──────────────────────────────────────────────────────┤
+    │  TOP BAR — Selector | Stats | Actions                │
     ├──────────┬──────────────────────┬────────────────────┤
     │  TEAMS   │  HEX BOARD           │ MATCH QUEUE        │
     │  (left)  │  + MATCH CREATION    │ (right)            │
     ├──────────┴──────────────────────┴────────────────────┤
 
-    FEATURES:
-    - Same as lightweight/admin.html (reuses lightweight scripts/admin.js)
-    - Modern dark void / gold accent visual theme
-    - 3-column layout: Teams | Board+Create | Queue
-
     USAGE:
-    - URL parameter: full/admin.html?tournamentId=xxx
+    - URL parameter: full/admin_improved.html?tournamentId=xxx
     - Or select tournament from dropdown
     ============================================================================
 -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tournament Admin v2</title>
+    <title>Tournament Admin v3 (Improved)</title>
 
     <!-- Favicons -->
     <link rel="apple-touch-icon" sizes="180x180" href="../shared/images/favicon/apple-touch-icon.png">
@@ -45,13 +57,14 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
 
-    <!-- CSS: navbar base → fantasy atmosphere → toast → void/gold overrides → v2 admin (final authority) -->
+    <!-- CSS: navbar base → fantasy atmosphere → toast → void/gold overrides → v2 admin → phase UI → improved overrides (final authority) -->
     <link rel="stylesheet" href="../shared/css/navbar.css">
     <link rel="stylesheet" href="../shared/css/toast.css">
     <link rel="stylesheet" href="../shared/css/fantasy-mountain-theme.css">
     <link rel="stylesheet" href="../shared/css/void-gold-theme.css">
-    <link rel="stylesheet" href="../lightweight/css/admin.css">
+    <link rel="stylesheet" href="css/admin.css">
     <link rel="stylesheet" href="css/phase-indicator.css">
+    <link rel="stylesheet" href="css/admin-improved.css">
 </head>
 <body>
     <!-- Atmosphere Layers -->
@@ -70,14 +83,14 @@
     <div id="navbar-container"></div>
     <script src="../shared/scripts/navbar.js"></script>
 
-    <!-- Flow Panel (driven by admin-phase-adapter.js) -->
+    <!-- Flow Panel (driven by admin-improved-adapter.js) -->
     <div id="flowPanel" class="flow-panel" style="display: none;">
         <!-- Phase Timeline Track -->
         <div class="flow-timeline" id="flowTimeline"></div>
 
         <!-- Main Flow Content -->
         <div class="flow-body">
-            <!-- Left: Current phase + guidance -->
+            <!-- Left: Current phase identity -->
             <div class="flow-current">
                 <div class="flow-phase-header">
                     <span id="flowPhaseIcon" class="flow-phase-icon"></span>
@@ -87,25 +100,32 @@
                     </div>
                     <span id="flowRoundBadge" class="flow-round-badge" style="display: none;"></span>
                 </div>
-                <p id="flowGuidance" class="flow-guidance"></p>
             </div>
 
-            <!-- Center: Action items (requirements + pending tasks) -->
-            <div class="flow-actions" id="flowActions"></div>
+            <!-- Center: NEXT STEP prompt (guidance + requirement/action pills) -->
+            <div class="flow-next-step">
+                <span class="next-step-label">Next Step</span>
+                <p id="flowGuidance" class="next-step-text"></p>
+                <div class="flow-actions" id="flowActions"></div>
+            </div>
 
-            <!-- Right: Controls -->
+            <!-- Right: Controls — one contextual primary action + secondaries -->
             <div class="flow-controls">
-                <button class="btn primary" id="advancePhaseBtn" onclick="advancePhase()" disabled>Next Phase &#x25B6;</button>
+                <button class="btn primary flow-primary-btn" id="flowPrimaryBtn" onclick="runFlowPrimaryAction()" disabled>---</button>
                 <div class="flow-controls-secondary">
+                    <button class="btn-small secondary" id="advancePhaseBtn" onclick="advancePhase()" disabled>Next Phase &#x25B6;</button>
+                    <span id="phaseExtraControls" style="display: none;"></span>
+                    <span id="lobbyAdminControls" style="display: none;"></span>
+                    <span id="spellWindowControls" style="display: none;"></span>
                     <button class="btn-small secondary" id="forceAdvanceBtn" onclick="forceAdvancePhase()" title="Force advance (skip requirements)">&#x26A0; Force</button>
                     <button class="btn-small secondary" id="insertBreakBtn" onclick="insertBreak()" title="Insert break">&#x23F8; Break</button>
+                    <button class="btn-small secondary" id="broadcastToggleBtn" onclick="toggleBroadcastBar()" title="Broadcast a message to view screens">&#x1F4E2;</button>
                     <span id="breakIntervalBadge" class="break-interval-badge" onclick="openBreakSettings()" title="Break interval settings" style="display: none;"></span>
                 </div>
-                <span id="lobbyAdminControls" style="display: none;"></span>
             </div>
         </div>
 
-        <!-- Broadcast Message Bar -->
+        <!-- Broadcast Message Bar (collapsed behind the 📢 toggle) -->
         <div class="broadcast-bar" id="broadcastBar" style="display: none;">
             <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;">Broadcast</span>
             <input type="text" id="broadcastInput" placeholder="Message shown on view page..."
@@ -146,12 +166,19 @@
                     <span class="stat-label">Hexes</span>
                     <span class="stat-value" id="hexCount">0</span>
                 </div>
+                <div class="stat-sep"></div>
+                <div class="stat-badge stat-badge-editable" onclick="openWinConditionModal()" title="Change the tournament win condition (victory points needed)">
+                    <span class="stat-label">Win At</span>
+                    <span class="stat-value" id="winConditionValue">50</span>
+                    <span class="stat-edit-icon">&#9998;</span>
+                </div>
             </div>
 
             <!-- Right: Actions + Status -->
             <div class="top-bar-actions">
                 <div class="status-message" id="statusMessage"></div>
-                <button class="btn primary" onclick="advanceRound()">Next Round</button>
+                <!-- Hidden by the adapter while the phase system is active (Flow Panel owns advancement) -->
+                <button class="btn primary" id="legacyNextRoundBtn" onclick="advanceRound()">Next Round</button>
                 <button class="btn secondary" onclick="openViewWindow()" title="Open digital signage view in new window">View</button>
                 <button class="btn secondary" onclick="openStatsWindow()" title="Open tournament statistics">Stats</button>
                 <div class="btn-group-separator"></div>
@@ -314,7 +341,7 @@
         </div>
     </div>
 
-    <!-- Next Round Confirmation Modal -->
+    <!-- Next Round Confirmation Modal (legacy flow only — phase mode uses the Flow Confirm modal) -->
     <div class="modal-overlay" id="nextRoundModal">
         <div class="modal-content next-round-modal">
             <h4>Advance to Next Round?</h4>
@@ -614,6 +641,49 @@
         </div>
     </div>
 
+    <!-- Win Condition Modal (experimental — no equivalent on the original admin.html) -->
+    <div id="winConditionModal" class="phase-modal" style="display: none;">
+        <div class="phase-modal-content" style="max-width: 400px;">
+            <div class="phase-modal-header">
+                <h2>Win Condition</h2>
+                <button onclick="closeWinConditionModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div class="phase-modal-body">
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 12px;">
+                    Victory points a team needs to win the tournament. Set during setup — can be adjusted here if the event runs long or short.
+                </p>
+                <div class="form-group">
+                    <label style="color: var(--text-secondary); font-size: 0.9rem;">Points to win:</label>
+                    <input type="number" id="winConditionInput" min="1" max="1000" value="50"
+                           style="width: 100px; padding: 8px 12px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 8px; color: white; font-size: 1rem; margin-top: 6px;">
+                </div>
+                <p style="color: var(--text-tertiary); font-size: 0.85rem; margin: 12px 0;" id="winConditionLeaderNote"></p>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn secondary" onclick="closeWinConditionModal()">Cancel</button>
+                    <button class="btn primary" onclick="saveWinCondition(this)">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Flow Confirm Modal (generic prompt used by the guided flow:
+         points preview, skip-lobby warning, skip-challenges, desync warning) -->
+    <div id="flowConfirmModal" class="phase-modal" style="display: none;">
+        <div class="phase-modal-content" style="max-width: 460px;">
+            <div class="phase-modal-header">
+                <h2 id="flowConfirmTitle">Confirm</h2>
+                <button onclick="closeFlowConfirm()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div class="phase-modal-body">
+                <div id="flowConfirmBody"></div>
+                <div class="flow-confirm-actions">
+                    <button class="btn secondary" onclick="closeFlowConfirm()">Cancel</button>
+                    <button class="btn primary" id="flowConfirmBtn">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script>window.BOARDGAME_BASE = '..';</script>
     <script src="../shared/scripts/firebase-loader.js"></script>
@@ -626,10 +696,10 @@
     <script src="../shared/scripts/smart-match-generator.js"></script>
     <script src="../shared/scripts/player-utils.js"></script>
     <script src="../shared/scripts/toast.js"></script>
-    <script src="../lightweight/scripts/admin.js"></script>
-    <!-- Phase system (OOP modules + adapter) -->
+    <script src="scripts/admin.js"></script>
+    <!-- Phase system (OOP modules + improved guided adapter) -->
     <script src="scripts/action-logger.js"></script>
     <script src="scripts/phase-manager.js"></script>
-    <script src="scripts/admin-phase-adapter.js"></script>
+    <script src="scripts/admin-improved-adapter.js"></script>
 </body>
 </html>
