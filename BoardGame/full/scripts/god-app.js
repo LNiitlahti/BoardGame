@@ -1538,13 +1538,14 @@ document.addEventListener('firebase-ready', async function () {
                 await godApp.loadTournament(tournamentId);
             }
 
-            // Hide loading overlay
-            const overlay = document.getElementById('loadingOverlay');
-            if (overlay) overlay.classList.add('hidden');
-
         } catch (error) {
             console.error('Error checking user role:', error);
             if (godApp.ui) godApp.ui.showStatus('Error loading user data', 'error');
+        } finally {
+            // Always hide the loading overlay — it covers the whole page
+            // (including the navbar) at z-index 2000, so leaving it up after
+            // an error silently blocks every click, not just this page's UI.
+            document.getElementById('loadingOverlay')?.classList.add('hidden');
         }
     });
 });
