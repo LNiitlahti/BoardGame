@@ -1,8 +1,8 @@
 # Sensitive Firebase configuration
-BoardGame/scripts/firebase.js
+BoardGame/shared/scripts/firebase.js
 
 # Dev tools (local only)
-BoardGame/dev-tools.html
+BoardGame/dev/dev-tools.html
 
 # Dependencies
 node_modules/

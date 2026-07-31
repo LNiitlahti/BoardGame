@@ -13,7 +13,7 @@ sequenceDiagram
     participant GC as games-config.js
     participant FB as Firebase
     participant Stats as statistics.js
-    participant View as lightweight/view.html
+    participant View as full/view.html
 
     User->>Admin: Click Generate Match
     Admin->>SMG: generateNext()
@@ -42,7 +42,7 @@ sequenceDiagram
     participant Admin as admin.js
     participant FB as Firebase
     participant Stats as statistics.js
-    participant OB as onboarding-lightweight.js
+    participant OB as onboarding.js
 
     User->>Admin: Click confirm result (winner)
     Admin->>Admin: Count players per team per side
@@ -61,7 +61,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Player
-    participant OB as onboarding-lightweight.js
+    participant OB as onboarding.js
     participant GC as games-config.js
     participant FB as Firebase
     participant AdminOB as Admin onboarding view
@@ -92,7 +92,7 @@ graph LR
     GC[games-config.js] -->|format lookup| SMG[smart-match-generator.js]
     GC -->|name lookup| ADM[admin.js]
     GC -->|name lookup| ST[statistics.js]
-    GC -->|game list| OB[onboarding-lightweight.js]
+    GC -->|game list| OB[onboarding.js]
 
     BO[balance-optimizer.js] -->|partition selection| SMG
     MS[match-suggester.js] -->|rotation pattern| ADM
@@ -129,7 +129,7 @@ graph TD
 
     ADM[admin.js] -->|reads/writes ALL| GS
     ST[statistics.js] -->|reads only| GS
-    OB[onboarding-lightweight.js] -->|reads/writes| OBD
+    OB[onboarding.js] -->|reads/writes| OBD
     SMG[smart-match-generator.js] -->|reads teams + games| GS
     SMG -->|reads/writes| SMS
     BO[balance-optimizer.js] -->|reads/writes via SMG| SMS

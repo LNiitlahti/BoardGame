@@ -53,7 +53,7 @@ flowchart TD
         U4 -->|No| U5[ALLOW]
         U4 -->|Yes| U6[DENY]
         U3 -->|No| U7{isOwner?}
-        U7 -->|Yes| U8{"Only touches safe fields?<br/>displayName, fullName,<br/>updatedAt, lastLogin"}
+        U7 -->|Yes| U8{"Only touches safe fields?<br/>displayName, fullName,<br/>updatedAt, lastLogin, avatarUrl"}
         U8 -->|Yes| U9[ALLOW]
         U8 -->|No| U10[DENY]
         U7 -->|No| U10
@@ -159,7 +159,7 @@ flowchart TD
 ```
 Collection              | Unauth | Anon Auth | User (owner) | Admin | God
 ------------------------|--------|-----------|--------------|-------|----
-users (own doc)         |   -    |     -     |    R         | R U   | CRUD
+users (own doc)         |   -    |     -     |   R C U      | R U   | CRUD
 users (other doc)       |   -    |     -     |    -         | R U*  | CRUD
 tournaments             |   -    |    R      |    R U‡      | CRU   | CRUD
   eventLog              |   -    |    R      |    R         | CRUD  | CRUD

@@ -324,16 +324,7 @@ graph TD
 
 ## 10. Deprecated Files
 
-Kept in `full/scripts/` with `_deprecated` suffix for reference:
-
-| File | Replaced by |
-|---|---|
-| `god-scripts_deprecated.js` | All 8 OOP modules |
-| `tournament-manager_deprecated.js` | GodApp (tournament loading/saving) |
-| `action-history_deprecated.js` | GodApp.logEvent + ResultManager |
-| `spell-manager_deprecated.js` | SpellEngine (spell-engine.js) |
-| `spells-god_deprecated.js` | SpellEngine admin UI (spell-engine.js) |
-| `stateManager_deprecated.js` | GodApp._onFirebaseSnapshot |
+None remain. `full/scripts/` used to keep 5 pre-OOP files around with a `_deprecated` suffix for reference (`god-scripts_deprecated.js`, `tournament-manager_deprecated.js`, `action-history_deprecated.js`, `spell-manager_deprecated.js`, `spells-god_deprecated.js`) — all confirmed to have zero live references and deleted during the 2026-07-31 cleanup pass. Their functionality lives entirely in the OOP module stack described elsewhere in this document.
 
 ## Action Logger — Firestore Subcollection
 
@@ -485,9 +476,8 @@ scoring_vp → scoring_hex → hex_placement_1 → spell_window_1 → hex_placem
 ### Voting Integration
 - `team-controls.js` fixed to read from `gameData.gameQueue || gameData.selectedGames` (was only reading `selectedGames`)
 - Vote writes use dynamic `queueField` for Firestore path compatibility
-- `ResultManager.getDisputedMatches()` — matches with votes but no consensus or admin confirmation
 - `ResultManager.renderVotingPanel()` — per-match vote progress with accept/override buttons
-- "Disputed Matches" panel in god.html (auto-hides when empty)
+- Confirmed matches are dropped from the queue and votes are shown in the confirm popup instead of a separate always-visible panel — the old "Disputed Matches" panel and `getDisputedMatches()` were removed
 - Action types: `vote_accepted`, `vote_overridden`
 
 ### New Action Types (Phase 2)

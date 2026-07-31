@@ -1,6 +1,6 @@
 # balance-optimizer.js — Logic Diagrams
 
-> Source: `BoardGame/lightweight/scripts/balance-optimizer.js`
+> Source: `BoardGame/shared/scripts/balance-optimizer.js`
 > Math engine: greedy variance minimization, W/A matrices, split fairness penalties.
 > Cost function: `C = Sum[(W_ij - meanW)^2 + (A_ij - meanA)^2]` across 40 cross-team pairs.
 

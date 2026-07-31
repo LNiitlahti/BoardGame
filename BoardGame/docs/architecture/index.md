@@ -8,26 +8,36 @@
 ```mermaid
 graph TB
     subgraph Pages
-        ADMIN[lightweight/admin.html]
         ADMIN2[full/admin.html]
-        SETUP[lightweight/setup.html]
-        ONBOARD[lightweight/onboarding.html]
-        VIEW[lightweight/view.html]
-        STATS[lightweight/statistics.html]
         GOD[full/god.html]
+        HOME[full/home.html]
+        TEAMP[full/team.html]
+        PROFILE[full/profile.html]
+        SETUP2[full/setup.html]
+        VIEW2[full/view.html]
+        STATS2[full/statistics.html]
+        MQUEUE[full/match-queue.html]
+        REPLAY[full/replay.html]
+        ONBOARD2[full/onboarding.html]
+        OBSTATUS[full/onboarding-status.html]
+        VIEWOB[full/view-onboarding.html]
     end
+    %% HOME/TEAMP/PROFILE/SETUP2/VIEW2/STATS2/MQUEUE/REPLAY/ONBOARD2/OBSTATUS/VIEWOB
+    %% are current full/ pages not yet traced into this diagram's edges below —
+    %% added as nodes per cleanup-checklist.md CL-12 so the page list itself is
+    %% accurate; their script dependencies need a dedicated pass to wire up.
 
     subgraph Core_JS
-        ADM_JS[admin.js]
-        SMG[smart-match-generator.js]
-        BO[balance-optimizer.js]
-        MS[match-suggester.js]
-        GC[games-config.js]
-        BR[board-renderer.js]
-        ST[statistics.js]
-        PC[platforms-config.js]
-        OB[onboarding-lightweight.js]
-        TOAST[toast.js]
+        ADM_JS[full/scripts/admin.js]
+        SMG[shared/scripts/smart-match-generator.js]
+        BO[shared/scripts/balance-optimizer.js]
+        MS[shared/scripts/match-suggester.js]
+        GC[shared/scripts/games-config.js]
+        BR[shared/scripts/board-renderer.js]
+        ST[full/scripts/statistics.js]
+        PC[shared/scripts/platforms-config.js]
+        OB[full/scripts/onboarding.js]
+        TOAST[shared/scripts/toast.js]
     end
 
     subgraph God_Modules
@@ -64,12 +74,10 @@ graph TB
         RULES[firestore.rules]
     end
 
-    ADMIN --> ADM_JS
     ADMIN2 --> ADM_JS
     ADMIN2 -->|phase adapter| PMM
-    STATS --> ST
-    ONBOARD --> OB
-    VIEW --> BR
+    STATS2 --> ST
+    ONBOARD2 --> OB
 
     ADM_JS -->|creates matches via| SMG
     ADM_JS -->|creates matches via| MS
@@ -122,18 +130,15 @@ graph TB
 
 | Diagram File | Source JS | Diagrams | Description |
 |---|---|---|---|
-| [admin-lightweight.md](admin-lightweight.md) | `lightweight/scripts/admin.js` | 14 | Auth, match results, challenges, player formats, game names, queue colors, connection monitor, seating order, breaks, tournament state, points award, Discord auto-assignment |
-| [smart-match-generator.md](smart-match-generator.md) | `scripts/smart-match-generator.js` | 5 | Main pipeline, 5v5 vs 3v3+2v2, rotation state machine, repeat counts |
-| [balance-optimizer.md](balance-optimizer.md) | `scripts/balance-optimizer.js` | 5 | Selection algorithm, split penalty, matrix updates, state restore, stats |
-| [match-suggester.md](match-suggester.md) | `scripts/match-suggester.js` | 2 | 10-match rotation pattern, fairness note |
-| [games-config.md](games-config.md) | `scripts/games-config.js` | 2 | Resolution chain, filtering & export |
+| [smart-match-generator.md](smart-match-generator.md) | `shared/scripts/smart-match-generator.js` | 5 | Main pipeline, 5v5 vs 3v3+2v2, rotation state machine, repeat counts |
+| [balance-optimizer.md](balance-optimizer.md) | `shared/scripts/balance-optimizer.js` | 5 | Selection algorithm, split penalty, matrix updates, state restore, stats |
+| [match-suggester.md](match-suggester.md) | `shared/scripts/match-suggester.js` | 2 | 10-match rotation pattern, fairness note |
+| [games-config.md](games-config.md) | `shared/scripts/games-config.js` | 2 | Resolution chain, filtering & export |
 | [platforms-config.md](platforms-config.md) | `shared/scripts/platforms-config.js` | 1 | Platform lookup, game-platform mapping |
-| [statistics.md](statistics.md) | `scripts/statistics.js` | 8 | Data pipeline, player stats, leaderboards, filters, H2H, streaks, charts |
-| [onboarding-lightweight.md](onboarding-lightweight.md) | `scripts/onboarding-lightweight.js` | 5 | View routing, completion, progress grid, secret management, platform IDs |
-| [board-renderer.md](board-renderer.md) | `scripts/board-renderer.js` | 3 | Render pipeline, responsive scaling, incremental updates |
+| [board-renderer.md](board-renderer.md) | `shared/scripts/board-renderer.js` | 3 | Render pipeline, responsive scaling, incremental updates |
 | [toast.md](toast.md) | `shared/scripts/toast.js` | 3 | Toast lifecycle, connection banner state machine, button loading |
 | [firestore-rules.md](firestore-rules.md) | `firestore.rules` | 6 | Role hierarchy, per-collection permissions, permission matrix, billing costs |
-| [god-modules.md](god-modules.md) | `full/scripts/*.js` (19 modules) | 10 | OOP module architecture, DI graph, data flow, window globals, script loading order, action logger, phase manager (21-phase flow with loops), spell engine, backup/undo, voting, scoring ceremony, display manager, season manager, VP + hex territory points |
+| [god-modules.md](god-modules.md) | `full/scripts/*.js` (19 modules) | 10 | OOP module architecture, DI graph, data flow, window globals, script loading order, action logger, phase manager (16-phase flow with loops and concurrent match slots), spell engine, backup/undo, voting, scoring ceremony, display manager, season manager, VP + hex territory points |
 | [replay-analytics.md](replay-analytics.md) | `full/scripts/replay-engine.js`, `summary-generator.js`, `action-export.js` | 9 | Replay engine architecture, state reconstruction, playback, summary generator, action export, god.html integration |
 | [cross-system.md](cross-system.md) | All files | 1 | End-to-end data flow sequence diagram |
 

@@ -1,7 +1,7 @@
 # Repository Upkeep Instructions
 
 > Rules for maintaining this codebase. Follow these when making changes.
-> Last reviewed: February 2026
+> Last reviewed: 2026-07-31
 
 ---
 
@@ -11,14 +11,11 @@ Full logic maps live in `BoardGame/docs/architecture/`. **These must stay in syn
 
 | When you... | Update this file |
 |---|---|
-| Change `lightweight/scripts/admin.js` | `docs/architecture/admin-lightweight.md` |
-| Change `lightweight/scripts/smart-match-generator.js` | `docs/architecture/smart-match-generator.md` |
-| Change `lightweight/scripts/balance-optimizer.js` | `docs/architecture/balance-optimizer.md` |
+| Change `shared/scripts/smart-match-generator.js` | `docs/architecture/smart-match-generator.md` |
+| Change `shared/scripts/balance-optimizer.js` | `docs/architecture/balance-optimizer.md` |
 | Change `shared/scripts/match-suggester.js` | `docs/architecture/match-suggester.md` |
 | Change `shared/scripts/games-config.js` | `docs/architecture/games-config.md` |
 | Change `shared/scripts/platforms-config.js` | `docs/architecture/platforms-config.md` |
-| Change `lightweight/scripts/statistics.js` | `docs/architecture/statistics.md` |
-| Change `lightweight/scripts/onboarding.js` | `docs/architecture/onboarding-lightweight.md` |
 | Change `shared/scripts/board-renderer.js` | `docs/architecture/board-renderer.md` |
 | Change `full/scripts/god-app.js` or any God module | `docs/architecture/god-modules.md` |
 | Change `full/scripts/replay-engine.js`, `summary-generator.js`, or `action-export.js` | `docs/architecture/replay-analytics.md` |
@@ -56,15 +53,12 @@ Follow existing patterns. Don't introduce new ones without reason.
 
 ### Where things go
 - Auth/hub pages: `BoardGame/` root (index.html, login.html, development-landing-page.html, rulebook.html)
-- Lightweight app: `BoardGame/lightweight/` (admin, setup, view, statistics, onboarding)
-- Full version app: `BoardGame/full/` (app, home, profile, setup, view, team, god + modules/)
+- The game: `BoardGame/full/` (app, home, profile, setup, view, team, god + modules/) — the only version, `lightweight/` was retired and deleted 2026-07-31
 - Shared scripts: `BoardGame/shared/scripts/` (firebase, config, board, games-config, etc.)
 - Shared CSS: `BoardGame/shared/css/` (brand-theme, navbar, fantasy-mountain-theme, etc.)
 - Shared images: `BoardGame/shared/images/` (favicon, game-logos, hexes, backgrounds)
-- Lightweight CSS: `BoardGame/lightweight/css/`
-- Lightweight scripts: `BoardGame/lightweight/scripts/`
-- Full version CSS: `BoardGame/full/css/`
-- Full version scripts: `BoardGame/full/scripts/`
+- CSS: `BoardGame/full/css/`
+- Scripts: `BoardGame/full/scripts/`
 - Dev/test pages: `BoardGame/dev/`
 - Utility tools: `BoardGame/tools/`
 - Architecture diagrams: `BoardGame/docs/architecture/`
@@ -94,12 +88,12 @@ These are baked into multiple files. Changing them requires updates across the c
 
 | Constraint | Where it's hardcoded |
 |---|---|
-| 5 teams | `lightweight/scripts/smart-match-generator.js`, `lightweight/scripts/balance-optimizer.js`, `shared/scripts/match-suggester.js` |
-| 2 players per team | `lightweight/scripts/smart-match-generator.js`, `lightweight/scripts/balance-optimizer.js`, `shared/scripts/match-suggester.js` |
-| 10 players total | ~~`lightweight/scripts/onboarding.js`~~ RESOLVED: now uses dynamic player IDs from team data |
+| 5 teams | `shared/scripts/smart-match-generator.js`, `shared/scripts/balance-optimizer.js`, `shared/scripts/match-suggester.js` |
+| 2 players per team | `shared/scripts/smart-match-generator.js`, `shared/scripts/balance-optimizer.js`, `shared/scripts/match-suggester.js` |
+| 10 players total | ~~`full/scripts/onboarding.js`~~ RESOLVED: now uses dynamic player IDs from team data |
 | 10-match rotation cycle | `shared/scripts/match-suggester.js` (ROTATION_PATTERN array) |
-| Win rate thresholds (60/40) | `lightweight/scripts/statistics.js` (used 8+ places, not extracted to function) |
-| Leaderboard min games (3) | `lightweight/scripts/statistics.js` (winrate leaderboard filter) |
+| Win rate thresholds (60/40) | `full/scripts/statistics.js` (used 11 places, not extracted to function) |
+| Leaderboard min games (3) | `full/scripts/statistics.js` (winrate leaderboard filter) |
 
 ---
 
@@ -107,12 +101,12 @@ These are baked into multiple files. Changing them requires updates across the c
 
 Track these. Fix when touching nearby code:
 
-- [ ] `lightweight/scripts/statistics.js`: Result filter only works when team filter is also set (nested bug)
-- [ ] `lightweight/scripts/admin.js`: DOM listeners accumulate on repeated modal opens (no cleanup)
-- [ ] `lightweight/scripts/admin.js`: `pendingHexWins` only clears first matching entry per team
-- [ ] `lightweight/scripts/statistics.js`: Win rate classification (60/40 thresholds) duplicated in 8+ places
-- [ ] `lightweight/scripts/admin.js`: No XSS sanitization on player name input to innerHTML
-- [ ] `lightweight/scripts/onboarding.js`: No rate limiting on Firebase writes from rapid checkbox toggles
+- [ ] `full/scripts/statistics.js`: Result filter only works when team filter is also set (nested bug)
+- [x] `full/scripts/admin.js`: DOM listeners accumulate on repeated modal opens (no cleanup) — fixed
+- [ ] `full/scripts/admin.js`: `pendingHexWins` only clears first matching entry per team
+- [ ] `full/scripts/statistics.js`: Win rate classification (60/40 thresholds) duplicated in 11 places
+- [ ] `full/scripts/admin.js`: No XSS sanitization on player name input to innerHTML
+- [x] `full/scripts/onboarding.js`: No rate limiting on Firebase writes from rapid checkbox toggles — fixed for onboarding (500ms debounce), not yet extended to chat/ready-check/rename
 
 ---
 
