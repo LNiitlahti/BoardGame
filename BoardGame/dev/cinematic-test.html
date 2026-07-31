@@ -18,6 +18,79 @@
         body.cine-active #hexBoard { transform-style: preserve-3d; }
         body.cine-active .board-hex { transform-style: preserve-3d; }
 
+        /* ===========================================
+           VISUAL EFFECTS — copied from view.html so this harness matches
+           the real production look by default (not the plain BoardRenderer
+           default gray hexes). Enabled unconditionally below, no toggle UI:
+           this is a preview tool, not the effects-toggle page that is
+           board-test2-3d.html.
+           =========================================== */
+
+        /* Effect: Hex Images — terrain/map images on each hex */
+        body.effect-hex-images .board-hex::before {
+            background-size: cover;
+            background-position: center;
+            z-index: 5;
+        }
+        body.effect-hex-images .hex-label { z-index: 1; }
+
+        /* Effect: Heart Glow */
+        body.effect-heart-glow .board-hex.side-heart::before,
+        body.effect-heart-glow .board-hex.mountain-heart::before {
+            box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.6);
+        }
+
+        /* Effect: Pulse Animation on Hearts */
+        body.effect-pulse-hearts .board-hex.side-heart,
+        body.effect-pulse-hearts .board-hex.mountain-heart {
+            animation: pulse-heart 7.2s ease-in-out infinite;
+            z-index: 20;
+        }
+        @keyframes pulse-heart {
+            0%, 100% {
+                filter: brightness(1) drop-shadow(0 0 0px transparent);
+                transform: translate(-50%, -50%) scale(1);
+            }
+            50% {
+                filter: brightness(1.5) drop-shadow(0 0 8px rgba(255, 100, 150, 0.8));
+                transform: translate(-50%, -50%) scale(1.08);
+            }
+        }
+        body.effect-pulse-hearts .heart-overlay-image {
+            animation: pulse-heart-image 7.2s ease-in-out infinite;
+        }
+        @keyframes pulse-heart-image {
+            0%, 100% {
+                filter: brightness(1) drop-shadow(0 0 0px transparent);
+                transform: translate(-50%, -50%) rotate(-30deg) scale(1);
+            }
+            50% {
+                filter: brightness(1.5) drop-shadow(0 0 8px rgba(255, 100, 150, 0.8));
+                transform: translate(-50%, -50%) rotate(-30deg) scale(1.08);
+            }
+        }
+
+        /* Effect: Rooms — dashed "marching ants" outline on room hexes */
+        body.effect-rooms .board-hex.room .room-border { display: block; }
+        /* Every .board-hex has a `transform`, making it its own stacking context, so a high
+           z-index on .room-border only wins WITHIN its own hex, never against a neighboring
+           hex's box — the hex itself must be raised above other hex effects. */
+        body.effect-rooms .board-hex.room { z-index: 30; }
+        .room-border {
+            display: none;
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 100%; height: 100%;
+            transform: translate(-50%, -50%);
+            z-index: 8;
+            pointer-events: none;
+            background-image:
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpolygon points='16.5,0 49.5,0 66,29 49.5,58 16.5,58 0,29' fill='none' stroke='black' stroke-width='3' stroke-dasharray='6 6' stroke-dashoffset='0'/%3E%3C/svg%3E"),
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpolygon points='16.5,0 49.5,0 66,29 49.5,58 16.5,58 0,29' fill='none' stroke='white' stroke-width='3' stroke-dasharray='6 6' stroke-dashoffset='6'/%3E%3C/svg%3E");
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+        }
+
         /* Tuning panel: same visual language as board-test2-3d.html's
            controls-3d-panel, but fixed/floating so it stays usable while
            the cinematic plays fullscreen behind it. */
@@ -99,6 +172,27 @@
         };
         boardModule.setRoomHexes(mockGame.rooms);
         renderer.render(mockGame);
+
+        // Match the real production look by default (terrain images, heart
+        // glow/pulse, room outlines) instead of BoardRenderer's plain gray
+        // hexes — copied from applyHexImages()/applyInitialEffects() in
+        // view.html.
+        function applyHexImages() {
+            const styleEl = document.createElement('style');
+            styleEl.id = 'hex-images-dynamic-css';
+            const hexCoords = boardModule.generateHexCoordinates();
+            let css = '';
+            hexCoords.forEach(([q, r]) => {
+                const coord = `q${q}r${r}`;
+                css += `body.effect-hex-images .board-hex[data-coord="${coord}"]::before {
+                    background-image: url('../shared/images/hexes/coords/${coord}.png');
+                }\n`;
+            });
+            styleEl.textContent = css;
+            document.head.appendChild(styleEl);
+        }
+        applyHexImages();
+        document.body.classList.add('effect-hex-images', 'effect-heart-glow', 'effect-pulse-hearts', 'effect-rooms');
 
         let cfg = null;          // live-tunable copy, seeded from the JSON file
         let timeline = null;
