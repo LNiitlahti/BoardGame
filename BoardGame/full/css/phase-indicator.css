@@ -288,66 +288,6 @@
   background: rgba(34, 120, 163, 0.06);
 }
 
-.phase-indicator-content {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-
-.phase-indicator-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.phase-indicator-label {
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--accent-steel, #8f98a6);
-  font-family: 'Quantico', var(--font-secondary, sans-serif);
-}
-
-.phase-indicator-icon {
-  font-size: 1.2rem;
-}
-
-.phase-indicator-name {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--accent-gold, #c8b37e);
-  font-family: 'Russo One', var(--font-primary, sans-serif);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.phase-indicator-round {
-  font-size: 0.8rem;
-  color: var(--text-muted, #9aa1ad);
-  padding: 2px 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 9999px;
-  font-family: 'Quantico', var(--font-secondary, sans-serif);
-}
-
-.phase-indicator-center {
-  flex: 1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  min-width: 0;
-}
-
-.phase-indicator-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
 /* ==================== REQUIREMENT PILLS ==================== */
 
 .phase-req-item {

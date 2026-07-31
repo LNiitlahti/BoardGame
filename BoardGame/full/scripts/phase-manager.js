@@ -1322,18 +1322,6 @@ class PhaseManager {
         bar.classList.toggle('phase-break', phase === 'break');
         bar.classList.toggle('phase-ended', phase === 'tournament_end');
 
-        // Phase name + icon
-        const nameEl = document.getElementById('phaseIndicatorName');
-        const iconEl = document.getElementById('phaseIndicatorIcon');
-        const roundEl = document.getElementById('phaseIndicatorRound');
-        if (nameEl) nameEl.textContent = this.getCurrentPhaseDisplayName();
-        if (iconEl) iconEl.textContent = this.getCurrentPhaseIcon();
-        if (roundEl) {
-            const round = gs.currentPhase?.roundNumber || 0;
-            roundEl.textContent = round > 0 ? `Round ${round}` : '';
-            roundEl.style.display = round > 0 ? '' : 'none';
-        }
-
         // Challenge games counter badge
         const challengeBadge = document.getElementById('challengeGamesBadge');
         if (challengeBadge) {
