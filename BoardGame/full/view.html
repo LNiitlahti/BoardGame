@@ -72,6 +72,61 @@
     <meta name="viewport" content="width=1920, height=1080">
     <title>Board Game - Infoscreen</title>
 
+    <script>
+        // Cinematic mode: blacken the page BEFORE first paint so the navigation
+        // from view-onboarding-layout.html is a black-to-black invisible cut.
+        (function () {
+            const wantsCinematic = new URLSearchParams(location.search).get('cinematic') === '1';
+            const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (!wantsCinematic || reducedMotion) return;
+            document.documentElement.classList.add('cine-pending');
+            window.CINE_MODE = true;
+            // Load cinematic modules only in this mode (normal loads pay zero cost).
+            [
+                'scripts/cinematic/cine-easing.js',
+                'scripts/cinematic/cine-board-order.js',
+                'scripts/cinematic/cine-timeline.js',
+                'scripts/cinematic/cine-camera.js',
+                'scripts/cinematic/cine-tiles.js',
+                'scripts/cinematic/cinematic-controller.js'
+            ].forEach(src => {
+                const s = document.createElement('script');
+                s.src = src;
+                s.async = false; // preserve order
+                document.head.appendChild(s);
+            });
+        })();
+    </script>
+    <style>
+        /* Opaque cover while cinematic initializes (removed by controller). */
+        html.cine-pending body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 9999;
+        }
+        /* During the cinematic the board column is the stage: it rises above the
+           cover; its panel chrome is hidden so tiles float in darkness. */
+        body.cine-active .board-wrap {
+            position: relative;
+            z-index: 10000;
+            background: transparent;
+            overflow: visible;
+        }
+        body.cine-active .board-wrap::after { display: none; }
+        .scene-3d, .rig-3d {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        body.cine-active .rig-3d { transform-style: preserve-3d; }
+        body.cine-active #hexBoard { transform-style: preserve-3d; }
+        body.cine-active .board-hex { transform-style: preserve-3d; }
+    </style>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
@@ -1403,7 +1458,7 @@
                     <div></div>
                 </div>
             </div>
-            <div class="board-wrap"><div id="hexBoard"></div></div>
+            <div class="board-wrap"><div class="scene-3d" id="cineScene"><div class="rig-3d" id="cineRig"><div id="hexBoard"></div></div></div></div>
         </div>
 
         <!-- UPCOMING QUEUE — Right panel -->
@@ -1490,6 +1545,12 @@
     }
 
     function renderBoard() {
+        // Cinematic: while active, defer re-renders (a render wipes per-hex
+        // inline transforms mid-cascade). Controller flushes on finish/skip.
+        if (window.CINEMATIC && window.CINEMATIC.shouldDeferRenders()) {
+            window.CINEMATIC.queueRender();
+            return;
+        }
         if (!boardRenderer || !boardModule) return;
 
         // Load room hexes into board module if available
@@ -1513,7 +1574,21 @@
                 hex.classList.add(`team-${teamId}`);
             }
         });
+
+        // Cinematic: announce data-driven renders so the controller can arm.
+        if (window.CINE_MODE) {
+            document.dispatchEvent(new CustomEvent('view-board-rendered', {
+                detail: { hasData: !!gameState }
+            }));
+        }
     }
+
+    // Bridge for the cinematic controller (script-scoped lets are not globals).
+    window.CineView = {
+        renderBoard: () => renderBoard(),
+        getBoardModule: () => boardModule,
+        getGameState: () => gameState
+    };
 
     /**
      * Apply hex terrain images dynamically via CSS
