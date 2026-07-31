@@ -19,10 +19,11 @@
         tiles: null,
         config: null,
         materials: null,
+        music: null,
+        audioEl: null,
         coverEl: null,
         watchdogId: null,
         dataWaitId: null,
-        voidId: null,
         boardWrapEl: null,
         boardWrapParent: null,
         boardWrapNextSibling: null
@@ -71,7 +72,6 @@
         state.active = false;
         clearInterval(state.watchdogId);
         clearTimeout(state.dataWaitId);
-        clearTimeout(state.voidId); // skip during the void must not resurrect the timeline
 
         // Each of these calls into tile/camera/timeline code that a bail()
         // triggered by a global error may itself be the source of the failure
@@ -86,6 +86,10 @@
         }
         if (state.camera) {
             try { state.camera.clearTo2D(); } catch (e) { console.error('[Cinematic] camera.clearTo2D failed:', e); }
+        }
+        if (state.audioEl) {
+            try { state.audioEl.pause(); state.audioEl.src = ''; } catch (e) { console.error('[Cinematic] audio teardown failed:', e); }
+            state.audioEl = null;
         }
 
         // Guaranteed cleanup: must happen no matter what went wrong above.
@@ -117,6 +121,18 @@
         if (e.key === 's' || e.key === 'S' || e.key === 'Escape') bail();
     }
 
+    // Effect 4 (music sync): screen-wide color wash on strong beats. See
+    // cine-tiles.js's triggerBeatPulse for the same remove-reflow-readd
+    // restart trick, needed because .flash may already be set from a
+    // previous beat.
+    function triggerWash() {
+        const wash = document.getElementById('cineWash');
+        if (!wash) return;
+        wash.classList.remove('flash');
+        void wash.offsetWidth; // force reflow so re-adding the class restarts the animation
+        wash.classList.add('flash');
+    }
+
     function buildTimeline() {
         const cfg = state.config;
         const easing = window.CineEasing;
@@ -128,8 +144,14 @@
         );
 
         // --- Tile drops ---
+        // Offset by the void span so this timeline's own t=0 lines up with
+        // arm()/audio start (see the music-sync tracks below) — the void is
+        // now just "no active track yet" on this same shared clock, instead
+        // of an external setTimeout gate that delayed the timeline's own
+        // existence.
         // S2: mountain heart alone; S3: ring 1 spaced; S4: rings 2-5 compressed.
-        let t = 0;
+        const voidMs = cfg.void.minDurationMs;
+        let t = voidMs;
         const first = order[0]; // q0r0 (guaranteed by buildLandingOrder)
         tl.add(state.tiles.makeDropTrack(first, t, cfg.firstImpact.fallDurationMs, easing.easeInQuad));
         t += cfg.firstImpact.fallDurationMs + cfg.firstImpact.holdAfterMs;
@@ -161,13 +183,11 @@
         const revealEnd = revealAt + cfg.reveal.durationMs;
 
         // --- Camera: one continuous spline through all three keyframes so
-        // it's never parked at a fixed pose (unlike the old chained-lerp
-        // version, which held still at "dramatic" until pullAt, then at
-        // "pulled" for the entire lock-in). Passes through "pulled" at
-        // cascadeEnd and arrives at "rest" exactly at revealEnd. No extra
-        // easing wrapper here — the spline's own shape provides the
-        // acceleration/deceleration, and wrapping it would decouple "reaches
-        // a keyframe" from the real wall-clock times used to define them.
+        // it's never parked at a fixed pose. The spline's own first keyframe
+        // time is voidMs (not 0) so the camera holds exactly at "dramatic"
+        // for the whole void span, then starts moving the instant tiles do
+        // — same visual result as before this task's refactor, just
+        // expressed as a spline clamp instead of an external delay.
         const cam = cfg.camera;
         tl.add({
             at: 0,
@@ -175,7 +195,7 @@
             onUpdate: p => state.camera.applyPose(
                 window.CineCamera.splinePose(
                     [cam.dramatic, cam.pulled, cam.rest],
-                    [0, cascadeEnd, revealEnd],
+                    [voidMs, cascadeEnd, revealEnd],
                     p * revealEnd
                 ))
         });
@@ -197,6 +217,63 @@
             at: revealEnd,
             duration: cfg.signage.durationMs,
             onUpdate: () => {}
+        });
+
+        // --- Music sync: envelope pulse (effects 1+2) + beat-triggered hex
+        // wave (effect 3) / color wash (effect 4). Same shared clock as
+        // everything above (t=0 = arm()/audio start). The cinematic's OWN
+        // total length (independent of music length) governs how long these
+        // run — a track shorter than this just goes quiet for the remainder
+        // (envelopeAt clamps to the last sample); a track longer than this
+        // is cut off when teardown() pauses the <audio> element, per spec
+        // (no fade-out logic in this pass).
+        const cinematicOwnEnd = revealEnd + cfg.signage.durationMs;
+        const music = state.music;
+        const envelopeDuration = Math.min(music.durationMs, cinematicOwnEnd);
+        if (envelopeDuration > 0) {
+            tl.add({
+                at: 0,
+                duration: envelopeDuration,
+                onUpdate: p => {
+                    const amp = music.envelopeAt(p * envelopeDuration);
+                    state.camera.applyBoardPulse(amp);
+                    state.tiles.applyBeatIntensity(amp);
+                }
+            });
+        }
+
+        const maxRing = order.reduce((m, e) => Math.max(m, e.ring), 0);
+        const hexesByRing = new Map();
+        for (const entry of order) {
+            if (!hexesByRing.has(entry.ring)) hexesByRing.set(entry.ring, []);
+            hexesByRing.get(entry.ring).push(entry.coord);
+        }
+        const washThreshold = cfg.music.washThreshold;
+        music.beats.forEach((beatMs, i) => {
+            // Past the cinematic's own end: it'll never fire (the timeline
+            // finishes and tears down the audio before reaching it), so
+            // don't schedule it — scheduling it anyway would silently
+            // stretch tl.duration (see the CineTimeline.duration getter)
+            // past the cinematic's real length, delaying its own finish.
+            if (beatMs > cinematicOwnEnd) return;
+
+            const ring = i % (maxRing + 1);
+            const coords = hexesByRing.get(ring) || [];
+            tl.add({
+                at: beatMs,
+                duration: 250,
+                onStart: () => coords.forEach(coord => state.tiles.triggerBeatPulse(coord)),
+                onUpdate: () => {}
+            });
+
+            if (music.envelopeAt(beatMs) >= washThreshold) {
+                tl.add({
+                    at: beatMs,
+                    duration: 250,
+                    onStart: () => triggerWash(),
+                    onUpdate: () => {}
+                });
+            }
         });
 
         tl.onFinished = teardown;
@@ -225,19 +302,26 @@
         document.addEventListener('keydown', onKeydown);
         window.addEventListener('error', bail);
 
-        // Void: hold darkness for minDurationMs, then roll.
-        state.voidId = setTimeout(() => {
-            state.timeline = buildTimeline();
-            state.timeline.play();
-            state.timeline.startRaf();
-            // Watchdog: rAF must tick steadily; a 4s gap means we're wedged.
-            state.watchdogId = setInterval(() => {
-                if (state.timeline && state.timeline.lastTickAt !== null &&
-                    performance.now() - state.timeline.lastTickAt > 4000) {
-                    bail();
-                }
-            }, 2000);
-        }, state.config.void.minDurationMs);
+        // Music starts right here so it plays through the void, exactly like
+        // the timeline below (both share the same t=0). Autoplay may be
+        // blocked with no prior user gesture — since sync is driven by the
+        // precomputed cues, not the actual playing audio, a blocked autoplay
+        // just means a silent light show, never a desynced one. The
+        // rejection is caught and ignored (not retried/surfaced) for that
+        // reason.
+        state.audioEl = new Audio('audio/cinematic-music.mp3');
+        state.audioEl.play().catch(() => {});
+
+        state.timeline = buildTimeline();
+        state.timeline.play();
+        state.timeline.startRaf();
+        // Watchdog: rAF must tick steadily; a 4s gap means we're wedged.
+        state.watchdogId = setInterval(() => {
+            if (state.timeline && state.timeline.lastTickAt !== null &&
+                performance.now() - state.timeline.lastTickAt > 4000) {
+                bail();
+            }
+        }, 2000);
     }
 
     async function init() {
@@ -246,12 +330,14 @@
             // instance internally on its own fetch failure) — so this
             // Promise.all only ever rejects on the scene config side, which
             // is the only failure that should bail the whole cinematic.
-            const [config, materials] = await Promise.all([
+            const [config, materials, music] = await Promise.all([
                 fetch('data/cinematic-scene.json').then(res => res.json()),
-                window.CineMaterials.load('../shared/data/hex-materials.json')
+                window.CineMaterials.load('../shared/data/hex-materials.json'),
+                window.CineMusic.load('data/music-cues.json')
             ]);
             state.config = config;
             state.materials = materials;
+            state.music = music;
         } catch (e) {
             console.error('[Cinematic] Config load failed, bailing:', e);
             document.documentElement.classList.remove('cine-pending');
