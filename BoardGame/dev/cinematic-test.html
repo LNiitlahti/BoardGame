@@ -96,8 +96,11 @@
         let timeline = null;
         let camera = null;
         let tiles = null;
+        let voidId = null;       // pending void-hold setTimeout id (see buildAndPlay/skip)
 
-        // Declarative slider spec: [path-in-cfg, label, min, max, step].
+        // Declarative slider spec: [path-in-cfg, label, min, max, step], or a
+        // ['__section', headingText] sentinel row that renders a <h3> divider
+        // instead of a slider (see buildSliderPanel below).
         // path is dot-notation into `cfg`, read/written via get/setPath below.
         const SLIDER_SPEC = [
             ['__section', 'Camera — Dramatic (opening)'],
@@ -176,8 +179,13 @@
             buildSliderPanel();
         }
 
+        // Standalone reimplementation of buildTimeline()/arm() in
+        // cinematic-controller.js — the track math below (drop order, timing
+        // offsets, camera pull/reveal lerps) must be kept in sync by hand if
+        // that file's real logic ever changes.
         function buildAndPlay() {
             if (timeline) timeline.skipToEnd();
+            clearTimeout(voidId); // cancel any still-pending void-hold from a previous run
 
             document.body.classList.add('cine-active');
             camera = new CineCamera(
@@ -232,10 +240,13 @@
             // Harness convenience: void hold is whatever the slider currently
             // says (developers will usually drag this down to near-zero while
             // iterating on the tile cascade, then push it back up before copying).
-            setTimeout(() => { timeline.play(); timeline.startRaf(); }, cfg.void.minDurationMs);
+            voidId = setTimeout(() => { timeline.play(); timeline.startRaf(); }, cfg.void.minDurationMs);
         }
 
-        function skip() { if (timeline) timeline.skipToEnd(); }
+        function skip() {
+            clearTimeout(voidId); // skip during the void must not resurrect the timeline
+            if (timeline) timeline.skipToEnd();
+        }
 
         async function copyConfig() {
             const text = JSON.stringify(cfg, null, 4);
