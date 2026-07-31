@@ -37,6 +37,7 @@ NUL
 
 # Planning documents
 .plan/
+docs/superpowers/
 
 # Build outputs
 dist/
