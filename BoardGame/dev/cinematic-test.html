@@ -40,6 +40,9 @@
         .tune-row label { color: #cdd; font-size: 0.72rem; min-width: 118px; }
         .tune-row input[type="range"] { flex: 1; }
         .tune-row .tune-value { color: #fff; font-size: 0.72rem; width: 48px; text-align: right; }
+        #scrubValue { width: 100px; font-variant-numeric: tabular-nums; }
+        #scrubRow { background: #24344a; margin-top: 2px; margin-bottom: 10px; }
+        #scrubRow input[type="range"] { accent-color: #f7ba32; }
         .tune-actions { display: flex; gap: 8px; margin-top: 14px; }
         .tune-actions button {
             flex: 1; background: #27ae60; color: #fff; border: none;
@@ -58,6 +61,11 @@
         </div>
         <div class="tune-actions">
             <button class="secondary" id="btnCopy">📋 Copy JSON to clipboard</button>
+        </div>
+        <div class="tune-row" id="scrubRow">
+            <label for="scrubSlider">Scrub</label>
+            <input type="range" id="scrubSlider" min="0" max="1000" step="50" value="0">
+            <span class="tune-value" id="scrubValue">0:00.0 / 0:00.0</span>
         </div>
         <div id="sliderHost"></div>
     </div>
@@ -97,6 +105,8 @@
         let camera = null;
         let tiles = null;
         let voidId = null;       // pending void-hold setTimeout id (see buildAndPlay/skip)
+        let currentTracks = [];       // last-built track list, scrubbed against by the time slider
+        let currentTotalDuration = 0; // ms, excludes the void hold (scrub range starts at first drop)
 
         // Declarative slider spec: [path-in-cfg, label, min, max, step], or a
         // ['__section', headingText] sentinel row that renders a <h3> divider
@@ -177,59 +187,129 @@
         async function loadConfig() {
             cfg = await (await fetch('../full/data/cinematic-scene.json')).json();
             buildSliderPanel();
+            // Build tracks up front (pure — no visible side effects) purely so
+            // the scrub bar has a range to work with before the user ever
+            // presses Play. The board stays untouched until Play or Scrub.
+            const built = buildTracks();
+            currentTracks = built.tracks;
+            updateScrubRange(built.totalDuration);
+        }
+
+        function formatMs(ms) {
+            const totalSec = Math.max(0, ms) / 1000;
+            const m = Math.floor(totalSec / 60);
+            const s = (totalSec - m * 60).toFixed(1).padStart(4, '0');
+            return `${m}:${s}`;
+        }
+
+        function updateScrubRange(totalDuration) {
+            currentTotalDuration = totalDuration;
+            scrubSlider.max = String(Math.round(totalDuration));
+            scrubSlider.value = '0';
+            scrubValueEl.textContent = `${formatMs(0)} / ${formatMs(totalDuration)}`;
         }
 
         // Standalone reimplementation of buildTimeline()/arm() in
         // cinematic-controller.js — the track math below (drop order, timing
         // offsets, camera pull/reveal lerps) must be kept in sync by hand if
-        // that file's real logic ever changes.
-        function buildAndPlay() {
-            if (timeline) timeline.skipToEnd();
-            clearTimeout(voidId); // cancel any still-pending void-hold from a previous run
-
-            document.body.classList.add('cine-active');
+        // that file's real logic ever changes. Pure: constructs fresh
+        // camera/tiles instances and the full track list, but does NOT hide
+        // tiles or move the camera — callers (buildAndPlay / renderAtTime)
+        // apply that reset themselves right before they actually use the
+        // tracks, since a fresh CineTiles/CineCamera pair alone has no
+        // visible effect on the page.
+        function buildTracks() {
             camera = new CineCamera(
                 document.getElementById('cineScene'),
                 document.getElementById('cineRig'));
-            camera.applyPose(cfg.camera.dramatic);
             tiles = new CineTiles(document.getElementById('hexBoard'), cfg.tiles);
-            tiles.hideAll();
 
             const order = CineBoardOrder.buildLandingOrder(boardModule.generateHexCoordinates());
-            timeline = new CineTimeline();
+            const tracks = [];
 
             let t = 0;
-            timeline.add(tiles.makeDropTrack(order[0], t, cfg.firstImpact.fallDurationMs, CineEasing.easeInQuad));
+            tracks.push(tiles.makeDropTrack(order[0], t, cfg.firstImpact.fallDurationMs, CineEasing.easeInQuad));
             t += cfg.firstImpact.fallDurationMs + cfg.firstImpact.holdAfterMs;
             for (const entry of order.filter(e => e.ring === 1)) {
-                timeline.add(tiles.makeDropTrack(entry, t, cfg.earlyImpacts.fallDurationMs, CineEasing.easeInQuad));
+                tracks.push(tiles.makeDropTrack(entry, t, cfg.earlyImpacts.fallDurationMs, CineEasing.easeInQuad));
                 t += cfg.earlyImpacts.intervalMs;
             }
             const rest = order.filter(e => e.ring >= 2);
             const spacing = (cfg.cascade.totalDurationMs - cfg.cascade.fallDurationMs) / rest.length;
             rest.forEach((entry, i) => {
-                timeline.add(tiles.makeDropTrack(entry, t + i * spacing, cfg.cascade.fallDurationMs, CineEasing.easeInQuad));
+                tracks.push(tiles.makeDropTrack(entry, t + i * spacing, cfg.cascade.fallDurationMs, CineEasing.easeInQuad));
             });
             const cascadeEnd = t + cfg.cascade.totalDurationMs;
             const pullAt = t + cfg.cascade.totalDurationMs * cfg.cascade.cameraStartFraction;
-            timeline.add({
+            tracks.push({
                 at: pullAt, duration: cascadeEnd - pullAt, ease: CineEasing.easeInOutCubic,
                 onUpdate: p => camera.applyPose(CineCamera.lerpPose(cfg.camera.dramatic, cfg.camera.pulled, p))
             });
-            timeline.add({
+            tracks.push({
                 at: cascadeEnd, duration: cfg.lockIn.durationMs,
                 onStart: () => tiles.showHearts(),
                 onUpdate: () => {}
             });
             const revealAt = cascadeEnd + cfg.lockIn.durationMs;
-            timeline.add({
+            tracks.push({
                 at: revealAt, duration: cfg.reveal.durationMs, ease: CineEasing.easeInOutCubic,
                 onUpdate: p => camera.applyPose(CineCamera.lerpPose(cfg.camera.pulled, cfg.camera.rest, p)),
                 onComplete: () => camera.clearTo2D()
             });
-            timeline.add({
+            tracks.push({
                 at: revealAt + cfg.reveal.durationMs, duration: cfg.signage.durationMs,
                 onUpdate: () => {}
+            });
+
+            const totalDuration = tracks.reduce((m, tr) => Math.max(m, tr.at + tr.duration), 0);
+            return { tracks, totalDuration };
+        }
+
+        // Scrubbing: stateless by design so it can jump to ANY time, forward
+        // or backward, unlike CineTimeline.tick() (which only ever advances —
+        // once a track completes it stays completed). Resets to the baseline
+        // pose every call, then locally replays each track's own callbacks up
+        // to T with a progress value computed fresh from T, not from any
+        // running clock.
+        function renderAtTime(T) {
+            if (!camera || !tiles) return;
+            document.body.classList.add('cine-active'); // needed for the preserve-3d CSS rules
+            camera.applyPose(cfg.camera.dramatic);
+            tiles.hideAll();
+            for (const track of currentTracks) {
+                if (T < track.at) continue;
+                const raw = track.duration === 0 ? 1 : Math.min(1, (T - track.at) / track.duration);
+                const ease = track.ease || (p => p);
+                if (track.onStart) track.onStart();
+                if (track.onUpdate) track.onUpdate(ease(raw));
+                if (raw >= 1 && track.onComplete) track.onComplete();
+            }
+        }
+
+        function buildAndPlay() {
+            if (timeline) timeline.skipToEnd();
+            clearTimeout(voidId); // cancel any still-pending void-hold from a previous run
+
+            document.body.classList.add('cine-active');
+            const built = buildTracks();
+            currentTracks = built.tracks;
+            updateScrubRange(built.totalDuration);
+
+            camera.applyPose(cfg.camera.dramatic);
+            tiles.hideAll();
+
+            timeline = new CineTimeline();
+            built.tracks.forEach(tr => timeline.add(tr));
+            // Ride along with the same timeline purely to keep the scrub bar
+            // in sync while live playback runs (dragging the bar takes over
+            // and stops this, see the scrubSlider listener below).
+            timeline.add({
+                at: 0, duration: built.totalDuration,
+                onUpdate: p => {
+                    const T = p * built.totalDuration;
+                    scrubSlider.value = String(Math.round(T));
+                    scrubValueEl.textContent = `${formatMs(T)} / ${formatMs(built.totalDuration)}`;
+                }
             });
             timeline.onFinished = () => {
                 tiles.restoreAll();
@@ -246,6 +326,10 @@
         function skip() {
             clearTimeout(voidId); // skip during the void must not resurrect the timeline
             if (timeline) timeline.skipToEnd();
+            if (currentTotalDuration > 0) {
+                scrubSlider.value = String(Math.round(currentTotalDuration));
+                scrubValueEl.textContent = `${formatMs(currentTotalDuration)} / ${formatMs(currentTotalDuration)}`;
+            }
         }
 
         async function copyConfig() {
@@ -256,6 +340,19 @@
             btn.textContent = '✓ Copied!';
             setTimeout(() => { btn.textContent = original; }, 1200);
         }
+
+        const scrubSlider = document.getElementById('scrubSlider');
+        const scrubValueEl = document.getElementById('scrubValue');
+
+        scrubSlider.addEventListener('input', () => {
+            // Manual scrubbing takes over from live playback so the two don't
+            // fight over tile/camera state on the next animation frame.
+            if (timeline) timeline.stopRaf();
+            clearTimeout(voidId);
+            const T = parseFloat(scrubSlider.value);
+            renderAtTime(T);
+            scrubValueEl.textContent = `${formatMs(T)} / ${formatMs(currentTotalDuration)}`;
+        });
 
         document.getElementById('btnPlay').addEventListener('click', buildAndPlay);
         document.getElementById('btnSkip').addEventListener('click', skip);
