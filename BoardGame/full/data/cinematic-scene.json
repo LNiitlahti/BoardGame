@@ -31,7 +31,7 @@
         "rest":     { "fov": 3500, "tilt": 0,  "spin": 0,   "zoom": 1 }
     },
     "tiles": {
-        "dropHeightPx": 1600,
+        "dropHeightPx": 500,
         "spinDegrees": 540
     }
 }
