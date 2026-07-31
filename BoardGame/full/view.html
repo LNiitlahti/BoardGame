@@ -107,9 +107,15 @@
             z-index: 9999;
         }
         /* During the cinematic the board column is the stage: it rises above the
-           cover; its panel chrome is hidden so tiles float in darkness. */
+           cover; its panel chrome is hidden so tiles float in darkness. The
+           controller moves .board-wrap to be a direct child of <body> at this
+           point (escaping .bottom-zone's own stacking context, which would
+           otherwise trap this z-index below it) — position:fixed + inset:0
+           makes it fill the viewport now that it's outside the CSS grid that
+           used to size it. */
         body.cine-active .board-wrap {
-            position: relative;
+            position: fixed;
+            inset: 0;
             z-index: 10000;
             background: transparent;
             overflow: visible;

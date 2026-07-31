@@ -21,7 +21,10 @@
         coverEl: null,
         watchdogId: null,
         dataWaitId: null,
-        voidId: null
+        voidId: null,
+        boardWrapEl: null,
+        boardWrapParent: null,
+        boardWrapNextSibling: null
     };
 
     window.CINEMATIC = {
@@ -36,6 +39,30 @@
             'position:fixed;inset:0;background:#000;z-index:9999;pointer-events:none;';
         document.body.appendChild(el);
         return el;
+    }
+
+    // .board-wrap normally lives inside .bottom-zone, which has its own
+    // position+z-index (a stacking context). That traps .board-wrap's
+    // z-index:10000 so it only ever wins against OTHER .bottom-zone
+    // children — #cineCover (z-index:9999, a direct child of body) still
+    // paints above the whole .bottom-zone (stacked at z-index:15), hiding
+    // the board throughout the cascade. Moving .board-wrap to be a direct
+    // sibling of #cineCover is what actually lets its z-index compete.
+    function liftBoardWrap() {
+        const el = document.querySelector('.board-wrap');
+        if (!el) return;
+        state.boardWrapEl = el;
+        state.boardWrapParent = el.parentNode;
+        state.boardWrapNextSibling = el.nextSibling;
+        document.body.appendChild(el);
+    }
+
+    function restoreBoardWrap() {
+        if (!state.boardWrapEl || !state.boardWrapParent) return;
+        state.boardWrapParent.insertBefore(state.boardWrapEl, state.boardWrapNextSibling);
+        state.boardWrapEl = null;
+        state.boardWrapParent = null;
+        state.boardWrapNextSibling = null;
     }
 
     function teardown() {
@@ -64,6 +91,7 @@
         document.body.classList.remove('cine-active');
         document.documentElement.classList.remove('cine-pending');
         if (state.coverEl) { state.coverEl.remove(); state.coverEl = null; }
+        try { restoreBoardWrap(); } catch (e) { console.error('[Cinematic] restoreBoardWrap failed:', e); }
         document.removeEventListener('keydown', onKeydown);
         window.removeEventListener('error', bail);
 
@@ -166,6 +194,7 @@
     function arm() {
         state.active = true;
         document.body.classList.add('cine-active');
+        liftBoardWrap();
         state.coverEl = makeCover();
         document.documentElement.classList.remove('cine-pending'); // our cover took over
 
