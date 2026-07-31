@@ -54,3 +54,6 @@ build/
 # Firebase
 firebase-debug.log
 .firebase/
+
+# Superpowers brainstorm sessions
+.superpowers/
