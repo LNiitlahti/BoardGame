@@ -1377,6 +1377,7 @@
     // =================================================================
 
     function triggerCompletion() {
+        if (completionTriggered) return; // already in progress — ignore re-entrant calls (e.g. double-clicking the dev "Complete" button)
         completionTriggered = true;
 
         // Blur the background content
