@@ -393,7 +393,7 @@ scoring_vp → scoring_hex → hex_placement_1 → spell_window_1 → hex_placem
 
 ### Points System
 - **Victory points (VP)**: Awarded instantly in `ResultManager.confirmResult()` when a non-challenge match result is confirmed (+1 VP per win for teams with full credit). `confirmCorrectResult()` reverses/re-awards VP on correction.
-- **Hex territory points**: Awarded when leaving `scoring_hex` via `_onAwardPoints` hook (wired in GodApp and admin-phase-adapter). `awardRoundPoints()` scans `heartHexControl` — side hearts = +1, mountain hearts = +2.
+- **Hex territory points**: Awarded when leaving `scoring_hex` via `_onAwardPoints` hook (wired in GodApp). `awardRoundPoints()` scans `heartHexControl` — side hearts = +1, mountain hearts = +2.
 - **scoring_vp phase**: Pure review/ceremony phase — VPs already awarded on match result confirmation. `_onScoringCeremony` hook fires here (round 2+).
 - **scoring_hex phase**: Admin reviews hex state; hex territory points awarded on exit (round 2+).
 - **Contested hex freeze**: `awardRoundPoints()` skips heart hexes with `challengeHexCoord` matching a pending/ongoing challenge match.

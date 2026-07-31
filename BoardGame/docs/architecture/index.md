@@ -46,7 +46,6 @@ graph TB
         SEM[spell-engine.js]
         SCM[scoring-ceremony.js]
         SNM[season-manager.js]
-        APA[admin-phase-adapter.js]
     end
 
     subgraph View_Modules

@@ -133,7 +133,6 @@ BoardGame/
 ├── full/                  # v2 — primary version, OOP module stack + guided admin
 │   ├── god.html            # Superadmin dashboard
 │   ├── admin.html           # Guided tournament admin dashboard (next-step flow, safety rails)
-│   ├── admin_old.html       # Prior non-guided admin dashboard, kept for reference
 │   ├── setup.html           # Tournament creation wizard (incl. Room Hexes step)
 │   ├── view.html            # Spectator display (1920×1080)
 │   ├── statistics.html      # Analytics & data export

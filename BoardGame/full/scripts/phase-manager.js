@@ -144,7 +144,7 @@ class PhaseManager {
         // Guard flag to prevent duplicate auto-advance calls
         this._autoAdvancePending = false;
 
-        // ── Hooks (wired by GodApp / admin-phase-adapter) ──
+        // ── Hooks (wired by GodApp) ──
         // this._onAwardPoints        — fire when leaving scoring_hex
         // this._onScoringCeremony    — fire when entering scoring_vp
         // this._onSpellPhaseEntered  — fire when admin begins spells
