@@ -47,5 +47,8 @@
     "tiles": {
         "dropHeightPx": 500,
         "spinDegrees": 540
+    },
+    "music": {
+        "washThreshold": 0.6
     }
 }
