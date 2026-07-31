@@ -370,10 +370,11 @@
 
         let cfg = null;          // live-tunable copy, seeded from the JSON file
         let materials = null;    // CineMaterials instance, loaded once alongside cfg
+        let music = null;    // CineMusic instance, loaded once alongside cfg/materials
+        let audioEl = null;  // harness preview <audio>, (re)created per buildAndPlay()
         let timeline = null;
         let camera = null;
         let tiles = null;
-        let voidId = null;       // pending void-hold setTimeout id (see buildAndPlay/skip)
         let currentTracks = [];       // last-built track list, scrubbed against by the time slider
         let currentTotalDuration = 0; // ms, excludes the void hold (scrub range starts at first drop)
 
@@ -410,7 +411,9 @@
             ['cascade.fallDurationMs', 'Cascade tile fall', 100, 2000, 50],
             ['lockIn.durationMs', 'Lock-in', 1000, 20000, 250],
             ['reveal.durationMs', 'Reveal', 2000, 40000, 500],
-            ['signage.durationMs', 'Signage', 2000, 30000, 500]
+            ['signage.durationMs', 'Signage', 2000, 30000, 500],
+            ['__section', 'Music Sync'],
+            ['music.washThreshold', 'Wash threshold', 0, 1, 0.05]
         ];
 
         function getPath(obj, path) {
@@ -453,9 +456,10 @@
         }
 
         async function loadConfig() {
-            [cfg, materials] = await Promise.all([
+            [cfg, materials, music] = await Promise.all([
                 fetch('../full/data/cinematic-scene.json').then(r => r.json()),
-                CineMaterials.load('../shared/data/hex-materials.json')
+                CineMaterials.load('../shared/data/hex-materials.json'),
+                CineMusic.load('../full/data/music-cues.json')
             ]);
             buildSliderPanel();
             // Build tracks up front (pure — no visible side effects) purely so
@@ -498,7 +502,11 @@
             const order = CineBoardOrder.buildLandingOrder(boardModule.generateHexCoordinates());
             const tracks = [];
 
-            let t = 0;
+            // Void is folded into this same clock (t=0 = "arm"/audio start),
+            // matching cinematic-controller.js — see that file's buildTimeline()
+            // for the full rationale.
+            const voidMs = cfg.void.minDurationMs;
+            let t = voidMs;
             tracks.push(tiles.makeDropTrack(order[0], t, cfg.firstImpact.fallDurationMs, CineEasing.easeInQuad));
             t += cfg.firstImpact.fallDurationMs + cfg.firstImpact.holdAfterMs;
             for (const entry of order.filter(e => e.ring === 1)) {
@@ -522,14 +530,14 @@
             const revealEnd = revealAt + cfg.reveal.durationMs;
 
             // Camera: one continuous spline through all three keyframes —
-            // never parked at a fixed pose. Passes through "pulled" at
-            // cascadeEnd, arrives at "rest" exactly at revealEnd.
+            // never parked at a fixed pose. First keyframe time is voidMs so
+            // it holds "dramatic" through the void, same as production.
             tracks.push({
                 at: 0, duration: revealEnd,
                 onUpdate: p => camera.applyPose(
                     CineCamera.splinePose(
                         [cfg.camera.dramatic, cfg.camera.pulled, cfg.camera.rest],
-                        [0, cascadeEnd, revealEnd],
+                        [voidMs, cascadeEnd, revealEnd],
                         p * revealEnd
                     ))
             });
@@ -543,8 +551,53 @@
                 onUpdate: () => {}
             });
 
+            // Music sync — mirrors cinematic-controller.js's buildTimeline().
+            const cinematicOwnEnd = revealEnd + cfg.signage.durationMs;
+            const envelopeDuration = Math.min(music.durationMs, cinematicOwnEnd);
+            if (envelopeDuration > 0) {
+                tracks.push({
+                    at: 0, duration: envelopeDuration,
+                    onUpdate: p => {
+                        const amp = music.envelopeAt(p * envelopeDuration);
+                        camera.applyBoardPulse(amp);
+                        tiles.applyBeatIntensity(amp);
+                    }
+                });
+            }
+            const maxRing = order.reduce((m, e) => Math.max(m, e.ring), 0);
+            const hexesByRing = new Map();
+            for (const entry of order) {
+                if (!hexesByRing.has(entry.ring)) hexesByRing.set(entry.ring, []);
+                hexesByRing.get(entry.ring).push(entry.coord);
+            }
+            music.beats.forEach((beatMs, i) => {
+                if (beatMs > cinematicOwnEnd) return;
+                const ring = i % (maxRing + 1);
+                const coords = hexesByRing.get(ring) || [];
+                tracks.push({
+                    at: beatMs, duration: 250,
+                    onStart: () => coords.forEach(coord => tiles.triggerBeatPulse(coord)),
+                    onUpdate: () => {}
+                });
+                if (music.envelopeAt(beatMs) >= cfg.music.washThreshold) {
+                    tracks.push({
+                        at: beatMs, duration: 250,
+                        onStart: () => triggerWash(),
+                        onUpdate: () => {}
+                    });
+                }
+            });
+
             const totalDuration = tracks.reduce((m, tr) => Math.max(m, tr.at + tr.duration), 0);
             return { tracks, totalDuration };
+        }
+
+        function triggerWash() {
+            const wash = document.getElementById('cineWash');
+            if (!wash) return;
+            wash.classList.remove('flash');
+            void wash.offsetWidth;
+            wash.classList.add('flash');
         }
 
         // Scrubbing: stateless by design so it can jump to ANY time, forward
@@ -567,6 +620,8 @@
             if (materials) {
                 document.querySelectorAll('.material-fx').forEach(fx => fx.classList.remove('active', 'flash'));
             }
+            document.querySelectorAll('.beat-pulse').forEach(p => p.classList.remove('flash'));
+            document.getElementById('hexBoard').style.removeProperty('--beat-intensity');
             for (const track of currentTracks) {
                 if (T < track.at) continue;
                 const raw = track.duration === 0 ? 1 : Math.min(1, (T - track.at) / track.duration);
@@ -579,7 +634,7 @@
 
         function buildAndPlay() {
             if (timeline) timeline.skipToEnd();
-            clearTimeout(voidId); // cancel any still-pending void-hold from a previous run
+            if (audioEl) { audioEl.pause(); audioEl.src = ''; audioEl = null; }
 
             document.body.classList.add('cine-active');
             const built = buildTracks();
@@ -591,10 +646,15 @@
             // buildTracks() re-uses this hex board's existing .material-fx
             // divs (creating them is idempotent) — a previous run's
             // 'active'/'flash' classes would otherwise carry over silently,
-            // same staleness issue as renderAtTime() above.
+            // same staleness issue as renderAtTime() above. Also clear the
+            // beat-pulse flash class and --beat-intensity feed for the same
+            // reason (music-sync effects, added alongside the material-fx
+            // ones they layer on top of).
             if (materials) {
                 document.querySelectorAll('.material-fx').forEach(fx => fx.classList.remove('active', 'flash'));
             }
+            document.querySelectorAll('.beat-pulse').forEach(p => p.classList.remove('flash'));
+            document.getElementById('hexBoard').style.removeProperty('--beat-intensity');
 
             timeline = new CineTimeline();
             built.tracks.forEach(tr => timeline.add(tr));
@@ -613,17 +673,22 @@
                 tiles.restoreAll();
                 camera.clearTo2D();
                 document.body.classList.remove('cine-active');
+                if (audioEl) { audioEl.pause(); audioEl.src = ''; audioEl = null; }
             };
 
-            // Harness convenience: void hold is whatever the slider currently
-            // says (developers will usually drag this down to near-zero while
-            // iterating on the tile cascade, then push it back up before copying).
-            voidId = setTimeout(() => { timeline.play(); timeline.startRaf(); }, cfg.void.minDurationMs);
+            // Harness plays audio too (unlike the skipped black cover) —
+            // hearing the light show while tuning is the point of the tool.
+            // Starts together with timeline.play() below, same shared clock
+            // as production's arm().
+            audioEl = new Audio('../full/audio/cinematic-music.mp3');
+            audioEl.play().catch(() => {});
+            timeline.play();
+            timeline.startRaf();
         }
 
         function skip() {
-            clearTimeout(voidId); // skip during the void must not resurrect the timeline
             if (timeline) timeline.skipToEnd();
+            if (audioEl) { audioEl.pause(); audioEl.src = ''; audioEl = null; }
             if (currentTotalDuration > 0) {
                 scrubSlider.value = String(Math.round(currentTotalDuration));
                 scrubValueEl.textContent = `${formatMs(currentTotalDuration)} / ${formatMs(currentTotalDuration)}`;
@@ -646,7 +711,7 @@
             // Manual scrubbing takes over from live playback so the two don't
             // fight over tile/camera state on the next animation frame.
             if (timeline) timeline.stopRaf();
-            clearTimeout(voidId);
+            if (audioEl) { audioEl.pause(); audioEl.src = ''; audioEl = null; }
             const T = parseFloat(scrubSlider.value);
             renderAtTime(T);
             scrubValueEl.textContent = `${formatMs(T)} / ${formatMs(currentTotalDuration)}`;
