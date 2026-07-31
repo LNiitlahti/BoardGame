@@ -139,7 +139,6 @@
             ['earlyImpacts.fallDurationMs', 'Ring-1 fall', 200, 3000, 100],
             ['cascade.totalDurationMs', 'Cascade total', 5000, 60000, 500],
             ['cascade.fallDurationMs', 'Cascade tile fall', 100, 2000, 50],
-            ['cascade.cameraStartFraction', 'Camera pull start (0-1)', 0, 1, 0.05],
             ['lockIn.durationMs', 'Lock-in', 1000, 20000, 250],
             ['reveal.durationMs', 'Reveal', 2000, 40000, 500],
             ['signage.durationMs', 'Signage', 2000, 30000, 500]
@@ -211,7 +210,7 @@
 
         // Standalone reimplementation of buildTimeline()/arm() in
         // cinematic-controller.js — the track math below (drop order, timing
-        // offsets, camera pull/reveal lerps) must be kept in sync by hand if
+        // offsets, camera spline keyframes) must be kept in sync by hand if
         // that file's real logic ever changes. Pure: constructs fresh
         // camera/tiles instances and the full track list, but does NOT hide
         // tiles or move the camera — callers (buildAndPlay / renderAtTime)
@@ -240,24 +239,35 @@
                 tracks.push(tiles.makeDropTrack(entry, t + i * spacing, cfg.cascade.fallDurationMs, CineEasing.easeInQuad));
             });
             const cascadeEnd = t + cfg.cascade.totalDurationMs;
-            const pullAt = t + cfg.cascade.totalDurationMs * cfg.cascade.cameraStartFraction;
-            tracks.push({
-                at: pullAt, duration: cascadeEnd - pullAt, ease: CineEasing.easeInOutCubic,
-                onUpdate: p => camera.applyPose(CineCamera.lerpPose(cfg.camera.dramatic, cfg.camera.pulled, p))
-            });
+
             tracks.push({
                 at: cascadeEnd, duration: cfg.lockIn.durationMs,
                 onStart: () => tiles.showHearts(),
                 onUpdate: () => {}
             });
+
             const revealAt = cascadeEnd + cfg.lockIn.durationMs;
+            const revealEnd = revealAt + cfg.reveal.durationMs;
+
+            // Camera: one continuous spline through all three keyframes —
+            // never parked at a fixed pose. Passes through "pulled" at
+            // cascadeEnd, arrives at "rest" exactly at revealEnd.
+            tracks.push({
+                at: 0, duration: revealEnd,
+                onUpdate: p => camera.applyPose(
+                    CineCamera.splinePose(
+                        [cfg.camera.dramatic, cfg.camera.pulled, cfg.camera.rest],
+                        [0, cascadeEnd, revealEnd],
+                        p * revealEnd
+                    ))
+            });
             tracks.push({
                 at: revealAt, duration: cfg.reveal.durationMs, ease: CineEasing.easeInOutCubic,
-                onUpdate: p => camera.applyPose(CineCamera.lerpPose(cfg.camera.pulled, cfg.camera.rest, p)),
+                onUpdate: () => {}, // no cover in the harness (unlike view.html) — nothing to fade
                 onComplete: () => camera.clearTo2D()
             });
             tracks.push({
-                at: revealAt + cfg.reveal.durationMs, duration: cfg.signage.durationMs,
+                at: revealEnd, duration: cfg.signage.durationMs,
                 onUpdate: () => {}
             });
 

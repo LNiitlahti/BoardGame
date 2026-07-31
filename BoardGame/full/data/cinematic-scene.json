@@ -13,8 +13,7 @@
     },
     "cascade": {
         "totalDurationMs": 33000,
-        "fallDurationMs": 900,
-        "cameraStartFraction": 0.4
+        "fallDurationMs": 900
     },
     "lockIn": {
         "durationMs": 10000

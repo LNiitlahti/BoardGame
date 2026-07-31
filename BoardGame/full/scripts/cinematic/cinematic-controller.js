@@ -148,17 +148,6 @@
         });
         const cascadeEnd = cascadeStart + cfg.cascade.totalDurationMs;
 
-        // --- Camera: dramatic → pulled during cascade, → rest during reveal ---
-        const cam = cfg.camera;
-        const pullAt = cascadeStart + cfg.cascade.totalDurationMs * cfg.cascade.cameraStartFraction;
-        tl.add({
-            at: pullAt,
-            duration: cascadeEnd - pullAt,
-            ease: easing.easeInOutCubic,
-            onUpdate: p => state.camera.applyPose(
-                window.CineCamera.lerpPose(cam.dramatic, cam.pulled, p))
-        });
-
         // --- Lock-in (Phase 1: hearts reappear + a quiet beat) ---
         tl.add({
             at: cascadeEnd,
@@ -167,22 +156,44 @@
             onUpdate: () => {}
         });
 
-        // --- Reveal: camera to rest + cover fades out ---
         const revealAt = cascadeEnd + cfg.lockIn.durationMs;
+        const revealEnd = revealAt + cfg.reveal.durationMs;
+
+        // --- Camera: one continuous spline through all three keyframes so
+        // it's never parked at a fixed pose (unlike the old chained-lerp
+        // version, which held still at "dramatic" until pullAt, then at
+        // "pulled" for the entire lock-in). Passes through "pulled" at
+        // cascadeEnd and arrives at "rest" exactly at revealEnd. No extra
+        // easing wrapper here — the spline's own shape provides the
+        // acceleration/deceleration, and wrapping it would decouple "reaches
+        // a keyframe" from the real wall-clock times used to define them.
+        const cam = cfg.camera;
+        tl.add({
+            at: 0,
+            duration: revealEnd,
+            onUpdate: p => state.camera.applyPose(
+                window.CineCamera.splinePose(
+                    [cam.dramatic, cam.pulled, cam.rest],
+                    [0, cascadeEnd, revealEnd],
+                    p * revealEnd
+                ))
+        });
+
+        // --- Reveal: cover fades out. The camera's own arrival at "rest"
+        // (kept identity-matched to the flat CSS default, see
+        // cinematic-scene.json's "Known follow-up" note) is what makes the
+        // clearTo2D() handoff below invisible instead of a visible pop.
         tl.add({
             at: revealAt,
             duration: cfg.reveal.durationMs,
             ease: easing.easeInOutCubic,
-            onUpdate: p => {
-                state.camera.applyPose(window.CineCamera.lerpPose(cam.pulled, cam.rest, p));
-                state.coverEl.style.opacity = String(1 - p);
-            },
+            onUpdate: p => { state.coverEl.style.opacity = String(1 - p); },
             onComplete: () => state.camera.clearTo2D()
         });
 
         // --- Signage (Phase 1: simple settle window; choreography is Phase 4) ---
         tl.add({
-            at: revealAt + cfg.reveal.durationMs,
+            at: revealEnd,
             duration: cfg.signage.durationMs,
             onUpdate: () => {}
         });
