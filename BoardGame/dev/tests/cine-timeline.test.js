@@ -93,3 +93,92 @@ test('lastTickAt is recorded (watchdog support)', () => {
     tl.tick(42);
     assert.strictEqual(tl.lastTickAt, 42);
 });
+
+test('play() resets pausedAt: pause() without resume(), then play() again resumes ticking', () => {
+    const tl = new CineTimeline();
+    const spy = makeSpyTrack(0, 1000);
+    tl.add(spy.track);
+    tl.play(0);
+    tl.tick(10);
+    assert.strictEqual(spy.log.updates.length, 1);
+
+    tl.pause(20); // paused, no resume() ever called
+    tl.play(500); // fresh playback; must clear the stale pausedAt or tick() stalls forever
+
+    tl.tick(600);
+    tl.tick(700);
+    tl.tick(50000);
+
+    assert.ok(spy.log.updates.length > 1, 'tick() must keep producing updates after play() following an unresolved pause()');
+    assert.strictEqual(spy.log.updates[spy.log.updates.length - 1], 1, 'timeline should reach completion, not silently stall');
+    assert.strictEqual(spy.log.completes, 1);
+});
+
+test('calling pause() twice in a row is a safe no-op the second time', () => {
+    const tl = new CineTimeline();
+    const spy = makeSpyTrack(0, 1000);
+    tl.add(spy.track);
+    tl.play(0);
+    tl.tick(400);
+    tl.pause(500);
+    const pausedAtAfterFirst = tl.pausedAt;
+
+    tl.pause(9999); // second pause() call with a very different "now"
+    assert.strictEqual(tl.pausedAt, pausedAtAfterFirst, 'second pause() must not change pausedAt');
+
+    tl.tick(999999); // timeline must still be treated as paused
+    assert.strictEqual(spy.log.updates.length, 1, 'no additional updates while still paused');
+});
+
+test('resume() without a prior pause() is a safe no-op', () => {
+    const tl = new CineTimeline();
+    const spy = makeSpyTrack(0, 1000);
+    tl.add(spy.track);
+    tl.play(0);
+    tl.tick(400);
+    const startTimeBefore = tl.startTime;
+
+    tl.resume(12345); // never paused
+    assert.strictEqual(tl.pausedAt, null, 'pausedAt stays null');
+    assert.strictEqual(tl.startTime, startTimeBefore, 'startTime must be untouched by a no-op resume()');
+
+    tl.tick(500); // playback continues unaffected
+    assert.strictEqual(spy.log.updates[spy.log.updates.length - 1], 0.5);
+});
+
+test('tick() before play() is a safe no-op', () => {
+    const tl = new CineTimeline();
+    const spy = makeSpyTrack(0, 100);
+    tl.add(spy.track);
+
+    tl.tick(50); // no play() yet
+    assert.strictEqual(spy.log.starts, 0);
+    assert.strictEqual(spy.log.updates.length, 0);
+    assert.strictEqual(spy.log.completes, 0);
+    assert.strictEqual(tl.lastTickAt, null, 'lastTickAt must not be set by a pre-play tick()');
+
+    // state isn't corrupted: a real playback afterward behaves normally
+    tl.play(0);
+    tl.tick(50);
+    assert.strictEqual(spy.log.starts, 1);
+    assert.strictEqual(spy.log.updates[spy.log.updates.length - 1], 0.5);
+});
+
+test('skipToEnd() called twice does not double-fire onComplete/onFinished', () => {
+    const tl = new CineTimeline();
+    const spy = makeSpyTrack(0, 100);
+    tl.add(spy.track);
+    let finished = 0;
+    tl.onFinished = () => finished++;
+    tl.play(0);
+
+    tl.skipToEnd();
+    assert.strictEqual(spy.log.starts, 1);
+    assert.strictEqual(spy.log.completes, 1);
+    assert.strictEqual(finished, 1);
+
+    tl.skipToEnd(); // second call, on an already-finished timeline
+    assert.strictEqual(spy.log.starts, 1, 'onStart must not re-fire');
+    assert.strictEqual(spy.log.completes, 1, 'onComplete must not re-fire');
+    assert.strictEqual(finished, 1, 'onFinished must not re-fire');
+});

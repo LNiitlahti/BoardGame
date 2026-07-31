@@ -1,7 +1,10 @@
 // DOM-free rAF timeline. Tracks: { at, duration, ease, onStart, onUpdate, onComplete }
 // (times in ms, `at` absolute from timeline start). Browser use: play() with no
 // argument + startRaf(); tests drive tick(now) manually.
-
+// Contract: one instance = one playback. Calling play() again after tracks have
+// already started/completed does NOT reset per-track _started/_completed state,
+// so onStart/onComplete will not re-fire for tracks already visited — construct a
+// fresh CineTimeline for a new playback rather than replaying an existing one.
 class CineTimeline {
     constructor() {
         this.tracks = [];
@@ -30,6 +33,7 @@ class CineTimeline {
 
     play(now) {
         this.startTime = (now !== undefined ? now : performance.now());
+        this.pausedAt = null;
         this.isFinished = false;
     }
 
