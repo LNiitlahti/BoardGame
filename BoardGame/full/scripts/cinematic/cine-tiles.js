@@ -53,6 +53,10 @@ class CineTiles {
         flash.className = 'landing-flash';
         fx.appendChild(flash);
 
+        const beatPulse = document.createElement('div');
+        beatPulse.className = 'beat-pulse';
+        fx.appendChild(beatPulse);
+
         hex.appendChild(fx);
     }
 
@@ -63,6 +67,29 @@ class CineTiles {
         const fx = hex.querySelector(':scope > .material-fx');
         if (!fx) return;
         fx.classList.add('active', 'flash');
+    }
+
+    // Effect 2 (music sync): feeds the existing (already-shipped) material
+    // glow layers via a CSS custom property they reference on top of their
+    // own idle-loop animation — additive, not a replacement.
+    applyBeatIntensity(amp) {
+        this.boardEl.style.setProperty('--beat-intensity', String(amp));
+    }
+
+    // Effect 3 (music sync): one-shot re-triggerable glow on a single hex,
+    // fired per beat for whichever ring is "on" this beat (see
+    // cinematic-controller.js's buildTimeline). Distinct from
+    // _triggerLanding's one-shot .flash (that one never repeats; this one
+    // must replay every time it's called) — remove-reflow-readd is the
+    // standard trick to restart a CSS animation on an already-flashed class.
+    triggerBeatPulse(coord) {
+        const hex = this.hexByCoord.get(coord);
+        if (!hex) return;
+        const pulse = hex.querySelector(':scope > .material-fx > .beat-pulse');
+        if (!pulse) return;
+        pulse.classList.remove('flash');
+        void pulse.offsetWidth; // force reflow so re-adding the class restarts the animation
+        pulse.classList.add('flash');
     }
 
     // Hide every hex (and heart images) before the cascade begins.
@@ -122,9 +149,14 @@ class CineTiles {
             hex.style.willChange = '';
             if (this.materials) {
                 const fx = hex.querySelector(':scope > .material-fx');
-                if (fx) fx.classList.remove('active', 'flash');
+                if (fx) {
+                    fx.classList.remove('active', 'flash');
+                    const pulse = fx.querySelector(':scope > .beat-pulse');
+                    if (pulse) pulse.classList.remove('flash');
+                }
             }
         }
+        this.boardEl.style.removeProperty('--beat-intensity');
         this.showHearts();
     }
 }
