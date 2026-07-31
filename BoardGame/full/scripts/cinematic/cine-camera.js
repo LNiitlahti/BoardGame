@@ -14,6 +14,14 @@ class CineCamera {
             `scale(${pose.zoom}) rotateX(${pose.tilt}deg) rotateY(${pose.spin}deg)`;
     }
 
+    // Effect 1 (music sync): whole-board brightness, driven every frame by
+    // music.envelopeAt(). amp is 0-1; subtle at rest, a noticeable glow at
+    // the track's peak. Filter, not transform, so it never fights
+    // applyPose()'s own transform writes on the same element.
+    applyBoardPulse(amp) {
+        this.rigEl.style.filter = `brightness(${1 + amp * 0.35})`;
+    }
+
     static lerpPose(a, b, t) {
         const lerp = (x, y) => x + (y - x) * t;
         return {
@@ -90,6 +98,7 @@ class CineCamera {
     clearTo2D() {
         this.sceneEl.style.perspective = '';
         this.rigEl.style.transform = '';
+        this.rigEl.style.filter = '';
     }
 }
 
