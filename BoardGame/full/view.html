@@ -1577,6 +1577,7 @@
 
         // Cinematic: announce data-driven renders so the controller can arm.
         if (window.CINE_MODE) {
+            window.__cineHadRender = true; // race guard: set even if no listener is attached yet
             document.dispatchEvent(new CustomEvent('view-board-rendered', {
                 detail: { hasData: !!gameState }
             }));

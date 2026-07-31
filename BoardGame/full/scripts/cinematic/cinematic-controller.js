@@ -44,17 +44,32 @@
         clearInterval(state.watchdogId);
         clearTimeout(state.dataWaitId);
         clearTimeout(state.voidId); // skip during the void must not resurrect the timeline
-        if (state.timeline) { state.timeline.stopRaf(); state.timeline = null; }
-        if (state.tiles) state.tiles.restoreAll();
-        if (state.camera) state.camera.clearTo2D();
+
+        // Each of these calls into tile/camera/timeline code that a bail()
+        // triggered by a global error may itself be the source of the failure
+        // in. Isolate them so one throwing can't skip the guaranteed cleanup
+        // below (classes, cover, listeners) and leave the venue screen stuck.
+        if (state.timeline) {
+            try { state.timeline.stopRaf(); } catch (e) { console.error('[Cinematic] stopRaf failed:', e); }
+            state.timeline = null;
+        }
+        if (state.tiles) {
+            try { state.tiles.restoreAll(); } catch (e) { console.error('[Cinematic] tiles.restoreAll failed:', e); }
+        }
+        if (state.camera) {
+            try { state.camera.clearTo2D(); } catch (e) { console.error('[Cinematic] camera.clearTo2D failed:', e); }
+        }
+
+        // Guaranteed cleanup: must happen no matter what went wrong above.
         document.body.classList.remove('cine-active');
         document.documentElement.classList.remove('cine-pending');
         if (state.coverEl) { state.coverEl.remove(); state.coverEl = null; }
         document.removeEventListener('keydown', onKeydown);
         window.removeEventListener('error', bail);
+
         if (state.renderQueued) {
             state.renderQueued = false;
-            window.CineView.renderBoard(); // flush deferred live update
+            try { window.CineView.renderBoard(); } catch (e) { console.error('[Cinematic] deferred renderBoard failed:', e); }
         }
     }
 
@@ -201,12 +216,20 @@
         };
         document.addEventListener('view-board-rendered', onRendered);
 
-        // …but never wait forever (bad tournament id, Firestore down).
-        state.dataWaitId = setTimeout(() => {
-            document.removeEventListener('view-board-rendered', onRendered);
-            console.warn('[Cinematic] No board data within 20s — showing dashboard.');
-            document.documentElement.classList.remove('cine-pending');
-        }, 20000);
+        // Race guard: renderBoard() may have already fired — and set this
+        // flag — during the config fetch's async gap above, before this
+        // listener existed to catch its event. Don't fall through to the
+        // 20s "no data" timeout when data actually already arrived.
+        if (window.__cineHadRender) {
+            onRendered();
+        } else {
+            // …but never wait forever (bad tournament id, Firestore down).
+            state.dataWaitId = setTimeout(() => {
+                document.removeEventListener('view-board-rendered', onRendered);
+                console.warn('[Cinematic] No board data within 20s — showing dashboard.');
+                document.documentElement.classList.remove('cine-pending');
+            }, 20000);
+        }
     }
 
     if (document.readyState === 'loading') {
