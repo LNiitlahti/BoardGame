@@ -1,0 +1,37 @@
+{
+    "version": 1,
+    "void": {
+        "minDurationMs": 12000
+    },
+    "firstImpact": {
+        "fallDurationMs": 1800,
+        "holdAfterMs": 5000
+    },
+    "earlyImpacts": {
+        "intervalMs": 2200,
+        "fallDurationMs": 1200
+    },
+    "cascade": {
+        "totalDurationMs": 33000,
+        "fallDurationMs": 900,
+        "cameraStartFraction": 0.4
+    },
+    "lockIn": {
+        "durationMs": 10000
+    },
+    "reveal": {
+        "durationMs": 20000
+    },
+    "signage": {
+        "durationMs": 15000
+    },
+    "camera": {
+        "dramatic": { "fov": 900,  "tilt": 62, "spin": -18, "zoom": 0.9 },
+        "pulled":   { "fov": 1400, "tilt": 45, "spin": -8,  "zoom": 0.7 },
+        "rest":     { "fov": 3500, "tilt": 0,  "spin": 0,   "zoom": 1 }
+    },
+    "tiles": {
+        "dropHeightPx": 1600,
+        "spinDegrees": 540
+    }
+}
