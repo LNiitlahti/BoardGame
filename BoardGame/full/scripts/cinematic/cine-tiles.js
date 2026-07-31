@@ -3,15 +3,66 @@
 // invisible; each drop animates translateZ dropHeight→0 with spin, then
 // settles to the exact stylesheet transform so the final board is untouched.
 
+// Particle sub-element counts/class per material — only created for hexes
+// that actually use them, so DOM size stays proportional to the board, not
+// 4x every hex. Water has no discrete particles (its look is a glow +
+// sweeping sheen, both pure CSS pseudo-elements, no extra nodes needed).
+const MATERIAL_PARTICLES = {
+    lava: { className: 'ember', count: 3 },
+    magic: { className: 'spark', count: 4 },
+    dust: { className: 'mote', count: 3 },
+    water: { className: null, count: 0 }
+};
+
 class CineTiles {
-    constructor(hexBoardEl, config) {
+    // `materials` is an optional CineMaterials instance. Omitting it (the
+    // Task 6/7 behavior) creates no material-fx overlays at all — fully
+    // backward compatible with any existing caller that doesn't pass one.
+    constructor(hexBoardEl, config, materials) {
         this.boardEl = hexBoardEl;
         this.config = config; // { dropHeightPx, spinDegrees }
+        this.materials = materials || null;
         this.hexByCoord = new Map();
         for (const hex of hexBoardEl.querySelectorAll('.board-hex')) {
             this.hexByCoord.set(hex.dataset.coord, hex);
+            if (this.materials) this._ensureMaterialFx(hex);
         }
         this.heartOverlay = hexBoardEl.querySelector('.heart-overlay-container');
+    }
+
+    // Creates the (inert until 'active') material overlay div for one hex,
+    // tagged with the material it resolves to. Idempotent, so constructing
+    // a second CineTiles against the same rendered DOM (e.g. a harness
+    // "Rebuild & Replay") doesn't stack duplicate overlays.
+    _ensureMaterialFx(hex) {
+        if (hex.querySelector(':scope > .material-fx')) return;
+        const material = this.materials.materialFor(hex.dataset.coord);
+        const fx = document.createElement('div');
+        fx.className = `material-fx mat-${material}`;
+
+        const particle = MATERIAL_PARTICLES[material];
+        if (particle && particle.count > 0) {
+            for (let i = 0; i < particle.count; i++) {
+                const p = document.createElement('div');
+                p.className = particle.className;
+                fx.appendChild(p);
+            }
+        }
+
+        const flash = document.createElement('div');
+        flash.className = 'landing-flash';
+        fx.appendChild(flash);
+
+        hex.appendChild(fx);
+    }
+
+    // Starts a hex's ambient material loop and plays its one-shot landing
+    // flash. Called from makeDropTrack()'s onComplete — never independently,
+    // so a hex's effect always starts exactly when its tile lands.
+    _triggerLanding(hex) {
+        const fx = hex.querySelector(':scope > .material-fx');
+        if (!fx) return;
+        fx.classList.add('active', 'flash');
     }
 
     // Hide every hex (and heart images) before the cascade begins.
@@ -49,6 +100,7 @@ class CineTiles {
                 hex.style.transform = '';
                 hex.style.opacity = '';
                 hex.style.willChange = '';
+                if (this.materials) this._triggerLanding(hex);
             }
         };
     }
@@ -57,13 +109,21 @@ class CineTiles {
         if (this.heartOverlay) this.heartOverlay.style.visibility = '';
     }
 
-    // Bail path: instantly restore every hex to its normal state.
+    // Bail path: instantly restore every hex to its normal state. Also
+    // stops material ambient effects — they're scoped to "while the
+    // cinematic is actively running" for now, not an always-on live-board
+    // feature (that's a later phase), so the board looks exactly like
+    // today's once the cinematic ends or is skipped.
     restoreAll() {
         for (const hex of this.hexByCoord.values()) {
             hex.style.visibility = '';
             hex.style.transform = '';
             hex.style.opacity = '';
             hex.style.willChange = '';
+            if (this.materials) {
+                const fx = hex.querySelector(':scope > .material-fx');
+                if (fx) fx.classList.remove('active', 'flash');
+            }
         }
         this.showHearts();
     }

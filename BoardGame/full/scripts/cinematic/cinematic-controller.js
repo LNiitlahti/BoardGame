@@ -18,6 +18,7 @@
         camera: null,
         tiles: null,
         config: null,
+        materials: null,
         coverEl: null,
         watchdogId: null,
         dataWaitId: null,
@@ -216,7 +217,8 @@
 
         state.tiles = new window.CineTiles(
             document.getElementById('hexBoard'),
-            state.config.tiles
+            state.config.tiles,
+            state.materials
         );
         state.tiles.hideAll();
 
@@ -240,8 +242,16 @@
 
     async function init() {
         try {
-            const res = await fetch('data/cinematic-scene.json');
-            state.config = await res.json();
+            // CineMaterials.load() never rejects (degrades to an all-default
+            // instance internally on its own fetch failure) — so this
+            // Promise.all only ever rejects on the scene config side, which
+            // is the only failure that should bail the whole cinematic.
+            const [config, materials] = await Promise.all([
+                fetch('data/cinematic-scene.json').then(res => res.json()),
+                window.CineMaterials.load('../shared/data/hex-materials.json')
+            ]);
+            state.config = config;
+            state.materials = materials;
         } catch (e) {
             console.error('[Cinematic] Config load failed, bailing:', e);
             document.documentElement.classList.remove('cine-pending');
