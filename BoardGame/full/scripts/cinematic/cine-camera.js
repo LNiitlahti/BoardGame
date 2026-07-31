@@ -16,10 +16,14 @@ class CineCamera {
 
     // Effect 1 (music sync): whole-board brightness, driven every frame by
     // music.envelopeAt(). amp is 0-1; subtle at rest, a noticeable glow at
-    // the track's peak. Filter, not transform, so it never fights
-    // applyPose()'s own transform writes on the same element.
+    // the track's peak. Applied to sceneEl (not rigEl): rigEl needs
+    // transform-style: preserve-3d to stay intact for the tile-drop
+    // cascade's translateZ depth (cine-tiles.js), and a non-none `filter`
+    // on an element forces that element's own transform-style to flatten
+    // per the CSS spec — sceneEl has no 3D-transformed children of its own,
+    // so it isn't part of that preserve-3d chain and is safe to filter.
     applyBoardPulse(amp) {
-        this.rigEl.style.filter = `brightness(${1 + amp * 0.35})`;
+        this.sceneEl.style.filter = `brightness(${1 + amp * 0.35})`;
     }
 
     static lerpPose(a, b, t) {
@@ -98,7 +102,7 @@ class CineCamera {
     clearTo2D() {
         this.sceneEl.style.perspective = '';
         this.rigEl.style.transform = '';
-        this.rigEl.style.filter = '';
+        this.sceneEl.style.filter = '';
     }
 }
 
