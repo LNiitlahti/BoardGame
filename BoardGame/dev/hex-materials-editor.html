@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Board Game - Hex Materials Editor</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #10131c; min-height: 100vh; font-family: system-ui, sans-serif; }
+
+        .board-wrap {
+            width: 100vw; height: 100vh; display: flex;
+            align-items: center; justify-content: center; position: relative;
+        }
+
+        /* Same production look as cinematic-test.html so materials are
+           assigned against the real terrain art, not plain gray hexes. */
+        body.effect-hex-images .board-hex::before {
+            background-size: cover;
+            background-position: center;
+            z-index: 5;
+        }
+        body.effect-hex-images .hex-label { z-index: 1; }
+
+        /* Material assignment indicator: a colored ring drawn above the
+           terrain image, one per hex, updated on click without re-rendering
+           the board (rendering only happens once on load). */
+        .board-hex { cursor: pointer; }
+        .material-ring {
+            position: absolute; inset: 0;
+            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+            pointer-events: none;
+            z-index: 6;
+            box-shadow: inset 0 0 0 4px transparent;
+            transition: box-shadow 0.15s ease;
+        }
+        .board-hex[data-material="lava"] .material-ring { box-shadow: inset 0 0 0 4px #ff6a1a, inset 0 0 14px 2px rgba(255,106,26,0.6); }
+        .board-hex[data-material="water"] .material-ring { box-shadow: inset 0 0 0 4px #35b6e0, inset 0 0 14px 2px rgba(53,182,224,0.6); }
+        .board-hex[data-material="magic"] .material-ring { box-shadow: inset 0 0 0 4px #b25bff, inset 0 0 14px 2px rgba(178,91,255,0.6); }
+        .board-hex[data-material="dust"] .material-ring { box-shadow: inset 0 0 0 3px #9a9280; }
+        .board-hex:hover .material-ring { box-shadow: inset 0 0 0 3px #fff, inset 0 0 10px 2px rgba(255,255,255,0.5); }
+
+        /* Palette panel */
+        .panel {
+            position: fixed; top: 10px; left: 10px; z-index: 20000;
+            width: 320px; max-height: 96vh; overflow-y: auto;
+            background: rgba(44, 62, 80, 0.95); border-radius: 8px;
+            padding: 14px; font-family: system-ui, sans-serif;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            color: #fff;
+        }
+        .panel h2 { font-size: 1rem; margin-bottom: 4px; }
+        .panel .hint { color: #9ab; font-size: 0.75rem; margin-bottom: 14px; line-height: 1.4; }
+
+        .palette { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+        .swatch {
+            display: flex; align-items: center; gap: 10px;
+            padding: 8px 10px; border-radius: 6px; cursor: pointer;
+            background: #1e2a38; border: 2px solid transparent;
+            font-size: 0.85rem;
+        }
+        .swatch:hover { background: #263547; }
+        .swatch.active { border-color: #fff; background: #2c3e50; }
+        .swatch .dot { width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; }
+        .swatch .count { margin-left: auto; color: #9ab; font-variant-numeric: tabular-nums; }
+        .swatch[data-material="lava"] .dot { background: #ff6a1a; }
+        .swatch[data-material="water"] .dot { background: #35b6e0; }
+        .swatch[data-material="magic"] .dot { background: #b25bff; }
+        .swatch[data-material="dust"] .dot { background: #9a9280; }
+        .swatch[data-material="__clear"] .dot { background: transparent; border: 2px dashed #778; }
+
+        .tune-actions { display: flex; gap: 8px; margin-top: 6px; }
+        .tune-actions button {
+            flex: 1; background: #27ae60; color: #fff; border: none;
+            padding: 8px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;
+        }
+        .tune-actions button.secondary { background: #34495e; }
+        .tune-actions button:hover { filter: brightness(1.1); }
+
+        .progress { font-size: 0.75rem; color: #9ab; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="panel" id="panel">
+        <h2>Hex Materials Editor</h2>
+        <p class="hint">Pick a material, then click hexes to paint them. Loads any existing assignments from hex-materials.json on start.</p>
+
+        <div class="palette" id="palette">
+            <div class="swatch" data-material="lava"><div class="dot"></div>Lava / Fire<span class="count">0</span></div>
+            <div class="swatch" data-material="water"><div class="dot"></div>Water / Ice<span class="count">0</span></div>
+            <div class="swatch" data-material="magic"><div class="dot"></div>Magic / Arcane<span class="count">0</span></div>
+            <div class="swatch" data-material="dust"><div class="dot"></div>Dust / Stone<span class="count">0</span></div>
+            <div class="swatch" data-material="__clear"><div class="dot"></div>Clear (unassign)<span class="count"></span></div>
+        </div>
+
+        <div class="tune-actions">
+            <button id="btnCopy">📋 Copy JSON to clipboard</button>
+        </div>
+        <div class="tune-actions">
+            <button class="secondary" id="btnResetAll">Reset all to unassigned</button>
+        </div>
+
+        <p class="progress" id="progress"></p>
+    </div>
+
+    <div class="board-wrap">
+        <div id="hexBoard"></div>
+    </div>
+
+    <script>window.BOARDGAME_BASE = '..';</script>
+    <script src="../shared/scripts/board-module.js"></script>
+    <script src="../shared/scripts/board-renderer.js"></script>
+    <script>
+        const MATERIALS = ['lava', 'water', 'magic', 'dust'];
+
+        const boardModule = new BoardModule(1.5);
+        const renderer = new BoardRenderer(document.getElementById('hexBoard'), boardModule, {
+            responsive: true, showHeartImages: true, hexScale: 1.5
+        });
+        renderer.render({}); // no team/room data needed for material tagging
+        document.body.classList.add('effect-hex-images');
+
+        // Terrain images use the same per-coordinate CSS-injection approach
+        // as cinematic-test.html/view.html.
+        (function applyHexImages() {
+            const styleEl = document.createElement('style');
+            const hexCoords = boardModule.generateHexCoordinates();
+            let css = '';
+            hexCoords.forEach(([q, r]) => {
+                const coord = `q${q}r${r}`;
+                css += `body.effect-hex-images .board-hex[data-coord="${coord}"]::before {
+                    background-image: url('../shared/images/hexes/coords/${coord}.png');
+                }\n`;
+            });
+            styleEl.textContent = css;
+            document.head.appendChild(styleEl);
+        })();
+
+        // One ring overlay per hex, created once — material shown via the
+        // data-material attribute + CSS above, never re-rendered.
+        document.querySelectorAll('.board-hex').forEach(hex => {
+            const ring = document.createElement('div');
+            ring.className = 'material-ring';
+            hex.appendChild(ring);
+        });
+
+        let doc = { version: 1, default: 'dust', materials: {} };
+        let activeMaterial = 'lava';
+
+        function applyAssignments() {
+            document.querySelectorAll('.board-hex').forEach(hex => {
+                const coord = hex.dataset.coord;
+                const material = doc.materials[coord];
+                if (material) {
+                    hex.dataset.material = material;
+                } else {
+                    delete hex.dataset.material;
+                }
+            });
+            updateCounts();
+        }
+
+        function updateCounts() {
+            const counts = { lava: 0, water: 0, magic: 0, dust: 0 };
+            let assignedTotal = 0;
+            for (const coord in doc.materials) {
+                const m = doc.materials[coord];
+                if (counts[m] !== undefined) { counts[m]++; assignedTotal++; }
+            }
+            for (const m of MATERIALS) {
+                const el = document.querySelector(`.swatch[data-material="${m}"] .count`);
+                if (el) el.textContent = String(counts[m]);
+            }
+            const total = boardModule.generateHexCoordinates().length;
+            document.getElementById('progress').textContent =
+                `${assignedTotal} / ${total} hexes assigned (${total - assignedTotal} left unassigned, will default to "${doc.default}")`;
+        }
+
+        async function loadExisting() {
+            try {
+                const res = await fetch('../shared/data/hex-materials.json');
+                if (res.ok) {
+                    const loaded = await res.json();
+                    if (loaded && typeof loaded === 'object' && loaded.materials) doc = loaded;
+                }
+            } catch (e) {
+                console.warn('Could not load existing hex-materials.json, starting empty:', e);
+            }
+            applyAssignments();
+        }
+
+        document.querySelectorAll('.swatch').forEach(swatch => {
+            swatch.addEventListener('click', () => {
+                document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+                swatch.classList.add('active');
+                activeMaterial = swatch.dataset.material;
+            });
+        });
+        document.querySelector('.swatch[data-material="lava"]').classList.add('active');
+
+        document.getElementById('hexBoard').addEventListener('click', (e) => {
+            const hex = e.target.closest('.board-hex');
+            if (!hex) return;
+            const coord = hex.dataset.coord;
+            if (activeMaterial === '__clear') {
+                delete doc.materials[coord];
+            } else {
+                doc.materials[coord] = activeMaterial;
+            }
+            applyAssignments();
+        });
+
+        document.getElementById('btnResetAll').addEventListener('click', () => {
+            if (!confirm('Clear ALL material assignments? This cannot be undone (unless you already copied the JSON).')) return;
+            doc.materials = {};
+            applyAssignments();
+        });
+
+        document.getElementById('btnCopy').addEventListener('click', async () => {
+            const text = JSON.stringify(doc, null, 4);
+            await navigator.clipboard.writeText(text);
+            const btn = document.getElementById('btnCopy');
+            const original = btn.textContent;
+            btn.textContent = '✓ Copied!';
+            setTimeout(() => { btn.textContent = original; }, 1200);
+        });
+
+        loadExisting();
+    </script>
+</body>
+</html>
