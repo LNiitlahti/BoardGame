@@ -771,24 +771,17 @@
     100% { font-size: 90px; letter-spacing: 0.15em; }
   }
 
-  .completion-countdown {
+  /* Cinematic handoff: whole page sinks to black before the redirect. */
+  .handoff-black {
     position: fixed;
-    bottom: 60px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 201;
-    font-family: 'Quantico', sans-serif;
-    font-size: 16px;
-    color: var(--text-muted);
-    letter-spacing: 3px;
+    inset: 0;
+    background: #000;
+    z-index: 500; /* above completion overlay (z 200s) */
     opacity: 0;
-    animation: fade-in-delayed 1s 4s ease forwards;
+    pointer-events: none;
+    transition: opacity 1.5s ease;
   }
-
-  @keyframes fade-in-delayed {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
+  .handoff-black.active { opacity: 1; }
 
   /* ── Dev controls ── */
   .dev-controls {
@@ -878,7 +871,7 @@
 <div class="completion-overlay" id="completionOverlay">
     <div class="completion-text">Onboarding Complete</div>
 </div>
-<div class="completion-countdown" id="completionCountdown"></div>
+<div class="handoff-black" id="handoffBlack"></div>
 
 <!-- Scripts -->
 <script>window.BOARDGAME_BASE = '..';</script>
@@ -1393,26 +1386,25 @@
         const overlay = document.getElementById('completionOverlay');
         overlay.classList.add('active');
 
-        // Start countdown to redirect
-        const countdownEl = document.getElementById('completionCountdown');
-        let secondsLeft = 60;
+        // Cinematic handoff: let COMPLETE breathe ~6s, fade to black 1.5s,
+        // then redirect in darkness. view.html opens equally black, so the
+        // navigation is an invisible black-to-black cut.
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const holdMs = reducedMotion ? 1000 : 6000;
 
-        countdownEl.textContent = 'Redirecting to tournament view in ' + secondsLeft + 's';
-
-        redirectTimer = setInterval(() => {
-            secondsLeft--;
-            if (secondsLeft <= 0) {
-                clearInterval(redirectTimer);
-                window.location.href = 'view.html?tournamentId=' + encodeURIComponent(tournamentId);
-            } else {
-                countdownEl.textContent = 'Redirecting to tournament view in ' + secondsLeft + 's';
-            }
-        }, 1000);
+        redirectTimer = setTimeout(() => {
+            document.getElementById('handoffBlack').classList.add('active');
+            redirectTimer = setTimeout(() => {
+                const flag = reducedMotion ? '' : '&cinematic=1';
+                window.location.href = 'view.html?tournamentId=' +
+                    encodeURIComponent(tournamentId) + flag;
+            }, reducedMotion ? 100 : 1700);
+        }, holdMs);
     }
 
     function resetCompletion() {
         completionTriggered = false;
-        if (redirectTimer) { clearInterval(redirectTimer); redirectTimer = null; }
+        if (redirectTimer) { clearTimeout(redirectTimer); redirectTimer = null; }
 
         document.body.classList.remove('onboarding-complete');
 
@@ -1424,11 +1416,7 @@
         const clone = textEl.cloneNode(true);
         textEl.replaceWith(clone);
 
-        const countdownEl = document.getElementById('completionCountdown');
-        countdownEl.textContent = '';
-        // Reset countdown fade animation
-        const countdownClone = countdownEl.cloneNode(true);
-        countdownEl.replaceWith(countdownClone);
+        document.getElementById('handoffBlack').classList.remove('active');
     }
 
     // =================================================================
