@@ -484,6 +484,61 @@
   padding: 20px;
 }
 
+/* ==================== MATCH SLOT PANELS (concurrent Match 1 / Match 2) ==================== */
+
+.match-slot-panels {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.match-slot-panel {
+  flex: 1 1 220px;
+  min-width: 220px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 8px);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.match-slot-panel.slot-done {
+  border-color: rgba(46, 145, 88, 0.3);
+  background: rgba(46, 145, 88, 0.06);
+}
+
+.match-slot-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.match-slot-icon {
+  font-size: 1.1rem;
+}
+
+.match-slot-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-gold, #c8b37e);
+  font-family: 'Russo One', var(--font-primary, sans-serif);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.match-slot-reqs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.match-slot-panel .btn-small {
+  align-self: flex-start;
+}
+
 /* ==================== ANIMATION ==================== */
 
 @keyframes fadeIn {

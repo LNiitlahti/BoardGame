@@ -17,6 +17,7 @@
     <script src="../shared/scripts/board-module.js"></script>
     <script src="../shared/scripts/board-renderer.js"></script>
     <script src="../shared/scripts/games-config.js"></script>
+    <script src="../shared/scripts/player-utils.js"></script>
     <script src="scripts/match-scheduler.js"></script>
 
     <!-- Dosis Font -->
@@ -1246,6 +1247,28 @@
             const scheduler = new MatchScheduler(teams, selectedGames.map(id => games.find(g => g.id === id).name));
             const scheduleData = scheduler.exportForFirebase();
 
+            // Populate the normalized player registry directly, so this tournament
+            // never depends on the post-hoc team.players[] -> players{} migration.
+            // team.players[] is kept as-is (match-scheduler.js and admin.js's roster
+            // editor both read it directly).
+            const players = {};
+            teams.forEach(team => {
+                const playerIds = [];
+                team.players.forEach(player => {
+                    const playerId = window.PlayerUtils.generatePlayerId();
+                    player.id = playerId;
+                    players[playerId] = {
+                        id: playerId,
+                        name: player.name || 'Unknown Player',
+                        teamId: team.id,
+                        uid: null,
+                        createdAt: new Date().toISOString()
+                    };
+                    playerIds.push(playerId);
+                });
+                team.playerIds = playerIds;
+            });
+
             // Build game definitions object with ID -> name/icon mapping
             const gameDefinitions = {};
             selectedGames.forEach(id => {
@@ -1266,6 +1289,7 @@
                 tournamentId,
                 name: tournamentId,
                 teams,
+                players,
                 matches,
                 schedule: scheduleData,
                 selectedGames,

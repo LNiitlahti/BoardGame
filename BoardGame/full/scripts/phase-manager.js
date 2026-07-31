@@ -46,12 +46,7 @@ const PHASE_ORDER = [
     'spell_window_3',
     'board_resolved',
     'spell_window_4',
-    'match_1_setup',
-    'match_1_lobby',
-    'match_1_playing',
-    'match_2_setup',
-    'match_2_lobby',
-    'match_2_playing',
+    'matches_in_progress',
     'round_advance',
     'break',
     'tournament_end'
@@ -70,12 +65,7 @@ const PHASE_DISPLAY = {
     spell_window_3:   { name: 'Spell Window',         icon: '\u2728' },
     board_resolved:   { name: 'Board Resolved',       icon: '\u{1F6E1}' },
     spell_window_4:   { name: 'Spell Window',         icon: '\u2728' },
-    match_1_setup:    { name: 'Match 1 — Setup',      icon: '\u{1F3DF}' },
-    match_1_lobby:    { name: 'Match 1 — Lobby',      icon: '\u{1F3AE}' },
-    match_1_playing:  { name: 'Match 1 — Playing',    icon: '\u{1F3AE}' },
-    match_2_setup:    { name: 'Match 2 — Setup',      icon: '\u{1F3DF}' },
-    match_2_lobby:    { name: 'Match 2 — Lobby',      icon: '\u{1F3AE}' },
-    match_2_playing:  { name: 'Match 2 — Playing',    icon: '\u{1F3AE}' },
+    matches_in_progress: { name: 'Matches In Progress', icon: '🎮' },
     round_advance:    { name: 'Round Advance',        icon: '\u23ED' },
     break:            { name: 'Break',                icon: '\u23F8' },
     tournament_end:   { name: 'Tournament End',       icon: '\u{1F3C6}' }
@@ -84,8 +74,27 @@ const PHASE_DISPLAY = {
 /** Phases that auto-advance immediately (no admin interaction needed) */
 const AUTO_ADVANCE_PHASES = ['round_advance'];
 
-/** Phases that auto-advance only when all requirements are met */
-const AUTO_ADVANCE_WHEN_MET = ['match_1_lobby', 'match_2_lobby'];
+/**
+ * Phases that auto-advance only when all requirements are met. Slot lobby
+ * readiness auto-advance is handled per-slot inside recheckRequirements()/
+ * advanceSlot(), not through this generic whole-phase mechanism.
+ */
+const AUTO_ADVANCE_WHEN_MET = [];
+
+/**
+ * Match 1 and Match 2 progress independently within 'matches_in_progress'
+ * (players don't overlap between the round's two match slots, so there's
+ * no reason to force one to fully finish before the other can even start).
+ * Each slot walks this same sub-phase sequence on its own.
+ */
+const SLOT_SUB_PHASES = ['setup', 'lobby', 'playing', 'done'];
+
+const SLOT_SUB_PHASE_DISPLAY = {
+    setup:   { name: 'Setup',   icon: '\u{1F3DF}' },
+    lobby:   { name: 'Lobby',   icon: '\u{1F3AE}' },
+    playing: { name: 'Playing', icon: '\u{1F3AE}' },
+    done:    { name: 'Done',    icon: '✅' }
+};
 
 /** Phases skipped in normal linear flow (only entered via dedicated methods) */
 const SKIP_IN_LINEAR_FLOW = ['break'];
@@ -153,24 +162,56 @@ class PhaseManager {
         const gs = this._gameState;
         if (!gs.currentPhase?.name) return false;
 
+        const oldName = gs.currentPhase.name;
+
+        // Ancient single-phase 'matches_in_progress' (from before per-slot
+        // tracking existed) happens to share its name with the current
+        // slots-based phase — the only way to tell them apart is that the
+        // ancient one has no `slots` object yet.
+        if (oldName === 'matches_in_progress' && !gs.currentPhase.slots) {
+            console.warn('[PhaseManager] Migrating ancient "matches_in_progress" phase to slot-based model');
+            gs.currentPhase.slots = { 1: 'playing', 2: 'setup' };
+            return true;
+        }
+
         const MIGRATION_MAP = {
             'round_start':           'scoring_vp',
             'challenge_selection':   'challenges',
             'pre_game_instructions': 'match_1_setup',
             'lobby_ready':           'match_1_lobby',
-            'matches_in_progress':   'match_1_playing',
             'scoring_and_placement': 'scoring_vp',
             'spell_phase':           'spell_window_1',
             'round_end':             'round_advance'
         };
 
-        const oldName = gs.currentPhase.name;
-        const newName = MIGRATION_MAP[oldName];
-        if (newName) {
-            console.warn(`[PhaseManager] Migrating phase "${oldName}" → "${newName}"`);
-            gs.currentPhase.name = newName;
-            return true; // caller should save
+        // The six now-retired per-slot linear phase names collapse onto the
+        // single 'matches_in_progress' phase + a `slots` object reflecting
+        // where the tournament actually was (e.g. mid Match 1 playing, Match
+        // 2 not started yet -> {1:'playing', 2:'setup'}).
+        const OLD_MATCH_PHASE_SLOTS = {
+            'match_1_setup':   { 1: 'setup',   2: 'setup' },
+            'match_1_lobby':   { 1: 'lobby',   2: 'setup' },
+            'match_1_playing': { 1: 'playing', 2: 'setup' },
+            'match_2_setup':   { 1: 'done',    2: 'setup' },
+            'match_2_lobby':   { 1: 'done',    2: 'lobby' },
+            'match_2_playing': { 1: 'done',    2: 'playing' }
+        };
+
+        const resolvedName = MIGRATION_MAP[oldName] || oldName;
+
+        if (OLD_MATCH_PHASE_SLOTS[resolvedName]) {
+            console.warn(`[PhaseManager] Migrating phase "${oldName}" → "matches_in_progress" (slots)`);
+            gs.currentPhase.name = 'matches_in_progress';
+            gs.currentPhase.slots = OLD_MATCH_PHASE_SLOTS[resolvedName];
+            return true;
         }
+
+        if (MIGRATION_MAP[oldName]) {
+            console.warn(`[PhaseManager] Migrating phase "${oldName}" → "${resolvedName}"`);
+            gs.currentPhase.name = resolvedName;
+            return true;
+        }
+
         return false;
     }
 
@@ -208,16 +249,23 @@ class PhaseManager {
 
     // ── Phase identity helpers ───────────────────────────────────
 
-    /** Is the current phase a lobby phase? */
+    /**
+     * Is the current phase a lobby phase? With independent match slots,
+     * "lobby" isn't a single whole-tournament phase anymore — true if
+     * EITHER slot is currently in its own lobby sub-phase.
+     */
     isLobbyPhase(phase) {
         const p = phase || this.getCurrentPhase();
-        return p === 'match_1_lobby' || p === 'match_2_lobby';
+        if (p !== 'matches_in_progress') return false;
+        return this.getSlotSubPhase(1) === 'lobby' || this.getSlotSubPhase(2) === 'lobby';
     }
 
     /** Is the current phase a playing/match-in-progress phase? */
     isPlayingPhase(phase) {
         const p = phase || this.getCurrentPhase();
-        return p === 'match_1_playing' || p === 'match_2_playing' || p === 'challenge_game';
+        if (p === 'challenge_game') return true;
+        if (p !== 'matches_in_progress') return false;
+        return this.getSlotSubPhase(1) === 'playing' || this.getSlotSubPhase(2) === 'playing';
     }
 
     /** Is the current phase a spell window? */
@@ -229,16 +277,42 @@ class PhaseManager {
     /** Is the current phase a match setup phase? */
     isMatchSetup(phase) {
         const p = phase || this.getCurrentPhase();
-        return p === 'match_1_setup' || p === 'match_2_setup' || p === 'challenges';
+        if (p === 'challenges') return true;
+        if (p !== 'matches_in_progress') return false;
+        return this.getSlotSubPhase(1) === 'setup' || this.getSlotSubPhase(2) === 'setup';
     }
 
-    /** Get current match slot (1 or 2), or 0 if not in a match phase */
-    getCurrentMatchSlot() {
-        const p = this.getCurrentPhase();
-        if (p && p.startsWith('match_1')) return 1;
-        if (p && p.startsWith('match_2')) return 2;
-        if (p === 'challenge_game') return 0; // challenge, not a numbered slot
-        return 0;
+    // ── Slot (Match 1 / Match 2) state ───────────────────────────
+    //
+    // Match 1 and Match 2 progress independently while currentPhase.name
+    // is 'matches_in_progress': gameState.currentPhase.slots = { 1: sub,
+    // 2: sub }, each sub one of SLOT_SUB_PHASES. round_advance only
+    // becomes reachable once both slots reach 'done' (see
+    // _calculateRequirements('matches_in_progress') below).
+
+    /** Sub-phase for one slot (1 or 2): 'setup' | 'lobby' | 'playing' | 'done' */
+    getSlotSubPhase(slot) {
+        return this._gameState.currentPhase?.slots?.[slot] || 'setup';
+    }
+
+    /** {name, icon} for a slot's current sub-phase, e.g. "Match 1 — Lobby" */
+    getSlotDisplayInfo(slot) {
+        const sub = this.getSlotSubPhase(slot);
+        const info = SLOT_SUB_PHASE_DISPLAY[sub] || SLOT_SUB_PHASE_DISPLAY.setup;
+        return { name: `Match ${slot} — ${info.name}`, icon: info.icon, subPhase: sub };
+    }
+
+    isSlotLobby(slot) {
+        return this.getCurrentPhase() === 'matches_in_progress' && this.getSlotSubPhase(slot) === 'lobby';
+    }
+
+    isSlotPlaying(slot) {
+        return this.getCurrentPhase() === 'matches_in_progress' && this.getSlotSubPhase(slot) === 'playing';
+    }
+
+    /** Are both match slots done? (the gate for leaving matches_in_progress) */
+    bothSlotsDone() {
+        return this.getSlotSubPhase(1) === 'done' && this.getSlotSubPhase(2) === 'done';
     }
 
     /**
@@ -298,9 +372,9 @@ class PhaseManager {
             return false;
         }
 
-        // Break interval check: when advancing to match_1_lobby, auto-insert break if due
-        if (nextPhase === 'match_1_lobby' && this._isBreakDue()) {
-            await this._autoInsertBreak('match_1_lobby');
+        // Break interval check: when advancing into the matches segment, auto-insert break if due
+        if (nextPhase === 'matches_in_progress' && this._isBreakDue()) {
+            await this._autoInsertBreak('matches_in_progress');
             return true;
         }
 
@@ -354,14 +428,10 @@ class PhaseManager {
 
         // ── Phase enter hooks ──
 
-        // Reset lobby readiness when entering a lobby phase
-        if (this.isLobbyPhase(nextPhase)) {
-            const prevLobbyReady = { ...(gs.lobbyReady || {}) };
-            this._resetLobbyReady();
-            this._logAction('lobby_reset', 'phase', {
-                roundNumber: newRound,
-                matchSlot: nextPhase === 'match_1_lobby' ? 1 : 2
-            }, { lobbyReady: prevLobbyReady });
+        // Match 1 and Match 2 start out independently in their own 'setup'
+        // sub-phase; each progresses on its own via advanceSlot() from here on.
+        if (nextPhase === 'matches_in_progress') {
+            gs.currentPhase.slots = { 1: 'setup', 2: 'setup' };
         }
 
         // Scoring ceremony when entering scoring_vp (skip round 1 — nothing to celebrate)
@@ -562,6 +632,10 @@ class PhaseManager {
             roundNumber: gs.currentPhase?.roundNumber || 0,
             startedAt: new Date().toISOString(),
             returnToPhase: current,
+            // Preserve each slot's progress across the break — a break taken
+            // mid-match (e.g. Match 1 playing, Match 2 still in lobby) must
+            // resume exactly where it was, not reset both slots to setup.
+            returnSlots: current === 'matches_in_progress' ? { ...previousPhase.slots } : undefined,
             challengeGamesPlayed: gs.currentPhase?.challengeGamesPlayed || 0
         };
 
@@ -584,6 +658,7 @@ class PhaseManager {
         if (gs.currentPhase?.name !== 'break') return;
 
         const returnTo = gs.currentPhase.returnToPhase || 'scoring_vp';
+        const returnSlots = gs.currentPhase.returnSlots;
         const challengeGamesPlayed = gs.currentPhase.challengeGamesPlayed || 0;
         const previousPhase = { ...gs.currentPhase };
 
@@ -599,6 +674,9 @@ class PhaseManager {
             startedAt: new Date().toISOString(),
             challengeGamesPlayed: challengeGamesPlayed
         };
+        if (returnTo === 'matches_in_progress' && returnSlots) {
+            gs.currentPhase.slots = returnSlots;
+        }
 
         await this._save();
         this._logAction('break_ended', 'phase', {
@@ -774,10 +852,169 @@ class PhaseManager {
                 this._autoAdvancePending = false;
             }, 100);
         }
+
+        // Match slots auto-advance independently: each slot's own lobby ->
+        // playing fires as soon as THAT slot's players are ready, regardless
+        // of where the other slot currently is.
+        if (phase === 'matches_in_progress') {
+            [1, 2].forEach(slot => {
+                if (this.getSlotSubPhase(slot) !== 'lobby') return;
+                const guardKey = slot === 1 ? '_autoAdvanceSlot1Pending' : '_autoAdvanceSlot2Pending';
+                if (this[guardKey]) return;
+                if (!this.getSlotRequirements(slot).every(r => r.met)) return;
+                this[guardKey] = true;
+                setTimeout(async () => {
+                    if (this.getSlotSubPhase(slot) === 'lobby') {
+                        await this.advanceSlot(slot);
+                    }
+                    this[guardKey] = false;
+                }, 100);
+            });
+        }
     }
 
     getPhaseRequirements() {
         return this._cachedReqs;
+    }
+
+    /**
+     * Requirements for one match slot's current sub-phase (setup/lobby/
+     * playing/done). Mirrors the old per-phase match_N_setup/lobby/playing
+     * logic, generalized by slot and filtered to that slot's own queue
+     * entries (entry.slot === slot). Untagged entries (created before slot
+     * tagging existed, or genuinely ambiguous) always count for either slot —
+     * safer than silently hiding a real match.
+     */
+    getSlotRequirements(slot) {
+        const gs = this._gameState;
+        const queue = gs.gameQueue || [];
+        const sub = this.getSlotSubPhase(slot);
+
+        const belongsToSlot = m => !m.isBreak && m.isChallenge !== true &&
+            (m.slot === undefined || m.slot === slot);
+        const pendingMatches = () => queue.filter(m => belongsToSlot(m) &&
+            (m.status === 'pending' || m.status === undefined || m.status === 'queued'));
+        const ongoingMatches = () => queue.filter(m => belongsToSlot(m) && m.status === 'ongoing');
+
+        switch (sub) {
+            case 'setup': {
+                const pending = pendingMatches();
+                return [{
+                    label: pending.length > 0
+                        ? `${pending.length} match${pending.length !== 1 ? 'es' : ''} queued`
+                        : `Create a match for Match ${slot}`,
+                    met: pending.length > 0
+                }];
+            }
+
+            case 'lobby': {
+                const lobbyReady = gs.lobbyReady || {};
+                const mustReady = this._getPlayersWhoMustReadyForSlot(slot);
+
+                if (mustReady.length === 0) {
+                    return [{ label: 'No players need to ready up', met: true }];
+                }
+
+                const lobbyCount = mustReady.filter(uid => {
+                    const r = lobbyReady[uid];
+                    return r?.gameLobby === true || r?.ready === true;
+                }).length;
+                const discordCount = mustReady.filter(uid => {
+                    const r = lobbyReady[uid];
+                    return r?.discord === true || r?.ready === true;
+                }).length;
+
+                return [
+                    { label: `Game lobby: ${lobbyCount}/${mustReady.length}`, met: lobbyCount === mustReady.length },
+                    { label: `Discord: ${discordCount}/${mustReady.length}`, met: discordCount === mustReady.length }
+                ];
+            }
+
+            case 'playing': {
+                const ongoing = ongoingMatches();
+                const pending = pendingMatches();
+                const hasStarted = queue.some(m => belongsToSlot(m) &&
+                    (m.status === 'ongoing' || m.status === 'completed'));
+
+                if (!hasStarted) {
+                    return [{ label: 'Start the match first', met: false }];
+                }
+                const reqs = [];
+                if (ongoing.length > 0) {
+                    reqs.push({ label: `${ongoing.length} match${ongoing.length !== 1 ? 'es' : ''} still playing`, met: false });
+                }
+                if (pending.length > 0) {
+                    reqs.push({ label: `${pending.length} match${pending.length !== 1 ? 'es' : ''} not started`, met: false });
+                }
+                if (reqs.length === 0) {
+                    reqs.push({ label: 'Match result confirmed', met: true });
+                }
+                return reqs;
+            }
+
+            case 'done':
+            default:
+                return [{ label: `Match ${slot} complete`, met: true }];
+        }
+    }
+
+    /**
+     * Advance one match slot to its next sub-phase (setup -> lobby ->
+     * playing -> done), independently of the other slot.
+     * @param {number} slot  1 or 2
+     * @param {boolean} force  Skip requirements check
+     */
+    async advanceSlot(slot, force = false) {
+        const gs = this._gameState;
+        if (this.getCurrentPhase() !== 'matches_in_progress') {
+            this._ui.showStatus('Not currently in the matches segment.', 'warning');
+            return false;
+        }
+        const current = this.getSlotSubPhase(slot);
+        if (current === 'done') {
+            this._ui.showStatus(`Match ${slot} is already done.`, 'warning');
+            return false;
+        }
+        if (!force) {
+            const reqs = this.getSlotRequirements(slot);
+            if (!reqs.every(r => r.met)) {
+                this._ui.showStatus(`Match ${slot} requirements not met. Use force to override.`, 'warning');
+                return false;
+            }
+        }
+        const idx = SLOT_SUB_PHASES.indexOf(current);
+        const next = SLOT_SUB_PHASES[idx + 1];
+        if (!next) return false;
+
+        const prevSlots = { ...(gs.currentPhase.slots || {}) };
+        gs.currentPhase.slots = { ...(gs.currentPhase.slots || {}), [slot]: next };
+
+        // Reset lobby readiness scoped to THIS slot's players only — the
+        // other slot may already be mid-lobby or mid-play and must not be
+        // disturbed by this slot entering its own lobby.
+        if (next === 'lobby') {
+            const prevLobbyReady = { ...(gs.lobbyReady || {}) };
+            this._resetLobbyReadyForSlot(slot);
+            this._logAction('lobby_reset', 'phase', {
+                roundNumber: gs.currentPhase.roundNumber,
+                matchSlot: slot
+            }, { lobbyReady: prevLobbyReady });
+        }
+
+        await this._save();
+        this._logAction('slot_advanced', 'phase', {
+            slot, fromSubPhase: current, toSubPhase: next,
+            roundNumber: gs.currentPhase.roundNumber, forced: !!force
+        }, { currentPhase: { ...gs.currentPhase, slots: prevSlots } });
+
+        this._ui.showStatus(
+            `Match ${slot}: ${SLOT_SUB_PHASE_DISPLAY[next]?.name || next}`,
+            force ? 'warning' : 'success'
+        );
+
+        this.recheckRequirements();
+        this.renderPhaseIndicator();
+        return true;
     }
 
     /**
@@ -890,77 +1127,19 @@ class PhaseManager {
             case 'board_resolved':
                 return []; // Admin verifies board correctness, clicks Next
 
-            // ── Match setup — create matches ──
-            case 'match_1_setup':
-            case 'match_2_setup': {
-                const slot = phaseName === 'match_1_setup' ? 1 : 2;
-                const pendingMatches = queue.filter(m => !m.isBreak && m.status === 'pending');
-                return [{
-                    label: pendingMatches.length > 0
-                        ? `${pendingMatches.length} match${pendingMatches.length !== 1 ? 'es' : ''} queued (Slot ${slot})`
-                        : `Create matches for Slot ${slot}`,
-                    met: pendingMatches.length > 0
-                }];
-            }
-
-            // ── Lobby phases — two-status readiness ──
-            case 'match_1_lobby':
-            case 'match_2_lobby': {
-                const lobbyReady = gs.lobbyReady || {};
-                const mustReady = this._getPlayersWhoMustReady();
-
-                if (mustReady.length === 0) {
-                    return [{ label: 'No players need to ready up', met: true }];
-                }
-
-                const lobbyCount = mustReady.filter(uid => {
-                    const r = lobbyReady[uid];
-                    return r?.gameLobby === true || r?.ready === true;
-                }).length;
-                const discordCount = mustReady.filter(uid => {
-                    const r = lobbyReady[uid];
-                    return r?.discord === true || r?.ready === true;
-                }).length;
-
-                return [
-                    {
-                        label: `Game lobby: ${lobbyCount}/${mustReady.length}`,
-                        met: lobbyCount === mustReady.length
-                    },
-                    {
-                        label: `Discord: ${discordCount}/${mustReady.length}`,
-                        met: discordCount === mustReady.length
-                    }
-                ];
-            }
-
-            // ── Playing phases — all matches completed ──
-            case 'match_1_playing':
-            case 'match_2_playing': {
-                const ongoingMatches = queue.filter(m => !m.isBreak && m.status === 'ongoing');
-                const pendingNonBreak = queue.filter(m => !m.isBreak && m.status === 'pending');
-                const hasStarted = queue.some(m => !m.isBreak && (m.status === 'ongoing' || m.status === 'completed'));
-
-                if (!hasStarted) {
-                    return [{ label: 'Start matches first', met: false }];
-                }
-                const reqs = [];
-                if (ongoingMatches.length > 0) {
-                    reqs.push({
-                        label: `${ongoingMatches.length} match${ongoingMatches.length !== 1 ? 'es' : ''} still playing`,
-                        met: false
-                    });
-                }
-                if (pendingNonBreak.length > 0) {
-                    reqs.push({
-                        label: `${pendingNonBreak.length} match${pendingNonBreak.length !== 1 ? 'es' : ''} not started`,
-                        met: false
-                    });
-                }
-                if (reqs.length === 0) {
-                    reqs.push({ label: 'All match results confirmed', met: true });
-                }
-                return reqs;
+            // ── Matches In Progress — Match 1 and Match 2 progress
+            // independently (see getSlotRequirements/getSlotSubPhase). The
+            // outer gate (for the Next Phase button, round_advance) is simply
+            // "both slots done" — the per-slot detail used by the dual-panel
+            // UI comes from getSlotRequirements(slot), not this list.
+            case 'matches_in_progress': {
+                return [1, 2].map(slot => {
+                    const sub = this.getSlotSubPhase(slot);
+                    return {
+                        label: `Match ${slot}: ${SLOT_SUB_PHASE_DISPLAY[sub]?.name || sub}`,
+                        met: sub === 'done'
+                    };
+                });
             }
 
             // ── Break — admin ends manually ──
@@ -1011,19 +1190,20 @@ class PhaseManager {
     // ── Lobby Ready ─────────────────────────────────────────────
 
     /**
-     * Get UIDs of all players who must confirm ready in lobby phase.
-     * Only players on teams that have pending/ongoing matches this round.
+     * Players who must ready up for one slot's match(es), by uid. Mirrors
+     * _getPlayersWhoMustReady(), narrowed to matches tagged for this slot
+     * (untagged matches count for either slot).
      * @returns {string[]}
      */
-    _getPlayersWhoMustReady() {
+    _getPlayersWhoMustReadyForSlot(slot) {
         const gs = this._gameState;
         const queue = gs.gameQueue || [];
         const teams = gs.teams || [];
 
-        // Collect team IDs that have pending/ongoing matches
         const activeTeamIds = new Set();
         queue.forEach(match => {
-            if (match.isBreak || match.status === 'completed') return;
+            if (match.isBreak || match.status === 'completed' || match.isChallenge) return;
+            if (match.slot !== undefined && match.slot !== slot) return;
             (match.sides || []).forEach(side => {
                 (side.players || []).forEach(player => {
                     if (player.teamId !== undefined) {
@@ -1033,7 +1213,6 @@ class PhaseManager {
             });
         });
 
-        // Collect player UIDs from those teams
         const playerUids = [];
         teams.forEach(team => {
             if (!activeTeamIds.has(String(team.id))) return;
@@ -1047,21 +1226,25 @@ class PhaseManager {
         return playerUids;
     }
 
-    _resetLobbyReady() {
-        this._gameState.lobbyReady = {};
+    /** Clear lobbyReady entries for exactly this slot's players (leaves the other slot's entries untouched) */
+    _resetLobbyReadyForSlot(slot) {
+        const gs = this._gameState;
+        if (!gs.lobbyReady) return;
+        this._getPlayersWhoMustReadyForSlot(slot).forEach(uid => {
+            delete gs.lobbyReady[uid];
+        });
     }
 
     /**
-     * Force all required players to ready status (admin override).
+     * Force all of one slot's required players to ready status (admin override).
      */
-    forceAllReady() {
-        const phase = this.getCurrentPhase();
-        if (!this.isLobbyPhase(phase)) return;
+    forceAllReadyForSlot(slot) {
+        if (!this.isSlotLobby(slot)) return;
 
         const gs = this._gameState;
         if (!gs.lobbyReady) gs.lobbyReady = {};
 
-        const mustReady = this._getPlayersWhoMustReady();
+        const mustReady = this._getPlayersWhoMustReadyForSlot(slot);
         const teams = gs.teams || [];
         const prevLobbyState = { ...(gs.lobbyReady || {}) };
 
@@ -1092,7 +1275,7 @@ class PhaseManager {
         this._logAction('force_all_ready', 'admin', {
             playerCount: mustReady.length,
             roundNumber: gs.currentPhase?.roundNumber,
-            matchSlot: phase === 'match_1_lobby' ? 1 : 2
+            matchSlot: slot
         }, { lobbyReady: prevLobbyState });
     }
 
@@ -1196,18 +1379,27 @@ class PhaseManager {
             breakBtn.style.display = (phase === 'break' || phase === 'tournament_end' || phase === 'pre_game_setup') ? 'none' : '';
         }
 
-        // Lobby ready admin controls (for both lobby phases)
+        // Lobby ready admin controls — one "Force All Ready" per slot
+        // currently in its own lobby sub-phase (both can be shown at once).
         const lobbyControls = document.getElementById('lobbyAdminControls');
         if (lobbyControls) {
             if (this.isLobbyPhase(phase)) {
                 lobbyControls.style.display = '';
-                lobbyControls.innerHTML =
-                    `<button class="btn-small secondary" onclick="forceAllReady()" title="Mark all players as ready">Force All Ready</button>`;
+                lobbyControls.innerHTML = [1, 2]
+                    .filter(slot => this.isSlotLobby(slot))
+                    .map(slot =>
+                        `<button class="btn-small secondary" onclick="forceAllReady(${slot})" title="Mark all Match ${slot} players as ready">Force Ready (M${slot})</button>`)
+                    .join('');
             } else {
                 lobbyControls.style.display = 'none';
                 lobbyControls.innerHTML = '';
             }
         }
+
+        // Match slot panels — Match 1 / Match 2 progress independently.
+        // Rendered dynamically inside the existing bar since neither slot
+        // corresponds to a single whole-tournament phase anymore.
+        this._renderSlotPanels(phase);
 
         // Spell window controls
         const spellControls = document.getElementById('spellWindowControls');
@@ -1248,6 +1440,54 @@ class PhaseManager {
                 breakBadge.style.display = 'none';
             }
         }
+    }
+
+    /**
+     * Render the Match 1 / Match 2 slot panels inside the phase bar. Each
+     * slot shows its own sub-phase, requirements, and an advance button —
+     * independent of the other slot and of the outer phase's Next Phase
+     * button (which only gates leaving 'matches_in_progress' once both
+     * slots are done).
+     */
+    _renderSlotPanels(phase) {
+        const bar = document.getElementById('phaseIndicatorBar');
+        if (!bar) return;
+
+        let container = document.getElementById('matchSlotPanels');
+        if (phase !== 'matches_in_progress') {
+            if (container) container.style.display = 'none';
+            return;
+        }
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'matchSlotPanels';
+            container.className = 'match-slot-panels';
+            bar.appendChild(container);
+        }
+        container.style.display = '';
+
+        container.innerHTML = [1, 2].map(slot => {
+            const info = this.getSlotDisplayInfo(slot);
+            const reqs = this.getSlotRequirements(slot);
+            const allMet = reqs.every(r => r.met);
+            const isDone = info.subPhase === 'done';
+
+            const reqsHtml = reqs.map(r =>
+                `<span class="phase-req-item ${r.met ? 'met' : 'unmet'}">` +
+                `<span class="phase-req-check">${r.met ? '✓' : '✗'}</span> ${this._escHtml(r.label)}</span>`
+            ).join('');
+
+            return `
+                <div class="match-slot-panel${isDone ? ' slot-done' : ''}">
+                    <div class="match-slot-header">
+                        <span class="match-slot-icon">${info.icon}</span>
+                        <span class="match-slot-name">${this._escHtml(info.name)}</span>
+                    </div>
+                    <div class="match-slot-reqs">${reqsHtml}</div>
+                    ${isDone ? '' : `<button class="btn-small primary" ${allMet ? '' : 'disabled'} onclick="advanceSlot(${slot})">Advance Match ${slot} ▶</button>`}
+                    <button class="btn-small secondary" onclick="forceAdvanceSlot(${slot})" title="Force advance (skip requirements)" ${isDone ? 'style="display:none"' : ''}>⚠ Force</button>
+                </div>`;
+        }).join('');
     }
 
     // ── Force Advance Modal ──────────────────────────────────────

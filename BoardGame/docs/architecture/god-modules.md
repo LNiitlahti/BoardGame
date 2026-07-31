@@ -367,20 +367,29 @@ The `actionLogSequence` counter lives on the tournament document and is incremen
 
 ## Phase Flow (Current)
 
-The tournament phase state machine uses 21 phases with loops and optional spell windows.
+The tournament phase state machine uses 16 phases with loops and optional spell windows.
 
 ### Round Flow
 ```
 scoring_vp → scoring_hex → hex_placement_1 → spell_window_1 → hex_placement_2
 → challenges → spell_window_2 → challenge_game → spell_window_3
   (loop → challenge_game, max 7×) → board_resolved → spell_window_4
-  (loop → challenges) → match_1_setup → match_1_lobby → match_1_playing
-→ match_2_setup → match_2_lobby → match_2_playing → round_advance → (loop)
+  (loop → challenges) → matches_in_progress → round_advance → (loop)
 ```
+
+### Match Slots (Match 1 / Match 2 run concurrently)
+- `matches_in_progress` replaced the old six linear phases (`match_1_setup → match_1_lobby → match_1_playing → match_2_setup → match_2_lobby → match_2_playing`). Match 1 and Match 2 don't share players, so there's no reason to force one to fully finish before the other can even start — they now progress independently.
+- State: `gameState.currentPhase.slots = { 1: subPhase, 2: subPhase }`, each `subPhase` one of `SLOT_SUB_PHASES = ['setup', 'lobby', 'playing', 'done']`. Initialized to `{1:'setup', 2:'setup'}` on entering `matches_in_progress`.
+- `PhaseManager.advanceSlot(slot, force)` moves ONE slot forward; `getSlotSubPhase(slot)`, `getSlotDisplayInfo(slot)`, `getSlotRequirements(slot)` read/gate that slot only. `getSlotRequirements` filters `gameQueue` by `entry.slot === slot` (untagged entries count for either slot).
+- The outer phase's requirements (`_calculateRequirements('matches_in_progress')`) are simply "both slots done" — `round_advance` only becomes reachable once `bothSlotsDone()` is true, regardless of which slot finished first.
+- Queue entries need an explicit `slot` tag since there's no longer a single "current phase" to infer it from — `admin-improved-adapter.js` tracks an admin-selected `_targetSlot` (see "Set Target" button on each match slot card) instead of inferring it from `_computeCurrentSlot()`.
+- Break mid-round preserves both slots' progress: `insertBreak()`/`_autoInsertBreak()` stash `currentPhase.slots` as `returnSlots`; `endBreak()` restores it exactly.
+- UI: `phase-manager.js`'s `renderPhaseIndicator()` (god.html) and `admin-improved-adapter.js`'s `_renderMatchSlotCards()` (admin.html) each render two side-by-side cards, one per slot, with their own guidance/action button — instead of one bar showing whichever slot the old linear phase pointed at.
 
 ### Auto-Advance
 - `AUTO_ADVANCE_PHASES = ['round_advance']` — immediate auto-advance (loops to scoring_vp)
-- `AUTO_ADVANCE_WHEN_MET = ['match_1_lobby', 'match_2_lobby']` — auto-advance when all players ready
+- `AUTO_ADVANCE_WHEN_MET = []` — no longer used for lobby readiness (see below); kept as an empty extension point.
+- Per-slot lobby auto-advance now lives in `PhaseManager.recheckRequirements()`: each slot independently auto-advances its own `lobby → playing` once `getSlotRequirements(slot)` is met, guarded by `_autoAdvanceSlot1Pending`/`_autoAdvanceSlot2Pending` (mirrors the old single `_autoAdvancePending` guard, just one per slot).
 
 ### Points System
 - **Victory points (VP)**: Awarded instantly in `ResultManager.confirmResult()` when a non-challenge match result is confirmed (+1 VP per win for teams with full credit). `confirmCorrectResult()` reverses/re-awards VP on correction.
@@ -389,14 +398,13 @@ scoring_vp → scoring_hex → hex_placement_1 → spell_window_1 → hex_placem
 - **scoring_hex phase**: Admin reviews hex state; hex territory points awarded on exit (round 2+).
 - **Contested hex freeze**: `awardRoundPoints()` skips heart hexes with `challengeHexCoord` matching a pending/ongoing challenge match.
 
-### Lobby Readiness (match_1_lobby, match_2_lobby)
+### Lobby Readiness (per match slot)
 - **Two-status readiness**: `gameState.lobbyReady = { [playerUid]: { gameLobby, discord, gameLobbyAt, discordAt, teamId, name } }`. Both must be `true` per player. Legacy `ready: true` treated as both met.
 - **Discord channel auto-assignment**: `assignDiscordAndLobby(entries)` in admin.js assigns channels #1-#5 to match sides and designates lobby creators. Stored on match doc as `discordChannels` + `lobbyCreators`.
-- **Phase requirements**: Two separate pills — "Game lobby: X/Y" and "Discord: X/Y". Both must be fully met for auto-advance.
-- **Reset on entry**: `lobbyReady` is cleared to `{}` when entering `match_1_lobby` or `match_2_lobby`.
-- **Team.html two-button UI**: Players see per-match Discord channel assignment, lobby creator role, and two buttons. Each writes independently via `tournamentRef.update({ ['lobbyReady.<uid>.<status>']: true })`.
-- **Admin override**: `forceAllReady()` marks all required players as ready (both statuses).
-- **startMatch() phase advance**: admin-phase-adapter overrides `startMatch()` — when phase is a setup/lobby phase, auto-advances (force=true) through to the corresponding playing phase.
+- **Phase requirements**: Two separate pills — "Game lobby: X/Y" and "Discord: X/Y" — computed per slot by `getSlotRequirements(slot)`, counting only that slot's players (`_getPlayersWhoMustReadyForSlot(slot)`). Both must be fully met for that slot's auto-advance.
+- **Reset on entry**: `_resetLobbyReadyForSlot(slot)` clears only that slot's players' entries when it enters `lobby` — the other slot's entries are untouched, since it may already be mid-lobby or mid-play.
+- **Team.html two-button UI**: Players see per-match Discord channel assignment, lobby creator role, and two buttons. Each writes independently via `tournamentRef.update({ ['lobbyReady.<uid>.<status>']: true })`. `team-controls.js` determines which slot's lobby state to show via `_getMyActiveSlot()` (finds the queue entry tagged with our team that isn't completed yet).
+- **Admin override**: `forceAllReadyForSlot(slot)` marks that slot's required players as ready (both statuses); wired as `window.forceAllReady(slot)`.
 
 ### Spell Windows (spell_window_1 through spell_window_4)
 - Optional phases — admin can begin spell casting (`beginSpells()`) or skip by advancing.
@@ -412,14 +420,16 @@ scoring_vp → scoring_hex → hex_placement_1 → spell_window_1 → hex_placem
 - **Firestore field**: `gameState.breakSettings = { intervalRounds: 2, roundsSinceLastBreak: 0, lastBreakAt: null }`
 - `roundsSinceLastBreak` incremented on `round_advance` exit.
 - `_isBreakDue()` checks `roundsSinceLastBreak >= intervalRounds`.
-- When advancing TO `match_1_lobby`, if break is due: `_autoInsertBreak('match_1_lobby')` inserts break with `returnToPhase` and `autoInserted: true` flag.
+- When advancing TO `matches_in_progress`, if break is due: `_autoInsertBreak('matches_in_progress')` inserts break with `returnToPhase` and `autoInserted: true` flag. A manual break taken mid-round (either slot already progressing) additionally stashes `currentPhase.slots` as `returnSlots` so `endBreak()` resumes both slots exactly where they were.
 - Counter resets to 0 in `endBreak()`.
 - Break settings modal in god.html: configure interval, reset counter, skip next break.
 - Break interval badge in phase indicator: shows `⏸ 1/2` counter.
 - Action types: `break_auto_inserted`, `break_settings_changed`, `break_skipped`.
 
 ### Legacy Phase Migration
-- `migratePhaseIfNeeded()` converts old phase names on load: `round_start → scoring_vp`, `challenge_selection → challenges`, `pre_game_instructions → match_1_setup`, `lobby_ready → match_1_lobby`, `matches_in_progress → match_1_playing`, `scoring_and_placement → scoring_vp`, `spell_phase → spell_window_1`, `round_end → round_advance`.
+- `migratePhaseIfNeeded()` converts old phase names on load: `round_start → scoring_vp`, `challenge_selection → challenges`, `pre_game_instructions → match_1_setup`, `lobby_ready → match_1_lobby`, `scoring_and_placement → scoring_vp`, `spell_phase → spell_window_1`, `round_end → round_advance`.
+- The six old per-slot linear names (`match_1_setup`, `match_1_lobby`, `match_1_playing`, `match_2_setup`, `match_2_lobby`, `match_2_playing`) collapse onto `matches_in_progress` + a `slots` object reflecting where the tournament actually was (e.g. `match_1_playing` → `{1:'playing', 2:'setup'}`).
+- An ancient, pre-slot-tracking `matches_in_progress` phase name (from before the six-phase split even existed) happens to collide with the current name — told apart only by the absence of a `slots` object, in which case `slots` is backfilled as `{1:'playing', 2:'setup'}`.
 
 ### Broadcast Message
 - Admin can send text from god.html/admin.html shown as cyan banner on view.html. Stored as `gameState.broadcastMessage = { text, sentAt, sentBy }`.

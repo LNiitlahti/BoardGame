@@ -625,6 +625,9 @@ class ReplayEngine {
             case 'lobby_reset':
                 state.lobbyReady = {};
                 break;
+            case 'slot_advanced':
+                this._applySlotAdvanced(state, p);
+                break;
 
             // Team / Admin
             case 'team_renamed':
@@ -903,9 +906,15 @@ class ReplayEngine {
             if (state.status !== 'playing') state.status = 'playing';
         }
 
-        // Reset lobby on entry to lobby phases
+        // Reset lobby on entry to lobby phases (old per-slot linear phases, pre-dates slot tracking)
         if (p.toPhase === 'match_1_lobby' || p.toPhase === 'match_2_lobby') {
             state.lobbyReady = {};
+        }
+
+        // Match 1 / Match 2 start out independently in their own 'setup'
+        // sub-phase; subsequent slot_advanced actions move them forward.
+        if (p.toPhase === 'matches_in_progress') {
+            state.currentPhase.slots = { 1: 'setup', 2: 'setup' };
         }
 
         // Increment break counter on round_advance
@@ -913,6 +922,17 @@ class ReplayEngine {
             state.breakSettings.roundsSinceLastBreak =
                 (state.breakSettings.roundsSinceLastBreak || 0) + 1;
         }
+    }
+
+    /**
+     * Match 1 / Match 2 advance independently within 'matches_in_progress'
+     * (see phase-manager.js advanceSlot). Reconstructs which sub-phase
+     * (setup/lobby/playing/done) each slot was in at this point in history.
+     */
+    _applySlotAdvanced(state, p) {
+        if (!state.currentPhase) return;
+        if (!state.currentPhase.slots) state.currentPhase.slots = {};
+        state.currentPhase.slots[p.slot] = p.toSubPhase;
     }
 
     _applyBreakStarted(state, p, previousState) {

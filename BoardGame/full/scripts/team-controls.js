@@ -238,12 +238,7 @@ const PHASE_GUIDE = {
     spell_window_3:   { icon: '✨',       name: 'Spell Window',             desc: 'Teams may cast spells.' },
     board_resolved:   { icon: '\u{1F6E1}',    name: 'Board Resolved',           desc: 'The board is settled. Matches are up next.' },
     spell_window_4:   { icon: '✨',       name: 'Spell Window',             desc: 'Teams may cast spells.' },
-    match_1_setup:    { icon: '\u{1F3DF}',    name: 'Match 1 — Assignments', desc: 'Review your match assignments for this round.', action: true },
-    match_1_lobby:    { icon: '\u{1F3AE}',    name: 'Match 1 — Lobby Check', desc: 'Join Discord and the game lobby, then confirm both.', action: true },
-    match_1_playing:  { icon: '\u{1F3AE}',    name: 'Match 1 — Playing',   desc: 'Matches are live!' },
-    match_2_setup:    { icon: '\u{1F3DF}',    name: 'Match 2 — Assignments', desc: 'Review your match assignments for this round.', action: true },
-    match_2_lobby:    { icon: '\u{1F3AE}',    name: 'Match 2 — Lobby Check', desc: 'Join Discord and the game lobby, then confirm both.', action: true },
-    match_2_playing:  { icon: '\u{1F3AE}',    name: 'Match 2 — Playing',   desc: 'Matches are live!' },
+    matches_in_progress: { icon: '\u{1F3AE}', name: 'Matches',  desc: 'Match 1 and Match 2 are running — see below for your assignment.' },
     round_advance:    { icon: '⏭',       name: 'Round Advancing',          desc: 'Moving on to the next round...' },
     break:            { icon: '⏸',       name: 'Break',                    desc: 'Take a breather — the tournament resumes shortly.' },
     tournament_end:   { icon: '\u{1F3C6}',    name: 'Tournament Complete',      desc: 'Thanks for playing! Final results are on the board.' }
@@ -288,26 +283,38 @@ function renderPhaseBanner() {
         }
     }
 
-    // Lobby phases: action needed until both statuses are confirmed
-    if (phaseName === 'match_1_lobby' || phaseName === 'match_2_lobby') {
-        const r = (gameData.lobbyReady || {})[currentUser?.uid] || {};
-        const confirmed = (r.gameLobby === true || r.ready === true) && (r.discord === true || r.ready === true);
-        if (confirmed) {
-            desc = 'You are confirmed. Waiting for the remaining players...';
-            action = false;
-        }
-    }
+    // Match 1 / Match 2 progress independently now — describe whichever
+    // slot our own team's match actually belongs to, not a single global
+    // "the" match phase.
+    if (phaseName === 'matches_in_progress') {
+        const mySlot = _getMyActiveSlot();
+        const sub = mySlot ? (gameData.currentPhase?.slots?.[mySlot] || 'setup') : null;
 
-    // Playing phases: point at the player's own live match if there is one
-    if (phaseName === 'match_1_playing' || phaseName === 'match_2_playing') {
-        const queue = gameData.gameQueue || [];
-        const ourLive = queue.find(m => m.status === 'ongoing' && !m.isBreak && _matchInvolvesUs(m));
-        if (ourLive) {
-            const gameName = getGameDisplayName(ourLive.gameId || ourLive.gameType || ourLive.game);
-            desc = `Your match is live — play ${gameName}! Vote on the result when it ends.`;
+        if (sub === 'lobby') {
+            const r = (gameData.lobbyReady || {})[currentUser?.uid] || {};
+            const confirmed = (r.gameLobby === true || r.ready === true) && (r.discord === true || r.ready === true);
+            if (confirmed) {
+                desc = 'You are confirmed. Waiting for the remaining players...';
+                action = false;
+            } else {
+                desc = `Match ${mySlot} — join Discord and the game lobby, then confirm both.`;
+                action = true;
+            }
+        } else if (sub === 'playing') {
+            const queue = gameData.gameQueue || [];
+            const ourLive = queue.find(m => m.status === 'ongoing' && !m.isBreak && _matchInvolvesUs(m));
+            if (ourLive) {
+                const gameName = getGameDisplayName(ourLive.gameId || ourLive.gameType || ourLive.game);
+                desc = `Your match is live — play ${gameName}! Vote on the result when it ends.`;
+                action = true;
+            } else {
+                desc = 'Matches are live. Not playing? Watch and cheer!';
+            }
+        } else if (sub === 'setup') {
+            desc = `Match ${mySlot} — review your assignment for this round.`;
             action = true;
-        } else {
-            desc = 'Matches are live. Not playing? Watch and cheer!';
+        } else if (sub === 'done' || !mySlot) {
+            desc = 'Waiting on the other match to finish this round.';
         }
     }
 
@@ -335,7 +342,8 @@ function renderTeammates() {
         return;
     }
 
-    const isLobbyPhase = gameData?.currentPhase?.name === 'match_1_lobby' || gameData?.currentPhase?.name === 'match_2_lobby';
+    const myLobbySlot = gameData?.currentPhase?.name === 'matches_in_progress' ? _getMyActiveSlot() : null;
+    const isLobbyPhase = !!myLobbySlot && gameData?.currentPhase?.slots?.[myLobbySlot] === 'lobby';
     const lobbyReady = gameData?.lobbyReady || {};
 
     // Find match assignment info for this team (discord channel, side label, lobby creator)
@@ -1410,6 +1418,20 @@ function _matchInvolvesUs(match) {
 }
 
 /**
+ * Which match slot (1 or 2) our team's active match belongs to this round,
+ * or null if we have no active match right now. Match 1 and Match 2 run
+ * independently, so this — not the tournament-wide phase — decides what
+ * the player should see (lobby check, live match, etc).
+ */
+function _getMyActiveSlot() {
+    const queue = gameData?.gameQueue || [];
+    const mine = queue.filter(m => !m.isBreak && !m.isChallenge && m.status !== 'completed' && _matchInvolvesUs(m));
+    if (mine.length === 0) return null;
+    const ongoing = mine.find(m => m.status === 'ongoing');
+    return (ongoing || mine[0]).slot || 1;
+}
+
+/**
  * Check if voting is available for any of this player's ongoing matches.
  */
 function checkForVoting() {
@@ -1771,10 +1793,13 @@ function renderPhaseOverlays() {
     if (lobbyOverlay) lobbyOverlay.style.display = 'none';
     if (spellOverlay) spellOverlay.style.display = 'none';
 
-    if (currentPhase === 'match_1_setup' || currentPhase === 'match_2_setup') {
+    const myOverlaySlot = currentPhase === 'matches_in_progress' ? _getMyActiveSlot() : null;
+    const mySlotSub = myOverlaySlot ? gameData?.currentPhase?.slots?.[myOverlaySlot] : null;
+
+    if (mySlotSub === 'setup') {
         renderPreGameInstructions();
         if (preGameOverlay) preGameOverlay.style.display = 'flex';
-    } else if (currentPhase === 'match_1_lobby' || currentPhase === 'match_2_lobby') {
+    } else if (mySlotSub === 'lobby') {
         renderLobbyReady();
         if (lobbyOverlay) lobbyOverlay.style.display = 'flex';
     } else if (currentPhase && currentPhase.startsWith('spell_window')) {

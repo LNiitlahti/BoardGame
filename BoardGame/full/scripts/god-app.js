@@ -1158,13 +1158,15 @@ class GodApp {
                 app.phase?.endTournament();
             }
         };
-        window.forceAllReady = async () => {
-            app.phase?.forceAllReady();
+        window.forceAllReady = async (slot) => {
+            app.phase?.forceAllReadyForSlot(slot);
             await app.saveGameState();
             app.updateDisplay();
         };
         window.beginSpells = () => app.phase?.beginSpells();
         window.loopBack = () => app.phase?.loopBack();
+        window.advanceSlot = (slot) => app.phase?.advanceSlot(slot, false);
+        window.forceAdvanceSlot = (slot) => app.phase?.advanceSlot(slot, true);
 
         // BoardManager
         window.renderBoard = () => app.board?.renderBoard();

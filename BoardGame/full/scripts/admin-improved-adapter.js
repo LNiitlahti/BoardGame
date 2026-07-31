@@ -43,61 +43,53 @@
         'challenges',
         'challenge_game',
         'board_resolved',
-        'match_1_playing',
-        'match_2_playing'
+        'matches_in_progress'
     ];
 
     const PHASE_LABELS = {
-        pre_game_setup:   'Setup',
-        scoring_vp:       'VP Scoring',
-        scoring_hex:      'Hex Scoring',
-        hex_placement_1:  'Hex 1',
-        spell_window_1:   'Spells',
-        hex_placement_2:  'Hex 2',
-        challenges:       'Challenges',
-        spell_window_2:   'Spells',
-        challenge_game:   'Challenge Game',
-        spell_window_3:   'Spells',
-        board_resolved:   'Board Check',
-        spell_window_4:   'Spells',
-        match_1_setup:    'Match 1 Setup',
-        match_1_lobby:    'Lobby 1',
-        match_1_playing:  'Match 1',
-        match_2_setup:    'Match 2 Setup',
-        match_2_lobby:    'Lobby 2',
-        match_2_playing:  'Match 2',
-        round_advance:    'Round End',
-        break:            'Break',
-        tournament_end:   'Finished'
+        pre_game_setup:      'Setup',
+        scoring_vp:          'VP Scoring',
+        scoring_hex:         'Hex Scoring',
+        hex_placement_1:     'Hex 1',
+        spell_window_1:      'Spells',
+        hex_placement_2:     'Hex 2',
+        challenges:          'Challenges',
+        spell_window_2:      'Spells',
+        challenge_game:      'Challenge Game',
+        spell_window_3:      'Spells',
+        board_resolved:      'Board Check',
+        spell_window_4:      'Spells',
+        matches_in_progress: 'Matches',
+        round_advance:       'Round End',
+        break:               'Break',
+        tournament_end:      'Finished'
     };
 
     const PHASE_ICONS = {
-        pre_game_setup:   '⚙',
-        scoring_vp:       '\u{1F3C6}',
-        scoring_hex:      '⬢',
-        hex_placement_1:  '\u{1F5FA}',
-        spell_window_1:   '✨',
-        hex_placement_2:  '\u{1F5FA}',
-        challenges:       '⚔',
-        spell_window_2:   '✨',
-        challenge_game:   '\u{1F3AE}',
-        spell_window_3:   '✨',
-        board_resolved:   '\u{1F6E1}',
-        spell_window_4:   '✨',
-        match_1_setup:    '\u{1F3DF}',
-        match_1_lobby:    '\u{1F3AE}',
-        match_1_playing:  '\u{1F3AE}',
-        match_2_setup:    '\u{1F3DF}',
-        match_2_lobby:    '\u{1F3AE}',
-        match_2_playing:  '\u{1F3AE}',
-        round_advance:    '⏭',
-        break:            '⏸',
-        tournament_end:   '\u{1F3C6}'
+        pre_game_setup:      '⚙',
+        scoring_vp:          '\u{1F3C6}',
+        scoring_hex:         '⬢',
+        hex_placement_1:     '\u{1F5FA}',
+        spell_window_1:      '✨',
+        hex_placement_2:     '\u{1F5FA}',
+        challenges:          '⚔',
+        spell_window_2:      '✨',
+        challenge_game:      '\u{1F3AE}',
+        spell_window_3:      '✨',
+        board_resolved:      '\u{1F6E1}',
+        spell_window_4:      '✨',
+        matches_in_progress: '\u{1F3AE}',
+        round_advance:       '⏭',
+        break:               '⏸',
+        tournament_end:      '\u{1F3C6}'
     };
 
-    const SETUP_PHASES = ['challenges', 'match_1_setup', 'match_2_setup'];
-    const LOBBY_PHASES = ['match_1_lobby', 'match_2_lobby'];
-    const PLAYING_PHASES = ['challenge_game', 'match_1_playing', 'match_2_playing'];
+    const SETUP_PHASES = ['challenges'];
+    const LOBBY_PHASES = [];
+    const PLAYING_PHASES = ['challenge_game'];
+
+    /** Which Match slot new queue entries get tagged with (admin-selected — see _renderMatchSlotCards) */
+    let _targetSlot = 1;
 
     // ── Minimal UIManager shim (PhaseManager only uses showStatus) ──
 
@@ -197,50 +189,10 @@
                     return reqs;
                 }
 
-                // Only regular (non-challenge) matches count toward the slots
-                case 'match_1_setup':
-                case 'match_2_setup': {
-                    const slot = phaseName === 'match_1_setup' ? 1 : 2;
-                    const pendingSlot = _pendingSlotMatches(slot);
-                    return [{
-                        label: pendingSlot.length > 0
-                            ? `${pendingSlot.length} match${pendingSlot.length !== 1 ? 'es' : ''} queued (Slot ${slot})`
-                            : `Create matches for Slot ${slot}`,
-                        met: pendingSlot.length > 0
-                    }];
-                }
-
-                // Slot 1: started matches must finish, but queued matches don't
-                // block (they may belong to Slot 2). Slot 2 ends the round, so
-                // everything left must be played out.
-                case 'match_1_playing':
-                case 'match_2_playing': {
-                    const slot = phaseName === 'match_1_playing' ? 1 : 2;
-                    const ongoingSlot = _ongoingSlotMatches(slot);
-                    const pendingSlot = _pendingSlotMatches(slot);
-                    const hasStarted = queue.some(m => !m.isBreak && m.isChallenge !== true &&
-                        (m.status === 'ongoing' || m.status === 'completed'));
-
-                    if (!hasStarted) {
-                        return [{ label: 'Start matches first', met: false }];
-                    }
-                    const reqs = [];
-                    if (ongoingSlot.length > 0) {
-                        reqs.push({ label: `${ongoingSlot.length} match${ongoingSlot.length !== 1 ? 'es' : ''} still playing`, met: false });
-                    }
-                    if (phaseName === 'match_2_playing' && pendingSlot.length > 0) {
-                        reqs.push({ label: `${pendingSlot.length} match${pendingSlot.length !== 1 ? 'es' : ''} not started`, met: false });
-                    }
-                    if (reqs.length === 0) {
-                        reqs.push({
-                            label: 'All started matches confirmed' +
-                                (phaseName === 'match_1_playing' && pendingSlot.length > 0
-                                    ? ` — ${pendingSlot.length} queued for Slot 2` : ''),
-                            met: true
-                        });
-                    }
-                    return reqs;
-                }
+                // matches_in_progress: Match 1 / Match 2 requirements are now
+                // computed natively by PhaseManager.getSlotRequirements(), fed
+                // by the SAME entry.slot tagging this adapter applies below —
+                // no override needed here, falls through to origCalcReqs.
 
                 // Only THIS round's slot-specific hex win(s) gate each phase —
                 // previously both shared the same global pendingHexWins count,
@@ -340,7 +292,14 @@
     // {roundNumber, slot} at creation time, based on whatever phase the
     // admin was in when they created it.
 
-    /** slot: 1, 2, 'challenge', or null (created outside a recognizable phase) */
+    /**
+     * slot: 1, 2, 'challenge', or null (created outside a recognizable phase).
+     * Match 1 and Match 2 both live under the single 'matches_in_progress'
+     * phase and can be open at the same time, so — unlike every other
+     * phase — there's no phase name to infer the slot from. The admin picks
+     * the target slot explicitly (see _renderMatchSlotCards / _targetSlot);
+     * it defaults to whichever slot is still in 'setup', or Slot 1.
+     */
     function _computeCurrentSlot() {
         const phase = _phaseManager?.getCurrentPhase() || null;
         const roundNumber = gameState.currentPhase?.roundNumber || 0;
@@ -348,13 +307,18 @@
         if (phase === 'challenges' || phase === 'challenge_game' ||
             phase === 'spell_window_2' || phase === 'spell_window_3') {
             slot = 'challenge';
-        } else if (phase && phase.startsWith('match_1')) {
-            slot = 1;
-        } else if (phase && phase.startsWith('match_2')) {
-            slot = 2;
+        } else if (phase === 'matches_in_progress') {
+            slot = _targetSlot;
         }
         return { roundNumber, slot };
     }
+
+    /** Admin explicitly selects which Match slot the next created match(es) belong to. */
+    function _setTargetSlot(slot) {
+        _targetSlot = slot;
+        _renderFlowPanel();
+    }
+    window.setTargetMatchSlot = _setTargetSlot;
 
     /** Snapshot of queue entry ids, taken right before calling a creation function. */
     function _snapshotQueueIds() {
@@ -499,6 +463,114 @@
         _renderActionItems(phase);
         _renderControls(phase, step);
         _renderBroadcastBar();
+        _renderMatchSlotCards(phase);
+    }
+
+    // ── Match Slot Cards (Match 1 / Match 2 progress independently) ──
+
+    /**
+     * Compute the guided step for ONE match slot — same shape as
+     * _computeNextStep's per-phase result, generalized by slot and that
+     * slot's own sub-phase (setup/lobby/playing/done) instead of a global
+     * phase name.
+     */
+    function _computeSlotStep(slot) {
+        const sub = _phaseManager.getSlotSubPhase(slot);
+        const pendingSlot = _pendingSlotMatches(slot);
+        const ongoingSlot = _ongoingSlotMatches(slot);
+
+        if (sub === 'done') {
+            return { text: 'Complete.', primary: null };
+        }
+
+        if (sub === 'setup') {
+            if (pendingSlot.length === 0) {
+                return {
+                    text: `Create a match for Match ${slot} — drag players into sides, or auto-generate.`,
+                    primary: { label: '⚡ Auto-Generate', action: () => { _setTargetSlot(slot); window.generateSuggestedMatches(); } }
+                };
+            }
+            return {
+                text: `${pendingSlot.length} match${pendingSlot.length !== 1 ? 'es' : ''} queued.`,
+                primary: { label: 'Open Lobby ▶', action: () => window.advanceSlot(slot) }
+            };
+        }
+
+        if (sub === 'lobby') {
+            return {
+                text: 'Waiting for players to ready up (auto-advances when done).',
+                primary: { label: 'Force Ready', action: () => window.forceAllReady(slot) }
+            };
+        }
+
+        // playing
+        if (ongoingSlot.length > 0) {
+            return {
+                text: `${ongoingSlot.length} match${ongoingSlot.length !== 1 ? 'es' : ''} live — click its card to record the result.`,
+                primary: null
+            };
+        }
+        if (pendingSlot.length > 0) {
+            const next = pendingSlot[0];
+            const label = _matchShortLabel(next);
+            return {
+                text: `Next up: ${_esc(label)}.`,
+                primary: { label: `▶ Start ${label}`, action: () => window.startMatch(next.id) }
+            };
+        }
+        return {
+            text: 'All results confirmed.',
+            primary: { label: `Mark Match ${slot} Done ▶`, action: () => window.advanceSlot(slot) }
+        };
+    }
+
+    /** Holds the live closure for each slot's primary button (same pattern as _primaryAction/runFlowPrimaryAction) */
+    const _slotPrimaryActions = { 1: null, 2: null };
+    window.runSlotPrimaryAction = (slot) => {
+        const fn = _slotPrimaryActions[slot];
+        if (fn) fn();
+    };
+
+    function _renderMatchSlotCards(phase) {
+        let container = document.getElementById('matchSlotCards');
+        const panel = document.getElementById('flowPanel');
+        if (phase !== 'matches_in_progress') {
+            if (container) container.style.display = 'none';
+            _slotPrimaryActions[1] = null;
+            _slotPrimaryActions[2] = null;
+            return;
+        }
+        if (!container && panel) {
+            container = document.createElement('div');
+            container.id = 'matchSlotCards';
+            container.className = 'match-slot-panels';
+            panel.appendChild(container);
+        }
+        if (!container) return;
+        container.style.display = '';
+
+        container.innerHTML = [1, 2].map(slot => {
+            const sub = _phaseManager.getSlotSubPhase(slot);
+            const step = _computeSlotStep(slot);
+            const isDone = sub === 'done';
+            const isTarget = sub === 'setup' && _targetSlot === slot;
+
+            _slotPrimaryActions[slot] = step.primary && !step.primary.disabled ? step.primary.action : null;
+            const btnHtml = step.primary
+                ? `<button class="btn-small primary" ${step.primary.disabled ? 'disabled' : ''} onclick="runSlotPrimaryAction(${slot})">${_esc(step.primary.label)}</button>`
+                : '';
+
+            return `
+                <div class="match-slot-panel${isDone ? ' slot-done' : ''}${isTarget ? ' slot-target' : ''}">
+                    <div class="match-slot-header">
+                        <span class="match-slot-icon">${PHASE_ICONS.matches_in_progress}</span>
+                        <span class="match-slot-name">Match ${slot} — ${_esc(sub)}</span>
+                        ${sub === 'setup' ? `<button class="btn-small secondary" onclick="setTargetMatchSlot(${slot})" title="New matches go to this slot">${isTarget ? '✓ Target' : 'Set Target'}</button>` : ''}
+                    </div>
+                    <div class="match-slot-guidance">${_esc(step.text)}</div>
+                    ${btnHtml}
+                </div>`;
+        }).join('');
     }
 
     // ── Timeline Track ──
@@ -520,11 +592,7 @@
             spell_window_2: 2,      // part of challenges block
             spell_window_3: 3,      // after challenge_game
             spell_window_4: 4,      // after board_resolved
-            match_1_setup: 5,       // part of match 1
-            match_1_lobby: 5,       // part of match 1
-            match_2_setup: 6,       // part of match 2
-            match_2_lobby: 6,       // part of match 2
-            round_advance: 7        // past end
+            round_advance: 6        // past end
         };
         return mapping[phase] ?? -1;
     }
@@ -769,61 +837,23 @@
                 };
             }
 
-            case 'match_1_playing':
-            case 'match_2_playing': {
-                const slot = phase === 'match_1_playing' ? 1 : 2;
-                const ongoingSlot = _ongoingSlotMatches(slot);
-                const pendingSlot = _pendingSlotMatches(slot);
-                const queueMp = gs.gameQueue || [];
-                const hasStarted = queueMp.some(m => !m.isBreak && m.isChallenge !== true &&
-                    (m.status === 'ongoing' || m.status === 'completed'));
-
-                if (ongoingSlot.length > 0) {
-                    let text = `<strong>${ongoingSlot.length}</strong> match${ongoingSlot.length !== 1 ? 'es' : ''} live — click a card to record results.`;
-                    if (pendingSlot.length > 0) {
-                        text += ' Use ▶ in the queue to start a parallel match if it belongs to this slot.';
-                    }
-                    return {
-                        text,
-                        primary: { label: 'Waiting for results…', action: null, disabled: true },
-                        primaryIsAdvance: true
-                    };
-                }
-
-                // Slot 1: queued matches may belong to Slot 2, so once every
-                // started match is confirmed, continuing is the default.
-                if (slot === 1 && hasStarted) {
-                    return {
-                        text: 'Slot 1 results confirmed.' +
-                              (pendingSlot.length > 0
-                                  ? ` <strong>${pendingSlot.length}</strong> queued match${pendingSlot.length !== 1 ? 'es carry' : ' carries'} over to Slot 2.`
-                                  : ''),
-                        primary: { label: 'Continue ▶', action: advance },
-                        primaryIsAdvance: true
-                    };
-                }
-
-                if (pendingSlot.length > 0) {
-                    const next = pendingSlot[0];
-                    const label = _matchShortLabel(next);
-                    return {
-                        text: `Next up: <strong>${_esc(label)}</strong>.`,
-                        primary: { label: `▶ Start ${label}`, action: () => window.startMatch(next.id) },
-                        primaryIsAdvance: false
-                    };
-                }
-
-                if (hasStarted) {
-                    return {
-                        text: 'All match results confirmed.',
-                        primary: { label: 'Continue ▶', action: advance },
-                        primaryIsAdvance: true
-                    };
-                }
-
+            // Match 1 and Match 2 progress independently now, so there's no
+            // single "the" primary action for this phase — each slot gets
+            // its own action button, rendered by _renderMatchSlotCards().
+            // This just supplies the guidance text and the Next Phase
+            // button, which only enables once PhaseManager reports both
+            // slots done (see phase-manager.js getSlotRequirements).
+            case 'matches_in_progress': {
+                const summaries = [1, 2].map(slot => {
+                    const sub = _phaseManager.getSlotSubPhase(slot);
+                    return `Match ${slot}: ${sub}`;
+                });
+                const bothDone = _phaseManager.bothSlotsDone();
                 return {
-                    text: `No matches queued for Slot ${slot} — create matches, or force-advance past it.`,
-                    primary: { label: 'No matches queued', action: null, disabled: true },
+                    text: bothDone
+                        ? 'Both matches complete.'
+                        : `${summaries.join(' · ')} — see the match cards below.`,
+                    primary: bothDone ? { label: 'Continue ▶', action: advance } : null,
                     primaryIsAdvance: true
                 };
             }
@@ -832,32 +862,6 @@
                 return {
                     text: 'Check that hex control on the board matches reality. Resolve any disputes before continuing.',
                     primary: { label: 'Board Verified ▶', action: advance },
-                    primaryIsAdvance: true
-                };
-
-            case 'match_1_setup':
-            case 'match_2_setup': {
-                const slot = phase === 'match_1_setup' ? 1 : 2;
-                const pendingMatches = _pendingSlotMatches(slot);
-                if (pendingMatches.length === 0) {
-                    return {
-                        text: `Create matches for Slot ${slot} — drag players into sides, or auto-generate from rotation.`,
-                        primary: { label: '⚡ Auto-Generate', action: () => window.generateSuggestedMatches() },
-                        primaryIsAdvance: false
-                    };
-                }
-                return {
-                    text: `<strong>${pendingMatches.length}</strong> match${pendingMatches.length !== 1 ? 'es' : ''} queued for Slot ${slot}. Open the lobby when the lineup is final.`,
-                    primary: { label: 'Open Lobby ▶', action: advance },
-                    primaryIsAdvance: true
-                };
-            }
-
-            case 'match_1_lobby':
-            case 'match_2_lobby':
-                return {
-                    text: 'Players are confirming game lobby + Discord. Advances automatically when everyone is ready.',
-                    primary: { label: 'Waiting for players…', action: null, disabled: true },
                     primaryIsAdvance: true
                 };
 
@@ -1001,16 +1005,12 @@
             }
         }
 
-        // Lobby ready admin controls
+        // Lobby ready admin controls — for matches_in_progress, each slot's
+        // own "Force Ready" button already lives on its match slot card
+        // (_renderMatchSlotCards), since the two slots' lobby state differs.
         if (lobbyControls) {
-            if (_phaseManager.isLobbyPhase(phase)) {
-                lobbyControls.style.display = '';
-                lobbyControls.innerHTML =
-                    '<button class="btn-small secondary" onclick="forceAllReady()" title="Mark all players as ready">Force All Ready</button>';
-            } else {
-                lobbyControls.style.display = 'none';
-                lobbyControls.innerHTML = '';
-            }
+            lobbyControls.style.display = 'none';
+            lobbyControls.innerHTML = '';
         }
 
         // Spell window controls (Begin Spells + Loop)
@@ -1407,6 +1407,16 @@
         _phaseManager?.openForceAdvanceModal();
     };
 
+    window.advanceSlot = async (slot) => {
+        _initPhaseAdapter();
+        await _phaseManager?.advanceSlot(slot, false);
+    };
+
+    window.forceAdvanceSlot = async (slot) => {
+        _initPhaseAdapter();
+        await _phaseManager?.advanceSlot(slot, true);
+    };
+
     window.confirmForceAdvance = async () => {
         await _phaseManager?.advancePhase(true);
         _phaseManager?.closeForceAdvanceModal();
@@ -1444,8 +1454,8 @@
         _phaseManager?.skipNextBreak();
     };
 
-    window.forceAllReady = async () => {
-        _phaseManager?.forceAllReady();
+    window.forceAllReady = async (slot) => {
+        _phaseManager?.forceAllReadyForSlot(slot);
         await saveGameState();
         if (typeof updateDisplay === 'function') updateDisplay();
     };

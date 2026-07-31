@@ -61,35 +61,12 @@ const DISPLAY_MODES = {
         slides: ['board_focus'],
         hidePanels: true
     },
-    // ── Match phases ──
-    match_1_setup: {
-        name: 'Match 1 — Setup',
-        slides: ['next_match_large'],
-        hidePanels: true
-    },
-    match_1_lobby: {
-        name: 'Match 1 — Lobby',
-        slides: ['readiness_large'],
-        hidePanels: true
-    },
-    match_1_playing: {
-        name: 'Match 1 — Playing',
-        slides: ['live_matches_large'],
-        hidePanels: true
-    },
-    match_2_setup: {
-        name: 'Match 2 — Setup',
-        slides: ['next_match_large'],
-        hidePanels: true
-    },
-    match_2_lobby: {
-        name: 'Match 2 — Lobby',
-        slides: ['readiness_large'],
-        hidePanels: true
-    },
-    match_2_playing: {
-        name: 'Match 2 — Playing',
-        slides: ['live_matches_large'],
+    // ── Matches In Progress — Match 1 / Match 2 run independently now, so
+    // any of setup/lobby/playing can be true for either slot at once.
+    // Rotate through all three slide types rather than picking one. ──
+    matches_in_progress: {
+        name: 'Matches In Progress',
+        slides: ['live_matches_large', 'readiness_large', 'next_match_large'],
         hidePanels: true
     },
     // ── Round advance ──
@@ -1064,14 +1041,25 @@ class DisplayManager {
             phaseBanner.style.borderBottom = '2px solid rgba(247,186,50,0.3)';
             const autoFlag = data.currentPhase?.autoInserted ? ' (Scheduled)' : '';
             phaseBanner.textContent = 'BREAK TIME' + autoFlag;
-        } else if (phaseName === 'match_1_playing' || phaseName === 'match_2_playing' || phaseName === 'challenge_game') {
+        } else if (phaseName === 'challenge_game') {
             phaseBanner.style.display = 'block';
             phaseBanner.style.background = 'rgba(16,185,129,0.08)';
             phaseBanner.style.color = '#10b981';
             phaseBanner.style.borderBottom = '2px solid rgba(16,185,129,0.3)';
-            const label = phaseName === 'challenge_game' ? 'CHALLENGE GAME' :
-                          phaseName === 'match_1_playing' ? 'MATCH 1 IN PROGRESS' : 'MATCH 2 IN PROGRESS';
-            phaseBanner.textContent = label;
+            phaseBanner.textContent = 'CHALLENGE GAME';
+        } else if (phaseName === 'matches_in_progress') {
+            // Match 1 and Match 2 progress independently — show both statuses
+            // at once instead of picking one to display.
+            phaseBanner.style.display = 'block';
+            phaseBanner.style.background = 'rgba(16,185,129,0.08)';
+            phaseBanner.style.color = '#10b981';
+            phaseBanner.style.borderBottom = '2px solid rgba(16,185,129,0.3)';
+            const slots = data.currentPhase?.slots || {};
+            const subLabel = { setup: 'SETUP', lobby: 'LOBBY', playing: 'LIVE', done: 'DONE' };
+            const parts = [1, 2]
+                .filter(slot => slots[slot] !== 'done')
+                .map(slot => `MATCH ${slot}: ${subLabel[slots[slot]] || 'SETUP'}`);
+            phaseBanner.textContent = parts.length > 0 ? parts.join('   ·   ') : 'MATCHES COMPLETE';
         } else if (phaseName === 'scoring_vp' || phaseName === 'scoring_hex') {
             phaseBanner.style.display = 'block';
             phaseBanner.style.background = 'rgba(168,85,247,0.08)';
@@ -1112,12 +1100,6 @@ class DisplayManager {
             } else {
                 phaseBanner.textContent = 'SPELL WINDOW';
             }
-        } else if (phaseName === 'match_1_lobby' || phaseName === 'match_2_lobby') {
-            phaseBanner.style.display = 'block';
-            phaseBanner.style.background = 'rgba(59,130,246,0.08)';
-            phaseBanner.style.color = '#3b82f6';
-            phaseBanner.style.borderBottom = '2px solid rgba(59,130,246,0.3)';
-            phaseBanner.textContent = phaseName === 'match_1_lobby' ? 'LOBBY 1 \u2014 Waiting for players' : 'LOBBY 2 \u2014 Waiting for players';
         } else {
             phaseBanner.style.display = 'none';
         }
@@ -1213,7 +1195,7 @@ class DisplayManager {
         // Fallback: if there are ongoing matches, show live display regardless of phase
         const queue = gameData.gameQueue || [];
         if (queue.some(m => m.status === 'ongoing' && !m.isBreak)) {
-            return 'match_1_playing';
+            return 'matches_in_progress';
         }
 
         return null;

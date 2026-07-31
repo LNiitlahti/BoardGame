@@ -332,8 +332,20 @@ function migrateToNormalizedPlayers(gameState) {
         gameState.players = {};
     }
 
-    // Track name -> ID mapping to deduplicate players across teams
+    // Name -> ID map used only as a best-effort lookup for migrating legacy
+    // name-based gameHistory records below. It must NOT be used to reuse IDs
+    // across team rosters: two different teams can legitimately have players
+    // with the same (often placeholder, e.g. "Player 1") name, and reusing an
+    // ID in that case merges two distinct players into one registry entry,
+    // silently dropping one of them from their team's player count.
     const nameToIdMap = {};
+
+    // IDs already claimed by an earlier roster slot in this pass. A slot whose
+    // existing id was already claimed (duplicate, e.g. from an earlier corrupt
+    // migration) gets a fresh one instead of reusing it — same for an id that
+    // isn't in the registry at all (orphaned reference). Slots that are fine
+    // are left completely untouched.
+    const seenIds = new Set();
 
     // Migrate team players
     if (gameState.teams) {
@@ -342,35 +354,26 @@ function migrateToNormalizedPlayers(gameState) {
                 const playerIds = [];
 
                 team.players.forEach(player => {
-                    // Check if this player name already has an ID
                     const normalizedName = player.name?.trim().toLowerCase();
-                    let playerId;
+                    const hasValidUnclaimedId = player.id
+                        && player.id.startsWith('p_')
+                        && !seenIds.has(player.id);
+                    const playerId = hasValidUnclaimedId ? player.id : generatePlayerId();
+                    player.id = playerId;
+                    seenIds.add(playerId);
 
-                    if (player.id && player.id.startsWith('p_')) {
-                        // Already has valid ID
-                        playerId = player.id;
-                    } else if (normalizedName && nameToIdMap[normalizedName]) {
-                        // Name already seen, might be duplicate or team change
-                        playerId = nameToIdMap[normalizedName];
-                        // Update teamId to current team
-                        if (gameState.players[playerId]) {
-                            gameState.players[playerId].teamId = team.id;
-                        }
-                    } else {
-                        // New player
-                        playerId = generatePlayerId();
-                        if (normalizedName) {
-                            nameToIdMap[normalizedName] = playerId;
-                        }
+                    if (normalizedName && !nameToIdMap[normalizedName]) {
+                        nameToIdMap[normalizedName] = playerId;
                     }
 
-                    // Add/update in registry
+                    // Add/update in registry, preserving the original creation time
+                    // across re-runs instead of stamping a new one every load.
                     gameState.players[playerId] = {
                         id: playerId,
                         name: player.name || 'Unknown',
                         teamId: team.id,
                         uid: player.uid || null,
-                        createdAt: player.createdAt || new Date().toISOString()
+                        createdAt: player.joinedAt || player.createdAt || gameState.players[playerId]?.createdAt || new Date().toISOString()
                     };
 
                     playerIds.push(playerId);
@@ -378,14 +381,14 @@ function migrateToNormalizedPlayers(gameState) {
 
                 // Set playerIds on team
                 team.playerIds = playerIds;
-
-                // Keep players array for backward compatibility during transition
-                // but mark them with IDs
-                team.players = team.players.map((p, idx) => ({
-                    ...p,
-                    id: playerIds[idx]
-                }));
             }
+        });
+
+        // Drop registry entries no longer referenced by any team (e.g. a player
+        // removed from a roster, or an orphan left behind by earlier corruption).
+        const referencedIds = new Set(gameState.teams.flatMap(t => t.playerIds || []));
+        Object.keys(gameState.players).forEach(id => {
+            if (!referencedIds.has(id)) delete gameState.players[id];
         });
     }
 
@@ -445,18 +448,30 @@ function migrateToNormalizedPlayers(gameState) {
 function needsPlayerMigration(gameState) {
     if (!gameState) return false;
 
-    // Already migrated
-    if (gameState.playersMigrated) return false;
+    // Note: deliberately NOT gated on gameState.playersMigrated. A team or
+    // player added after the first migration run would otherwise never get
+    // backfilled into the registry, since that flag is set once and never
+    // cleared. Re-scanning every load is cheap (a handful of teams/players)
+    // and migrateToNormalizedPlayers() is idempotent for already-migrated ones.
+    if (!gameState.teams) return false;
 
-    // Check if teams have old-style players without IDs
-    if (gameState.teams) {
-        for (const team of gameState.teams) {
-            if (team.players && team.players.length > 0) {
-                // Check if any player lacks a proper ID
-                if (team.players.some(p => !p.id || !p.id.startsWith('p_'))) {
-                    return true;
-                }
-            }
+    const registry = gameState.players || {};
+    const seenIds = new Set();
+
+    for (const team of gameState.teams) {
+        if (!team.players || team.players.length === 0) continue;
+
+        for (const p of team.players) {
+            // Missing/malformed id
+            if (!p.id || !p.id.startsWith('p_')) return true;
+            // Duplicate id reused across roster slots (the corruption pattern
+            // a stale cross-team name-dedup once produced)
+            if (seenIds.has(p.id)) return true;
+            seenIds.add(p.id);
+            // Slot points at an id that was never actually saved to the registry
+            if (!registry[p.id]) return true;
+            // Registry disagrees about which team owns this id
+            if (String(registry[p.id].teamId) !== String(team.id)) return true;
         }
     }
 
