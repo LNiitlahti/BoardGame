@@ -39,6 +39,9 @@ NUL
 .plan/
 docs/superpowers/
 
+# Local analysis docs (not for git)
+docs/analysis/
+
 # Build outputs
 dist/
 build/
