@@ -116,8 +116,8 @@ This project is in **active development**. The lightweight version ran its first
 
 | Version | Status |
 |---------|--------|
-| Full | **Primary** — the OOP module stack with a guided admin dashboard (next-step prompts, phase gating, safety-rail confirmations) is now the version used to run live events |
-| Lightweight | Legacy — superseded by Full; kept for reference under `lightweight_legacy/` |
+| Full | **The only version** — the OOP module stack with a guided admin dashboard (next-step prompts, phase gating, safety-rail confirmations) is what runs live events |
+| Lightweight | Retired and removed from the repo 2026-07-31 (see git history if needed) |
 
 ## License
 
@@ -130,7 +130,7 @@ Free to use for non-profit purposes. For commercial use, contact the maintainer.
 
 ```
 BoardGame/
-├── full/                  # v2 — primary version, OOP module stack + guided admin
+├── full/                  # The game — OOP module stack + guided admin
 │   ├── god.html            # Superadmin dashboard
 │   ├── admin.html           # Guided tournament admin dashboard (next-step flow, safety rails)
 │   ├── setup.html           # Tournament creation wizard (incl. Room Hexes step)
@@ -142,12 +142,7 @@ BoardGame/
 │   ├── css/                 # Full-version styles (admin, onboarding, statistics, themes, etc.)
 │   └── scripts/             # OOP managers (phase, board, spell, undo, backup, onboarding, etc.)
 │
-├── lightweight_legacy/    # v1 — superseded by full/, kept for reference
-│   ├── admin.html / setup.html / view.html / statistics.html / onboarding.html / match-queue.html
-│   ├── css/
-│   └── scripts/
-│
-├── shared/                # Shared across both versions
+├── shared/                # Shared engine, config, and utilities
 │   ├── scripts/           # Firebase, board engine, match scheduling, utilities
 │   ├── css/               # Theme, navbar, toast notifications
 │   └── images/            # Favicons, game logos, hex tiles

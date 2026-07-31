@@ -96,30 +96,17 @@
         const base = window.BOARDGAME_BASE || '.';
         const path = window.location.pathname.replace(/\\/g, '/');
         if (path.includes('/full/')) return '.';
-        if (path.includes('/lightweight/')) return '../full';
         return base + '/full';
-    }
-
-    /**
-     * Get base path to /lightweight/ directory from current page location
-     */
-    function getLightweightBasePath() {
-        const base = window.BOARDGAME_BASE || '.';
-        const path = window.location.pathname.replace(/\\/g, '/');
-        if (path.includes('/lightweight/')) return '.';
-        if (path.includes('/full/')) return '../lightweight';
-        return base + '/lightweight';
     }
 
     /**
      * Build URL with current tournament context
      */
-    function buildNavUrl(href, item) {
+    function buildNavUrl(href) {
         const currentTournamentId = sessionStorage.getItem('currentTournamentId') || localStorage.getItem('currentTournamentId');
         const currentTeamId = sessionStorage.getItem('currentTeamId') || localStorage.getItem('currentTeamId');
 
-        // Most nav targets live in /full/, lightweight-flagged ones in /lightweight/
-        let url = (item && item.lightweight ? getLightweightBasePath() : getFullBasePath()) + '/' + href;
+        let url = getFullBasePath() + '/' + href;
         const params = new URLSearchParams();
 
         if (currentTournamentId) {
@@ -153,7 +140,7 @@
 
         const navLinksHTML = navItems.map(item => {
             const isActive = currentPage === item.id;
-            const href = buildNavUrl(item.href, item);
+            const href = buildNavUrl(item.href);
             return `
                 <a href="${href}" class="navbar-link ${isActive ? 'active' : ''}" data-page="${item.id}">
                     <span class="navbar-link-icon">${item.icon}</span>
