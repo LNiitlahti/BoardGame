@@ -26,9 +26,24 @@
         "durationMs": 15000
     },
     "camera": {
-        "dramatic": { "fov": 900,  "tilt": 62, "spin": -18, "zoom": 0.9 },
-        "pulled":   { "fov": 1400, "tilt": 45, "spin": -8,  "zoom": 0.7 },
-        "rest":     { "fov": 3500, "tilt": 0,  "spin": 0,   "zoom": 1 }
+        "dramatic": {
+            "fov": 2450,
+            "tilt": 46,
+            "spin": -24,
+            "zoom": 1.2
+        },
+        "pulled": {
+            "fov": 1400,
+            "tilt": 38,
+            "spin": -8,
+            "zoom": 0.7
+        },
+        "rest": {
+            "fov": 3500,
+            "tilt": 0,
+            "spin": 0,
+            "zoom": 1
+        }
     },
     "tiles": {
         "dropHeightPx": 500,
