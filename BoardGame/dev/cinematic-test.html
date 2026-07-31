@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Board Game - Cinematic Test</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #10131c; min-height: 100vh; font-family: system-ui, sans-serif; }
+        .board-wrap {
+            width: 100vw; height: 100vh; display: flex;
+            align-items: center; justify-content: center; position: relative;
+        }
+        .scene-3d, .rig-3d {
+            width: 100%; height: 100%; display: flex;
+            align-items: center; justify-content: center;
+        }
+        body.cine-active .rig-3d { transform-style: preserve-3d; }
+        body.cine-active #hexBoard { transform-style: preserve-3d; }
+        body.cine-active .board-hex { transform-style: preserve-3d; }
+
+        /* Tuning panel: same visual language as board-test2-3d.html's
+           controls-3d-panel, but fixed/floating so it stays usable while
+           the cinematic plays fullscreen behind it. */
+        .tune-panel {
+            position: fixed; top: 10px; left: 10px; z-index: 20000;
+            width: 360px; max-height: 96vh; overflow-y: auto;
+            background: rgba(44, 62, 80, 0.95); border-radius: 8px;
+            padding: 14px; font-family: system-ui, sans-serif;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .tune-panel h2 { color: #fff; font-size: 1rem; margin-bottom: 10px; }
+        .tune-panel h3 {
+            color: #9fd; font-size: 0.8rem; margin: 14px 0 6px;
+            text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .tune-row {
+            display: flex; align-items: center; gap: 8px;
+            padding: 4px 8px; background: #1e2a38; border-radius: 4px; margin-bottom: 4px;
+        }
+        .tune-row label { color: #cdd; font-size: 0.72rem; min-width: 118px; }
+        .tune-row input[type="range"] { flex: 1; }
+        .tune-row .tune-value { color: #fff; font-size: 0.72rem; width: 48px; text-align: right; }
+        .tune-actions { display: flex; gap: 8px; margin-top: 14px; }
+        .tune-actions button {
+            flex: 1; background: #27ae60; color: #fff; border: none;
+            padding: 8px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;
+        }
+        .tune-actions button.secondary { background: #34495e; }
+        .tune-actions button:hover { filter: brightness(1.1); }
+    </style>
+</head>
+<body>
+    <div class="tune-panel" id="tunePanel">
+        <h2>Cinematic Tuning</h2>
+        <div class="tune-actions">
+            <button id="btnPlay">▶ Rebuild &amp; Replay</button>
+            <button class="secondary" id="btnSkip">⏭ Skip</button>
+        </div>
+        <div class="tune-actions">
+            <button class="secondary" id="btnCopy">📋 Copy JSON to clipboard</button>
+        </div>
+        <div id="sliderHost"></div>
+    </div>
+
+    <div class="board-wrap">
+        <div class="scene-3d" id="cineScene">
+            <div class="rig-3d" id="cineRig"><div id="hexBoard"></div></div>
+        </div>
+    </div>
+
+    <script>window.BOARDGAME_BASE = '..';</script>
+    <script src="../shared/scripts/board-module.js"></script>
+    <script src="../shared/scripts/board-renderer.js"></script>
+    <script src="../full/scripts/cinematic/cine-easing.js"></script>
+    <script src="../full/scripts/cinematic/cine-board-order.js"></script>
+    <script src="../full/scripts/cinematic/cine-timeline.js"></script>
+    <script src="../full/scripts/cinematic/cine-camera.js"></script>
+    <script src="../full/scripts/cinematic/cine-tiles.js"></script>
+    <script>
+        // Minimal re-implementation of the controller flow with mock data,
+        // instant replay, and a live-tunable copy of cinematic-scene.json.
+        // Deliberately NOT loading cinematic-controller.js: it is coupled to
+        // view.html (CineView bridge, cover element, URL flag detection).
+        const boardModule = new BoardModule(1.5);
+        const renderer = new BoardRenderer(document.getElementById('hexBoard'), boardModule, {
+            responsive: true, showHeartImages: true, hexScale: 1.5
+        });
+        const mockGame = {
+            board: { 'q0r-5': 'team1', 'q5r-5': 'team2', 'q0r0': 'team4' },
+            rooms: ['q1r1', 'q-1r-1', 'q2r0', 'q-2r0']
+        };
+        boardModule.setRoomHexes(mockGame.rooms);
+        renderer.render(mockGame);
+
+        let cfg = null;          // live-tunable copy, seeded from the JSON file
+        let timeline = null;
+        let camera = null;
+        let tiles = null;
+
+        // Declarative slider spec: [path-in-cfg, label, min, max, step].
+        // path is dot-notation into `cfg`, read/written via get/setPath below.
+        const SLIDER_SPEC = [
+            ['__section', 'Camera — Dramatic (opening)'],
+            ['camera.dramatic.fov', 'FOV', 300, 3000, 50],
+            ['camera.dramatic.tilt', 'Tilt', 0, 85, 1],
+            ['camera.dramatic.spin', 'Spin', -180, 180, 1],
+            ['camera.dramatic.zoom', 'Zoom', 0.3, 2.5, 0.05],
+            ['__section', 'Camera — Pulled (mid-cascade)'],
+            ['camera.pulled.fov', 'FOV', 300, 3000, 50],
+            ['camera.pulled.tilt', 'Tilt', 0, 85, 1],
+            ['camera.pulled.spin', 'Spin', -180, 180, 1],
+            ['camera.pulled.zoom', 'Zoom', 0.3, 2.5, 0.05],
+            ['__section', 'Camera — Rest (final overview)'],
+            ['camera.rest.fov', 'FOV', 300, 4000, 50],
+            ['camera.rest.tilt', 'Tilt', 0, 85, 1],
+            ['camera.rest.spin', 'Spin', -180, 180, 1],
+            ['camera.rest.zoom', 'Zoom', 0.3, 2.5, 0.05],
+            ['__section', 'Tile Drop Physics'],
+            ['tiles.dropHeightPx', 'Drop Height (px)', 200, 4000, 50],
+            ['tiles.spinDegrees', 'Spin (deg)', 0, 1440, 30],
+            ['__section', 'Scene Timing (ms)'],
+            ['void.minDurationMs', 'Void hold', 500, 20000, 250],
+            ['firstImpact.fallDurationMs', 'First impact fall', 200, 4000, 100],
+            ['firstImpact.holdAfterMs', 'First impact hold', 0, 8000, 250],
+            ['earlyImpacts.intervalMs', 'Ring-1 interval', 500, 5000, 100],
+            ['earlyImpacts.fallDurationMs', 'Ring-1 fall', 200, 3000, 100],
+            ['cascade.totalDurationMs', 'Cascade total', 5000, 60000, 500],
+            ['cascade.fallDurationMs', 'Cascade tile fall', 100, 2000, 50],
+            ['cascade.cameraStartFraction', 'Camera pull start (0-1)', 0, 1, 0.05],
+            ['lockIn.durationMs', 'Lock-in', 1000, 20000, 250],
+            ['reveal.durationMs', 'Reveal', 2000, 40000, 500],
+            ['signage.durationMs', 'Signage', 2000, 30000, 500]
+        ];
+
+        function getPath(obj, path) {
+            return path.split('.').reduce((o, k) => o[k], obj);
+        }
+        function setPath(obj, path, value) {
+            const keys = path.split('.');
+            const last = keys.pop();
+            keys.reduce((o, k) => o[k], obj)[last] = value;
+        }
+
+        function buildSliderPanel() {
+            const host = document.getElementById('sliderHost');
+            host.innerHTML = '';
+            for (const spec of SLIDER_SPEC) {
+                if (spec[0] === '__section') {
+                    const h = document.createElement('h3');
+                    h.textContent = spec[1];
+                    host.appendChild(h);
+                    continue;
+                }
+                const [path, label, min, max, step] = spec;
+                const row = document.createElement('div');
+                row.className = 'tune-row';
+                const value = getPath(cfg, path);
+                row.innerHTML = `
+                    <label>${label}</label>
+                    <input type="range" min="${min}" max="${max}" step="${step}" value="${value}">
+                    <span class="tune-value">${value}</span>
+                `;
+                const input = row.querySelector('input');
+                const valueEl = row.querySelector('.tune-value');
+                input.addEventListener('input', () => {
+                    const v = parseFloat(input.value);
+                    setPath(cfg, path, v);
+                    valueEl.textContent = v;
+                });
+                host.appendChild(row);
+            }
+        }
+
+        async function loadConfig() {
+            cfg = await (await fetch('../full/data/cinematic-scene.json')).json();
+            buildSliderPanel();
+        }
+
+        function buildAndPlay() {
+            if (timeline) timeline.skipToEnd();
+
+            document.body.classList.add('cine-active');
+            camera = new CineCamera(
+                document.getElementById('cineScene'),
+                document.getElementById('cineRig'));
+            camera.applyPose(cfg.camera.dramatic);
+            tiles = new CineTiles(document.getElementById('hexBoard'), cfg.tiles);
+            tiles.hideAll();
+
+            const order = CineBoardOrder.buildLandingOrder(boardModule.generateHexCoordinates());
+            timeline = new CineTimeline();
+
+            let t = 0;
+            timeline.add(tiles.makeDropTrack(order[0], t, cfg.firstImpact.fallDurationMs, CineEasing.easeInQuad));
+            t += cfg.firstImpact.fallDurationMs + cfg.firstImpact.holdAfterMs;
+            for (const entry of order.filter(e => e.ring === 1)) {
+                timeline.add(tiles.makeDropTrack(entry, t, cfg.earlyImpacts.fallDurationMs, CineEasing.easeInQuad));
+                t += cfg.earlyImpacts.intervalMs;
+            }
+            const rest = order.filter(e => e.ring >= 2);
+            const spacing = (cfg.cascade.totalDurationMs - cfg.cascade.fallDurationMs) / rest.length;
+            rest.forEach((entry, i) => {
+                timeline.add(tiles.makeDropTrack(entry, t + i * spacing, cfg.cascade.fallDurationMs, CineEasing.easeInQuad));
+            });
+            const cascadeEnd = t + cfg.cascade.totalDurationMs;
+            const pullAt = t + cfg.cascade.totalDurationMs * cfg.cascade.cameraStartFraction;
+            timeline.add({
+                at: pullAt, duration: cascadeEnd - pullAt, ease: CineEasing.easeInOutCubic,
+                onUpdate: p => camera.applyPose(CineCamera.lerpPose(cfg.camera.dramatic, cfg.camera.pulled, p))
+            });
+            timeline.add({
+                at: cascadeEnd, duration: cfg.lockIn.durationMs,
+                onStart: () => tiles.showHearts(),
+                onUpdate: () => {}
+            });
+            const revealAt = cascadeEnd + cfg.lockIn.durationMs;
+            timeline.add({
+                at: revealAt, duration: cfg.reveal.durationMs, ease: CineEasing.easeInOutCubic,
+                onUpdate: p => camera.applyPose(CineCamera.lerpPose(cfg.camera.pulled, cfg.camera.rest, p)),
+                onComplete: () => camera.clearTo2D()
+            });
+            timeline.add({
+                at: revealAt + cfg.reveal.durationMs, duration: cfg.signage.durationMs,
+                onUpdate: () => {}
+            });
+            timeline.onFinished = () => {
+                tiles.restoreAll();
+                camera.clearTo2D();
+                document.body.classList.remove('cine-active');
+            };
+
+            // Harness convenience: void hold is whatever the slider currently
+            // says (developers will usually drag this down to near-zero while
+            // iterating on the tile cascade, then push it back up before copying).
+            setTimeout(() => { timeline.play(); timeline.startRaf(); }, cfg.void.minDurationMs);
+        }
+
+        function skip() { if (timeline) timeline.skipToEnd(); }
+
+        async function copyConfig() {
+            const text = JSON.stringify(cfg, null, 4);
+            await navigator.clipboard.writeText(text);
+            const btn = document.getElementById('btnCopy');
+            const original = btn.textContent;
+            btn.textContent = '✓ Copied!';
+            setTimeout(() => { btn.textContent = original; }, 1200);
+        }
+
+        document.getElementById('btnPlay').addEventListener('click', buildAndPlay);
+        document.getElementById('btnSkip').addEventListener('click', skip);
+        document.getElementById('btnCopy').addEventListener('click', copyConfig);
+        document.addEventListener('keydown', e => {
+            if (e.key === 's' || e.key === 'S' || e.key === 'Escape') skip();
+        });
+
+        loadConfig();
+    </script>
+</body>
+</html>
