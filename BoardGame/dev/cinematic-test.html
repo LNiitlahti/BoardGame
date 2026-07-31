@@ -25,7 +25,11 @@
         .material-fx {
             position: absolute;
             inset: 0;
-            z-index: 4;
+            /* Above the terrain image (5), inner bevel shading (7), and room
+               border outline (8) so the glow/particles are actually visible
+               on top of the art, not hidden behind it — below the existing
+               heart pulse/overlay layers (20/25) so those stay dominant. */
+            z-index: 9;
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.3s ease;
