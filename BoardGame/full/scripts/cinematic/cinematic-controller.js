@@ -121,6 +121,17 @@
         if (e.key === 's' || e.key === 'S' || e.key === 'Escape') bail();
     }
 
+    // ?volume=0-100 (percent) sets the cinematic music's playback volume.
+    // Missing/invalid/out-of-range values fall back to full volume (1) or
+    // clamp into range, never throw.
+    function getVolumeFromUrl() {
+        const raw = new URLSearchParams(location.search).get('volume');
+        if (raw === null) return 1;
+        const pct = parseFloat(raw);
+        if (Number.isNaN(pct)) return 1;
+        return Math.max(0, Math.min(100, pct)) / 100;
+    }
+
     // Effect 4 (music sync): screen-wide color wash on strong beats. See
     // cine-tiles.js's triggerBeatPulse for the same remove-reflow-readd
     // restart trick, needed because .flash may already be set from a
@@ -310,6 +321,7 @@
         // rejection is caught and ignored (not retried/surfaced) for that
         // reason.
         state.audioEl = new Audio('audio/cinematic-music.mp3');
+        state.audioEl.volume = getVolumeFromUrl();
         state.audioEl.play().catch(() => {});
 
         state.timeline = buildTimeline();

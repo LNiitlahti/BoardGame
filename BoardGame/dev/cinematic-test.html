@@ -600,6 +600,15 @@
             wash.classList.add('flash');
         }
 
+        // ?volume=0-100 (percent), same as production cinematic-controller.js.
+        function getVolumeFromUrl() {
+            const raw = new URLSearchParams(location.search).get('volume');
+            if (raw === null) return 1;
+            const pct = parseFloat(raw);
+            if (Number.isNaN(pct)) return 1;
+            return Math.max(0, Math.min(100, pct)) / 100;
+        }
+
         // Scrubbing: stateless by design so it can jump to ANY time, forward
         // or backward, unlike CineTimeline.tick() (which only ever advances —
         // once a track completes it stays completed). Resets to the baseline
@@ -681,6 +690,7 @@
             // Starts together with timeline.play() below, same shared clock
             // as production's arm().
             audioEl = new Audio('../full/audio/cinematic-music.mp3');
+            audioEl.volume = getVolumeFromUrl();
             audioEl.play().catch(() => {});
             timeline.play();
             timeline.startRaf();
