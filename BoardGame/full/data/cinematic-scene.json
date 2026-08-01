@@ -42,6 +42,12 @@
             "tilt": 0,
             "spin": 0,
             "zoom": 1
+        },
+        "outro": {
+            "fov": 3200,
+            "tilt": 6,
+            "spin": 10,
+            "zoom": 1.05
         }
     },
     "tiles": {
