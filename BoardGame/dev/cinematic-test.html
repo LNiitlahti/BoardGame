@@ -459,6 +459,7 @@
     <script src="../full/scripts/cinematic/cine-materials.js"></script>
     <script src="../full/scripts/cinematic/cine-music.js"></script>
     <script src="../full/scripts/cinematic/cine-outro.js"></script>
+    <script src="../full/scripts/cinematic/cine-tempo.js"></script>
     <script>
         // Minimal re-implementation of the controller flow with mock data,
         // instant replay, and a live-tunable copy of cinematic-scene.json.
@@ -510,6 +511,12 @@
         // envelope/beats) pending a manual vocal-stem analysis step, so the
         // flicker trigger is wired but inert until real data replaces it.
         let musicVocals = null;
+        let musicBackingVocals = null;
+        let musicBass = null;
+        let musicPercussion = null;
+        let musicStrings = null;
+        let musicSynth = null;
+        let musicOther = null;
         let audioEl = null;  // harness preview <audio>, (re)created per buildAndPlay()
         let timeline = null;
         let camera = null;
@@ -679,11 +686,18 @@
         }
 
         async function loadConfig() {
-            [cfg, materials, music, musicVocals] = await Promise.all([
+            [cfg, materials, music, musicVocals, musicBackingVocals, musicBass,
+                musicPercussion, musicStrings, musicSynth, musicOther] = await Promise.all([
                 fetch('../full/data/cinematic-scene.json').then(r => r.json()),
                 CineMaterials.load('../shared/data/hex-materials.json'),
                 CineMusic.load('../full/data/music-cues-drums.json'),
-                CineMusic.load('../full/data/music-cues-vocals.json')
+                CineMusic.load('../full/data/music-cues-vocals.json'),
+                CineMusic.load('../full/data/music-cues-backingVocals.json'),
+                CineMusic.load('../full/data/music-cues-bass.json'),
+                CineMusic.load('../full/data/music-cues-percussion.json'),
+                CineMusic.load('../full/data/music-cues-strings.json'),
+                CineMusic.load('../full/data/music-cues-synth.json'),
+                CineMusic.load('../full/data/music-cues-other.json')
             ]);
             buildSliderPanel();
             // Build tracks up front (pure — no visible side effects) purely so
@@ -799,6 +813,10 @@
             // cinematic's own authored length.
             const cinematicOwnEnd = revealEnd + cfg.signage.durationMs;
             const { outroDurationMs, finalEnd } = CineOutro.computeOutro(cinematicOwnEnd, music.durationMs);
+            const tempoStems = [
+                music, musicVocals, musicBackingVocals, musicBass,
+                musicPercussion, musicStrings, musicSynth, musicOther
+            ];
             if (outroDurationMs > 0) {
                 tracks.push({
                     at: cinematicOwnEnd, duration: outroDurationMs,
@@ -824,7 +842,7 @@
                 if (beatMs < textWindowStart || beatMs > textWindowEnd) return;
                 tracks.push({
                     at: beatMs, duration: 0,
-                    onStart: () => text.triggerFlicker()
+                    onStart: () => text.triggerFlicker(CineTempo.computeTempo(tempoStems, beatMs))
                 });
             });
 
@@ -865,6 +883,56 @@
                     });
                 }
             });
+
+            if (musicBackingVocals.envelope.length > 0) {
+                const dur = Math.min(musicBackingVocals.durationMs, finalEnd);
+                tracks.push({
+                    at: 0, duration: dur,
+                    onUpdate: p => atmosphere.applyFogIntensity(musicBackingVocals.envelopeAt(p * dur))
+                });
+            }
+            if (musicBass.envelope.length > 0) {
+                const dur = Math.min(musicBass.durationMs, finalEnd);
+                tracks.push({
+                    at: 0, duration: dur,
+                    onUpdate: p => camera.applyBassScale(musicBass.envelopeAt(p * dur))
+                });
+            }
+            if (musicPercussion.beats.length > 0) {
+                musicPercussion.beats.forEach(beatMs => {
+                    if (beatMs > finalEnd) return;
+                    tracks.push({
+                        at: beatMs, duration: 0,
+                        onStart: () => atmosphere.triggerSpark(CineTempo.computeTempo(tempoStems, beatMs))
+                    });
+                });
+            }
+            if (musicStrings.envelope.length > 0) {
+                const dur = Math.min(musicStrings.durationMs, finalEnd);
+                tracks.push({
+                    at: 0, duration: dur,
+                    onUpdate: p => {
+                        const t = p * dur;
+                        const amp = musicStrings.envelopeAt(t);
+                        const speedFactor = CineTempo.computeTempo(tempoStems, t);
+                        camera.applyDrift(amp, speedFactor, t);
+                    }
+                });
+            }
+            if (musicSynth.envelope.length > 0) {
+                const dur = Math.min(musicSynth.durationMs, finalEnd);
+                tracks.push({
+                    at: 0, duration: dur,
+                    onUpdate: p => atmosphere.applySynthGlow(musicSynth.envelopeAt(p * dur))
+                });
+            }
+            if (musicOther.envelope.length > 0) {
+                const dur = Math.min(musicOther.durationMs, finalEnd);
+                tracks.push({
+                    at: 0, duration: dur,
+                    onUpdate: p => atmosphere.applyBaseIntensity(musicOther.envelopeAt(p * dur))
+                });
+            }
 
             const totalDuration = tracks.reduce((m, tr) => Math.max(m, tr.at + tr.duration), 0);
             return { tracks, totalDuration };
