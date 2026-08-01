@@ -82,3 +82,64 @@ test('splinePose: velocity at the interior keyframe is non-zero (camera keeps mo
     const velocity = (after.fov - before.fov) / (2 * dt);
     assert.ok(Math.abs(velocity) > 0.001, `expected non-zero velocity through the interior keyframe, got ${velocity}`);
 });
+
+test('randomOffset: magnitude 0 always returns zero offset regardless of rng', () => {
+    const amp = { tiltAmp: 2.5, spinAmp: 3, zoomAmp: 0.03 };
+    const result = CineCamera.randomOffset(amp, 0, () => 0.999);
+    assert.deepStrictEqual(result, { tilt: 0, spin: 0, zoom: 0 });
+});
+
+test('randomOffset: rng() = 1 gives +amp*magnitude on every axis', () => {
+    const amp = { tiltAmp: 2.5, spinAmp: 3, zoomAmp: 0.03 };
+    const result = CineCamera.randomOffset(amp, 1, () => 1);
+    assert.strictEqual(result.tilt, 2.5);
+    assert.strictEqual(result.spin, 3);
+    assert.strictEqual(result.zoom, 0.03);
+});
+
+test('randomOffset: rng() = 0 gives -amp*magnitude on every axis', () => {
+    const amp = { tiltAmp: 2.5, spinAmp: 3, zoomAmp: 0.03 };
+    const result = CineCamera.randomOffset(amp, 1, () => 0);
+    assert.strictEqual(result.tilt, -2.5);
+    assert.strictEqual(result.spin, -3);
+    assert.strictEqual(result.zoom, -0.03);
+});
+
+test('randomOffset: magnitude scales linearly', () => {
+    const amp = { tiltAmp: 10, spinAmp: 10, zoomAmp: 10 };
+    const full = CineCamera.randomOffset(amp, 1, () => 1);
+    const half = CineCamera.randomOffset(amp, 0.5, () => 1);
+    assert.strictEqual(half.tilt, full.tilt / 2);
+});
+
+test('setShake: two named shakes sum in the rendered transform', () => {
+    const sceneEl = { style: {} };
+    const rigEl = { style: {} };
+    const cam = new CineCamera(sceneEl, rigEl);
+    cam.applyPose({ fov: 3500, tilt: 0, spin: 0, zoom: 1 });
+    cam.setShake('impact', { tilt: 2, spin: 3, zoom: 0.01 });
+    cam.setShake('music', { tilt: 1, spin: -1, zoom: 0.02 });
+    assert.strictEqual(rigEl.style.transform, 'scale(1.03) rotateX(3deg) rotateY(2deg)');
+});
+
+test('applyPose with no shakes set reproduces the no-shake transform exactly', () => {
+    const sceneEl = { style: {} };
+    const rigEl = { style: {} };
+    const cam = new CineCamera(sceneEl, rigEl);
+    cam.applyPose({ fov: 3500, tilt: 10, spin: -5, zoom: 1.2 });
+    assert.strictEqual(sceneEl.style.perspective, '3500px');
+    assert.strictEqual(rigEl.style.transform, 'scale(1.2) rotateX(10deg) rotateY(-5deg)');
+});
+
+test('clearTo2D resets shake state as well as inline styles', () => {
+    const sceneEl = { style: {} };
+    const rigEl = { style: {} };
+    const cam = new CineCamera(sceneEl, rigEl);
+    cam.applyPose({ fov: 3500, tilt: 0, spin: 0, zoom: 1 });
+    cam.setShake('impact', { tilt: 5, spin: 5, zoom: 0.1 });
+    cam.clearTo2D();
+    cam.applyPose({ fov: 1000, tilt: 0, spin: 0, zoom: 1 });
+    // If clearTo2D had NOT reset _shakes, this second applyPose's _render()
+    // would still add the stale impact offset back in.
+    assert.strictEqual(rigEl.style.transform, 'scale(1) rotateX(0deg) rotateY(0deg)');
+});

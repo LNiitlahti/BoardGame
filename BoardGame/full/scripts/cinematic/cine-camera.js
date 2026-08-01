@@ -1,17 +1,42 @@
 // BoardGame/full/scripts/cinematic/cine-camera.js
 // Applies camera poses to the .scene-3d (perspective) / .rig-3d (rotation+zoom)
 // pair wrapping the live board. Pose: { fov, tilt, spin, zoom }.
+//
+// Shake: named, summed offsets layered on top of the base pose (impact jolts,
+// continuous music rumble). Neither shake source touches applyPose/splinePose/
+// lerpPose — they only ever change what _render() adds on top.
+
+const ZERO_SHAKE = { tilt: 0, spin: 0, zoom: 0 };
 
 class CineCamera {
     constructor(sceneEl, rigEl) {
         this.sceneEl = sceneEl;
         this.rigEl = rigEl;
+        this._basePose = { fov: 3500, tilt: 0, spin: 0, zoom: 1 }; // matches CSS rest default
+        this._shakes = { impact: ZERO_SHAKE, music: ZERO_SHAKE };
     }
 
     applyPose(pose) {
-        this.sceneEl.style.perspective = `${pose.fov}px`;
-        this.rigEl.style.transform =
-            `scale(${pose.zoom}) rotateX(${pose.tilt}deg) rotateY(${pose.spin}deg)`;
+        this._basePose = pose;
+        this._render();
+    }
+
+    // name: 'impact' | 'music'. Offsets from different sources are summed,
+    // not overwritten — an impact jolt and the music rumble can be in-flight
+    // at the same time without one clobbering the other.
+    setShake(name, offset) {
+        this._shakes[name] = offset;
+        this._render();
+    }
+
+    _render() {
+        const p = this._basePose;
+        let tilt = p.tilt, spin = p.spin, zoom = p.zoom;
+        for (const s of Object.values(this._shakes)) {
+            tilt += s.tilt; spin += s.spin; zoom += s.zoom;
+        }
+        this.sceneEl.style.perspective = `${p.fov}px`;
+        this.rigEl.style.transform = `scale(${zoom}) rotateX(${tilt}deg) rotateY(${spin}deg)`;
     }
 
     // Effect 1 (music sync): whole-board brightness, driven every frame by
@@ -24,6 +49,14 @@ class CineCamera {
     // so it isn't part of that preserve-3d chain and is safe to filter.
     applyBoardPulse(amp) {
         this.sceneEl.style.filter = `brightness(${1 + amp * 0.35})`;
+    }
+
+    // magnitude: 0-1. 0 = no shake. 1 = full amplitude. Caller supplies an
+    // `rng` (defaults to Math.random) purely so tests can inject a
+    // deterministic one instead of asserting on random output.
+    static randomOffset(amp, magnitude, rng = Math.random) {
+        const jitter = (a) => a * magnitude * (rng() * 2 - 1);
+        return { tilt: jitter(amp.tiltAmp), spin: jitter(amp.spinAmp), zoom: jitter(amp.zoomAmp) };
     }
 
     static lerpPose(a, b, t) {
@@ -98,11 +131,13 @@ class CineCamera {
     }
 
     // Exact normal-mode look: remove all inline 3D so the page is
-    // pixel-identical to a non-cinematic load.
+    // pixel-identical to a non-cinematic load. Also resets shake state so a
+    // skip/teardown mid-shake never leaves residue in a reused instance.
     clearTo2D() {
         this.sceneEl.style.perspective = '';
         this.rigEl.style.transform = '';
         this.sceneEl.style.filter = '';
+        this._shakes = { impact: ZERO_SHAKE, music: ZERO_SHAKE };
     }
 }
 
