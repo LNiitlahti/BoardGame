@@ -47,6 +47,7 @@ class BoardManager {
         this._onDisplayRefresh = onDisplayRefresh || (() => {});
         this._onPhaseChanged = onPhaseRequirementsChanged || (() => {});
         this._selectedHexCoord = null;
+        this._prevBoardSignature = null;
     }
 
     // ------------------------------------------------------------------
@@ -55,6 +56,12 @@ class BoardManager {
 
     renderBoard() {
         if (!this._boardRenderer || !this._boardModule) return;
+
+        const signature = window.RenderSignature.computeBoardSignature(
+            this._gameState?.board, this._gameState?.rooms
+        );
+        if (signature === this._prevBoardSignature) return;
+        this._prevBoardSignature = signature;
 
         this._boardRenderer.render(this._gameState || {});
 
