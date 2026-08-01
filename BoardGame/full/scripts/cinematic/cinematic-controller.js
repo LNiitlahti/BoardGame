@@ -230,17 +230,17 @@
             onUpdate: () => {}
         });
 
-        // --- Music sync: envelope pulse (effects 1+2) + beat-triggered hex
-        // wave (effect 3) / color wash (effect 4). Same shared clock as
-        // everything above (t=0 = arm()/audio start). The cinematic's OWN
-        // total length (independent of music length) governs how long these
-        // run — a track shorter than this just goes quiet for the remainder
-        // (envelopeAt clamps to the last sample); a track longer than this
-        // is cut off when teardown() pauses the <audio> element, per spec
-        // (no fade-out logic in this pass).
         const cinematicOwnEnd = revealEnd + cfg.signage.durationMs;
         const { outroDurationMs, finalEnd } = window.CineOutro.computeOutro(
             cinematicOwnEnd, state.music.durationMs);
+
+        // --- Outro camera drift: when the music runs longer than the
+        // cinematic's own choreography (cinematicOwnEnd), extend the
+        // timeline to finalEnd so the track can play to completion instead
+        // of being cut off when teardown() pauses the <audio> element. The
+        // camera drifts from "rest" to "outro" linearly (no easing) over
+        // this span — per spec, a multi-minute drift with easing would
+        // visibly stall mid-motion long before it reaches the target pose.
         if (outroDurationMs > 0) {
             tl.add({
                 at: cinematicOwnEnd,
@@ -249,6 +249,15 @@
                     window.CineCamera.lerpPose(cam.rest, cam.outro, p))
             });
         }
+
+        // --- Music sync: envelope pulse (effects 1+2) + beat-triggered hex
+        // wave (effect 3) / color wash (effect 4). Same shared clock as
+        // everything above (t=0 = arm()/audio start). These now run through
+        // finalEnd — the cinematic's own length, extended by the outro
+        // drift above when the music runs longer — so a track shorter than
+        // finalEnd just goes quiet for the remainder (envelopeAt clamps to
+        // the last sample), and a track at or under finalEnd plays to
+        // completion instead of being cut off.
         const music = state.music;
         const envelopeDuration = Math.min(music.durationMs, finalEnd);
         if (envelopeDuration > 0) {
