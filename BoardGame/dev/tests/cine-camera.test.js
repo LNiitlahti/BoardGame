@@ -143,3 +143,57 @@ test('clearTo2D resets shake state as well as inline styles', () => {
     // would still add the stale impact offset back in.
     assert.strictEqual(rigEl.style.transform, 'scale(1) rotateX(0deg) rotateY(0deg)');
 });
+
+test('applyBassScale: multiplies zoom on top of pose and shake, does not overwrite them', () => {
+    const sceneEl = { style: {} };
+    const rigEl = { style: {} };
+    const cam = new CineCamera(sceneEl, rigEl);
+    cam.applyPose({ fov: 3500, tilt: 0, spin: 0, zoom: 1 });
+    cam.setShake('music', { tilt: 0, spin: 0, zoom: 0.02 });
+    cam.applyBassScale(1); // amp=1 -> bassScale = 1.03
+    assert.strictEqual(rigEl.style.transform, 'scale(1.0506) rotateX(0deg) rotateY(0deg)');
+});
+
+test('applyBassScale: amp=0 leaves zoom unchanged', () => {
+    const sceneEl = { style: {} };
+    const rigEl = { style: {} };
+    const cam = new CineCamera(sceneEl, rigEl);
+    cam.applyPose({ fov: 3500, tilt: 0, spin: 0, zoom: 1 });
+    cam.applyBassScale(0);
+    assert.strictEqual(rigEl.style.transform, 'scale(1) rotateX(0deg) rotateY(0deg)');
+});
+
+test('applyDrift: amp=0 contributes zero offset regardless of speedFactor/time', () => {
+    const sceneEl = { style: {} };
+    const rigEl = { style: {} };
+    const cam = new CineCamera(sceneEl, rigEl);
+    cam.applyPose({ fov: 3500, tilt: 10, spin: -5, zoom: 1 });
+    cam.applyDrift(0, 1.6, 12345);
+    assert.strictEqual(rigEl.style.transform, 'scale(1) rotateX(10deg) rotateY(-5deg)');
+});
+
+test('applyDrift: composes additively with pose, not overwriting it', () => {
+    const sceneEl = { style: {} };
+    const rigEl = { style: {} };
+    const cam = new CineCamera(sceneEl, rigEl);
+    cam.applyPose({ fov: 3500, tilt: 10, spin: -5, zoom: 1 });
+    cam.applyDrift(1, 1, 1500); // period=6000ms, phase = 1500/6000*2*PI = PI/2
+    const expectedTilt = 10 + Math.sin(Math.PI / 2) * 1 * 1.2;
+    const expectedSpin = -5 + Math.cos(Math.PI / 2 * 0.7) * 1 * 1.5;
+    const gotTilt = parseFloat(rigEl.style.transform.match(/rotateX\((-?[\d.]+)deg\)/)[1]);
+    const gotSpin = parseFloat(rigEl.style.transform.match(/rotateY\((-?[\d.]+)deg\)/)[1]);
+    assert.ok(Math.abs(gotTilt - expectedTilt) < 1e-6, `tilt: expected ${expectedTilt}, got ${gotTilt}`);
+    assert.ok(Math.abs(gotSpin - expectedSpin) < 1e-6, `spin: expected ${expectedSpin}, got ${gotSpin}`);
+});
+
+test('clearTo2D resets bass scale and drift as well as shakes', () => {
+    const sceneEl = { style: {} };
+    const rigEl = { style: {} };
+    const cam = new CineCamera(sceneEl, rigEl);
+    cam.applyPose({ fov: 3500, tilt: 0, spin: 0, zoom: 1 });
+    cam.applyBassScale(1);
+    cam.applyDrift(1, 1, 1500);
+    cam.clearTo2D();
+    cam.applyPose({ fov: 1000, tilt: 0, spin: 0, zoom: 1 });
+    assert.strictEqual(rigEl.style.transform, 'scale(1) rotateX(0deg) rotateY(0deg)');
+});
