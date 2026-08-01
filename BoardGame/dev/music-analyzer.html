@@ -37,6 +37,10 @@
 
     <div class="panel">
         <input type="file" id="fileInput" accept="audio/*">
+        <label for="secondaryFileInput" style="display:block; margin-top:8px; font-size:0.8rem; color:#9fd;">
+            Secondary layer (optional) — merged into the primary via point-wise max envelope (e.g. lead + backing vocals)
+        </label>
+        <input type="file" id="secondaryFileInput" accept="audio/*">
         <audio id="previewAudio" controls style="display:none;"></audio>
     </div>
 
@@ -59,11 +63,14 @@
         <canvas id="waveformCanvas" height="200"></canvas>
     </div>
 
+    <script src="music-merge-envelopes.js"></script>
     <script>
-        let envelope = [];   // [{t, amp}], amp normalized 0-1
+        let envelope = [];   // [{t, amp}], amp normalized 0-1 — merged if a secondary file is present
         let durationMs = 0;
         let beats = [];      // [ms, ...]
         let currentObjectUrl = null;
+        let secondaryEnvelope = null; // set when a secondary file has been analyzed
+        let secondaryDurationMs = 0;
 
         // RMS envelope, one sample per ~100ms window, normalized against the
         // track's own peak window (so quiet tracks still reach amp=1 at
@@ -182,8 +189,13 @@
                 const offlineCtx = new OfflineAudioContext(2, 1, 44100); // throwaway ctx, decodeAudioData only
                 const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
                 const result = computeRmsEnvelope(audioBuffer);
-                envelope = result.envelope;
-                durationMs = result.durationMs;
+                if (secondaryEnvelope) {
+                    envelope = mergeEnvelopes(result.envelope, secondaryEnvelope);
+                    durationMs = Math.max(result.durationMs, secondaryDurationMs);
+                } else {
+                    envelope = result.envelope;
+                    durationMs = result.durationMs;
+                }
 
                 if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
                 currentObjectUrl = URL.createObjectURL(file);
@@ -218,9 +230,33 @@
             setTimeout(() => { btn.textContent = original; }, 1200);
         }
 
+        async function handleSecondaryFile(file) {
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const offlineCtx = new OfflineAudioContext(2, 1, 44100);
+                const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
+                const result = computeRmsEnvelope(audioBuffer);
+                secondaryEnvelope = result.envelope;
+                secondaryDurationMs = result.durationMs;
+                // Re-run the primary analysis's merge if a primary file was
+                // already analyzed, so selecting the secondary file second
+                // still produces a merged result without re-selecting the
+                // primary.
+                if (envelope.length > 0 && document.getElementById('fileInput').files[0]) {
+                    handleFile(document.getElementById('fileInput').files[0]);
+                }
+            } catch (err) {
+                document.getElementById('status').textContent = `Failed to analyze secondary file: ${err.message}`;
+            }
+        }
+
         document.getElementById('fileInput').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) handleFile(file);
+        });
+        document.getElementById('secondaryFileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleSecondaryFile(file);
         });
         document.getElementById('thresholdSlider').addEventListener('input', (e) => {
             document.getElementById('thresholdValue').textContent = e.target.value;
