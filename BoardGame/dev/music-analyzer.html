@@ -63,6 +63,7 @@
         let envelope = [];   // [{t, amp}], amp normalized 0-1
         let durationMs = 0;
         let beats = [];      // [ms, ...]
+        let currentObjectUrl = null;
 
         // RMS envelope, one sample per ~100ms window, normalized against the
         // track's own peak window (so quiet tracks still reach amp=1 at
@@ -160,20 +161,34 @@
         }
 
         async function handleFile(file) {
-            const arrayBuffer = await file.arrayBuffer();
-            const offlineCtx = new OfflineAudioContext(2, 1, 44100); // throwaway ctx, decodeAudioData only
-            const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
-            const result = computeRmsEnvelope(audioBuffer);
-            envelope = result.envelope;
-            durationMs = result.durationMs;
+            // Make #status visible before the async work starts so the
+            // loading message is actually seen: it lives inside #tunePanel,
+            // which is display:none until the first successful analysis.
+            const tunePanel = document.getElementById('tunePanel');
+            const statusEl = document.getElementById('status');
+            tunePanel.style.display = '';
+            statusEl.textContent = 'Analyzing...';
 
-            const previewAudio = document.getElementById('previewAudio');
-            previewAudio.src = URL.createObjectURL(file);
-            previewAudio.style.display = '';
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const offlineCtx = new OfflineAudioContext(2, 1, 44100); // throwaway ctx, decodeAudioData only
+                const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
+                const result = computeRmsEnvelope(audioBuffer);
+                envelope = result.envelope;
+                durationMs = result.durationMs;
 
-            document.getElementById('tunePanel').style.display = '';
-            document.getElementById('canvasHost').style.display = '';
-            reanalyzeBeats();
+                if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+                currentObjectUrl = URL.createObjectURL(file);
+
+                const previewAudio = document.getElementById('previewAudio');
+                previewAudio.src = currentObjectUrl;
+                previewAudio.style.display = '';
+
+                document.getElementById('canvasHost').style.display = '';
+                reanalyzeBeats();
+            } catch (err) {
+                statusEl.textContent = `Failed to analyze file: ${err.message}`;
+            }
         }
 
         async function copyJson() {
