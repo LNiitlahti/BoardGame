@@ -21,6 +21,11 @@
         .tune-row label { color: #cdd; font-size: 0.8rem; min-width: 200px; }
         .tune-row input[type="range"] { flex: 1; }
         .tune-row .tune-value { color: #fff; font-size: 0.8rem; width: 60px; text-align: right; }
+        .tune-row .scale-inputs { color: #9fd; font-size: 0.75rem; display: flex; align-items: center; gap: 4px; }
+        .tune-row .scale-inputs input[type="number"] {
+            background: #10131c; color: #fff; border: 1px solid #3a4a5c; border-radius: 3px;
+            font-size: 0.75rem; padding: 2px 4px;
+        }
         button {
             background: #27ae60; color: #fff; border: none;
             padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;
@@ -63,8 +68,8 @@
 
     <script>
         const STEM_DEFS = [
-            { key: 'vocals',        label: 'Vocals',         match: /vocals(?!.*backing)/i },
             { key: 'backingVocals', label: 'Backing Vocals', match: /backing.*vocals/i },
+            { key: 'vocals',        label: 'Vocals',         match: /vocals(?!.*backing)/i },
             { key: 'drums',         label: 'Drums',          match: /drums/i },
             { key: 'bass',          label: 'Bass',           match: /bass/i },
             { key: 'percussion',    label: 'Percussion',     match: /percussion/i },
@@ -82,9 +87,10 @@
         const stemStates = new Map();
 
         // backingVocals is checked before vocals by iteration order in
-        // STEM_DEFS, so "Backing Vocals.wav" is claimed first; the vocals
-        // pattern's negative lookahead is a second guard against the same
-        // misclassification.
+        // STEM_DEFS, so "Backing Vocals.wav" is claimed first — necessary
+        // because "backing" precedes "vocals" in that filename, so the
+        // vocals pattern's negative lookahead (which only excludes "backing"
+        // appearing after "vocals") can't catch it on its own.
         function matchStemKey(filename) {
             const stripped = filename.replace(/^\s*\d+[\s._-]+/, '');
             for (const def of STEM_DEFS) {
@@ -215,11 +221,19 @@
                         <label>Onset threshold (&times; rolling avg)</label>
                         <input type="range" class="threshold-slider" min="1" max="3" step="0.05" value="1.35">
                         <span class="tune-value threshold-value">1.35</span>
+                        <span class="scale-inputs">
+                            min <input type="number" class="threshold-min" value="1" step="0.05" style="width:50px;">
+                            max <input type="number" class="threshold-max" value="3" step="0.05" style="width:50px;">
+                        </span>
                     </div>
                     <div class="tune-row">
                         <label>Debounce (ms)</label>
                         <input type="range" class="debounce-slider" min="50" max="500" step="10" value="200">
                         <span class="tune-value debounce-value">200</span>
+                        <span class="scale-inputs">
+                            min <input type="number" class="debounce-min" value="50" step="10" style="width:55px;">
+                            max <input type="number" class="debounce-max" value="500" step="10" style="width:55px;">
+                        </span>
                     </div>
                     <button class="copy-btn">Copy JSON (music-cues-${key}.json)</button>
                     <div class="status"></div>
@@ -238,11 +252,17 @@
                 audio: panel.querySelector('audio'),
                 thresholdSlider: panel.querySelector('.threshold-slider'),
                 thresholdValue: panel.querySelector('.threshold-value'),
+                thresholdMin: panel.querySelector('.threshold-min'),
+                thresholdMax: panel.querySelector('.threshold-max'),
                 debounceSlider: panel.querySelector('.debounce-slider'),
                 debounceValue: panel.querySelector('.debounce-value'),
+                debounceMin: panel.querySelector('.debounce-min'),
+                debounceMax: panel.querySelector('.debounce-max'),
                 copyBtn: panel.querySelector('.copy-btn'),
                 status: panel.querySelector('.status'),
             };
+
+            els.audio.volume = 0.5;
 
             els.header.addEventListener('click', () => {
                 panel.classList.toggle('expanded');
@@ -254,6 +274,18 @@
             els.debounceSlider.addEventListener('input', (e) => {
                 els.debounceValue.textContent = e.target.value;
                 reanalyzeStem(key);
+            });
+            els.thresholdMin.addEventListener('change', (e) => {
+                els.thresholdSlider.min = e.target.value;
+            });
+            els.thresholdMax.addEventListener('change', (e) => {
+                els.thresholdSlider.max = e.target.value;
+            });
+            els.debounceMin.addEventListener('change', (e) => {
+                els.debounceSlider.min = e.target.value;
+            });
+            els.debounceMax.addEventListener('change', (e) => {
+                els.debounceSlider.max = e.target.value;
             });
             els.copyBtn.addEventListener('click', () => copyStemJson(key));
             els.audio.addEventListener('timeupdate', () => drawPlayhead(key));
