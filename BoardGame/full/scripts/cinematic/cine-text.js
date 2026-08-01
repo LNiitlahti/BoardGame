@@ -16,10 +16,13 @@ class CineText {
 
     // Restarts the glitch-flicker CSS animation (remove-reflow-readd, same
     // trick as triggerBeatPulse/triggerWash) on whatever text is currently
-    // set.
-    triggerFlicker() {
+    // set. speedFactor (from CineTempo.computeTempo) shortens the flicker
+    // under high tempo -- feels snappier when the music is busy. Defaults to
+    // 1 so the method stays usable standalone.
+    triggerFlicker(speedFactor = 1) {
         this.el.classList.remove('flicker');
         void this.el.offsetWidth; // force reflow so re-adding the class restarts the animation
+        this.el.style.animationDuration = `${180 / speedFactor}ms`;
         this.el.classList.add('flicker');
     }
 
