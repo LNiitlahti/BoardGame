@@ -268,6 +268,16 @@
         const { outroDurationMs, finalEnd } = window.CineOutro.computeOutro(
             cinematicOwnEnd, state.musicDrums.durationMs);
 
+        // --- Shared tempo signal: beat density across every loaded stem
+        // (including drums/vocals) in a trailing 2s window. Read fresh at
+        // each call site below rather than cached, since it's cheap and
+        // varies continuously with t.
+        const tempoStems = [
+            state.musicDrums, state.musicVocals, state.musicBackingVocals,
+            state.musicBass, state.musicPercussion, state.musicStrings,
+            state.musicSynth, state.musicOther
+        ];
+
         // --- Outro camera drift: when the music runs longer than the
         // cinematic's own choreography (cinematicOwnEnd), extend the
         // timeline to finalEnd so the track can play to completion instead
@@ -308,7 +318,8 @@
             if (beatMs < textWindowStart || beatMs > textWindowEnd) return;
             tl.add({
                 at: beatMs, duration: 0,
-                onStart: () => state.text.triggerFlicker()
+                onStart: () => state.text.triggerFlicker(
+                    window.CineTempo.computeTempo(tempoStems, beatMs))
             });
         });
 
@@ -369,6 +380,79 @@
                 });
             }
         });
+
+        // --- Multi-stem effects: backing vocals, bass, percussion, strings,
+        // synth, other. Each stem is independently optional — a missing/
+        // failed load yields an inert CineMusic (empty envelope/beats, see
+        // cine-music.js), so guarding on envelope/beats length here is what
+        // makes a missing stem's effect not fire, without needing a separate
+        // null-check path. Continuous-envelope stems run 0..min(duration,
+        // finalEnd), same clamping pattern as the drums envelope block above.
+        if (state.musicBackingVocals.envelope.length > 0) {
+            const dur = Math.min(state.musicBackingVocals.durationMs, finalEnd);
+            tl.add({
+                at: 0,
+                duration: dur,
+                onUpdate: p => state.atmosphere.applyFogIntensity(
+                    state.musicBackingVocals.envelopeAt(p * dur))
+            });
+        }
+
+        if (state.musicBass.envelope.length > 0) {
+            const dur = Math.min(state.musicBass.durationMs, finalEnd);
+            tl.add({
+                at: 0,
+                duration: dur,
+                onUpdate: p => state.camera.applyBassScale(
+                    state.musicBass.envelopeAt(p * dur))
+            });
+        }
+
+        if (state.musicPercussion.beats.length > 0) {
+            state.musicPercussion.beats.forEach(beatMs => {
+                if (beatMs > finalEnd) return; // never fires past the cinematic's own end, see the drums beat loop above
+                tl.add({
+                    at: beatMs,
+                    duration: 0,
+                    onStart: () => state.atmosphere.triggerSpark(
+                        window.CineTempo.computeTempo(tempoStems, beatMs))
+                });
+            });
+        }
+
+        if (state.musicStrings.envelope.length > 0) {
+            const dur = Math.min(state.musicStrings.durationMs, finalEnd);
+            tl.add({
+                at: 0,
+                duration: dur,
+                onUpdate: p => {
+                    const t = p * dur;
+                    const amp = state.musicStrings.envelopeAt(t);
+                    const speedFactor = window.CineTempo.computeTempo(tempoStems, t);
+                    state.camera.applyDrift(amp, speedFactor, t);
+                }
+            });
+        }
+
+        if (state.musicSynth.envelope.length > 0) {
+            const dur = Math.min(state.musicSynth.durationMs, finalEnd);
+            tl.add({
+                at: 0,
+                duration: dur,
+                onUpdate: p => state.atmosphere.applySynthGlow(
+                    state.musicSynth.envelopeAt(p * dur))
+            });
+        }
+
+        if (state.musicOther.envelope.length > 0) {
+            const dur = Math.min(state.musicOther.durationMs, finalEnd);
+            tl.add({
+                at: 0,
+                duration: dur,
+                onUpdate: p => state.atmosphere.applyBaseIntensity(
+                    state.musicOther.envelopeAt(p * dur))
+            });
+        }
 
         tl.onFinished = teardown;
         return tl;
