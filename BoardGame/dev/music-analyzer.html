@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Board Game - Music Analyzer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #10131c; min-height: 100vh; font-family: system-ui, sans-serif;
+            color: #cdd; padding: 20px;
+        }
+        h1 { color: #fff; font-size: 1.2rem; margin-bottom: 14px; }
+        .panel {
+            background: rgba(44, 62, 80, 0.95); border-radius: 8px;
+            padding: 14px; margin-bottom: 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .tune-row {
+            display: flex; align-items: center; gap: 8px;
+            padding: 4px 8px; background: #1e2a38; border-radius: 4px; margin-bottom: 4px;
+        }
+        .tune-row label { color: #cdd; font-size: 0.8rem; min-width: 200px; }
+        .tune-row input[type="range"] { flex: 1; }
+        .tune-row .tune-value { color: #fff; font-size: 0.8rem; width: 60px; text-align: right; }
+        button {
+            background: #27ae60; color: #fff; border: none;
+            padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;
+        }
+        button:hover { filter: brightness(1.1); }
+        #canvasHost { width: 100%; overflow-x: auto; }
+        canvas { display: block; background: #1e2a38; border-radius: 4px; }
+        #status { font-size: 0.85rem; margin-top: 8px; color: #9fd; }
+        audio { width: 100%; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Music Analyzer &mdash; beat/envelope extraction for music-cues.json</h1>
+
+    <div class="panel">
+        <input type="file" id="fileInput" accept="audio/*">
+        <audio id="previewAudio" controls style="display:none;"></audio>
+    </div>
+
+    <div class="panel" id="tunePanel" style="display:none;">
+        <div class="tune-row">
+            <label for="thresholdSlider">Onset threshold (&times; rolling avg)</label>
+            <input type="range" id="thresholdSlider" min="1" max="3" step="0.05" value="1.35">
+            <span class="tune-value" id="thresholdValue">1.35</span>
+        </div>
+        <div class="tune-row">
+            <label for="debounceSlider">Debounce (ms)</label>
+            <input type="range" id="debounceSlider" min="50" max="500" step="10" value="200">
+            <span class="tune-value" id="debounceValue">200</span>
+        </div>
+        <button id="btnCopy">Copy JSON to clipboard</button>
+        <div id="status"></div>
+    </div>
+
+    <div class="panel" id="canvasHost" style="display:none;">
+        <canvas id="waveformCanvas" height="200"></canvas>
+    </div>
+
+    <script>
+        let envelope = [];   // [{t, amp}], amp normalized 0-1
+        let durationMs = 0;
+        let beats = [];      // [ms, ...]
+
+        // RMS envelope, one sample per ~100ms window, normalized against the
+        // track's own peak window (so quiet tracks still reach amp=1 at
+        // their own loudest point).
+        function computeRmsEnvelope(audioBuffer) {
+            const sampleRate = audioBuffer.sampleRate;
+            const windowMs = 100;
+            const windowSamples = Math.round(sampleRate * windowMs / 1000);
+            const ch0 = audioBuffer.getChannelData(0);
+            const ch1 = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : null;
+            const total = ch0.length;
+            const env = [];
+            let maxRms = 0;
+            for (let start = 0; start < total; start += windowSamples) {
+                const end = Math.min(total, start + windowSamples);
+                let sumSq = 0;
+                for (let i = start; i < end; i++) {
+                    const s = ch1 ? (ch0[i] + ch1[i]) / 2 : ch0[i];
+                    sumSq += s * s;
+                }
+                const rms = Math.sqrt(sumSq / (end - start));
+                if (rms > maxRms) maxRms = rms;
+                env.push({ t: Math.round(start / sampleRate * 1000), amp: rms });
+            }
+            if (maxRms > 0) {
+                for (const e of env) e.amp = Math.min(1, e.amp / maxRms);
+            }
+            return { envelope: env, durationMs: Math.round(total / sampleRate * 1000) };
+        }
+
+        // Threshold-over-rolling-average onset detection with a debounce
+        // window, per the design spec. rollWindow=15 samples = ~1.5s of
+        // trailing context at the 100ms sampling rate above.
+        function detectBeats(env, thresholdRatio, debounceMs) {
+            const result = [];
+            const rollWindow = 15;
+            let lastBeatT = -Infinity;
+            for (let i = 0; i < env.length; i++) {
+                const start = Math.max(0, i - rollWindow);
+                let sum = 0;
+                for (let j = start; j < i; j++) sum += env[j].amp;
+                const count = i - start;
+                const avg = count > 0 ? sum / count : 0;
+                const isOnset = env[i].amp > avg * thresholdRatio && env[i].amp > 0.05;
+                if (isOnset && env[i].t - lastBeatT >= debounceMs) {
+                    result.push(env[i].t);
+                    lastBeatT = env[i].t;
+                }
+            }
+            return result;
+        }
+
+        function renderWaveform() {
+            const canvas = document.getElementById('waveformCanvas');
+            const pxPerSec = 60;
+            canvas.width = Math.max(600, Math.round(durationMs / 1000 * pxPerSec));
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = '#1e2a38';
+            ctx.fillRect(0, 0, w, h);
+
+            ctx.strokeStyle = '#4fd1c5';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            envelope.forEach((e, i) => {
+                const x = (e.t / durationMs) * w;
+                const y = h - e.amp * h;
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            ctx.strokeStyle = '#f7ba32';
+            ctx.lineWidth = 1;
+            beats.forEach(bt => {
+                const x = (bt / durationMs) * w;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, h);
+                ctx.stroke();
+            });
+        }
+
+        function updateStatus() {
+            document.getElementById('status').textContent =
+                `${(durationMs / 1000).toFixed(1)}s track, ${envelope.length} envelope samples, ${beats.length} beats detected`;
+        }
+
+        function reanalyzeBeats() {
+            const threshold = parseFloat(document.getElementById('thresholdSlider').value);
+            const debounce = parseFloat(document.getElementById('debounceSlider').value);
+            beats = detectBeats(envelope, threshold, debounce);
+            renderWaveform();
+            updateStatus();
+        }
+
+        async function handleFile(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const offlineCtx = new OfflineAudioContext(2, 1, 44100); // throwaway ctx, decodeAudioData only
+            const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
+            const result = computeRmsEnvelope(audioBuffer);
+            envelope = result.envelope;
+            durationMs = result.durationMs;
+
+            const previewAudio = document.getElementById('previewAudio');
+            previewAudio.src = URL.createObjectURL(file);
+            previewAudio.style.display = '';
+
+            document.getElementById('tunePanel').style.display = '';
+            document.getElementById('canvasHost').style.display = '';
+            reanalyzeBeats();
+        }
+
+        async function copyJson() {
+            const doc = { version: 1, durationMs, envelope, beats };
+            await navigator.clipboard.writeText(JSON.stringify(doc, null, 4));
+            const btn = document.getElementById('btnCopy');
+            const original = btn.textContent;
+            btn.textContent = '✓ Copied!';
+            setTimeout(() => { btn.textContent = original; }, 1200);
+        }
+
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleFile(file);
+        });
+        document.getElementById('thresholdSlider').addEventListener('input', (e) => {
+            document.getElementById('thresholdValue').textContent = e.target.value;
+            reanalyzeBeats();
+        });
+        document.getElementById('debounceSlider').addEventListener('input', (e) => {
+            document.getElementById('debounceValue').textContent = e.target.value;
+            reanalyzeBeats();
+        });
+        document.getElementById('btnCopy').addEventListener('click', copyJson);
+    </script>
+</body>
+</html>
