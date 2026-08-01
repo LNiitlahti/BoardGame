@@ -372,6 +372,7 @@
         let cfg = null;          // live-tunable copy, seeded from the JSON file
         let materials = null;    // CineMaterials instance, loaded once alongside cfg
         let music = null;    // CineMusic instance, loaded once alongside cfg/materials
+        let musicVocals = null; // CineMusic instance for vocals cues, loaded but not yet wired up
         let audioEl = null;  // harness preview <audio>, (re)created per buildAndPlay()
         let timeline = null;
         let camera = null;
@@ -471,10 +472,11 @@
         }
 
         async function loadConfig() {
-            [cfg, materials, music] = await Promise.all([
+            [cfg, materials, music, musicVocals] = await Promise.all([
                 fetch('../full/data/cinematic-scene.json').then(r => r.json()),
                 CineMaterials.load('../shared/data/hex-materials.json'),
-                CineMusic.load('../full/data/music-cues.json')
+                CineMusic.load('../full/data/music-cues-drums.json'),
+                CineMusic.load('../full/data/music-cues-vocals.json')
             ]);
             buildSliderPanel();
             // Build tracks up front (pure — no visible side effects) purely so

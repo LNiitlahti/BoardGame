@@ -19,7 +19,8 @@
         tiles: null,
         config: null,
         materials: null,
-        music: null,
+        musicDrums: null,
+        musicVocals: null,
         audioEl: null,
         coverEl: null,
         watchdogId: null,
@@ -249,7 +250,7 @@
 
         const cinematicOwnEnd = revealEnd + cfg.signage.durationMs;
         const { outroDurationMs, finalEnd } = window.CineOutro.computeOutro(
-            cinematicOwnEnd, state.music.durationMs);
+            cinematicOwnEnd, state.musicDrums.durationMs);
 
         // --- Outro camera drift: when the music runs longer than the
         // cinematic's own choreography (cinematicOwnEnd), extend the
@@ -275,7 +276,7 @@
         // finalEnd just goes quiet for the remainder (envelopeAt clamps to
         // the last sample), and a track at or under finalEnd plays to
         // completion instead of being cut off.
-        const music = state.music;
+        const music = state.musicDrums;
         const envelopeDuration = Math.min(music.durationMs, finalEnd);
         if (envelopeDuration > 0) {
             tl.add({
@@ -379,14 +380,16 @@
             // instance internally on its own fetch failure) — so this
             // Promise.all only ever rejects on the scene config side, which
             // is the only failure that should bail the whole cinematic.
-            const [config, materials, music] = await Promise.all([
+            const [config, materials, musicDrums, musicVocals] = await Promise.all([
                 fetch('data/cinematic-scene.json').then(res => res.json()),
                 window.CineMaterials.load('../shared/data/hex-materials.json'),
-                window.CineMusic.load('data/music-cues.json')
+                window.CineMusic.load('data/music-cues-drums.json'),
+                window.CineMusic.load('data/music-cues-vocals.json')
             ]);
             state.config = config;
             state.materials = materials;
-            state.music = music;
+            state.musicDrums = musicDrums;
+            state.musicVocals = musicVocals;
         } catch (e) {
             console.error('[Cinematic] Config load failed, bailing:', e);
             document.documentElement.classList.remove('cine-pending');
