@@ -166,8 +166,16 @@
             // which is display:none until the first successful analysis.
             const tunePanel = document.getElementById('tunePanel');
             const statusEl = document.getElementById('status');
+            const thresholdSlider = document.getElementById('thresholdSlider');
+            const debounceSlider = document.getElementById('debounceSlider');
+            const btnCopy = document.getElementById('btnCopy');
             tunePanel.style.display = '';
             statusEl.textContent = 'Analyzing...';
+            // Disable controls during in-flight analysis so a slider drag or
+            // copy click can't act on stale/placeholder envelope/beats data.
+            thresholdSlider.disabled = true;
+            debounceSlider.disabled = true;
+            btnCopy.disabled = true;
 
             try {
                 const arrayBuffer = await file.arrayBuffer();
@@ -185,9 +193,19 @@
                 previewAudio.style.display = '';
 
                 document.getElementById('canvasHost').style.display = '';
+                thresholdSlider.disabled = false;
+                debounceSlider.disabled = false;
+                btnCopy.disabled = false;
                 reanalyzeBeats();
             } catch (err) {
                 statusEl.textContent = `Failed to analyze file: ${err.message}`;
+                // Only re-enable if a prior successful analysis left real data
+                // in place; otherwise there's nothing valid to interact with.
+                if (envelope.length > 0) {
+                    thresholdSlider.disabled = false;
+                    debounceSlider.disabled = false;
+                    btnCopy.disabled = false;
+                }
             }
         }
 
