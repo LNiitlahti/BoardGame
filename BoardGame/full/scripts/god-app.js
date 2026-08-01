@@ -20,6 +20,7 @@ class GodApp {
         this._boardRenderer = null;
         this._suppressLoadToast = false;
         this._allTournaments = [];
+        this._prevRenderSignature = null;
 
         // Action logger (created in init)
         this.actionLogger = null;
@@ -470,8 +471,15 @@ class GodApp {
                     }
 
                     this.ui.updateConnectionStatus('connected');
-                    this.updateDisplay();
-                    this.teams.applyTeamColors();
+
+                    const newSignature = window.RenderSignature.computeFieldSignature(
+                        this.gameState, window.RenderSignature.EXCLUDED_KEYS
+                    );
+                    if (newSignature !== this._prevRenderSignature) {
+                        this._prevRenderSignature = newSignature;
+                        this.updateDisplay();
+                        this.teams.applyTeamColors();
+                    }
 
                     // Initialize SmartMatchGenerator
                     if (typeof SmartMatchGenerator !== 'undefined') {
