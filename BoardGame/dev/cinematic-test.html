@@ -331,6 +331,7 @@
     <script src="../full/scripts/cinematic/cine-tiles.js"></script>
     <script src="../full/scripts/cinematic/cine-materials.js"></script>
     <script src="../full/scripts/cinematic/cine-music.js"></script>
+    <script src="../full/scripts/cinematic/cine-outro.js"></script>
     <script>
         // Minimal re-implementation of the controller flow with mock data,
         // instant replay, and a live-tunable copy of cinematic-scene.json.
@@ -398,6 +399,11 @@
             ['camera.rest.tilt', 'Tilt', 0, 85, 1],
             ['camera.rest.spin', 'Spin', -180, 180, 1],
             ['camera.rest.zoom', 'Zoom', 0.3, 2.5, 0.05],
+            ['__section', 'Camera — Outro (post-signage drift)'],
+            ['camera.outro.fov', 'FOV', 300, 4000, 50],
+            ['camera.outro.tilt', 'Tilt', 0, 85, 1],
+            ['camera.outro.spin', 'Spin', -180, 180, 1],
+            ['camera.outro.zoom', 'Zoom', 0.3, 2.5, 0.05],
             ['__section', 'Tile Drop Physics'],
             ['tiles.dropHeightPx', 'Drop Height (px)', 200, 4000, 50],
             ['tiles.spinDegrees', 'Spin (deg)', 0, 1440, 30],
@@ -551,9 +557,21 @@
                 onUpdate: () => {}
             });
 
-            // Music sync — mirrors cinematic-controller.js's buildTimeline().
+            // Camera: outro drift track, mirrors cinematic-controller.js's
+            // buildTimeline() — added when the music runs longer than the
+            // cinematic's own authored length.
             const cinematicOwnEnd = revealEnd + cfg.signage.durationMs;
-            const envelopeDuration = Math.min(music.durationMs, cinematicOwnEnd);
+            const { outroDurationMs, finalEnd } = CineOutro.computeOutro(cinematicOwnEnd, music.durationMs);
+            if (outroDurationMs > 0) {
+                tracks.push({
+                    at: cinematicOwnEnd, duration: outroDurationMs,
+                    onUpdate: p => camera.applyPose(
+                        CineCamera.lerpPose(cfg.camera.rest, cfg.camera.outro, p))
+                });
+            }
+
+            // Music sync — mirrors cinematic-controller.js's buildTimeline().
+            const envelopeDuration = Math.min(music.durationMs, finalEnd);
             if (envelopeDuration > 0) {
                 tracks.push({
                     at: 0, duration: envelopeDuration,
@@ -571,7 +589,7 @@
                 hexesByRing.get(entry.ring).push(entry.coord);
             }
             music.beats.forEach((beatMs, i) => {
-                if (beatMs > cinematicOwnEnd) return;
+                if (beatMs > finalEnd) return;
                 const ring = i % (maxRing + 1);
                 const coords = hexesByRing.get(ring) || [];
                 tracks.push({
