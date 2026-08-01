@@ -24,6 +24,10 @@
     "signage": {
         "durationMs": 15000
     },
+    "text": {
+        "title": "Sota Jatkuu",
+        "displayIntervalMs": 4000
+    },
     "camera": {
         "dramatic": {
             "fov": 2450,

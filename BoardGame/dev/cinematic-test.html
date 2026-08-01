@@ -370,6 +370,10 @@
         };
         boardModule.setRoomHexes(mockGame.rooms);
         renderer.render(mockGame);
+        const mockTeamNames = [
+            { players: [{ name: 'Aino' }, { name: 'Eero' }] },
+            { players: [{ name: 'Liisa' }, { name: 'Onni' }] }
+        ];
 
         // Match the real production look by default (terrain images, heart
         // glow/pulse, room outlines) instead of BoardRenderer's plain gray
@@ -406,6 +410,7 @@
         let timeline = null;
         let camera = null;
         let tiles = null;
+        let text = null;
         let currentTracks = [];       // last-built track list, scrubbed against by the time slider
         let currentTotalDuration = 0; // ms, includes the void hold (scrub range starts at arm/audio start, t=0)
 
@@ -544,6 +549,8 @@
                 document.getElementById('cineScene'),
                 document.getElementById('cineRig'));
             tiles = new CineTiles(document.getElementById('hexBoard'), cfg.tiles, materials);
+            if (text) text.remove();
+            text = new CineText(document.querySelector('.board-wrap'));
 
             const order = CineBoardOrder.buildLandingOrder(boardModule.generateHexCoordinates());
             const tracks = [];
@@ -624,6 +631,27 @@
                         CineCamera.lerpPose(cfg.camera.rest, cfg.camera.outro, p))
                 });
             }
+
+            // Vocal-synced text — mirrors cinematic-controller.js's buildTimeline().
+            const names = mockTeamNames.flatMap(team => (team.players || []).map(p => p.name)).filter(Boolean);
+            const cycle = [cfg.text.title, ...names];
+            const textWindowStart = revealEnd;
+            const textWindowEnd = finalEnd;
+            const textInterval = cfg.text.displayIntervalMs;
+            for (let at = textWindowStart, i = 0; at < textWindowEnd; at += textInterval, i++) {
+                const displayText = cycle[i % cycle.length];
+                tracks.push({
+                    at, duration: 0,
+                    onStart: () => text.setText(displayText)
+                });
+            }
+            musicVocals.beats.forEach(beatMs => {
+                if (beatMs < textWindowStart || beatMs > textWindowEnd) return;
+                tracks.push({
+                    at: beatMs, duration: 0,
+                    onStart: () => text.triggerFlicker()
+                });
+            });
 
             // Music sync — mirrors cinematic-controller.js's buildTimeline().
             const envelopeDuration = Math.min(music.durationMs, finalEnd);

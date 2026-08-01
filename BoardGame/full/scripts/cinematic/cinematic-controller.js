@@ -17,6 +17,7 @@
         timeline: null,
         camera: null,
         tiles: null,
+        text: null,
         config: null,
         materials: null,
         musicDrums: null,
@@ -91,6 +92,10 @@
         if (state.audioEl) {
             try { state.audioEl.pause(); state.audioEl.src = ''; } catch (e) { console.error('[Cinematic] audio teardown failed:', e); }
             state.audioEl = null;
+        }
+        if (state.text) {
+            try { state.text.remove(); } catch (e) { console.error('[Cinematic] text.remove failed:', e); }
+            state.text = null;
         }
 
         // Guaranteed cleanup: must happen no matter what went wrong above.
@@ -268,6 +273,34 @@
             });
         }
 
+        // --- Vocal-synced text: title first, then cycles through
+        // team/player names on a fixed schedule, re-flickering on every
+        // vocal onset. Runs only during signage+outro (revealEnd → finalEnd).
+        const names = (window.CineView.getGameState()?.teams || [])
+            .flatMap(team => (team.players || []).map(p => p.name))
+            .filter(Boolean);
+        const cycle = [cfg.text.title, ...names]; // always at least the title
+
+        const textWindowStart = revealEnd;
+        const textWindowEnd = finalEnd;
+        const textInterval = cfg.text.displayIntervalMs;
+
+        for (let at = textWindowStart, i = 0; at < textWindowEnd; at += textInterval, i++) {
+            const displayText = cycle[i % cycle.length];
+            tl.add({
+                at, duration: 0,
+                onStart: () => state.text.setText(displayText)
+            });
+        }
+
+        state.musicVocals.beats.forEach(beatMs => {
+            if (beatMs < textWindowStart || beatMs > textWindowEnd) return;
+            tl.add({
+                at: beatMs, duration: 0,
+                onStart: () => state.text.triggerFlicker()
+            });
+        });
+
         // --- Music sync: envelope pulse (effects 1+2) + beat-triggered hex
         // wave (effect 3) / color wash (effect 4). Same shared clock as
         // everything above (t=0 = arm()/audio start). These now run through
@@ -347,6 +380,8 @@
             state.materials
         );
         state.tiles.hideAll();
+
+        state.text = new window.CineText(document.querySelector('.board-wrap'));
 
         document.addEventListener('keydown', onKeydown);
         window.addEventListener('error', bail);
