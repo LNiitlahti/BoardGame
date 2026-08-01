@@ -376,7 +376,7 @@
         let camera = null;
         let tiles = null;
         let currentTracks = [];       // last-built track list, scrubbed against by the time slider
-        let currentTotalDuration = 0; // ms, excludes the void hold (scrub range starts at first drop)
+        let currentTotalDuration = 0; // ms, includes the void hold (scrub range starts at arm/audio start, t=0)
 
         // Declarative slider spec: [path-in-cfg, label, min, max, step], or a
         // ['__section', headingText] sentinel row that renders a <h3> divider
