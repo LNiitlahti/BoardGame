@@ -17,6 +17,9 @@ let teamData = null;
 let boardRenderer = null;
 let unsubscribeGameListener = null;
 let selectedVote = null;
+let _prevRenderSignature = null;
+let _prevBoardSignature = null;
+let _hexImagesBuilt = false;
 
 /**
  * Initialize team controls when Firebase is ready
@@ -133,18 +136,24 @@ async function loadTournamentData() {
                 detail: { teamId: currentTeamId }
             }));
 
-            // Render all sections
-            renderScoreStrip();
-            renderPhaseBanner();
-            renderTeammates();
-            renderSpellCards();
-            renderActiveConditions();
-            renderBoard();
-            renderCurrentMatch();
-            renderUpcomingMatches();
-            renderRecentEvents();
-            checkForVoting();
-            renderPhaseOverlays();
+            // Render all sections (skip if nothing display-relevant changed)
+            const newSignature = window.RenderSignature.computeFieldSignature(
+                gameData, window.RenderSignature.EXCLUDED_KEYS
+            );
+            if (newSignature !== _prevRenderSignature) {
+                _prevRenderSignature = newSignature;
+                renderScoreStrip();
+                renderPhaseBanner();
+                renderTeammates();
+                renderSpellCards();
+                renderActiveConditions();
+                renderBoard();
+                renderCurrentMatch();
+                renderUpcomingMatches();
+                renderRecentEvents();
+                checkForVoting();
+                renderPhaseOverlays();
+            }
         }, (error) => {
             console.error('[Team Controls] Error loading tournament:', error);
             showStatus('Error loading tournament data: ' + error.message, 'error');
@@ -976,9 +985,19 @@ function renderBoard() {
         document.body.classList.add('effect-hex-images', 'effect-heart-glow', 'effect-pulse-hearts', 'effect-rooms');
     }
 
+    // applyHexImages() builds a static, board-state-independent stylesheet
+    // (same 91 coordinate rules every time) — build it once, not per render.
+    if (!_hexImagesBuilt) {
+        applyHexImages(true);
+        _hexImagesBuilt = true;
+    }
+
+    const boardSignature = window.RenderSignature.computeBoardSignature(gameData?.board, gameData?.rooms);
+    if (boardSignature === _prevBoardSignature) return;
+    _prevBoardSignature = boardSignature;
+
     boardRenderer.render(gameData);
     applyTeamColorsToBoard();
-    applyHexImages(true);
 }
 
 /**
