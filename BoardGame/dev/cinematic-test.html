@@ -189,6 +189,28 @@
             100% { opacity: 0; }
         }
 
+        /* --- Vocal-synced text overlay: black/white glitch-flicker, driven
+           by vocal onsets. Sibling of #cineWash, same "positioned element
+           outside the preserve-3d chain" rationale. */
+        #cineText {
+            position: absolute; inset: 0;
+            display: flex; align-items: center; justify-content: center;
+            font: 700 4vw system-ui, sans-serif;
+            color: #fff;
+            text-shadow: 0 2px 12px rgba(0,0,0,0.8);
+            pointer-events: none;
+            opacity: 0;
+        }
+        #cineText.flicker { animation: cineTextFlicker 180ms steps(1); }
+        @keyframes cineTextFlicker {
+            0%   { opacity: 1; color: #000; text-shadow: none; }
+            16%  { opacity: 1; color: #fff; }
+            33%  { opacity: 1; color: #000; text-shadow: none; }
+            50%  { opacity: 1; color: #fff; }
+            66%  { opacity: 1; color: #000; text-shadow: none; }
+            100% { opacity: 1; color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,0.8); }
+        }
+
         /* ===========================================
            VISUAL EFFECTS — copied from view.html so this harness matches
            the real production look by default (not the plain BoardRenderer
@@ -319,6 +341,7 @@
             <div class="rig-3d" id="cineRig"><div id="hexBoard"></div></div>
         </div>
         <div id="cineWash"></div>
+        <div id="cineText"></div>
     </div>
 
     <script>window.BOARDGAME_BASE = '..';</script>
@@ -329,6 +352,7 @@
     <script src="../full/scripts/cinematic/cine-timeline.js"></script>
     <script src="../full/scripts/cinematic/cine-camera.js"></script>
     <script src="../full/scripts/cinematic/cine-tiles.js"></script>
+    <script src="../full/scripts/cinematic/cine-text.js"></script>
     <script src="../full/scripts/cinematic/cine-materials.js"></script>
     <script src="../full/scripts/cinematic/cine-music.js"></script>
     <script src="../full/scripts/cinematic/cine-outro.js"></script>

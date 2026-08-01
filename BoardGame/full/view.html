@@ -88,6 +88,7 @@
                 'scripts/cinematic/cine-timeline.js',
                 'scripts/cinematic/cine-camera.js',
                 'scripts/cinematic/cine-tiles.js',
+                'scripts/cinematic/cine-text.js',
                 'scripts/cinematic/cine-materials.js',
                 'scripts/cinematic/cine-music.js',
                 'scripts/cinematic/cine-outro.js',
@@ -313,6 +314,28 @@
             0% { opacity: 0; }
             25% { opacity: 0.6; }
             100% { opacity: 0; }
+        }
+
+        /* --- Vocal-synced text overlay: black/white glitch-flicker, driven
+           by vocal onsets. Sibling of #cineWash, same "positioned element
+           outside the preserve-3d chain" rationale. */
+        #cineText {
+            position: absolute; inset: 0;
+            display: flex; align-items: center; justify-content: center;
+            font: 700 4vw system-ui, sans-serif;
+            color: #fff;
+            text-shadow: 0 2px 12px rgba(0,0,0,0.8);
+            pointer-events: none;
+            opacity: 0;
+        }
+        #cineText.flicker { animation: cineTextFlicker 180ms steps(1); }
+        @keyframes cineTextFlicker {
+            0%   { opacity: 1; color: #000; text-shadow: none; }
+            16%  { opacity: 1; color: #fff; }
+            33%  { opacity: 1; color: #000; text-shadow: none; }
+            50%  { opacity: 1; color: #fff; }
+            66%  { opacity: 1; color: #000; text-shadow: none; }
+            100% { opacity: 1; color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,0.8); }
         }
     </style>
 
@@ -1647,7 +1670,7 @@
                     <div></div>
                 </div>
             </div>
-            <div class="board-wrap"><div class="scene-3d" id="cineScene"><div class="rig-3d" id="cineRig"><div id="hexBoard"></div></div></div><div id="cineWash"></div></div>
+            <div class="board-wrap"><div class="scene-3d" id="cineScene"><div class="rig-3d" id="cineRig"><div id="hexBoard"></div></div></div><div id="cineWash"></div><div id="cineText"></div></div>
         </div>
 
         <!-- UPCOMING QUEUE — Right panel -->
