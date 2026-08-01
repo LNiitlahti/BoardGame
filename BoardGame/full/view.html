@@ -349,14 +349,31 @@
             overflow: hidden;
             pointer-events: none;
         }
+        /* Behind the board: sits below the (non-positioned) .scene-3d in
+           .board-wrap's stacking context via negative z-index. */
+        #cineAtmosphereBack {
+            position: absolute; inset: 0;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: -1;
+        }
         .atmo-fog {
             position: absolute; left: -20%; right: -20%; bottom: 0; height: 35%;
-            background: linear-gradient(to top, rgba(200,200,210,0.35), transparent);
             filter: blur(8px);
             opacity: calc(0.6 + (var(--atmo-intensity, 0) + var(--atmo-fog-intensity, 0)) * 0.2);
         }
-        .atmo-fog.layer-1 { animation: atmoFogDrift1 55s linear infinite; }
-        .atmo-fog.layer-2 { animation: atmoFogDrift2 70s linear infinite reverse; opacity: 0.4; }
+        .atmo-fog.layer-1 {
+            background: linear-gradient(to top, var(--fog-near, rgba(255,150,60,0.5)), var(--fog-far, rgba(90,60,120,0.2)) 70%, transparent);
+            animation: atmoFogDrift1 55s linear infinite;
+        }
+        .atmo-fog.layer-2 {
+            background: linear-gradient(to top, var(--fog-far, rgba(90,60,120,0.4)), transparent);
+            animation: atmoFogDrift2 70s linear infinite reverse; opacity: 0.4;
+        }
+        /* Front duplicate: same fog, dimmed to a faint depth echo in front
+           of the board. */
+        .atmo-fog.front { opacity: calc(var(--fog-front-opacity, 0.2) + (var(--atmo-intensity, 0) + var(--atmo-fog-intensity, 0)) * 0.05); }
+        .atmo-fog.layer-2.front { opacity: calc(var(--fog-front-opacity, 0.2) * 0.4); }
         @keyframes atmoFogDrift1 { from { transform: translateX(-5%); } to { transform: translateX(5%); } }
         @keyframes atmoFogDrift2 { from { transform: translateX(3%); } to { transform: translateX(-3%); } }
 

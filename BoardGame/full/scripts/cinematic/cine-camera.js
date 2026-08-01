@@ -36,8 +36,8 @@ class CineCamera {
     // overwrites -- same non-overwriting contract as setShake's named
     // channels, just multiplicative instead of additive (a scale pulse reads
     // as "punchier" multiplicative than additive at these small amplitudes).
-    applyBassScale(amp) {
-        this._bassScale = 1 + amp * 0.03;
+    applyBassScale(amp, scaleAmp = 0.03) {
+        this._bassScale = 1 + amp * scaleAmp;
         this._render();
     }
 
@@ -46,11 +46,13 @@ class CineCamera {
     // Stateless (a pure function of tMs), matching splinePose/lerpPose's
     // pure-function style, so no per-frame delta-time bookkeeping is needed
     // in the timeline's onUpdate callbacks. period shrinks as speedFactor
-    // grows (faster tempo => faster drift cycle).
-    applyDrift(amp, speedFactor, tMs) {
-        const period = 6000 / speedFactor;
+    // grows (faster tempo => faster drift cycle). tiltAmp/spinAmp/periodBaseMs
+    // are tunable (wired to cinematic-scene.json's "strings" section); the
+    // defaults reproduce the original hardcoded values.
+    applyDrift(amp, speedFactor, tMs, { tiltAmp = 1.2, spinAmp = 1.5, periodBaseMs = 6000 } = {}) {
+        const period = periodBaseMs / speedFactor;
         const phase = (tMs / period) * Math.PI * 2;
-        this._drift = { tilt: Math.sin(phase) * amp * 1.2, spin: Math.cos(phase * 0.7) * amp * 1.5 };
+        this._drift = { tilt: Math.sin(phase) * amp * tiltAmp, spin: Math.cos(phase * 0.7) * amp * spinAmp };
         this._render();
     }
 

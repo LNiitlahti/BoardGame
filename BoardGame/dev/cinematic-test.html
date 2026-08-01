@@ -579,6 +579,18 @@
             ['shake.music.tiltAmp', 'Tilt amp', 0, 5, 0.1],
             ['shake.music.spinAmp', 'Spin amp', 0, 5, 0.1],
             ['shake.music.zoomAmp', 'Zoom amp', 0, 0.05, 0.001],
+            ['__section', 'Bass'],
+            ['bass.scaleAmp', 'Scale amp', 0, 0.1, 0.005],
+            ['__section', 'Strings Drift'],
+            ['strings.driftTiltAmp', 'Tilt amp', 0, 5, 0.1],
+            ['strings.driftSpinAmp', 'Spin amp', 0, 5, 0.1],
+            ['strings.driftPeriodMs', 'Period (ms)', 1000, 20000, 250],
+            ['__section', 'Percussion'],
+            ['percussion.sparkDurationMs', 'Spark duration (ms)', 100, 2000, 50],
+            ['__section', 'Tempo'],
+            ['tempo.windowMs', 'Window (ms)', 500, 5000, 100],
+            ['tempo.maxBeats', 'Max beats (clamp)', 1, 20, 1],
+            ['tempo.maxSpeedFactor', 'Max speed factor', 1, 3, 0.05],
             ['__section', 'Atmosphere'],
             ['atmosphere.particleCount', 'Particle count', 0, 150, 5],
             ['atmosphere.emberCount', 'Ember count', 0, 60, 2],
@@ -842,7 +854,7 @@
                 if (beatMs < textWindowStart || beatMs > textWindowEnd) return;
                 tracks.push({
                     at: beatMs, duration: 0,
-                    onStart: () => text.triggerFlicker(CineTempo.computeTempo(tempoStems, beatMs))
+                    onStart: () => text.triggerFlicker(CineTempo.computeTempo(tempoStems, beatMs, cfg.tempo))
                 });
             });
 
@@ -895,7 +907,7 @@
                 const dur = Math.min(musicBass.durationMs, finalEnd);
                 tracks.push({
                     at: 0, duration: dur,
-                    onUpdate: p => camera.applyBassScale(musicBass.envelopeAt(p * dur))
+                    onUpdate: p => camera.applyBassScale(musicBass.envelopeAt(p * dur), cfg.bass.scaleAmp)
                 });
             }
             if (musicPercussion.beats.length > 0) {
@@ -903,7 +915,9 @@
                     if (beatMs > finalEnd) return;
                     tracks.push({
                         at: beatMs, duration: 0,
-                        onStart: () => atmosphere.triggerSpark(CineTempo.computeTempo(tempoStems, beatMs))
+                        onStart: () => atmosphere.triggerSpark(
+                            CineTempo.computeTempo(tempoStems, beatMs, cfg.tempo),
+                            cfg.percussion.sparkDurationMs)
                     });
                 });
             }
@@ -914,8 +928,12 @@
                     onUpdate: p => {
                         const t = p * dur;
                         const amp = musicStrings.envelopeAt(t);
-                        const speedFactor = CineTempo.computeTempo(tempoStems, t);
-                        camera.applyDrift(amp, speedFactor, t);
+                        const speedFactor = CineTempo.computeTempo(tempoStems, t, cfg.tempo);
+                        camera.applyDrift(amp, speedFactor, t, {
+                            tiltAmp: cfg.strings.driftTiltAmp,
+                            spinAmp: cfg.strings.driftSpinAmp,
+                            periodBaseMs: cfg.strings.driftPeriodMs
+                        });
                     }
                 });
             }

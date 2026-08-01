@@ -111,9 +111,10 @@ class CineAtmosphere {
     // elsewhere in the cinematic, but this element is spawned fresh per call
     // (not pre-existing in the DOM) and removed after its animation finishes
     // so repeated bursts don't pile up unremoved elements. Duration shrinks
-    // as speedFactor grows -- snappier under high tempo.
-    triggerSpark(speedFactor = 1) {
-        const durationMs = 600 / speedFactor;
+    // as speedFactor grows -- snappier under high tempo. baseDurationMs is
+    // tunable (wired to cinematic-scene.json's "percussion" section).
+    triggerSpark(speedFactor = 1, baseDurationMs = 600) {
+        const durationMs = baseDurationMs / speedFactor;
         const spark = document.createElement('div');
         spark.className = 'atmo-spark';
         spark.style.setProperty('--x', `${Math.random() * 100}%`);

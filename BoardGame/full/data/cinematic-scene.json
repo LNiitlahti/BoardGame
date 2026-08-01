@@ -70,5 +70,21 @@
     "shake": {
         "impact": { "durationMs": 300, "tiltAmp": 2.5, "spinAmp": 3, "zoomAmp": 0.03 },
         "music": { "tiltAmp": 0.4, "spinAmp": 0.5, "zoomAmp": 0.006 }
+    },
+    "bass": {
+        "scaleAmp": 0.03
+    },
+    "strings": {
+        "driftTiltAmp": 1.2,
+        "driftSpinAmp": 1.5,
+        "driftPeriodMs": 6000
+    },
+    "percussion": {
+        "sparkDurationMs": 600
+    },
+    "tempo": {
+        "windowMs": 2000,
+        "maxBeats": 8,
+        "maxSpeedFactor": 1.6
     }
 }
