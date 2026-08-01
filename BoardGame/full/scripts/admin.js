@@ -18,6 +18,8 @@ let boardRenderer = null;
 let currentUser = null;
 let currentTournamentId = null;
 let currentUserRole = null; // 'god' or 'admin'
+let _prevRenderSignature = null;
+let _prevBoardSignature = null;
 
 // Match creation state - dynamic array of sides
 let manualGameSetup = {
@@ -381,11 +383,17 @@ async function loadTournament(tournamentId) {
                     navLabel.classList.remove('empty');
                 }
 
-                // Update all displays
-                updateDisplay();
+                // Update all displays (skip if nothing display-relevant changed)
+                const newSignature = window.RenderSignature.computeFieldSignature(
+                    gameState, window.RenderSignature.EXCLUDED_KEYS
+                );
+                if (newSignature !== _prevRenderSignature) {
+                    _prevRenderSignature = newSignature;
+                    updateDisplay();
 
-                // Apply custom team colors from Firebase
-                applyTeamColors();
+                    // Apply custom team colors from Firebase
+                    applyTeamColors();
+                }
 
                 if (gameState.status === 'archived') {
                     showStatus('This tournament is archived. Changes are blocked by the server.', 'warning');
@@ -1498,6 +1506,10 @@ function reinitializeMatchGenerator() {
 
 function renderBoard() {
     if (!boardRenderer || !boardModule) return;
+
+    const boardSignature = window.RenderSignature.computeBoardSignature(gameState?.board, gameState?.rooms);
+    if (boardSignature === _prevBoardSignature) return;
+    _prevBoardSignature = boardSignature;
 
     // Render board with current state
     boardRenderer.render(gameState || {});
