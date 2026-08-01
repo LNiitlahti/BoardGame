@@ -23,6 +23,12 @@
         materials: null,
         musicDrums: null,
         musicVocals: null,
+        musicBackingVocals: null,
+        musicBass: null,
+        musicPercussion: null,
+        musicStrings: null,
+        musicSynth: null,
+        musicOther: null,
         audioEl: null,
         coverEl: null,
         watchdogId: null,
@@ -425,23 +431,41 @@
             // Promise.all only ever rejects on the scene config side, which
             // is the only failure that should bail the whole cinematic.
             //
-            // music-cues-drums.json and music-cues-vocals.json are separate
-            // stems feeding different effects (drum-synced camera/light beats
-            // vs. state.musicVocals.beats driving triggerFlicker() in the
-            // vocal-synced text effect below). The vocals file itself is
-            // currently a placeholder (empty envelope/beats) pending a manual
-            // vocal-stem analysis step, so the flicker trigger is wired but
-            // inert until real data replaces the placeholder.
-            const [config, materials, musicDrums, musicVocals] = await Promise.all([
+            // Each music-cues-*.json is a separate stem feeding a distinct
+            // effect (see cine-camera.js/cine-atmosphere.js/cine-text.js for
+            // the effect wiring, and buildTimeline() below for where each is
+            // scheduled). CineMusic.load() never rejects either (see
+            // cine-music.js) — a missing/failed stem file degrades to an
+            // inert CineMusic (empty envelope/beats), so every stem beyond
+            // drums is independently optional with no extra wrapping needed
+            // here. vocals/backingVocals/bass/percussion/strings/synth/other
+            // may all ship partially analyzed; drums is the only stem this
+            // cinematic treats as required for its own beat-synced staging.
+            const [
+                config, materials, musicDrums, musicVocals, musicBackingVocals,
+                musicBass, musicPercussion, musicStrings, musicSynth, musicOther
+            ] = await Promise.all([
                 fetch('data/cinematic-scene.json').then(res => res.json()),
                 window.CineMaterials.load('../shared/data/hex-materials.json'),
                 window.CineMusic.load('data/music-cues-drums.json'),
-                window.CineMusic.load('data/music-cues-vocals.json')
+                window.CineMusic.load('data/music-cues-vocals.json'),
+                window.CineMusic.load('data/music-cues-backingVocals.json'),
+                window.CineMusic.load('data/music-cues-bass.json'),
+                window.CineMusic.load('data/music-cues-percussion.json'),
+                window.CineMusic.load('data/music-cues-strings.json'),
+                window.CineMusic.load('data/music-cues-synth.json'),
+                window.CineMusic.load('data/music-cues-other.json')
             ]);
             state.config = config;
             state.materials = materials;
             state.musicDrums = musicDrums;
             state.musicVocals = musicVocals;
+            state.musicBackingVocals = musicBackingVocals;
+            state.musicBass = musicBass;
+            state.musicPercussion = musicPercussion;
+            state.musicStrings = musicStrings;
+            state.musicSynth = musicSynth;
+            state.musicOther = musicOther;
         } catch (e) {
             console.error('[Cinematic] Config load failed, bailing:', e);
             document.documentElement.classList.remove('cine-pending');
