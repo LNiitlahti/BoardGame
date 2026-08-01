@@ -220,14 +220,31 @@
             overflow: hidden;
             pointer-events: none;
         }
+        /* Behind the board: sits below the (non-positioned) .scene-3d in
+           .board-wrap's stacking context via negative z-index. */
+        #cineAtmosphereBack {
+            position: absolute; inset: 0;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: -1;
+        }
         .atmo-fog {
             position: absolute; left: -20%; right: -20%; bottom: 0; height: 35%;
-            background: linear-gradient(to top, rgba(200,200,210,0.35), transparent);
             filter: blur(8px);
-            opacity: calc(0.6 + var(--atmo-intensity, 0) * 0.2);
+            opacity: calc(0.6 + (var(--atmo-intensity, 0) + var(--atmo-fog-intensity, 0)) * 0.2);
         }
-        .atmo-fog.layer-1 { animation: atmoFogDrift1 55s linear infinite; }
-        .atmo-fog.layer-2 { animation: atmoFogDrift2 70s linear infinite reverse; opacity: 0.4; }
+        .atmo-fog.layer-1 {
+            background: linear-gradient(to top, var(--fog-near, rgba(255,150,60,0.5)), var(--fog-far, rgba(90,60,120,0.2)) 70%, transparent);
+            animation: atmoFogDrift1 55s linear infinite;
+        }
+        .atmo-fog.layer-2 {
+            background: linear-gradient(to top, var(--fog-far, rgba(90,60,120,0.4)), transparent);
+            animation: atmoFogDrift2 70s linear infinite reverse; opacity: 0.4;
+        }
+        /* Front duplicate: same fog, dimmed to a faint depth echo in front
+           of the board. */
+        .atmo-fog.front { opacity: calc(var(--fog-front-opacity, 0.2) + (var(--atmo-intensity, 0) + var(--atmo-fog-intensity, 0)) * 0.05); }
+        .atmo-fog.layer-2.front { opacity: calc(var(--fog-front-opacity, 0.2) * 0.4); }
         @keyframes atmoFogDrift1 { from { transform: translateX(-5%); } to { transform: translateX(5%); } }
         @keyframes atmoFogDrift2 { from { transform: translateX(3%); } to { transform: translateX(-3%); } }
 
@@ -236,7 +253,7 @@
             width: 2px; height: 2px; border-radius: 50%;
             background: rgba(230,225,210,0.55);
             animation: atmoMoteDrift var(--duration) linear var(--delay) infinite;
-            opacity: calc(0.5 + var(--atmo-intensity, 0) * 0.3);
+            opacity: calc(0.5 + (var(--atmo-intensity, 0) + var(--atmo-base-intensity, 0)) * 0.3);
         }
         @keyframes atmoMoteDrift {
             0%   { transform: translateY(0) translateX(0); opacity: 0; }
@@ -252,7 +269,7 @@
             left: var(--x); top: var(--y);
             animation-duration: var(--duration); animation-delay: var(--delay);
             animation-timing-function: ease-in-out; animation-iteration-count: infinite;
-            opacity: calc(0.4 + var(--atmo-intensity, 0) * 0.4);
+            opacity: calc(0.4 + (var(--atmo-intensity, 0) + var(--atmo-fog-intensity, 0)) * 0.4);
         }
         .atmo-ghost:nth-child(3n)   { animation-name: atmoGhostPathA; }
         .atmo-ghost:nth-child(3n+1) { animation-name: atmoGhostPathB; }
@@ -266,12 +283,35 @@
             width: 3px; height: 3px; border-radius: 50%;
             background: #ffb347; box-shadow: 0 0 6px 2px #ff8c1a;
             animation: atmoEmberRise var(--duration) linear var(--delay) infinite;
-            filter: brightness(calc(1 + var(--atmo-intensity, 0) * 0.6));
+            filter: brightness(calc(1 + (var(--atmo-intensity, 0) + var(--atmo-base-intensity, 0)) * 0.6));
         }
         @keyframes atmoEmberRise {
             0%   { transform: translateY(0) translateX(0) scale(1); opacity: 0; }
             15%  { opacity: 1; }
             100% { transform: translateY(-115%) translateX(4%) scale(0.4); opacity: 0; }
+        }
+
+        .atmo-spark {
+            position: absolute; left: var(--x); top: var(--y);
+            width: 3px; height: 3px; border-radius: 50%;
+            background: #ffe27a; box-shadow: 0 0 6px 2px #ffcf40;
+            opacity: 0;
+            animation-name: atmoSparkBurst;
+            animation-timing-function: ease-out;
+            animation-fill-mode: forwards;
+        }
+        @keyframes atmoSparkBurst {
+            0%   { opacity: 0; transform: scale(0.4); }
+            30%  { opacity: 1; transform: scale(1.3); }
+            100% { opacity: 0; transform: scale(0.6); }
+        }
+
+        #cineGlow {
+            position: absolute; inset: 0;
+            pointer-events: none;
+            mix-blend-mode: screen;
+            background: radial-gradient(circle at 50% 45%, rgba(150,110,255,0.9), transparent 65%);
+            opacity: calc(var(--atmo-synth-intensity, 0) * 0.7);
         }
 
         /* ===========================================
@@ -419,6 +459,7 @@
     <script src="../full/scripts/cinematic/cine-materials.js"></script>
     <script src="../full/scripts/cinematic/cine-music.js"></script>
     <script src="../full/scripts/cinematic/cine-outro.js"></script>
+    <script src="../full/scripts/cinematic/cine-tempo.js"></script>
     <script>
         // Minimal re-implementation of the controller flow with mock data,
         // instant replay, and a live-tunable copy of cinematic-scene.json.
@@ -470,6 +511,12 @@
         // envelope/beats) pending a manual vocal-stem analysis step, so the
         // flicker trigger is wired but inert until real data replaces it.
         let musicVocals = null;
+        let musicBackingVocals = null;
+        let musicBass = null;
+        let musicPercussion = null;
+        let musicStrings = null;
+        let musicSynth = null;
+        let musicOther = null;
         let audioEl = null;  // harness preview <audio>, (re)created per buildAndPlay()
         let timeline = null;
         let camera = null;
@@ -518,6 +565,9 @@
             ['lockIn.durationMs', 'Lock-in', 1000, 20000, 250],
             ['reveal.durationMs', 'Reveal', 2000, 40000, 500],
             ['signage.durationMs', 'Signage', 2000, 30000, 500],
+            ['__section', 'Text'],
+            ['__text', 'text.title', 'Title'],
+            ['text.displayIntervalMs', 'Display interval', 500, 10000, 250],
             ['__section', 'Music Sync'],
             ['music.washThreshold', 'Wash threshold', 0, 1, 0.05],
             ['__section', 'Camera Shake — Impact (first + ring-1 landings)'],
@@ -529,11 +579,26 @@
             ['shake.music.tiltAmp', 'Tilt amp', 0, 5, 0.1],
             ['shake.music.spinAmp', 'Spin amp', 0, 5, 0.1],
             ['shake.music.zoomAmp', 'Zoom amp', 0, 0.05, 0.001],
+            ['__section', 'Bass'],
+            ['bass.scaleAmp', 'Scale amp', 0, 0.1, 0.005],
+            ['__section', 'Strings Drift'],
+            ['strings.driftTiltAmp', 'Tilt amp', 0, 5, 0.1],
+            ['strings.driftSpinAmp', 'Spin amp', 0, 5, 0.1],
+            ['strings.driftPeriodMs', 'Period (ms)', 1000, 20000, 250],
+            ['__section', 'Percussion'],
+            ['percussion.sparkDurationMs', 'Spark duration (ms)', 100, 2000, 50],
+            ['__section', 'Tempo'],
+            ['tempo.windowMs', 'Window (ms)', 500, 5000, 100],
+            ['tempo.maxBeats', 'Max beats (clamp)', 1, 20, 1],
+            ['tempo.maxSpeedFactor', 'Max speed factor', 1, 3, 0.05],
             ['__section', 'Atmosphere'],
             ['atmosphere.particleCount', 'Particle count', 0, 150, 5],
             ['atmosphere.emberCount', 'Ember count', 0, 60, 2],
             ['atmosphere.ghostLightCount', 'Ghost light count', 0, 30, 1],
-            ['__checkbox', 'atmosphere.fog.enabled', 'Fog enabled']
+            ['__checkbox', 'atmosphere.fog.enabled', 'Fog enabled'],
+            ['__color', '--fog-near', 'Fog near color', '#ff9635'],
+            ['__color', '--fog-far', 'Fog far color', '#5a3c78'],
+            ['__range-css', '--fog-front-opacity', 'Fog front opacity', 0, 1, 0.05, 0.2]
         ];
 
         function getPath(obj, path) {
@@ -566,6 +631,52 @@
                     host.appendChild(row);
                     continue;
                 }
+                if (spec[0] === '__text') {
+                    const [, path, label] = spec;
+                    const row = document.createElement('div');
+                    row.className = 'tune-row';
+                    const value = getPath(cfg, path);
+                    row.innerHTML = `<label>${label}</label><input type="text" value="${value}">`;
+                    const input = row.querySelector('input');
+                    input.addEventListener('input', () => setPath(cfg, path, input.value));
+                    host.appendChild(row);
+                    continue;
+                }
+                if (spec[0] === '__color') {
+                    // Not part of cfg (JS atmosphere config) — these drive
+                    // CSS custom properties directly, since fog color is a
+                    // pure-CSS gradient, not something CineAtmosphere reads.
+                    const [, cssVar, label, initial] = spec;
+                    const row = document.createElement('div');
+                    row.className = 'tune-row';
+                    row.innerHTML = `<label>${label}</label><input type="color" value="${initial}">`;
+                    const input = row.querySelector('input');
+                    document.documentElement.style.setProperty(cssVar, initial);
+                    input.addEventListener('input', () => {
+                        document.documentElement.style.setProperty(cssVar, input.value);
+                    });
+                    host.appendChild(row);
+                    continue;
+                }
+                if (spec[0] === '__range-css') {
+                    const [, cssVar, label, min, max, step, initial] = spec;
+                    const row = document.createElement('div');
+                    row.className = 'tune-row';
+                    row.innerHTML = `
+                        <label>${label}</label>
+                        <input type="range" min="${min}" max="${max}" step="${step}" value="${initial}">
+                        <span class="tune-value">${initial}</span>
+                    `;
+                    const input = row.querySelector('input');
+                    const valueEl = row.querySelector('.tune-value');
+                    document.documentElement.style.setProperty(cssVar, initial);
+                    input.addEventListener('input', () => {
+                        document.documentElement.style.setProperty(cssVar, input.value);
+                        valueEl.textContent = input.value;
+                    });
+                    host.appendChild(row);
+                    continue;
+                }
                 const [path, label, min, max, step] = spec;
                 const row = document.createElement('div');
                 row.className = 'tune-row';
@@ -587,11 +698,18 @@
         }
 
         async function loadConfig() {
-            [cfg, materials, music, musicVocals] = await Promise.all([
+            [cfg, materials, music, musicVocals, musicBackingVocals, musicBass,
+                musicPercussion, musicStrings, musicSynth, musicOther] = await Promise.all([
                 fetch('../full/data/cinematic-scene.json').then(r => r.json()),
                 CineMaterials.load('../shared/data/hex-materials.json'),
                 CineMusic.load('../full/data/music-cues-drums.json'),
-                CineMusic.load('../full/data/music-cues-vocals.json')
+                CineMusic.load('../full/data/music-cues-vocals.json'),
+                CineMusic.load('../full/data/music-cues-backingVocals.json'),
+                CineMusic.load('../full/data/music-cues-bass.json'),
+                CineMusic.load('../full/data/music-cues-percussion.json'),
+                CineMusic.load('../full/data/music-cues-strings.json'),
+                CineMusic.load('../full/data/music-cues-synth.json'),
+                CineMusic.load('../full/data/music-cues-other.json')
             ]);
             buildSliderPanel();
             // Build tracks up front (pure — no visible side effects) purely so
@@ -707,6 +825,10 @@
             // cinematic's own authored length.
             const cinematicOwnEnd = revealEnd + cfg.signage.durationMs;
             const { outroDurationMs, finalEnd } = CineOutro.computeOutro(cinematicOwnEnd, music.durationMs);
+            const tempoStems = [
+                music, musicVocals, musicBackingVocals, musicBass,
+                musicPercussion, musicStrings, musicSynth, musicOther
+            ];
             if (outroDurationMs > 0) {
                 tracks.push({
                     at: cinematicOwnEnd, duration: outroDurationMs,
@@ -732,7 +854,7 @@
                 if (beatMs < textWindowStart || beatMs > textWindowEnd) return;
                 tracks.push({
                     at: beatMs, duration: 0,
-                    onStart: () => text.triggerFlicker()
+                    onStart: () => text.triggerFlicker(CineTempo.computeTempo(tempoStems, beatMs, cfg.tempo))
                 });
             });
 
@@ -773,6 +895,62 @@
                     });
                 }
             });
+
+            if (musicBackingVocals.envelope.length > 0) {
+                const dur = Math.min(musicBackingVocals.durationMs, finalEnd);
+                tracks.push({
+                    at: 0, duration: dur,
+                    onUpdate: p => atmosphere.applyFogIntensity(musicBackingVocals.envelopeAt(p * dur))
+                });
+            }
+            if (musicBass.envelope.length > 0) {
+                const dur = Math.min(musicBass.durationMs, finalEnd);
+                tracks.push({
+                    at: 0, duration: dur,
+                    onUpdate: p => camera.applyBassScale(musicBass.envelopeAt(p * dur), cfg.bass.scaleAmp)
+                });
+            }
+            if (musicPercussion.beats.length > 0) {
+                musicPercussion.beats.forEach(beatMs => {
+                    if (beatMs > finalEnd) return;
+                    tracks.push({
+                        at: beatMs, duration: 0,
+                        onStart: () => atmosphere.triggerSpark(
+                            CineTempo.computeTempo(tempoStems, beatMs, cfg.tempo),
+                            cfg.percussion.sparkDurationMs)
+                    });
+                });
+            }
+            if (musicStrings.envelope.length > 0) {
+                const dur = Math.min(musicStrings.durationMs, finalEnd);
+                tracks.push({
+                    at: 0, duration: dur,
+                    onUpdate: p => {
+                        const t = p * dur;
+                        const amp = musicStrings.envelopeAt(t);
+                        const speedFactor = CineTempo.computeTempo(tempoStems, t, cfg.tempo);
+                        camera.applyDrift(amp, speedFactor, t, {
+                            tiltAmp: cfg.strings.driftTiltAmp,
+                            spinAmp: cfg.strings.driftSpinAmp,
+                            periodBaseMs: cfg.strings.driftPeriodMs
+                        });
+                    }
+                });
+            }
+            if (musicSynth.envelope.length > 0) {
+                const dur = Math.min(musicSynth.durationMs, finalEnd);
+                tracks.push({
+                    at: 0, duration: dur,
+                    onUpdate: p => atmosphere.applySynthGlow(musicSynth.envelopeAt(p * dur))
+                });
+            }
+            if (musicOther.envelope.length > 0) {
+                const dur = Math.min(musicOther.durationMs, finalEnd);
+                tracks.push({
+                    at: 0, duration: dur,
+                    onUpdate: p => atmosphere.applyBaseIntensity(musicOther.envelopeAt(p * dur))
+                });
+            }
 
             const totalDuration = tracks.reduce((m, tr) => Math.max(m, tr.at + tr.duration), 0);
             return { tracks, totalDuration };

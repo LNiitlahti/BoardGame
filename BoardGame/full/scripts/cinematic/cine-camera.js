@@ -14,6 +14,8 @@ class CineCamera {
         this.rigEl = rigEl;
         this._basePose = { fov: 3500, tilt: 0, spin: 0, zoom: 1 }; // matches CSS rest default
         this._shakes = { impact: ZERO_SHAKE, music: ZERO_SHAKE };
+        this._bassScale = 1;
+        this._drift = { tilt: 0, spin: 0 };
     }
 
     applyPose(pose) {
@@ -29,12 +31,39 @@ class CineCamera {
         this._render();
     }
 
+    // Effect (music sync): board-wide scale pulse driven by bass amplitude,
+    // multiplicative on top of pose/shake zoom so it composes rather than
+    // overwrites -- same non-overwriting contract as setShake's named
+    // channels, just multiplicative instead of additive (a scale pulse reads
+    // as "punchier" multiplicative than additive at these small amplitudes).
+    applyBassScale(amp, scaleAmp = 0.03) {
+        this._bassScale = 1 + amp * scaleAmp;
+        this._render();
+    }
+
+    // Effect (music sync): slow, smoothly-eased camera drift driven by
+    // strings amplitude -- distinct from setShake's per-frame random jitter.
+    // Stateless (a pure function of tMs), matching splinePose/lerpPose's
+    // pure-function style, so no per-frame delta-time bookkeeping is needed
+    // in the timeline's onUpdate callbacks. period shrinks as speedFactor
+    // grows (faster tempo => faster drift cycle). tiltAmp/spinAmp/periodBaseMs
+    // are tunable (wired to cinematic-scene.json's "strings" section); the
+    // defaults reproduce the original hardcoded values.
+    applyDrift(amp, speedFactor, tMs, { tiltAmp = 1.2, spinAmp = 1.5, periodBaseMs = 6000 } = {}) {
+        const period = periodBaseMs / speedFactor;
+        const phase = (tMs / period) * Math.PI * 2;
+        this._drift = { tilt: Math.sin(phase) * amp * tiltAmp, spin: Math.cos(phase * 0.7) * amp * spinAmp };
+        this._render();
+    }
+
     _render() {
         const p = this._basePose;
         let tilt = p.tilt, spin = p.spin, zoom = p.zoom;
         for (const s of Object.values(this._shakes)) {
             tilt += s.tilt; spin += s.spin; zoom += s.zoom;
         }
+        tilt += this._drift.tilt; spin += this._drift.spin;
+        zoom *= this._bassScale;
         this.sceneEl.style.perspective = `${p.fov}px`;
         this.rigEl.style.transform = `scale(${zoom}) rotateX(${tilt}deg) rotateY(${spin}deg)`;
     }
@@ -138,6 +167,8 @@ class CineCamera {
         this.rigEl.style.transform = '';
         this.sceneEl.style.filter = '';
         this._shakes = { impact: ZERO_SHAKE, music: ZERO_SHAKE };
+        this._bassScale = 1;
+        this._drift = { tilt: 0, spin: 0 };
     }
 }
 

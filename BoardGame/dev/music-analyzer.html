@@ -21,56 +21,84 @@
         .tune-row label { color: #cdd; font-size: 0.8rem; min-width: 200px; }
         .tune-row input[type="range"] { flex: 1; }
         .tune-row .tune-value { color: #fff; font-size: 0.8rem; width: 60px; text-align: right; }
+        .tune-row .scale-inputs { color: #9fd; font-size: 0.75rem; display: flex; align-items: center; gap: 4px; }
+        .tune-row .scale-inputs input[type="number"] {
+            background: #10131c; color: #fff; border: 1px solid #3a4a5c; border-radius: 3px;
+            font-size: 0.75rem; padding: 2px 4px;
+        }
         button {
             background: #27ae60; color: #fff; border: none;
             padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;
         }
         button:hover { filter: brightness(1.1); }
-        #canvasHost { width: 100%; overflow-x: auto; }
         canvas { display: block; background: #1e2a38; border-radius: 4px; }
-        #status { font-size: 0.85rem; margin-top: 8px; color: #9fd; }
         audio { width: 100%; margin-top: 10px; }
+        .stem-panel {
+            background: rgba(44, 62, 80, 0.95); border-radius: 8px;
+            margin-bottom: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+        .stem-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 14px; cursor: pointer; user-select: none;
+        }
+        .stem-header:hover { background: rgba(255,255,255,0.05); }
+        .stem-header .stem-title { color: #fff; font-weight: 600; }
+        .stem-header .stem-summary { color: #9fd; font-size: 0.8rem; }
+        .stem-body { display: none; padding: 0 14px 14px; }
+        .stem-panel.expanded .stem-body { display: block; }
+        .stem-canvas-host { width: 100%; overflow-x: auto; position: relative; }
+        .stem-canvas-host canvas.playhead {
+            position: absolute; left: 0; top: 0; pointer-events: none;
+            background: transparent;
+        }
+        .unrecognized-status { font-size: 0.8rem; color: #f7ba32; margin-top: 8px; }
+        .stem-error { color: #f77; font-size: 0.85rem; padding: 10px 0; }
     </style>
 </head>
 <body>
     <h1>Music Analyzer &mdash; beat/envelope extraction for music-cues.json</h1>
 
     <div class="panel">
-        <input type="file" id="fileInput" accept="audio/*">
-        <label for="secondaryFileInput" style="display:block; margin-top:8px; font-size:0.8rem; color:#9fd;">
-            Secondary layer (optional) — merged into the primary via point-wise max envelope (e.g. lead + backing vocals)
-        </label>
-        <input type="file" id="secondaryFileInput" accept="audio/*">
-        <audio id="previewAudio" controls style="display:none;"></audio>
+        <input type="file" id="fileInput" accept="audio/*" multiple>
+        <button id="btnDownloadAll" style="margin-top:8px;">Download all music-cues-*.json</button>
+        <div id="unrecognizedStatus" class="unrecognized-status"></div>
     </div>
 
-    <div class="panel" id="tunePanel" style="display:none;">
-        <div class="tune-row">
-            <label for="thresholdSlider">Onset threshold (&times; rolling avg)</label>
-            <input type="range" id="thresholdSlider" min="1" max="3" step="0.05" value="1.35">
-            <span class="tune-value" id="thresholdValue">1.35</span>
-        </div>
-        <div class="tune-row">
-            <label for="debounceSlider">Debounce (ms)</label>
-            <input type="range" id="debounceSlider" min="50" max="500" step="10" value="200">
-            <span class="tune-value" id="debounceValue">200</span>
-        </div>
-        <button id="btnCopy">Copy JSON to clipboard</button>
-        <div id="status"></div>
-    </div>
+    <div id="stemPanels"></div>
 
-    <div class="panel" id="canvasHost" style="display:none;">
-        <canvas id="waveformCanvas" height="200"></canvas>
-    </div>
-
-    <script src="music-merge-envelopes.js"></script>
     <script>
-        let envelope = [];   // [{t, amp}], amp normalized 0-1 — merged if a secondary file is present
-        let durationMs = 0;
-        let beats = [];      // [ms, ...]
-        let currentObjectUrl = null;
-        let secondaryEnvelope = null; // set when a secondary file has been analyzed
-        let secondaryDurationMs = 0;
+        const STEM_DEFS = [
+            { key: 'backingVocals', label: 'Backing Vocals', match: /backing.*vocals/i },
+            { key: 'vocals',        label: 'Vocals',         match: /vocals(?!.*backing)/i },
+            { key: 'drums',         label: 'Drums',          match: /drums/i },
+            { key: 'bass',          label: 'Bass',           match: /bass/i },
+            { key: 'percussion',    label: 'Percussion',     match: /percussion/i },
+            { key: 'strings',       label: 'Strings',        match: /strings/i },
+            { key: 'synth',         label: 'Synth',          match: /synth/i },
+            { key: 'other',         label: 'Other',          match: /other/i },
+        ];
+
+        // One entry per matched stem, created lazily on first match.
+        // Shape: { key, label, envelope, durationMs, beats, threshold,
+        //          debounce, objectUrl, els: { panel, header, summary, body,
+        //          canvas, playheadCanvas, audio, thresholdSlider,
+        //          thresholdValue, debounceSlider, debounceValue, copyBtn,
+        //          status, errorEl } }
+        const stemStates = new Map();
+
+        // backingVocals is checked before vocals by iteration order in
+        // STEM_DEFS, so "Backing Vocals.wav" is claimed first — necessary
+        // because "backing" precedes "vocals" in that filename, so the
+        // vocals pattern's negative lookahead (which only excludes "backing"
+        // appearing after "vocals") can't catch it on its own.
+        function matchStemKey(filename) {
+            const stripped = filename.replace(/^\s*\d+[\s._-]+/, '');
+            for (const def of STEM_DEFS) {
+                if (def.match.test(stripped)) return def.key;
+            }
+            return null;
+        }
 
         // RMS envelope, one sample per ~100ms window, normalized against the
         // track's own peak window (so quiet tracks still reach amp=1 at
@@ -123,10 +151,206 @@
             return result;
         }
 
-        function renderWaveform() {
-            const canvas = document.getElementById('waveformCanvas');
+        async function analyzeStemFile(key, label, file) {
+            let state = stemStates.get(key);
+            if (!state) {
+                state = createStemPanel(key, label);
+                stemStates.set(key, state);
+            }
+            state.els.status.textContent = 'Analyzing...';
+            state.els.thresholdSlider.disabled = true;
+            state.els.debounceSlider.disabled = true;
+            state.els.copyBtn.disabled = true;
+            state.els.errorEl.style.display = 'none';
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const offlineCtx = new OfflineAudioContext(2, 1, 44100); // throwaway ctx, decodeAudioData only
+                const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
+                const result = computeRmsEnvelope(audioBuffer);
+                state.envelope = result.envelope;
+                state.durationMs = result.durationMs;
+                state.threshold = 1.35;
+                state.debounce = 200;
+                state.els.thresholdSlider.value = '1.35';
+                state.els.thresholdValue.textContent = '1.35';
+                state.els.debounceSlider.value = '200';
+                state.els.debounceValue.textContent = '200';
+
+                if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+                state.objectUrl = URL.createObjectURL(file);
+                state.els.audio.src = state.objectUrl;
+
+                state.els.thresholdSlider.disabled = false;
+                state.els.debounceSlider.disabled = false;
+                state.els.copyBtn.disabled = false;
+                reanalyzeStem(key);
+            } catch (err) {
+                state.els.errorEl.textContent = `Failed to analyze file: ${err.message}`;
+                state.els.errorEl.style.display = '';
+                state.els.status.textContent = '';
+            }
+        }
+
+        function reanalyzeStem(key) {
+            const state = stemStates.get(key);
+            if (!state || state.envelope.length === 0) return;
+            state.threshold = parseFloat(state.els.thresholdSlider.value);
+            state.debounce = parseFloat(state.els.debounceSlider.value);
+            state.beats = detectBeats(state.envelope, state.threshold, state.debounce);
+            renderStemWaveform(key);
+            updateStemSummary(key);
+        }
+
+        function createStemPanel(key, label) {
+            const host = document.getElementById('stemPanels');
+            const panel = document.createElement('div');
+            panel.className = 'stem-panel';
+            panel.innerHTML = `
+                <div class="stem-header">
+                    <span class="stem-title">${label}</span>
+                    <span class="stem-summary"></span>
+                </div>
+                <div class="stem-body">
+                    <div class="stem-error" style="display:none;"></div>
+                    <div class="stem-canvas-host">
+                        <canvas class="waveform"></canvas>
+                        <canvas class="playhead"></canvas>
+                    </div>
+                    <audio controls></audio>
+                    <div class="tune-row">
+                        <label>Onset threshold (&times; rolling avg)</label>
+                        <input type="range" class="threshold-slider" min="1" max="3" step="0.05" value="1.35">
+                        <span class="tune-value threshold-value">1.35</span>
+                        <span class="scale-inputs">
+                            min <input type="number" class="threshold-min" value="1" step="0.05" style="width:50px;">
+                            max <input type="number" class="threshold-max" value="3" step="0.05" style="width:50px;">
+                        </span>
+                    </div>
+                    <div class="tune-row">
+                        <label>Debounce (ms)</label>
+                        <input type="range" class="debounce-slider" min="50" max="500" step="10" value="200">
+                        <span class="tune-value debounce-value">200</span>
+                        <span class="scale-inputs">
+                            min <input type="number" class="debounce-min" value="50" step="10" style="width:55px;">
+                            max <input type="number" class="debounce-max" value="500" step="10" style="width:55px;">
+                        </span>
+                    </div>
+                    <button class="copy-btn">Copy JSON (music-cues-${key}.json)</button>
+                    <div class="status"></div>
+                </div>
+            `;
+            host.appendChild(panel);
+
+            const els = {
+                panel,
+                header: panel.querySelector('.stem-header'),
+                summary: panel.querySelector('.stem-summary'),
+                body: panel.querySelector('.stem-body'),
+                errorEl: panel.querySelector('.stem-error'),
+                canvas: panel.querySelector('canvas.waveform'),
+                playheadCanvas: panel.querySelector('canvas.playhead'),
+                audio: panel.querySelector('audio'),
+                thresholdSlider: panel.querySelector('.threshold-slider'),
+                thresholdValue: panel.querySelector('.threshold-value'),
+                thresholdMin: panel.querySelector('.threshold-min'),
+                thresholdMax: panel.querySelector('.threshold-max'),
+                debounceSlider: panel.querySelector('.debounce-slider'),
+                debounceValue: panel.querySelector('.debounce-value'),
+                debounceMin: panel.querySelector('.debounce-min'),
+                debounceMax: panel.querySelector('.debounce-max'),
+                copyBtn: panel.querySelector('.copy-btn'),
+                status: panel.querySelector('.status'),
+            };
+
+            els.audio.volume = 0.5;
+
+            els.header.addEventListener('click', () => {
+                panel.classList.toggle('expanded');
+            });
+            els.thresholdSlider.addEventListener('input', (e) => {
+                els.thresholdValue.textContent = e.target.value;
+                reanalyzeStem(key);
+            });
+            els.debounceSlider.addEventListener('input', (e) => {
+                els.debounceValue.textContent = e.target.value;
+                reanalyzeStem(key);
+            });
+            els.thresholdMin.addEventListener('change', (e) => {
+                els.thresholdSlider.min = e.target.value;
+            });
+            els.thresholdMax.addEventListener('change', (e) => {
+                els.thresholdSlider.max = e.target.value;
+            });
+            els.debounceMin.addEventListener('change', (e) => {
+                els.debounceSlider.min = e.target.value;
+            });
+            els.debounceMax.addEventListener('change', (e) => {
+                els.debounceSlider.max = e.target.value;
+            });
+            els.copyBtn.addEventListener('click', () => copyStemJson(key));
+            els.audio.addEventListener('timeupdate', () => drawPlayhead(key));
+
+            return {
+                key, label,
+                envelope: [], durationMs: 0, beats: [],
+                threshold: 1.35, debounce: 200,
+                objectUrl: null,
+                els,
+            };
+        }
+
+        function updateStemSummary(key) {
+            const state = stemStates.get(key);
+            state.els.summary.textContent =
+                `${(state.durationMs / 1000).toFixed(1)}s, ${state.beats.length} beats`;
+            state.els.status.textContent =
+                `${(state.durationMs / 1000).toFixed(1)}s track, ${state.envelope.length} envelope samples, ${state.beats.length} beats detected`;
+        }
+
+        async function copyStemJson(key) {
+            const state = stemStates.get(key);
+            const doc = { version: 1, durationMs: state.durationMs, envelope: state.envelope, beats: state.beats };
+            await navigator.clipboard.writeText(JSON.stringify(doc, null, 4));
+            const btn = state.els.copyBtn;
+            const original = btn.textContent;
+            btn.textContent = '✓ Copied!';
+            setTimeout(() => { btn.textContent = original; }, 1200);
+        }
+
+        function downloadStemJson(key) {
+            const state = stemStates.get(key);
+            const doc = { version: 1, durationMs: state.durationMs, envelope: state.envelope, beats: state.beats };
+            const blob = new Blob([JSON.stringify(doc, null, 4)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `music-cues-${key}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        // Browsers throttle/block rapid-fire multi-download triggers from a
+        // single click; a short stagger keeps each save-file prompt/download
+        // from getting dropped when several stems are analyzed at once.
+        function downloadAllStemJson() {
+            const keys = [...stemStates.keys()].filter(k => stemStates.get(k).envelope.length > 0);
+            keys.forEach((key, i) => setTimeout(() => downloadStemJson(key), i * 300));
+        }
+
+        function renderStemWaveform(key) {
+            const state = stemStates.get(key);
+            const canvas = state.els.canvas;
+            const playheadCanvas = state.els.playheadCanvas;
             const pxPerSec = 60;
-            canvas.width = Math.max(600, Math.round(durationMs / 1000 * pxPerSec));
+            const width = Math.max(600, Math.round(state.durationMs / 1000 * pxPerSec));
+            canvas.width = width;
+            canvas.height = 200;
+            playheadCanvas.width = width;
+            playheadCanvas.height = 200;
+
             const ctx = canvas.getContext('2d');
             const w = canvas.width, h = canvas.height;
             ctx.clearRect(0, 0, w, h);
@@ -136,8 +360,8 @@
             ctx.strokeStyle = '#4fd1c5';
             ctx.lineWidth = 1;
             ctx.beginPath();
-            envelope.forEach((e, i) => {
-                const x = (e.t / durationMs) * w;
+            state.envelope.forEach((e, i) => {
+                const x = (e.t / state.durationMs) * w;
                 const y = h - e.amp * h;
                 if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
             });
@@ -145,128 +369,53 @@
 
             ctx.strokeStyle = '#f7ba32';
             ctx.lineWidth = 1;
-            beats.forEach(bt => {
-                const x = (bt / durationMs) * w;
+            state.beats.forEach(bt => {
+                const x = (bt / state.durationMs) * w;
                 ctx.beginPath();
                 ctx.moveTo(x, 0);
                 ctx.lineTo(x, h);
                 ctx.stroke();
             });
+
+            drawPlayhead(key);
         }
 
-        function updateStatus() {
-            document.getElementById('status').textContent =
-                `${(durationMs / 1000).toFixed(1)}s track, ${envelope.length} envelope samples, ${beats.length} beats detected`;
-        }
-
-        function reanalyzeBeats() {
-            const threshold = parseFloat(document.getElementById('thresholdSlider').value);
-            const debounce = parseFloat(document.getElementById('debounceSlider').value);
-            beats = detectBeats(envelope, threshold, debounce);
-            renderWaveform();
-            updateStatus();
-        }
-
-        async function handleFile(file) {
-            // Make #status visible before the async work starts so the
-            // loading message is actually seen: it lives inside #tunePanel,
-            // which is display:none until the first successful analysis.
-            const tunePanel = document.getElementById('tunePanel');
-            const statusEl = document.getElementById('status');
-            const thresholdSlider = document.getElementById('thresholdSlider');
-            const debounceSlider = document.getElementById('debounceSlider');
-            const btnCopy = document.getElementById('btnCopy');
-            tunePanel.style.display = '';
-            statusEl.textContent = 'Analyzing...';
-            // Disable controls during in-flight analysis so a slider drag or
-            // copy click can't act on stale/placeholder envelope/beats data.
-            thresholdSlider.disabled = true;
-            debounceSlider.disabled = true;
-            btnCopy.disabled = true;
-
-            try {
-                const arrayBuffer = await file.arrayBuffer();
-                const offlineCtx = new OfflineAudioContext(2, 1, 44100); // throwaway ctx, decodeAudioData only
-                const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
-                const result = computeRmsEnvelope(audioBuffer);
-                if (secondaryEnvelope) {
-                    envelope = mergeEnvelopes(result.envelope, secondaryEnvelope);
-                    durationMs = Math.max(result.durationMs, secondaryDurationMs);
-                } else {
-                    envelope = result.envelope;
-                    durationMs = result.durationMs;
-                }
-
-                if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
-                currentObjectUrl = URL.createObjectURL(file);
-
-                const previewAudio = document.getElementById('previewAudio');
-                previewAudio.src = currentObjectUrl;
-                previewAudio.style.display = '';
-
-                document.getElementById('canvasHost').style.display = '';
-                thresholdSlider.disabled = false;
-                debounceSlider.disabled = false;
-                btnCopy.disabled = false;
-                reanalyzeBeats();
-            } catch (err) {
-                statusEl.textContent = `Failed to analyze file: ${err.message}`;
-                // Only re-enable if a prior successful analysis left real data
-                // in place; otherwise there's nothing valid to interact with.
-                if (envelope.length > 0) {
-                    thresholdSlider.disabled = false;
-                    debounceSlider.disabled = false;
-                    btnCopy.disabled = false;
-                }
-            }
-        }
-
-        async function copyJson() {
-            const doc = { version: 1, durationMs, envelope, beats };
-            await navigator.clipboard.writeText(JSON.stringify(doc, null, 4));
-            const btn = document.getElementById('btnCopy');
-            const original = btn.textContent;
-            btn.textContent = '✓ Copied!';
-            setTimeout(() => { btn.textContent = original; }, 1200);
-        }
-
-        async function handleSecondaryFile(file) {
-            try {
-                const arrayBuffer = await file.arrayBuffer();
-                const offlineCtx = new OfflineAudioContext(2, 1, 44100);
-                const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
-                const result = computeRmsEnvelope(audioBuffer);
-                secondaryEnvelope = result.envelope;
-                secondaryDurationMs = result.durationMs;
-                // Re-run the primary analysis's merge if a primary file was
-                // already analyzed, so selecting the secondary file second
-                // still produces a merged result without re-selecting the
-                // primary.
-                if (envelope.length > 0 && document.getElementById('fileInput').files[0]) {
-                    handleFile(document.getElementById('fileInput').files[0]);
-                }
-            } catch (err) {
-                document.getElementById('status').textContent = `Failed to analyze secondary file: ${err.message}`;
-            }
+        function drawPlayhead(key) {
+            const state = stemStates.get(key);
+            if (!state || state.durationMs === 0) return;
+            const canvas = state.els.playheadCanvas;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+            ctx.clearRect(0, 0, w, h);
+            const currentMs = state.els.audio.currentTime * 1000;
+            const x = (currentMs / state.durationMs) * w;
+            ctx.strokeStyle = '#ff5555';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, h);
+            ctx.stroke();
         }
 
         document.getElementById('fileInput').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) handleFile(file);
+            const files = Array.from(e.target.files);
+            const unrecognized = [];
+            for (const file of files) {
+                const key = matchStemKey(file.name);
+                if (!key) {
+                    unrecognized.push(file.name);
+                    continue;
+                }
+                const def = STEM_DEFS.find(d => d.key === key);
+                analyzeStemFile(key, def.label, file);
+            }
+            document.getElementById('unrecognizedStatus').textContent =
+                unrecognized.length
+                    ? `Unrecognized (not analyzed): ${unrecognized.join(', ')}`
+                    : '';
         });
-        document.getElementById('secondaryFileInput').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) handleSecondaryFile(file);
-        });
-        document.getElementById('thresholdSlider').addEventListener('input', (e) => {
-            document.getElementById('thresholdValue').textContent = e.target.value;
-            reanalyzeBeats();
-        });
-        document.getElementById('debounceSlider').addEventListener('input', (e) => {
-            document.getElementById('debounceValue').textContent = e.target.value;
-            reanalyzeBeats();
-        });
-        document.getElementById('btnCopy').addEventListener('click', copyJson);
+
+        document.getElementById('btnDownloadAll').addEventListener('click', downloadAllStemJson);
     </script>
 </body>
 </html>

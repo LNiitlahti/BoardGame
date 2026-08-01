@@ -23,13 +23,20 @@
         materials: null,
         musicDrums: null,
         musicVocals: null,
+        musicBackingVocals: null,
+        musicBass: null,
+        musicPercussion: null,
+        musicStrings: null,
+        musicSynth: null,
+        musicOther: null,
         audioEl: null,
         coverEl: null,
         watchdogId: null,
         dataWaitId: null,
         boardWrapEl: null,
         boardWrapParent: null,
-        boardWrapNextSibling: null
+        boardWrapNextSibling: null,
+        dimOverlayEl: null
     };
 
     window.CINEMATIC = {
@@ -115,6 +122,46 @@
             state.renderQueued = false;
             try { window.CineView.renderBoard(); } catch (e) { console.error('[Cinematic] deferred renderBoard failed:', e); }
         }
+
+        redirectToCleanUrl();
+    }
+
+    // The cinematic leaves one-shot state behind (armed camera pose, spent
+    // timeline, etc.) that a plain page load doesn't have. Rather than reset
+    // it all in place, fade everything (including the board itself) to solid
+    // black and reload the same URL minus &cinematic=1 so the page comes
+    // back in its normal steady state.
+    function redirectToCleanUrl() {
+        const fade = document.createElement('div');
+        fade.id = 'cineOutroFade';
+        // Above .board-wrap (z-index:10000) and the dim veil (9998) — this
+        // one has to cover the cinematic itself, not just what's under it.
+        fade.style.cssText =
+            'position:fixed;inset:0;z-index:10002;background-color:#000;' +
+            'opacity:0;transition:opacity 0.6s ease;pointer-events:none;';
+        document.body.appendChild(fade);
+        requestAnimationFrame(() => { fade.style.opacity = '1'; });
+
+        const url = new URL(location.href);
+        url.searchParams.delete('cinematic');
+        setTimeout(() => { location.href = url.toString(); }, 2000);
+    }
+
+    // Persistent 50%-black/12px-blur veil sitting *under* the cinematic
+    // (below .board-wrap's z-index:10000, so the camera/tiles/text/atmosphere
+    // stay sharp) but above the rest of the page. Present from arm() through
+    // teardown() (see redirectToCleanUrl, which fades it to full black rather
+    // than removing it).
+    function makeDimOverlay() {
+        const el = document.createElement('div');
+        el.id = 'cineDimOverlay';
+        el.style.cssText =
+            'position:fixed;inset:0;z-index:9998;background-color:rgba(0,0,0,0.5);' +
+            'backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);' +
+            'transition:background-color 0.6s ease;pointer-events:none;';
+        document.body.appendChild(el);
+        state.dimOverlayEl = el;
+        return el;
     }
 
     function bail() {
@@ -262,6 +309,16 @@
         const { outroDurationMs, finalEnd } = window.CineOutro.computeOutro(
             cinematicOwnEnd, state.musicDrums.durationMs);
 
+        // --- Shared tempo signal: beat density across every loaded stem
+        // (including drums/vocals) in a trailing 2s window. Read fresh at
+        // each call site below rather than cached, since it's cheap and
+        // varies continuously with t.
+        const tempoStems = [
+            state.musicDrums, state.musicVocals, state.musicBackingVocals,
+            state.musicBass, state.musicPercussion, state.musicStrings,
+            state.musicSynth, state.musicOther
+        ];
+
         // --- Outro camera drift: when the music runs longer than the
         // cinematic's own choreography (cinematicOwnEnd), extend the
         // timeline to finalEnd so the track can play to completion instead
@@ -302,7 +359,8 @@
             if (beatMs < textWindowStart || beatMs > textWindowEnd) return;
             tl.add({
                 at: beatMs, duration: 0,
-                onStart: () => state.text.triggerFlicker()
+                onStart: () => state.text.triggerFlicker(
+                    window.CineTempo.computeTempo(tempoStems, beatMs, cfg.tempo))
             });
         });
 
@@ -364,6 +422,84 @@
             }
         });
 
+        // --- Multi-stem effects: backing vocals, bass, percussion, strings,
+        // synth, other. Each stem is independently optional — a missing/
+        // failed load yields an inert CineMusic (empty envelope/beats, see
+        // cine-music.js), so guarding on envelope/beats length here is what
+        // makes a missing stem's effect not fire, without needing a separate
+        // null-check path. Continuous-envelope stems run 0..min(duration,
+        // finalEnd), same clamping pattern as the drums envelope block above.
+        if (state.musicBackingVocals.envelope.length > 0) {
+            const dur = Math.min(state.musicBackingVocals.durationMs, finalEnd);
+            tl.add({
+                at: 0,
+                duration: dur,
+                onUpdate: p => state.atmosphere.applyFogIntensity(
+                    state.musicBackingVocals.envelopeAt(p * dur))
+            });
+        }
+
+        if (state.musicBass.envelope.length > 0) {
+            const dur = Math.min(state.musicBass.durationMs, finalEnd);
+            tl.add({
+                at: 0,
+                duration: dur,
+                onUpdate: p => state.camera.applyBassScale(
+                    state.musicBass.envelopeAt(p * dur), cfg.bass.scaleAmp)
+            });
+        }
+
+        if (state.musicPercussion.beats.length > 0) {
+            state.musicPercussion.beats.forEach(beatMs => {
+                if (beatMs > finalEnd) return; // never fires past the cinematic's own end, see the drums beat loop above
+                tl.add({
+                    at: beatMs,
+                    duration: 0,
+                    onStart: () => state.atmosphere.triggerSpark(
+                        window.CineTempo.computeTempo(tempoStems, beatMs, cfg.tempo),
+                        cfg.percussion.sparkDurationMs)
+                });
+            });
+        }
+
+        if (state.musicStrings.envelope.length > 0) {
+            const dur = Math.min(state.musicStrings.durationMs, finalEnd);
+            tl.add({
+                at: 0,
+                duration: dur,
+                onUpdate: p => {
+                    const t = p * dur;
+                    const amp = state.musicStrings.envelopeAt(t);
+                    const speedFactor = window.CineTempo.computeTempo(tempoStems, t, cfg.tempo);
+                    state.camera.applyDrift(amp, speedFactor, t, {
+                        tiltAmp: cfg.strings.driftTiltAmp,
+                        spinAmp: cfg.strings.driftSpinAmp,
+                        periodBaseMs: cfg.strings.driftPeriodMs
+                    });
+                }
+            });
+        }
+
+        if (state.musicSynth.envelope.length > 0) {
+            const dur = Math.min(state.musicSynth.durationMs, finalEnd);
+            tl.add({
+                at: 0,
+                duration: dur,
+                onUpdate: p => state.atmosphere.applySynthGlow(
+                    state.musicSynth.envelopeAt(p * dur))
+            });
+        }
+
+        if (state.musicOther.envelope.length > 0) {
+            const dur = Math.min(state.musicOther.durationMs, finalEnd);
+            tl.add({
+                at: 0,
+                duration: dur,
+                onUpdate: p => state.atmosphere.applyBaseIntensity(
+                    state.musicOther.envelopeAt(p * dur))
+            });
+        }
+
         tl.onFinished = teardown;
         return tl;
     }
@@ -373,6 +509,7 @@
         document.body.classList.add('cine-active');
         liftBoardWrap();
         state.coverEl = makeCover();
+        makeDimOverlay();
         document.documentElement.classList.remove('cine-pending'); // our cover took over
 
         const scene = document.getElementById('cineScene');
@@ -425,23 +562,41 @@
             // Promise.all only ever rejects on the scene config side, which
             // is the only failure that should bail the whole cinematic.
             //
-            // music-cues-drums.json and music-cues-vocals.json are separate
-            // stems feeding different effects (drum-synced camera/light beats
-            // vs. state.musicVocals.beats driving triggerFlicker() in the
-            // vocal-synced text effect below). The vocals file itself is
-            // currently a placeholder (empty envelope/beats) pending a manual
-            // vocal-stem analysis step, so the flicker trigger is wired but
-            // inert until real data replaces the placeholder.
-            const [config, materials, musicDrums, musicVocals] = await Promise.all([
+            // Each music-cues-*.json is a separate stem feeding a distinct
+            // effect (see cine-camera.js/cine-atmosphere.js/cine-text.js for
+            // the effect wiring, and buildTimeline() below for where each is
+            // scheduled). CineMusic.load() never rejects either (see
+            // cine-music.js) — a missing/failed stem file degrades to an
+            // inert CineMusic (empty envelope/beats), so every stem beyond
+            // drums is independently optional with no extra wrapping needed
+            // here. vocals/backingVocals/bass/percussion/strings/synth/other
+            // may all ship partially analyzed; drums is the only stem this
+            // cinematic treats as required for its own beat-synced staging.
+            const [
+                config, materials, musicDrums, musicVocals, musicBackingVocals,
+                musicBass, musicPercussion, musicStrings, musicSynth, musicOther
+            ] = await Promise.all([
                 fetch('data/cinematic-scene.json').then(res => res.json()),
                 window.CineMaterials.load('../shared/data/hex-materials.json'),
                 window.CineMusic.load('data/music-cues-drums.json'),
-                window.CineMusic.load('data/music-cues-vocals.json')
+                window.CineMusic.load('data/music-cues-vocals.json'),
+                window.CineMusic.load('data/music-cues-backingVocals.json'),
+                window.CineMusic.load('data/music-cues-bass.json'),
+                window.CineMusic.load('data/music-cues-percussion.json'),
+                window.CineMusic.load('data/music-cues-strings.json'),
+                window.CineMusic.load('data/music-cues-synth.json'),
+                window.CineMusic.load('data/music-cues-other.json')
             ]);
             state.config = config;
             state.materials = materials;
             state.musicDrums = musicDrums;
             state.musicVocals = musicVocals;
+            state.musicBackingVocals = musicBackingVocals;
+            state.musicBass = musicBass;
+            state.musicPercussion = musicPercussion;
+            state.musicStrings = musicStrings;
+            state.musicSynth = musicSynth;
+            state.musicOther = musicOther;
         } catch (e) {
             console.error('[Cinematic] Config load failed, bailing:', e);
             document.documentElement.classList.remove('cine-pending');
