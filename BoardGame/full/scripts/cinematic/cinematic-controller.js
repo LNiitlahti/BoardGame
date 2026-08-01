@@ -239,8 +239,18 @@
         // is cut off when teardown() pauses the <audio> element, per spec
         // (no fade-out logic in this pass).
         const cinematicOwnEnd = revealEnd + cfg.signage.durationMs;
+        const { outroDurationMs, finalEnd } = window.CineOutro.computeOutro(
+            cinematicOwnEnd, state.music.durationMs);
+        if (outroDurationMs > 0) {
+            tl.add({
+                at: cinematicOwnEnd,
+                duration: outroDurationMs,
+                onUpdate: p => state.camera.applyPose(
+                    window.CineCamera.lerpPose(cam.rest, cam.outro, p))
+            });
+        }
         const music = state.music;
-        const envelopeDuration = Math.min(music.durationMs, cinematicOwnEnd);
+        const envelopeDuration = Math.min(music.durationMs, finalEnd);
         if (envelopeDuration > 0) {
             tl.add({
                 at: 0,
@@ -266,7 +276,7 @@
             // don't schedule it — scheduling it anyway would silently
             // stretch tl.duration (see the CineTimeline.duration getter)
             // past the cinematic's real length, delaying its own finish.
-            if (beatMs > cinematicOwnEnd) return;
+            if (beatMs > finalEnd) return;
 
             const ring = i % (maxRing + 1);
             const coords = hexesByRing.get(ring) || [];
