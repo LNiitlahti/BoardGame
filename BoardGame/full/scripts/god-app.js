@@ -372,50 +372,6 @@ class GodApp {
         }).join('');
     }
 
-    async createNewTournament() {
-        const name = prompt('Enter tournament name:');
-        if (!name || !name.trim()) return;
-
-        try {
-            // Load default rooms if available
-            let defaultRooms = [];
-            try {
-                const configDoc = await window.firebaseDB.collection('config').doc('defaultRooms').get();
-                if (configDoc.exists && configDoc.data().rooms?.length) {
-                    defaultRooms = configDoc.data().rooms;
-                }
-            } catch (e) {
-                console.warn('Could not load default rooms:', e);
-            }
-
-            const tournamentRef = window.firebaseDB.collection('tournaments').doc();
-            await tournamentRef.set({
-                name: name.trim(),
-                status: 'setup',
-                seasonId: null,
-                createdAt: new Date().toISOString(),
-                currentRound: 0,
-                gamesPlayed: 0,
-                teams: [],
-                players: {},
-                matchQueue: [],
-                gameHistory: [],
-                board: {},
-                rooms: defaultRooms,
-                selectedGames: []
-            });
-
-            this.ui.showStatus(`Tournament "${name.trim()}" created`, 'success');
-            await this.loadTournamentsList();
-
-            // Auto-select the new tournament
-            this.onTournamentSelect(tournamentRef.id);
-        } catch (error) {
-            console.error('Error creating tournament:', error);
-            this.ui.showStatus('Error creating tournament', 'error');
-        }
-    }
-
     // ------------------------------------------------------------------
     // Tournament loading
     // ------------------------------------------------------------------
@@ -1353,7 +1309,6 @@ class GodApp {
 
         // Tournament management (old god-scripts.js names)
         window.filterTournaments = () => app.filterTournaments();
-        window.createNewTournament = () => app.createNewTournament();
         window.openEditTournamentModal = (id) => app.openEditTournamentModal(id);
         window.closeEditModal = () => app.closeEditModal();
         window.saveTournamentEdits = () => app.saveTournamentEdits();

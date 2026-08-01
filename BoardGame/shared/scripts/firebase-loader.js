@@ -45,6 +45,21 @@ document.addEventListener('DOMContentLoaded', function() {
             // Get Firestore instance
             const db = firebase.firestore();
 
+            // Serve reads from the local IndexedDB cache when the data is
+            // already there instead of always hitting the network — cuts
+            // read cost on page reloads and repeated one-time get() calls
+            // for data that hasn't changed. synchronizeTabs lets it work
+            // even when a device has more than one tab of this app open
+            // (e.g. admin.html + god.html side by side) instead of just
+            // failing for every tab after the first.
+            db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+                if (err.code === 'failed-precondition') {
+                    console.warn('[Firebase] Persistence unavailable (unsupported multi-tab state)');
+                } else if (err.code === 'unimplemented') {
+                    console.warn('[Firebase] Persistence not supported in this browser');
+                }
+            });
+
             // Expose Firestore helpers to window
             window.firebaseDB = db;
             window.firebaseDoc = function(db, collection, document) {

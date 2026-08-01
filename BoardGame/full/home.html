@@ -867,7 +867,7 @@
       <div class="action-buttons" style="flex-wrap: wrap; margin-top: 12px;">
         <button class="btn-small btn-secondary" onclick="goToPage('../rulebook.html')">📖 Rulebook</button>
         <button class="btn-small btn-secondary" onclick="goToPage('statistics.html')">📊 Statistics</button>
-        <button class="btn-small btn-secondary" onclick="goToPage('onboarding.html')">🧭 Player Onboarding</button>
+        <button class="btn-small btn-secondary" onclick="goToOnboarding()">🧭 Player Onboarding</button>
       </div>
 
       <!-- Dev tools (god only) -->
@@ -1406,6 +1406,20 @@
 
     window.goToPage = function(page) {
       window.location.href = page;
+    };
+
+    // The always-visible Resources link needs the player's own assignment
+    // IDs — same as the one-time new-assignment banner (checkNewAssignment)
+    // — instead of a bare 'onboarding.html' which onboarding.js immediately
+    // rejects with "No tournament ID specified" (bug #6).
+    window.goToOnboarding = function() {
+      const userData = appState.get('userProfile');
+      if (userData && userData.assignedTournamentId && userData.assignedPlayerId) {
+        const url = `onboarding.html?tournamentId=${encodeURIComponent(userData.assignedTournamentId)}&player=${encodeURIComponent(userData.assignedPlayerId)}`;
+        window.location.href = url;
+      } else {
+        errorHandler.showInfo("You're not assigned to a tournament yet — an admin needs to add you to a team first.");
+      }
     };
 
     window.createNewGame = function() {

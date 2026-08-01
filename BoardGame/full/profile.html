@@ -1395,6 +1395,21 @@
           .collection('onboarding').doc('state')
           .update(updates);
 
+        // Also mirror to the cross-tournament users/{uid}.platformIds record —
+        // this is the only field onboarding.js's carry-forward reads from for
+        // a *future* tournament, and it's otherwise only written by
+        // onboarding.html's own form (see bug #7).
+        const profileUpdates = {};
+        for (const p of activePlatforms) {
+          const input = document.getElementById(`platform_${p.id}`);
+          if (input && input.value.trim()) {
+            profileUpdates[`platformIds.${p.id}`] = input.value.trim();
+          }
+        }
+        if (Object.keys(profileUpdates).length > 0 && auth.currentUser) {
+          await db.collection('users').doc(auth.currentUser.uid).update(profileUpdates);
+        }
+
         onboardingDirty = false;
         document.getElementById('saveOnboardingBtn').style.display = 'none';
         document.getElementById('onboardingSaveStatus').textContent = 'Saved!';

@@ -707,6 +707,13 @@ class PhaseManager {
             startedAt: new Date().toISOString(),
             returnToPhase: returnToPhase,
             autoInserted: true,
+            // This path only fires when advancing INTO a fresh matches_in_progress
+            // (see the call site's `nextPhase === 'matches_in_progress'` guard) —
+            // no match slots exist yet. Explicitly seed 'setup' (rather than
+            // leaving returnSlots undefined) so endBreak() writes a clean
+            // { 1: 'setup', 2: 'setup' } instead of letting Firestore's merge
+            // leave the previous round's stale 'done' slots in place (bug #0).
+            returnSlots: returnToPhase === 'matches_in_progress' ? { 1: 'setup', 2: 'setup' } : undefined,
             challengeGamesPlayed: gs.currentPhase?.challengeGamesPlayed || 0
         };
 

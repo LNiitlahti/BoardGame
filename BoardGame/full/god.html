@@ -132,7 +132,7 @@
                            style="width: 100%; padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white; font-size: 1rem;">
                 </div>
 
-                <!-- Filter & Create -->
+                <!-- Filter -->
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                     <select id="statusFilter" onchange="filterTournaments()" style="flex: 1; padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white;">
                         <option value="all">All Status</option>
@@ -141,9 +141,6 @@
                         <option value="finished">Finished</option>
                         <option value="archived">Archived</option>
                     </select>
-                    <button class="btn primary" onclick="createNewTournament()" style="white-space: nowrap;" data-tooltip="Create a new tournament with custom settings">
-                        ➕ Create New
-                    </button>
                 </div>
 
                 <!-- Tournament List -->

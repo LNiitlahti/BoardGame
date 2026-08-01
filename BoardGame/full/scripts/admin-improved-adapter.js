@@ -86,7 +86,6 @@
 
     const SETUP_PHASES = ['challenges'];
     const LOBBY_PHASES = [];
-    const PLAYING_PHASES = ['challenge_game'];
 
     /** Which Match slot new queue entries get tagged with (admin-selected — see _renderMatchSlotCards) */
     let _targetSlot = 1;
@@ -1350,6 +1349,11 @@
         const phaseRound = gameState.currentPhase.roundNumber || 0;
         if (gameState.currentRound !== phaseRound) {
             gameState.currentRound = phaseRound;
+            // Persist immediately instead of waiting on some unrelated future
+            // save — otherwise the top-bar "ROUND" stat can show a stale
+            // number (read from Firestore on next load) even though the
+            // in-memory value here is already correct (bug #5).
+            if (typeof saveGameState === 'function') saveGameState();
         }
 
         _phaseManager.recheckRequirements();
@@ -1534,7 +1538,7 @@
         // Advance until we reach a playing phase, break, or tournament end
         let safety = 10;
         while (safety-- > 0 &&
-               !PLAYING_PHASES.includes(_phaseManager.getCurrentPhase()) &&
+               !_phaseManager.isPlayingPhase() &&
                _phaseManager.getCurrentPhase() !== 'break' &&
                _phaseManager.getCurrentPhase() !== 'tournament_end') {
             await _phaseManager.advancePhase(true);
@@ -1567,7 +1571,7 @@
         const phase = _phaseManager.getCurrentPhase();
 
         // Playing phases: this is the expected place to start matches
-        if (PLAYING_PHASES.includes(phase)) {
+        if (_phaseManager.isPlayingPhase(phase)) {
             return _origStartMatch(gameId);
         }
 

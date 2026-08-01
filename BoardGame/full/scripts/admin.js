@@ -687,12 +687,35 @@ function getTeamColor(teamId) {
 async function adjustTeamPoints(teamId, delta, e) {
     if (e) e.stopPropagation();
 
-    if (!gameState?.teams) return;
+    if (!gameState?.teams || !currentTournamentId) return;
 
-    const team = gameState.teams.find(t => t.id === teamId);
-    if (team) {
-        team.points = Math.max(0, (team.points || 0) + delta);
-        await saveGameState();
+    // Delta adjustments must go through a transaction: two admin devices
+    // both reading their own stale local gameState, adding a delta, then
+    // saveGameState()-ing the whole doc (which fully overwrites the `teams`
+    // array — Firestore merge:true doesn't merge array elements) can silently
+    // drop one device's edit (bug #5a). The transaction re-reads the current
+    // server value immediately before writing, so concurrent deltas
+    // correctly accumulate instead of racing.
+    const tournamentRef = window.firebaseDB.collection('tournaments').doc(currentTournamentId);
+    let updatedTeams = null;
+    try {
+        await window.firebaseDB.runTransaction(async (transaction) => {
+            const doc = await transaction.get(tournamentRef);
+            const teams = (doc.data() || {}).teams || [];
+            const idx = teams.findIndex(t => t.id === teamId);
+            if (idx === -1) return;
+            teams[idx] = { ...teams[idx], points: Math.max(0, (teams[idx].points || 0) + delta) };
+            transaction.update(tournamentRef, { teams });
+            updatedTeams = teams;
+        });
+    } catch (error) {
+        console.error('Error adjusting team points:', error);
+        showStatus('Error saving points to Firebase', 'error');
+        return;
+    }
+
+    if (updatedTeams) {
+        gameState.teams = updatedTeams;
         renderTeamsList();
     }
 }
@@ -3521,9 +3544,14 @@ async function confirmAutoMatch() {
     const addedMatches = [];
 
     // Add each match from the result (1 for 5v5, 2 for 3v3+2v2)
+    // Compute the base number once — getNextMatchNumber() reads from
+    // gameState.gameQueue, which isn't updated until after this loop, so
+    // calling it per-iteration would stamp every entry in a multi-match
+    // batch (e.g. a 3v3+2v2 split) with the same duplicate number (bug #2).
+    const baseMatchNumber = getNextMatchNumber();
     for (let i = 0; i < result.matches.length; i++) {
         const match = result.matches[i];
-        const matchNumber = getNextMatchNumber();
+        const matchNumber = baseMatchNumber + i;
 
         // Create the queue entry
         const queueEntry = {

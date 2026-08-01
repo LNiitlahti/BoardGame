@@ -63,7 +63,7 @@
           >
         </div>
 
-        <button type="submit" class="auth-btn auth-btn-primary" id="loginBtn">
+        <button type="submit" class="auth-btn auth-btn-primary" id="loginBtn" disabled>
           Sign In
         </button>
       </form>
@@ -139,7 +139,7 @@
           >
         </div>
 
-        <button type="submit" class="auth-btn auth-btn-secondary" id="registerBtn">
+        <button type="submit" class="auth-btn auth-btn-secondary" id="registerBtn" disabled>
           Create Account
         </button>
       </form>
@@ -155,16 +155,33 @@
     let auth;
     let db;
 
+    // Set while handleRegister() has Firestore writes in flight, so the
+    // onAuthStateChanged listener below doesn't redirect out from under them
+    // (createUserWithEmailAndPassword fires the auth state change before the
+    // user-doc/referral-code writes that follow it have finished — see
+    // handleRegister's explicit redirect for the registration path).
+    let isRegistering = false;
+
+    showStatus('Connecting…', 'info');
+
     // Wait for Firebase to be ready
     document.addEventListener('firebase-ready', function() {
+      hideStatus();
       console.log("Firebase ready, setting up auth...");
 
       auth = firebase.auth();
       db = firebase.firestore();
 
+      // Forms are inert (submit buttons disabled) until this point, so a click
+      // before Firebase finishes loading can't fall back to a native HTML
+      // form GET-submit (which would reload the page and silently drop
+      // whatever the user typed instead of calling handleLogin/handleRegister).
+      document.getElementById('loginBtn').disabled = false;
+      document.getElementById('registerBtn').disabled = false;
+
       // Monitor auth state — ignore anonymous users (firebase-loader signs in anonymously)
       auth.onAuthStateChanged(user => {
-        if (user && !user.isAnonymous) {
+        if (user && !user.isAnonymous && !isRegistering) {
           console.log("User logged in:", user.uid);
           // Update lastLogin timestamp in Firestore
           db.collection('users').doc(user.uid).update({
@@ -247,6 +264,7 @@
       // Show loading state
       btn.classList.add('loading');
       btn.disabled = true;
+      isRegistering = true;
 
       let userId;
 
@@ -304,11 +322,18 @@
       })
       .then(() => {
         showStatus('Registration successful! Redirecting...', 'success');
+        // Explicit redirect — do NOT rely on onAuthStateChanged here, since it
+        // fires as soon as the Auth account exists, before the Firestore
+        // writes above (user doc + referral code) have actually completed.
+        setTimeout(() => {
+          window.location.href = 'index.html';
+        }, 1000);
       })
       .catch(err => {
         console.error('Registration error:', err);
         btn.classList.remove('loading');
         btn.disabled = false;
+        isRegistering = false;
 
         let message = err.message || 'Registration failed. Please try again.';
         if (err.code === 'auth/email-already-in-use') {
