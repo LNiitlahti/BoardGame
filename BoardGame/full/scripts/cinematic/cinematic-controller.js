@@ -380,6 +380,13 @@
             // instance internally on its own fetch failure) — so this
             // Promise.all only ever rejects on the scene config side, which
             // is the only failure that should bail the whole cinematic.
+            //
+            // music-cues-drums.json and music-cues-vocals.json are separate
+            // stems feeding different future effects (drum-synced camera/light
+            // beats vs. a planned vocal-synced text effect). The vocals file
+            // is currently a placeholder (empty envelope/beats) pending a
+            // manual vocal-stem analysis step, so state.musicVocals is loaded
+            // but intentionally unused for now.
             const [config, materials, musicDrums, musicVocals] = await Promise.all([
                 fetch('data/cinematic-scene.json').then(res => res.json()),
                 window.CineMaterials.load('../shared/data/hex-materials.json'),

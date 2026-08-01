@@ -372,7 +372,13 @@
         let cfg = null;          // live-tunable copy, seeded from the JSON file
         let materials = null;    // CineMaterials instance, loaded once alongside cfg
         let music = null;    // CineMusic instance, loaded once alongside cfg/materials
-        let musicVocals = null; // CineMusic instance for vocals cues, loaded but not yet wired up
+        // CineMusic instance for the vocals stem. music-cues-drums.json and
+        // music-cues-vocals.json feed different future effects (drum-synced
+        // beats vs. a planned vocal-synced text effect); the vocals file is
+        // currently a placeholder (empty envelope/beats) pending a manual
+        // vocal-stem analysis step, so musicVocals is loaded but intentionally
+        // unused for now.
+        let musicVocals = null;
         let audioEl = null;  // harness preview <audio>, (re)created per buildAndPlay()
         let timeline = null;
         let camera = null;
