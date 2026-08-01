@@ -35,7 +35,8 @@
         dataWaitId: null,
         boardWrapEl: null,
         boardWrapParent: null,
-        boardWrapNextSibling: null
+        boardWrapNextSibling: null,
+        dimOverlayEl: null
     };
 
     window.CINEMATIC = {
@@ -121,6 +122,46 @@
             state.renderQueued = false;
             try { window.CineView.renderBoard(); } catch (e) { console.error('[Cinematic] deferred renderBoard failed:', e); }
         }
+
+        redirectToCleanUrl();
+    }
+
+    // The cinematic leaves one-shot state behind (armed camera pose, spent
+    // timeline, etc.) that a plain page load doesn't have. Rather than reset
+    // it all in place, fade everything (including the board itself) to solid
+    // black and reload the same URL minus &cinematic=1 so the page comes
+    // back in its normal steady state.
+    function redirectToCleanUrl() {
+        const fade = document.createElement('div');
+        fade.id = 'cineOutroFade';
+        // Above .board-wrap (z-index:10000) and the dim veil (9998) — this
+        // one has to cover the cinematic itself, not just what's under it.
+        fade.style.cssText =
+            'position:fixed;inset:0;z-index:10002;background-color:#000;' +
+            'opacity:0;transition:opacity 0.6s ease;pointer-events:none;';
+        document.body.appendChild(fade);
+        requestAnimationFrame(() => { fade.style.opacity = '1'; });
+
+        const url = new URL(location.href);
+        url.searchParams.delete('cinematic');
+        setTimeout(() => { location.href = url.toString(); }, 2000);
+    }
+
+    // Persistent 50%-black/12px-blur veil sitting *under* the cinematic
+    // (below .board-wrap's z-index:10000, so the camera/tiles/text/atmosphere
+    // stay sharp) but above the rest of the page. Present from arm() through
+    // teardown() (see redirectToCleanUrl, which fades it to full black rather
+    // than removing it).
+    function makeDimOverlay() {
+        const el = document.createElement('div');
+        el.id = 'cineDimOverlay';
+        el.style.cssText =
+            'position:fixed;inset:0;z-index:9998;background-color:rgba(0,0,0,0.5);' +
+            'backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);' +
+            'transition:background-color 0.6s ease;pointer-events:none;';
+        document.body.appendChild(el);
+        state.dimOverlayEl = el;
+        return el;
     }
 
     function bail() {
@@ -319,7 +360,7 @@
             tl.add({
                 at: beatMs, duration: 0,
                 onStart: () => state.text.triggerFlicker(
-                    window.CineTempo.computeTempo(tempoStems, beatMs))
+                    window.CineTempo.computeTempo(tempoStems, beatMs, cfg.tempo))
             });
         });
 
@@ -404,7 +445,7 @@
                 at: 0,
                 duration: dur,
                 onUpdate: p => state.camera.applyBassScale(
-                    state.musicBass.envelopeAt(p * dur))
+                    state.musicBass.envelopeAt(p * dur), cfg.bass.scaleAmp)
             });
         }
 
@@ -415,7 +456,8 @@
                     at: beatMs,
                     duration: 0,
                     onStart: () => state.atmosphere.triggerSpark(
-                        window.CineTempo.computeTempo(tempoStems, beatMs))
+                        window.CineTempo.computeTempo(tempoStems, beatMs, cfg.tempo),
+                        cfg.percussion.sparkDurationMs)
                 });
             });
         }
@@ -428,8 +470,12 @@
                 onUpdate: p => {
                     const t = p * dur;
                     const amp = state.musicStrings.envelopeAt(t);
-                    const speedFactor = window.CineTempo.computeTempo(tempoStems, t);
-                    state.camera.applyDrift(amp, speedFactor, t);
+                    const speedFactor = window.CineTempo.computeTempo(tempoStems, t, cfg.tempo);
+                    state.camera.applyDrift(amp, speedFactor, t, {
+                        tiltAmp: cfg.strings.driftTiltAmp,
+                        spinAmp: cfg.strings.driftSpinAmp,
+                        periodBaseMs: cfg.strings.driftPeriodMs
+                    });
                 }
             });
         }
@@ -463,6 +509,7 @@
         document.body.classList.add('cine-active');
         liftBoardWrap();
         state.coverEl = makeCover();
+        makeDimOverlay();
         document.documentElement.classList.remove('cine-pending'); // our cover took over
 
         const scene = document.getElementById('cineScene');
