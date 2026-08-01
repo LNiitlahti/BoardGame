@@ -3,6 +3,12 @@
     "void": {
         "minDurationMs": 12000
     },
+    "atmosphere": {
+        "particleCount": 40,
+        "emberCount": 15,
+        "ghostLightCount": 6,
+        "fog": { "enabled": true }
+    },
     "firstImpact": {
         "fallDurationMs": 1800,
         "holdAfterMs": 5000

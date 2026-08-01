@@ -18,6 +18,7 @@
         camera: null,
         tiles: null,
         text: null,
+        atmosphere: null,
         config: null,
         materials: null,
         musicDrums: null,
@@ -96,6 +97,10 @@
         if (state.text) {
             try { state.text.remove(); } catch (e) { console.error('[Cinematic] text.remove failed:', e); }
             state.text = null;
+        }
+        if (state.atmosphere) {
+            try { state.atmosphere.remove(); } catch (e) { console.error('[Cinematic] atmosphere.remove failed:', e); }
+            state.atmosphere = null;
         }
 
         // Guaranteed cleanup: must happen no matter what went wrong above.
@@ -320,6 +325,7 @@
                     state.camera.applyBoardPulse(amp);
                     state.tiles.applyBeatIntensity(amp);
                     state.camera.setShake('music', window.CineCamera.randomOffset(cfg.shake.music, amp));
+                    state.atmosphere.applyIntensity(amp);
                 }
             });
         }
@@ -382,6 +388,9 @@
         state.tiles.hideAll();
 
         state.text = new window.CineText(document.querySelector('.board-wrap'));
+
+        state.atmosphere = new window.CineAtmosphere(
+            document.querySelector('.board-wrap'), state.config.atmosphere);
 
         document.addEventListener('keydown', onKeydown);
         window.addEventListener('error', bail);
