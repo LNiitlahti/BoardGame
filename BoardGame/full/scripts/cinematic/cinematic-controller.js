@@ -149,6 +149,21 @@
         const easing = window.CineEasing;
         const tl = new window.CineTimeline();
 
+        // Camera shake: a short, punchy, decaying jolt on the first impact
+        // and each of the 6 ring-1 landings (not the dense ring2-5 cascade —
+        // that would read as jittery rather than violent). Decaying
+        // magnitude (1 - p) is a linear decay from full amplitude to zero,
+        // a punchy hit rather than a sustained tremor.
+        function addImpactShake(landingMs) {
+            tl.add({
+                at: landingMs,
+                duration: cfg.shake.impact.durationMs,
+                onUpdate: p => state.camera.setShake('impact',
+                    window.CineCamera.randomOffset(cfg.shake.impact, 1 - p)),
+                onComplete: () => state.camera.setShake('impact', { tilt: 0, spin: 0, zoom: 0 })
+            });
+        }
+
         const boardModule = window.CineView.getBoardModule();
         const order = window.CineBoardOrder.buildLandingOrder(
             boardModule.generateHexCoordinates()
@@ -165,11 +180,13 @@
         let t = voidMs;
         const first = order[0]; // q0r0 (guaranteed by buildLandingOrder)
         tl.add(state.tiles.makeDropTrack(first, t, cfg.firstImpact.fallDurationMs, easing.easeInQuad));
+        addImpactShake(t + cfg.firstImpact.fallDurationMs);
         t += cfg.firstImpact.fallDurationMs + cfg.firstImpact.holdAfterMs;
 
         const ring1 = order.filter(e => e.ring === 1);
         for (const entry of ring1) {
             tl.add(state.tiles.makeDropTrack(entry, t, cfg.earlyImpacts.fallDurationMs, easing.easeInQuad));
+            addImpactShake(t + cfg.earlyImpacts.fallDurationMs);
             t += cfg.earlyImpacts.intervalMs;
         }
 
@@ -268,6 +285,7 @@
                     const amp = music.envelopeAt(p * envelopeDuration);
                     state.camera.applyBoardPulse(amp);
                     state.tiles.applyBeatIntensity(amp);
+                    state.camera.setShake('music', window.CineCamera.randomOffset(cfg.shake.music, amp));
                 }
             });
         }

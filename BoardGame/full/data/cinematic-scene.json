@@ -56,5 +56,9 @@
     },
     "music": {
         "washThreshold": 0.6
+    },
+    "shake": {
+        "impact": { "durationMs": 300, "tiltAmp": 2.5, "spinAmp": 3, "zoomAmp": 0.03 },
+        "music": { "tiltAmp": 0.4, "spinAmp": 0.5, "zoomAmp": 0.006 }
     }
 }
