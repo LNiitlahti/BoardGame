@@ -464,11 +464,11 @@
         let materials = null;    // CineMaterials instance, loaded once alongside cfg
         let music = null;    // CineMusic instance, loaded once alongside cfg/materials
         // CineMusic instance for the vocals stem. music-cues-drums.json and
-        // music-cues-vocals.json feed different future effects (drum-synced
-        // beats vs. a planned vocal-synced text effect); the vocals file is
-        // currently a placeholder (empty envelope/beats) pending a manual
-        // vocal-stem analysis step, so musicVocals is loaded but intentionally
-        // unused for now.
+        // music-cues-vocals.json feed different effects (drum-synced beats
+        // vs. musicVocals.beats driving triggerFlicker() in buildTracks()
+        // below); the vocals file itself is currently a placeholder (empty
+        // envelope/beats) pending a manual vocal-stem analysis step, so the
+        // flicker trigger is wired but inert until real data replaces it.
         let musicVocals = null;
         let audioEl = null;  // harness preview <audio>, (re)created per buildAndPlay()
         let timeline = null;
