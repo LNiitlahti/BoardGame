@@ -231,7 +231,7 @@
         .atmo-fog {
             position: absolute; left: -20%; right: -20%; bottom: 0; height: 35%;
             filter: blur(8px);
-            opacity: calc(0.6 + var(--atmo-fog-intensity, 0) * 0.2);
+            opacity: calc(0.6 + (var(--atmo-intensity, 0) + var(--atmo-fog-intensity, 0)) * 0.2);
         }
         .atmo-fog.layer-1 {
             background: linear-gradient(to top, var(--fog-near, rgba(255,150,60,0.5)), var(--fog-far, rgba(90,60,120,0.2)) 70%, transparent);
@@ -243,7 +243,7 @@
         }
         /* Front duplicate: same fog, dimmed to a faint depth echo in front
            of the board. */
-        .atmo-fog.front { opacity: calc(var(--fog-front-opacity, 0.2) + var(--atmo-fog-intensity, 0) * 0.05); }
+        .atmo-fog.front { opacity: calc(var(--fog-front-opacity, 0.2) + (var(--atmo-intensity, 0) + var(--atmo-fog-intensity, 0)) * 0.05); }
         .atmo-fog.layer-2.front { opacity: calc(var(--fog-front-opacity, 0.2) * 0.4); }
         @keyframes atmoFogDrift1 { from { transform: translateX(-5%); } to { transform: translateX(5%); } }
         @keyframes atmoFogDrift2 { from { transform: translateX(3%); } to { transform: translateX(-3%); } }
@@ -253,7 +253,7 @@
             width: 2px; height: 2px; border-radius: 50%;
             background: rgba(230,225,210,0.55);
             animation: atmoMoteDrift var(--duration) linear var(--delay) infinite;
-            opacity: calc(0.5 + var(--atmo-base-intensity, 0) * 0.3);
+            opacity: calc(0.5 + (var(--atmo-intensity, 0) + var(--atmo-base-intensity, 0)) * 0.3);
         }
         @keyframes atmoMoteDrift {
             0%   { transform: translateY(0) translateX(0); opacity: 0; }
@@ -269,7 +269,7 @@
             left: var(--x); top: var(--y);
             animation-duration: var(--duration); animation-delay: var(--delay);
             animation-timing-function: ease-in-out; animation-iteration-count: infinite;
-            opacity: calc(0.4 + var(--atmo-fog-intensity, 0) * 0.4);
+            opacity: calc(0.4 + (var(--atmo-intensity, 0) + var(--atmo-fog-intensity, 0)) * 0.4);
         }
         .atmo-ghost:nth-child(3n)   { animation-name: atmoGhostPathA; }
         .atmo-ghost:nth-child(3n+1) { animation-name: atmoGhostPathB; }
@@ -283,7 +283,7 @@
             width: 3px; height: 3px; border-radius: 50%;
             background: #ffb347; box-shadow: 0 0 6px 2px #ff8c1a;
             animation: atmoEmberRise var(--duration) linear var(--delay) infinite;
-            filter: brightness(calc(1 + var(--atmo-base-intensity, 0) * 0.6));
+            filter: brightness(calc(1 + (var(--atmo-intensity, 0) + var(--atmo-base-intensity, 0)) * 0.6));
         }
         @keyframes atmoEmberRise {
             0%   { transform: translateY(0) translateX(0) scale(1); opacity: 0; }
