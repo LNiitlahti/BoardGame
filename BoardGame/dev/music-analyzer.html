@@ -55,6 +55,7 @@
 
     <div class="panel">
         <input type="file" id="fileInput" accept="audio/*" multiple>
+        <button id="btnDownloadAll" style="margin-top:8px;">Download all music-cues-*.json</button>
         <div id="unrecognizedStatus" class="unrecognized-status"></div>
     </div>
 
@@ -284,6 +285,28 @@
             setTimeout(() => { btn.textContent = original; }, 1200);
         }
 
+        function downloadStemJson(key) {
+            const state = stemStates.get(key);
+            const doc = { version: 1, durationMs: state.durationMs, envelope: state.envelope, beats: state.beats };
+            const blob = new Blob([JSON.stringify(doc, null, 4)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `music-cues-${key}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        // Browsers throttle/block rapid-fire multi-download triggers from a
+        // single click; a short stagger keeps each save-file prompt/download
+        // from getting dropped when several stems are analyzed at once.
+        function downloadAllStemJson() {
+            const keys = [...stemStates.keys()].filter(k => stemStates.get(k).envelope.length > 0);
+            keys.forEach((key, i) => setTimeout(() => downloadStemJson(key), i * 300));
+        }
+
         function renderStemWaveform(key) {
             const state = stemStates.get(key);
             const canvas = state.els.canvas;
@@ -358,6 +381,8 @@
                     ? `Unrecognized (not analyzed): ${unrecognized.join(', ')}`
                     : '';
         });
+
+        document.getElementById('btnDownloadAll').addEventListener('click', downloadAllStemJson);
     </script>
 </body>
 </html>
