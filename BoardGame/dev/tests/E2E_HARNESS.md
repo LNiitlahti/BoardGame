@@ -183,6 +183,34 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   source does. Snapshots/restores `teams`, `players`, `gameQueue`,
   `currentPhase`, `gamesPlayed`, `gameHistory` in a `finally` block — see
   the two new gotchas below, both discovered while building this test.
+- `e2e-slot-tagging-sanity.js` — **standing sanity check, meant to be re-run,
+  not a one-off regression test** (see TODO.md's "RESOLVED (was NOT a CL-32
+  regression, false alarm from confusing data)" entry). That investigation
+  found `cl32-smoke-test`'s ~117 leftover pending matches had scrambled `slot`
+  tags (sampled: 1,1,1,2,2,1,2,1,2,1) and concluded it was residue from
+  repeated past test-data generation on a heavily-reused scratch tournament,
+  not a bug in the tagging logic itself (`admin-improved-adapter.js`'s
+  `_tagNewQueueEntries`/`_computeCurrentSlot`, wired onto the real
+  `window.addMatchToQueue`). This script proves that conclusion by driving
+  the REAL guided-flow match-creation function on **full/admin.html** (per
+  the god.html-has-no-tagging-step gotcha below) — seeding its input state
+  (`manualGameSetup.sides` / `#gameType`) with real player ids from
+  `e2e-disposable-1`'s Team Alpha/Team Beta rosters rather than hand-
+  constructing pre-tagged queue entries — to create 2 matches while Match
+  Slot 1 is targeted (`window.setTargetMatchSlot(1)`) and 2 more while Slot 2
+  is targeted, then asserts the resulting `slot` tags partition cleanly (not
+  alternating) AND that the on-screen "Match 1"/"Match 2" slot-card guidance
+  text (`_renderMatchSlotCards`/`_computeSlotStep`/`_pendingSlotMatches`,
+  read live from the DOM, not re-derived) agrees with the raw field ("2
+  matches queued." for each). Confirmed passing against live `e2e-disposable-1`
+  data — fresh queues are NOT scrambled, matching the prior theory. **Intended
+  to be re-run before the real event**, against the real event tournament
+  once it exists (`TEST_TOURNAMENT_ID=<real-id> node
+  dev/tests/e2e-slot-tagging-sanity.js`), before trusting any live "Next
+  up"/slot mismatch as a real bug rather than leftover-data confusion — this
+  is exactly what TODO.md asked for going forward. Real Firestore writes
+  happen (each `addMatchToQueue()` call saves for real); snapshots/restores
+  `gameQueue`/`currentPhase` in a `finally` block like every sibling script.
 - `.env.e2e` (gitignored, not in git) — real credentials. Copy `.env.e2e.example`
   to create it if missing.
 
