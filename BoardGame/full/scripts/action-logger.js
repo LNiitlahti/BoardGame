@@ -380,6 +380,10 @@ class ActionLogger {
                 return `Player "${p.playerName || '?'}" added to ${teamName(p.teamId)}`;
             case 'player_removed':
                 return `Player "${p.playerName || '?'}" removed from ${teamName(p.teamId)}`;
+            case 'player_linked':
+                return `"${p.playerName || '?'}" linked to account ${p.userName || '?'} on ${teamName(p.teamId)}`;
+            case 'player_swapped':
+                return `${teamName(p.teamId)}: ${p.oldPlayerName || '?'} swapped out for ${p.newPlayerName || '?'}`;
             case 'player_renamed':
                 return `Player renamed: ${p.oldName || '?'} → ${p.newName || '?'}`;
             case 'seating_changed':

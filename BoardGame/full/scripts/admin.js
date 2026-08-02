@@ -21,6 +21,17 @@ let currentUserRole = null; // 'god' or 'admin'
 let _prevRenderSignature = null;
 let _prevBoardSignature = null;
 
+// Structured action logger — instantiated eagerly (not lazily, unlike some
+// other admin.js state) so player add/remove/link/swap always have
+// somewhere to log to, matching what team-manager.js already does in god.html.
+const actionLogger = new ActionLogger({
+    getFirebaseDB: () => window.firebaseDB,
+    getTournamentId: () => currentTournamentId,
+    getCurrentUser: () => currentUser,
+    getCurrentUserRole: () => currentUserRole,
+    getGameState: () => gameState
+});
+
 // Match creation state - dynamic array of sides
 let manualGameSetup = {
     sides: [[], []] // Start with 2 sides (A, B)
@@ -194,11 +205,11 @@ document.addEventListener('firebase-ready', async function() {
 
             // Tournament context comes from the navbar switcher: URL param first,
             // falling back to the shared storage contract it maintains.
-            const urlParams = new URLSearchParams(window.location.search);
-            const tournamentId = urlParams.get('tournament') || urlParams.get('tournamentId') ||
-                urlParams.get('gameId') || urlParams.get('game') ||
-                sessionStorage.getItem('currentTournamentId') ||
-                localStorage.getItem('currentTournamentId');
+            const tournamentId = resolveTournamentId({
+                search: window.location.search,
+                paramNames: ['tournament', 'tournamentId', 'gameId', 'game'],
+                cached: sessionStorage.getItem('currentTournamentId') || localStorage.getItem('currentTournamentId')
+            });
 
             if (tournamentId) {
                 await loadTournament(tournamentId);
@@ -780,14 +791,22 @@ function renderPlayerManager() {
         const players = team.players || [];
         const canAddMore = players.length < MAX_PLAYERS_PER_TEAM;
 
-        const playersList = players.map((player, idx) => `
+        const playersList = players.map((player, idx) => {
+            const isLinked = !!player.uid;
+            return `
             <div class="pm-player">
-                <input type="text" value="${escapeHtml(player.name || '')}"
-                       onchange="updatePlayerName(${team.id}, ${idx}, this.value)"
-                       placeholder="Player name">
-                <button class="btn-remove" onclick="removePlayerFromTeam(${team.id}, ${idx})" title="Remove player">✕</button>
+                <div class="pm-player-info" style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+                    <input type="text" value="${escapeHtml(player.name || '')}"
+                           onchange="updatePlayerName(${team.id}, ${idx}, this.value)"
+                           placeholder="Player name">
+                    <span class="pm-player-badge" style="font-size:0.7rem;color:${isLinked ? '#10b981' : '#f59e0b'};">
+                        ${isLinked ? '● Linked' : '○ Placeholder'}
+                    </span>
+                </div>
+                <button class="btn-remove" onclick="removePlayerFromTeam(${team.id}, ${idx})" title="Delete this slot">✕</button>
             </div>
-        `).join('');
+        `;
+        }).join('');
 
         // Only show add player section if under the limit
         const addPlayerSection = canAddMore ? `
@@ -864,6 +883,9 @@ async function addPlayerToTeam(teamId) {
     });
 
     await saveGameState();
+    actionLogger.logAction('player_added', 'admin', {
+        teamId, teamName: team.name, playerName, playerId
+    }, { playerId, teamId });
     input.value = '';
     renderPlayerManager();
     renderTeamsList();
@@ -881,23 +903,53 @@ async function removePlayerFromTeam(teamId, playerIndex) {
     const player = team.players[playerIndex];
     const playerName = player?.name || 'Player';
     const playerId = player?.id;
+    const isLinked = !!player?.uid;
 
-    if (!confirm(`Remove ${playerName} from ${team.name}?`)) return;
+    const confirmMsg = isLinked
+        ? `Delete "${playerName}"'s slot from ${team.name}? This permanently removes their match history attribution and cannot be undone — if you're replacing this player, use god.html's Users tab to swap instead.`
+        : `Delete this empty slot from ${team.name}? This cannot be undone.`;
+    if (!confirm(confirmMsg)) return;
 
-    // Remove from legacy players array
-    team.players.splice(playerIndex, 1);
-
-    // Also remove from playerIds and registry if using normalized structure
-    if (playerId) {
-        if (team.playerIds) {
+    if (playerId && window.PlayerUtils) {
+        window.PlayerUtils.deletePlayerSlot(gameState, teamId, playerId);
+    } else {
+        team.players.splice(playerIndex, 1);
+        if (playerId && team.playerIds) {
             team.playerIds = team.playerIds.filter(id => id !== playerId);
         }
-        if (gameState.players && gameState.players[playerId]) {
-            delete gameState.players[playerId];
+    }
+
+    // Linked players need their Firestore user doc unhooked too, or a stale
+    // assignedTeamId strands them on a team they've been removed from.
+    if (isLinked && window.firebaseDB) {
+        try {
+            if (!team.formerPlayers) team.formerPlayers = [];
+            team.formerPlayers.push({
+                uid: player.uid, playerId, name: playerName,
+                leftAt: new Date().toISOString(), pointsWhenLeft: team.points || 0
+            });
+            // Only clear if their account still points at this exact slot —
+            // they may have since been linked into a different tournament,
+            // whose assignment must not get wiped out here.
+            const userRef = window.firebaseDB.collection('users').doc(player.uid);
+            const userSnap = await userRef.get();
+            if (window.UserAssignment.shouldClearUserAssignment(userSnap.data(), { tournamentId: currentTournamentId, playerId })) {
+                await userRef.update({
+                    assignedTournamentId: null, assignedTeamId: null, assignedTeamName: null,
+                    assignedPlayerId: null, isPlayer: false,
+                    unassignedAt: new Date().toISOString(),
+                    unassignedBy: firebase.auth().currentUser?.uid || 'admin'
+                });
+            }
+        } catch (error) {
+            console.error('[Admin] Failed to clear removed player\'s user doc:', error);
         }
     }
 
     await saveGameState();
+    actionLogger.logAction('player_removed', 'admin', {
+        teamId, teamName: team.name, playerName, playerId, wasLinked: isLinked
+    }, { player });
     renderPlayerManager();
     renderTeamsList();
     showStatus(`Removed ${playerName}`, 'success');

@@ -19,6 +19,7 @@
     <script src="../shared/scripts/board-renderer.js"></script>
     <script src="../shared/scripts/games-config.js"></script>
     <script src="../shared/scripts/player-utils.js"></script>
+    <script src="../shared/scripts/user-picker.js"></script>
     <script src="scripts/match-scheduler.js"></script>
 
     <!-- Dosis Font -->
@@ -712,6 +713,20 @@
                 </div>
             </div>
 
+            <!-- Link-an-existing-user picker (Step 2) -->
+            <div id="setupUserPickerOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:3000;align-items:center;justify-content:center;">
+                <div style="background:#1a1d24;border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:16px;width:340px;max-height:70vh;display:flex;flex-direction:column;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                        <strong style="color:#f7f0e3;">Link an existing user</strong>
+                        <button onclick="closeSetupUserPicker()" style="background:none;border:none;color:#9aa1ad;cursor:pointer;font-size:1.1rem;">×</button>
+                    </div>
+                    <input type="text" id="setupUserPickerSearch" placeholder="Search name or email..."
+                           oninput="renderSetupUserPickerList()"
+                           style="width:100%;padding:8px 10px;margin-bottom:10px;background:rgba(11,13,16,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:white;box-sizing:border-box;">
+                    <div id="setupUserPickerList" style="overflow-y:auto;flex:1;"></div>
+                </div>
+            </div>
+
             <!-- Step 3: Room Hexes -->
             <div class="step" id="step3">
                 <h2 class="step-title">
@@ -968,23 +983,31 @@
             container.innerHTML = teams.map((team, idx) => {
                 // team.color is now already a hex code
                 const colorHex = team.color || '#666';
+                const playerField = (player, slotIdx, label) => `
+                    <div class="form-group">
+                        <label>${label}</label>
+                        <div style="display:flex;gap:6px;align-items:center;">
+                            <input type="text" value="${player.name}" style="flex:1;"
+                                   oninput="updateTeam(${idx}, 'player${slotIdx + 1}', this.value)">
+                            ${player.uid
+                                ? `<span style="font-size:0.7rem;color:#10b981;white-space:nowrap;">● Linked</span>
+                                   <button type="button" class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem;"
+                                           onclick="unlinkSetupUser(${idx}, ${slotIdx})" title="Unlink account">×</button>`
+                                : `<button type="button" class="btn" style="padding:4px 8px;font-size:0.9rem;"
+                                           onclick="openSetupUserPicker(${idx}, ${slotIdx})" title="Link an existing user">🔗</button>`
+                            }
+                        </div>
+                    </div>
+                `;
                 return `
                     <div class="team-card" style="border-left-color: ${colorHex}">
                         <div class="form-group">
                             <label>Tiimin Nimi</label>
-                            <input type="text" value="${team.name}" 
+                            <input type="text" value="${team.name}"
                                    oninput="updateTeam(${idx}, 'name', this.value)">
                         </div>
-                        <div class="form-group">
-                            <label>Pelaaja 1</label>
-                            <input type="text" value="${team.players[0].name}" 
-                                   oninput="updateTeam(${idx}, 'player1', this.value)">
-                        </div>
-                        <div class="form-group">
-                            <label>Pelaaja 2</label>
-                            <input type="text" value="${team.players[1].name}" 
-                                   oninput="updateTeam(${idx}, 'player2', this.value)">
-                        </div>
+                        ${playerField(team.players[0], 0, 'Pelaaja 1')}
+                        ${playerField(team.players[1], 1, 'Pelaaja 2')}
                         <button class="btn btn-danger" onclick="removeTeam(${idx})">🗑️</button>
                     </div>
                 `;
@@ -999,6 +1022,65 @@
             } else if (field === 'player2') {
                 teams[idx].players[1].name = value;
             }
+        }
+
+        // ── Link-an-existing-user picker (Step 2) ──
+        // setup.html has no tournament yet, so this can't reuse
+        // user-management.js's picker (tightly coupled to an already-loaded
+        // tournament) — it uses the standalone shared/scripts/user-picker.js
+        // helper instead, passing null for currentTournamentId.
+        let setupPickerTarget = null; // { teamIdx, slotIdx }
+        let setupPickerUsers = [];
+
+        function getSetupLinkedUids() {
+            const uids = new Set();
+            teams.forEach(t => t.players.forEach(p => { if (p.uid) uids.add(p.uid); }));
+            return uids;
+        }
+
+        async function openSetupUserPicker(teamIdx, slotIdx) {
+            if (!db) {
+                alert('Not connected to Firebase yet — try again in a moment.');
+                return;
+            }
+            setupPickerTarget = { teamIdx, slotIdx };
+            document.getElementById('setupUserPickerOverlay').style.display = 'flex';
+            document.getElementById('setupUserPickerSearch').value = '';
+            document.getElementById('setupUserPickerList').innerHTML = '<div style="opacity:0.6;padding:8px;">Loading…</div>';
+
+            setupPickerUsers = await window.UserPicker.fetchAvailableUsers(db, {
+                currentTournamentId: null,
+                alreadyLinkedUids: getSetupLinkedUids()
+            });
+            renderSetupUserPickerList();
+        }
+
+        function renderSetupUserPickerList() {
+            const searchTerm = document.getElementById('setupUserPickerSearch').value;
+            window.UserPicker.renderPickerList('setupUserPickerList', setupPickerUsers, null, (user) => {
+                if (user.alreadyLinked) {
+                    alert(`${user.displayName} is already linked to another slot in this setup.`);
+                    return;
+                }
+                const { teamIdx, slotIdx } = setupPickerTarget;
+                teams[teamIdx].players[slotIdx].uid = user.uid;
+                teams[teamIdx].players[slotIdx].email = user.email;
+                teams[teamIdx].players[slotIdx].name = user.displayName;
+                closeSetupUserPicker();
+                renderTeams();
+            }, { searchTerm });
+        }
+
+        function closeSetupUserPicker() {
+            document.getElementById('setupUserPickerOverlay').style.display = 'none';
+            setupPickerTarget = null;
+        }
+
+        function unlinkSetupUser(teamIdx, slotIdx) {
+            const player = teams[teamIdx].players[slotIdx];
+            delete player.uid;
+            delete player.email;
+            renderTeams();
         }
 
         function removeTeam(idx) {
@@ -1253,6 +1335,7 @@
             // team.players[] is kept as-is (match-scheduler.js and admin.js's roster
             // editor both read it directly).
             const players = {};
+            const linkedPlayers = []; // players with a uid set via the Step 2 picker — need a users/{uid} write too
             teams.forEach(team => {
                 const playerIds = [];
                 team.players.forEach(player => {
@@ -1262,9 +1345,12 @@
                         id: playerId,
                         name: player.name || 'Unknown Player',
                         teamId: team.id,
-                        uid: null,
+                        uid: player.uid || null,
                         createdAt: new Date().toISOString()
                     };
+                    if (player.uid) {
+                        linkedPlayers.push({ uid: player.uid, playerId, teamId: team.id, teamName: team.name });
+                    }
                     playerIds.push(playerId);
                 });
                 team.playerIds = playerIds;
@@ -1311,8 +1397,24 @@
             };
             
             try {
-                // Only write to tournaments collection (games collection is deprecated)
-                await db.collection('tournaments').doc(tournamentId).set(tournamentData);
+                // Only write to tournaments collection (games collection is deprecated).
+                // Players linked during Step 2 also need their users/{uid} doc updated
+                // with the assignment — same fields replacePlayerWithUser() writes when
+                // linking after creation — folded into one batch with the tournament write.
+                const batch = db.batch();
+                batch.set(db.collection('tournaments').doc(tournamentId), tournamentData);
+                linkedPlayers.forEach(({ uid, playerId, teamId, teamName }) => {
+                    batch.update(db.collection('users').doc(uid), {
+                        assignedTournamentId: tournamentId,
+                        assignedTeamId: teamId,
+                        assignedTeamName: teamName,
+                        assignedPlayerId: playerId,
+                        isPlayer: true,
+                        appointedAt: new Date().toISOString(),
+                        appointedBy: firebase.auth().currentUser?.uid || 'admin'
+                    });
+                });
+                await batch.commit();
 
                 alert('Turnaus luotu onnistuneesti!');
                 window.location.href = `view.html?tournamentId=${tournamentId}`;

@@ -560,11 +560,13 @@ function renderTeamAssignmentSlots() {
                         const borderColor = isPlaceholder ? '#f59e0b' : '#10b981';
                         const bgColor = isPlaceholder ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)';
 
-                        // Show "Link" button on placeholders when a user is selected
-                        const linkBtnHtml = (isPlaceholder && selectedUserForAssignment)
+                        // "Use {name} here" links a placeholder or swaps an already-linked
+                        // slot for whoever is currently selected in the user picker —
+                        // replacePlayerWithUser() decides which underneath.
+                        const useBtnHtml = selectedUserForAssignment
                             ? `<button onclick="replacePlayerWithUser(${team.id}, '${player.playerId}')"
-                                      style="background: #10b981; color: white; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem;">
-                                  Link ${escapeHtml(selectedUserForAssignment.displayName)}
+                                      style="background: ${isPlaceholder ? '#10b981' : '#d97706'}; color: white; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem;">
+                                  Use ${escapeHtml(selectedUserForAssignment.displayName)} here
                               </button>`
                             : '';
 
@@ -577,10 +579,10 @@ function renderTeamAssignmentSlots() {
                                     </div>
                                 </div>
                                 <div style="display: flex; gap: 4px;">
-                                    ${linkBtnHtml}
+                                    ${useBtnHtml}
                                     <button onclick="unassignUserFromTeam(${team.id}, '${player.playerId}')"
-                                            style="background: rgba(239, 68, 68, 0.8); color: white; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem;">
-                                        Remove
+                                            style="background: rgba(239, 68, 68, 0.6); color: white; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 0.75rem; margin-left: 6px;">
+                                        Delete slot
                                     </button>
                                 </div>
                             </div>
@@ -598,9 +600,13 @@ function renderTeamAssignmentSlots() {
 }
 
 /**
- * Replace a placeholder player with a real user (in-place update).
- * Preserves the p_xxx ID and array position so match history and
- * pre-generated schedules stay intact.
+ * Use the selected user for a roster slot — either a first-time link
+ * (slot is a placeholder) or a swap (slot is already linked to someone
+ * else). Both share one button/verb ("Use {name} here") since from the
+ * admin's point of view it's the same action; underneath, linking is an
+ * in-place update (no identity changes) while swapping mints a fresh
+ * player ID for the new person so the previous occupant's match history
+ * stays theirs — see PlayerUtils.swapPlayerInSlot for why.
  */
 async function replacePlayerWithUser(teamId, playerId) {
     if (!selectedUserForAssignment) {
@@ -625,11 +631,6 @@ async function replacePlayerWithUser(teamId, playerId) {
         return;
     }
 
-    if (player.uid) {
-        if (typeof showStatus === 'function') showStatus('This slot is already linked to an account', 'warning');
-        return;
-    }
-
     // Check if user is already in the registry for this tournament
     const registry = window.gameState.players || {};
     for (const pid of Object.keys(registry)) {
@@ -639,40 +640,79 @@ async function replacePlayerWithUser(teamId, playerId) {
         }
     }
 
+    const isSwap = window.PlayerUtils.isPlayerLinked(window.gameState, playerId);
     const oldName = player.name;
 
-    try {
-        // Update player registry in-place (same p_xxx ID, same array position)
-        window.PlayerUtils.updatePlayerInRegistry(window.gameState, playerId, {
-            name: user.displayName,
-            uid: user.uid
-        });
+    if (isSwap) {
+        const confirmed = confirm(
+            `"${oldName}"'s completed games stay on their own record. ${user.displayName} takes over this slot starting now.`
+        );
+        if (!confirmed) return;
+    }
 
-        // Also update legacy players[] array
-        if (team.players && Array.isArray(team.players)) {
-            const legacyPlayer = team.players.find(p => p.id === playerId);
-            if (legacyPlayer) {
-                legacyPlayer.name = user.displayName;
-                legacyPlayer.uid = user.uid;
-                legacyPlayer.email = user.email;
-                legacyPlayer.linkedAt = new Date().toISOString();
-            }
+    try {
+        const mutation = isSwap
+            ? window.PlayerUtils.swapPlayerInSlot(window.gameState, team.id, playerId, {
+                uid: user.uid, name: user.displayName, email: user.email
+            })
+            : window.PlayerUtils.linkUserToPlayerSlot(window.gameState, team.id, playerId, {
+                uid: user.uid, name: user.displayName, email: user.email
+            });
+
+        if (!mutation.ok) {
+            if (typeof showStatus === 'function') showStatus(`Could not link user: ${mutation.reason}`, 'error');
+            return;
         }
+
+        const newPlayerId = isSwap ? mutation.newPlayerId : playerId;
 
         // Save to Firestore
         const batch = window.firebaseDB.batch();
 
-        // Update user document with assignment
+        // Update the new occupant's user document with the assignment
         const userRef = window.firebaseDB.collection('users').doc(user.uid);
         batch.update(userRef, {
             assignedTournamentId: window.gameState.tournamentId,
             assignedTeamId: team.id,
             assignedTeamName: team.name,
-            assignedPlayerId: playerId,
+            assignedPlayerId: newPlayerId,
             isPlayer: true,
             appointedAt: new Date().toISOString(),
             appointedBy: firebase.auth().currentUser?.uid || 'admin'
         });
+
+        // On a swap, the OLD occupant is no longer on this team — clear
+        // their assignment so home.html's "you're on a team" banner and
+        // team-controls.js's bootstrap redirect don't point them at a
+        // slot they no longer control (onboarding.js's own access check
+        // is roster-based and already correctly locks them out regardless).
+        if (isSwap && player.uid) {
+            if (!team.formerPlayers) team.formerPlayers = [];
+            team.formerPlayers.push({
+                uid: player.uid,
+                playerId,
+                name: oldName,
+                leftAt: new Date().toISOString(),
+                pointsWhenLeft: team.points || 0
+            });
+
+            const oldUserRef = window.firebaseDB.collection('users').doc(player.uid);
+            // Same guard as unassignUserFromTeam: only clear if their
+            // account still points at this exact slot — they may have been
+            // linked into a different tournament since.
+            const oldUserSnap = await oldUserRef.get();
+            if (window.UserAssignment.shouldClearUserAssignment(oldUserSnap.data(), { tournamentId: window.gameState.tournamentId, playerId })) {
+                batch.update(oldUserRef, {
+                    assignedTournamentId: null,
+                    assignedTeamId: null,
+                    assignedTeamName: null,
+                    assignedPlayerId: null,
+                    isPlayer: false,
+                    unassignedAt: new Date().toISOString(),
+                    unassignedBy: firebase.auth().currentUser?.uid || 'admin'
+                });
+            }
+        }
 
         // Save tournament data
         const cleanData = JSON.parse(JSON.stringify({
@@ -687,10 +727,28 @@ async function replacePlayerWithUser(teamId, playerId) {
         await batch.commit();
 
         if (typeof showStatus === 'function') {
-            showStatus(`Linked "${oldName}" -> ${user.displayName} on ${team.name}`, 'success');
+            showStatus(
+                isSwap
+                    ? `${user.displayName} now plays "${oldName}"'s slot on ${team.name}`
+                    : `Linked "${oldName}" -> ${user.displayName} on ${team.name}`,
+                'success'
+            );
         }
 
-        console.log(`[User Management] Replaced placeholder "${oldName}" (${playerId}) with user "${user.displayName}" (${user.uid})`);
+        if (isSwap) {
+            window.godApp?.actionLogger?.logAction('player_swapped', 'admin', {
+                teamId: team.id, teamName: team.name,
+                oldPlayerId: playerId, oldPlayerName: oldName,
+                newPlayerId, newPlayerName: user.displayName
+            });
+            console.log(`[User Management] Swapped "${oldName}" (${playerId}) for "${user.displayName}" (${newPlayerId}) on ${team.name}`);
+        } else {
+            window.godApp?.actionLogger?.logAction('player_linked', 'admin', {
+                teamId: team.id, teamName: team.name,
+                playerId, playerName: oldName, userName: user.displayName
+            });
+            console.log(`[User Management] Replaced placeholder "${oldName}" (${playerId}) with user "${user.displayName}" (${user.uid})`);
+        }
 
         // Remove from unassigned list and clear selection
         unassignedUsers = unassignedUsers.filter(u => u.uid !== user.uid);
@@ -901,7 +959,7 @@ function renderTournamentRoster() {
                                 </div>
                                 <button onclick="unassignUserFromTeam(${team.id}, '${player.playerId}')"
                                         style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 0.85rem;">
-                                    Remove
+                                    Delete slot
                                 </button>
                             </div>
                         `;
@@ -953,7 +1011,10 @@ async function unassignUserFromTeam(teamId, playerId) {
         return;
     }
 
-    if (!confirm(`Remove "${player.name}" from ${team.name}?\n\nThey will return to the available users list.`)) {
+    const confirmMsg = player.uid
+        ? `Delete "${player.name}"'s slot from ${team.name}? This permanently removes their match history attribution and cannot be undone — if you're replacing this player, select their replacement above and click "Use ... here" instead of deleting.`
+        : `Delete this empty slot from ${team.name}? This cannot be undone.`;
+    if (!confirm(confirmMsg)) {
         return;
     }
 
@@ -978,13 +1039,8 @@ async function unassignUserFromTeam(teamId, playerId) {
             team.formerPlayers.push(formerData);
         }
 
-        // Remove from normalized registry
-        window.PlayerUtils.removePlayerFromTeam(window.gameState, team.id, playerId);
-
-        // Also remove from legacy players[] array
-        if (team.players && Array.isArray(team.players)) {
-            team.players = team.players.filter(p => p.id !== playerId);
-        }
+        // Remove from registry + team.playerIds + legacy team.players[]
+        window.PlayerUtils.deletePlayerSlot(window.gameState, team.id, playerId);
 
         // Save tournament data
         const cleanData = JSON.parse(JSON.stringify({
@@ -999,13 +1055,22 @@ async function unassignUserFromTeam(teamId, playerId) {
         // Clear user doc assignment if player had a linked uid
         if (player.uid) {
             const userRef = window.firebaseDB.collection('users').doc(player.uid);
-            batch.update(userRef, {
-                assignedTournamentId: null,
-                assignedTeamId: null,
-                assignedTeamName: null,
-                unassignedAt: new Date().toISOString(),
-                unassignedBy: firebase.auth().currentUser?.uid || 'admin'
-            });
+            // Only clear the account's assignment pointer if it still points
+            // at THIS tournament/slot — they may have since been linked into
+            // a different tournament, whose assignment must not be wiped out
+            // by removing them from this older one.
+            const userSnap = await userRef.get();
+            if (window.UserAssignment.shouldClearUserAssignment(userSnap.data(), { tournamentId: window.gameState.tournamentId, playerId })) {
+                batch.update(userRef, {
+                    assignedTournamentId: null,
+                    assignedTeamId: null,
+                    assignedTeamName: null,
+                    assignedPlayerId: null,
+                    isPlayer: false,
+                    unassignedAt: new Date().toISOString(),
+                    unassignedBy: firebase.auth().currentUser?.uid || 'admin'
+                });
+            }
         }
 
         await batch.commit();
@@ -1013,6 +1078,10 @@ async function unassignUserFromTeam(teamId, playerId) {
         if (typeof showStatus === 'function') {
             showStatus(`${player.name} removed from ${team.name}`, 'success');
         }
+
+        window.godApp?.actionLogger?.logAction('player_removed', 'admin', {
+            teamId: team.id, teamName: team.name, playerName: player.name, playerId, wasLinked: !!player.uid
+        }, { player });
 
         // Refresh displays
         await loadUnassignedUsers();

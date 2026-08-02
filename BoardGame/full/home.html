@@ -1284,9 +1284,10 @@
         const createdDate = tournament.createdAt ? new Date(tournament.createdAt).toLocaleDateString() : 'Unknown';
         const tournamentId = tournament.tournamentId || tournament.id;
 
-        // Find user's team in this tournament
+        // Find user's team (and roster slot) in this tournament
         let userTeamName = null;
         let userTeamId = null;
+        let userPlayerId = null;
         if (tournament.teams && Array.isArray(tournament.teams) && currentUser) {
           const userTeam = tournament.teams.find(team =>
             team.players && team.players.some(player => player.uid === currentUser.uid)
@@ -1294,6 +1295,7 @@
           if (userTeam) {
             userTeamName = userTeam.name;
             userTeamId = userTeam.id;
+            userPlayerId = userTeam.players.find(p => p.uid === currentUser.uid)?.id || null;
           }
         }
 
@@ -1306,6 +1308,22 @@
         if (userTeamName) infoParts.push(`Your team: ${userTeamName}`);
         const infoLine = infoParts.length > 0 ? infoParts.join(' · ') : createdDate;
 
+        // A player linked into more than one tournament can only have ONE
+        // "primary" (the assignedTournamentId pointer that drives their
+        // dashboard banner and team.html's no-URL-param redirect) — let
+        // them pick it themselves rather than whichever admin linked them
+        // last silently deciding for them.
+        const isPrimary = userTeamId !== null && appState.get('userProfile')?.assignedTournamentId === tournamentId;
+        const escapedTeamName = (userTeamName || '').replace(/'/g, "\\'");
+        const starBtn = userTeamId !== null
+          ? `<button class="btn-small ${isPrimary ? 'btn-primary' : 'btn-secondary'}"
+                     onclick="setPrimaryTournament('${tournamentId}', ${userTeamId}, '${escapedName}', '${escapedTeamName}', '${userPlayerId}')"
+                     title="${isPrimary ? 'This is your primary tournament' : 'Set as your primary tournament'}"
+                     ${isPrimary ? 'disabled' : ''}>
+               ${isPrimary ? '★ Primary' : '☆ Set as primary'}
+             </button>`
+          : '';
+
         return `
           <div class="tournament-card fade-in" id="tcard-${tournamentId}" style="animation-delay: ${index * 0.06}s;">
             <div class="tournament-header">
@@ -1317,6 +1335,7 @@
             </div>
             <div class="tournament-actions">
               <button class="btn-small btn-enter" onclick="enterTournament('${tournamentId}', '${escapedName}', ${userTeamId !== null ? `'${userTeamId}'` : 'null'})">Enter</button>
+              ${starBtn}
             </div>
           </div>
         `;
@@ -1366,6 +1385,42 @@
     };
 
     window.deleteTournamentConfirm = deleteTournamentConfirm;
+
+    // ── Set which linked tournament is "primary" (self-service) ──
+    // A player's account doc has one assignedTournamentId pointer, driving
+    // their dashboard banner and team.html's no-URL-param redirect. If an
+    // admin links them into a second tournament, that pointer silently
+    // moves — this lets the player pick it back themselves instead of
+    // needing an admin to intervene.
+    window.setPrimaryTournament = async function(tournamentId, teamId, tournamentName, teamName, playerId) {
+      if (!currentUser) return;
+      try {
+        const updates = {
+          assignedTournamentId: tournamentId,
+          assignedTeamId: teamId,
+          assignedTeamName: teamName,
+          assignedPlayerId: playerId,
+          isPlayer: true,
+          appointedAt: new Date().toISOString(),
+          appointedBy: currentUser.uid
+        };
+        await db.collection('users').doc(currentUser.uid).update(updates);
+
+        const profile = appState.get('userProfile') || {};
+        appState.set('userProfile', { ...profile, ...updates });
+
+        sessionStorage.setItem('currentTournamentId', tournamentId);
+        localStorage.setItem('currentTournamentId', tournamentId);
+        sessionStorage.setItem('currentTournamentName', tournamentName);
+        localStorage.setItem('currentTournamentName', tournamentName);
+        currentActiveTournament = tournamentId;
+
+        errorHandler.showSuccess(`${tournamentName} is now your primary tournament`);
+        loadRecentTournaments();
+      } catch (error) {
+        errorHandler.handleFirebaseError(error, 'setPrimaryTournament');
+      }
+    };
 
     // ── Enter / clear active tournament ──
 

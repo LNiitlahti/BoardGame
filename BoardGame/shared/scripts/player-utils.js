@@ -281,6 +281,134 @@ function removePlayerFromTeam(gameState, teamId, playerId) {
 }
 
 /**
+ * Link a real user account into a roster slot that doesn't have one yet
+ * (a placeholder). In-place update — same p_xxx id, same array position —
+ * because no identity actually changes: the placeholder was always this
+ * specific human, linking just attaches their account. Refuses to touch a
+ * slot that's already linked; use swapPlayerInSlot for that case instead,
+ * since overwriting an existing link in place would retroactively
+ * reattribute the previous occupant's match history to the new person.
+ * @param {Object} gameState - Tournament game state
+ * @param {number} teamId - Team ID
+ * @param {string} playerId - Player ID (must not already have a uid)
+ * @param {Object} newPlayer - { uid, name, email }
+ * @returns {{ok: true} | {ok: false, reason: string}}
+ */
+function linkUserToPlayerSlot(gameState, teamId, playerId, newPlayer) {
+    const team = gameState.teams?.find(t => t.id === teamId);
+    if (!team) return { ok: false, reason: 'team-not-found' };
+
+    const player = getPlayerById(gameState, playerId);
+    if (!player) return { ok: false, reason: 'player-not-found' };
+    if (player.uid) return { ok: false, reason: 'already-linked' };
+
+    updatePlayerInRegistry(gameState, playerId, { name: newPlayer.name, uid: newPlayer.uid });
+
+    if (Array.isArray(team.players)) {
+        const mirrored = team.players.find(p => p.id === playerId);
+        if (mirrored) {
+            mirrored.name = newPlayer.name;
+            mirrored.uid = newPlayer.uid;
+            mirrored.email = newPlayer.email;
+            mirrored.linkedAt = new Date().toISOString();
+        }
+    }
+
+    return { ok: true };
+}
+
+/**
+ * Replace the occupant of an already-linked slot with a different real
+ * person — a genuine identity change, unlike linkUserToPlayerSlot. Does
+ * NOT reuse the old p_xxx id: statistics/history resolve player names via
+ * a live registry lookup (not a snapshot taken when a match was played),
+ * so overwriting the existing entry in place would retroactively relabel
+ * the previous occupant's completed games as the new person's. Instead,
+ * the old registry entry is left untouched (so their history keeps
+ * resolving correctly) but retired from the team's active membership; the
+ * new person gets a freshly generated id inserted at the same slot
+ * position.
+ * @param {Object} gameState - Tournament game state
+ * @param {number} teamId - Team ID
+ * @param {string} oldPlayerId - The linked slot's current player ID
+ * @param {Object} newPlayer - { uid, name, email }
+ * @returns {{ok: true, oldPlayerId: string, newPlayerId: string} | {ok: false, reason: string}}
+ */
+function swapPlayerInSlot(gameState, teamId, oldPlayerId, newPlayer) {
+    const team = gameState.teams?.find(t => t.id === teamId);
+    if (!team) return { ok: false, reason: 'team-not-found' };
+
+    const oldPlayer = getPlayerById(gameState, oldPlayerId);
+    if (!oldPlayer) return { ok: false, reason: 'player-not-found' };
+    if (!oldPlayer.uid) return { ok: false, reason: 'not-linked' };
+
+    // Retire the old entry: stays in the registry (so history keeps
+    // resolving to them) but no longer counts as an active team member.
+    updatePlayerInRegistry(gameState, oldPlayerId, { teamId: null });
+
+    const newPlayerId = addPlayerToRegistry(gameState, {
+        name: newPlayer.name,
+        uid: newPlayer.uid,
+        teamId: teamId
+    });
+
+    if (Array.isArray(team.playerIds)) {
+        const idx = team.playerIds.indexOf(oldPlayerId);
+        if (idx !== -1) team.playerIds[idx] = newPlayerId;
+        else team.playerIds.push(newPlayerId);
+    }
+
+    if (Array.isArray(team.players)) {
+        const idx = team.players.findIndex(p => p.id === oldPlayerId);
+        const newEntry = { id: newPlayerId, name: newPlayer.name, uid: newPlayer.uid, email: newPlayer.email, linkedAt: new Date().toISOString() };
+        if (idx !== -1) team.players[idx] = newEntry;
+        else team.players.push(newEntry);
+    }
+
+    return { ok: true, oldPlayerId, newPlayerId };
+}
+
+/**
+ * Delete a roster slot entirely — registry entry, team.playerIds, and the
+ * legacy team.players[] mirror. Unlike swapPlayerInSlot, this is for when
+ * the slot itself shouldn't exist (wrong headcount), not for replacing who
+ * occupies it. Returns the removed player record so the caller can build
+ * a formerPlayers audit entry / action-log payload without re-deriving it.
+ * @param {Object} gameState - Tournament game state
+ * @param {number} teamId - Team ID
+ * @param {string} playerId - Player ID
+ * @returns {Object|null} The removed player record, or null if not found on the team
+ */
+function deletePlayerSlot(gameState, teamId, playerId) {
+    const team = gameState.teams?.find(t => t.id === teamId);
+    if (!team) return null;
+
+    const wasOnTeam = (team.playerIds || []).includes(playerId) || (team.players || []).some(p => p.id === playerId);
+    if (!wasOnTeam) return null;
+
+    const removed = getPlayerById(gameState, playerId);
+
+    if (Array.isArray(team.playerIds)) {
+        team.playerIds = team.playerIds.filter(id => id !== playerId);
+    }
+    if (Array.isArray(team.players)) {
+        team.players = team.players.filter(p => p.id !== playerId);
+    }
+    removePlayerFromRegistry(gameState, playerId);
+
+    return removed;
+}
+
+/**
+ * @param {Object} gameState - Tournament game state
+ * @param {string} playerId - Player ID
+ * @returns {boolean} True if the slot currently has a linked account
+ */
+function isPlayerLinked(gameState, playerId) {
+    return !!getPlayerById(gameState, playerId)?.uid;
+}
+
+/**
  * Move a player to a different team
  * @param {Object} gameState - Tournament game state
  * @param {string} playerId - Player ID
@@ -531,38 +659,45 @@ function getPlayerDisplayInfo(gameState, playerOrId) {
 // EXPORTS (for non-module usage, attach to window)
 // =============================================================================
 
-if (typeof window !== 'undefined') {
-    window.PlayerUtils = {
-        // ID Generation
-        generatePlayerId,
-        ensurePlayerId,
+const PlayerUtils = {
+    // ID Generation
+    generatePlayerId,
+    ensurePlayerId,
 
-        // Registry Management
-        getPlayersRegistry,
-        addPlayerToRegistry,
-        updatePlayerInRegistry,
-        removePlayerFromRegistry,
+    // Registry Management
+    getPlayersRegistry,
+    addPlayerToRegistry,
+    updatePlayerInRegistry,
+    removePlayerFromRegistry,
 
-        // Player Lookup
-        getPlayerById,
-        getPlayerName,
-        getPlayerTeamId,
-        getPlayerTeam,
-        getPlayerTeamColor,
-        resolvePlayerIds,
+    // Player Lookup
+    getPlayerById,
+    getPlayerName,
+    getPlayerTeamId,
+    getPlayerTeam,
+    getPlayerTeamColor,
+    resolvePlayerIds,
 
-        // Team-Player Management
-        getTeamPlayers,
-        getTeamPlayerIds,
-        addPlayerToTeam,
-        removePlayerFromTeam,
-        movePlayerToTeam,
+    // Team-Player Management
+    getTeamPlayers,
+    getTeamPlayerIds,
+    addPlayerToTeam,
+    removePlayerFromTeam,
+    movePlayerToTeam,
 
-        // Migration
-        migrateToNormalizedPlayers,
-        needsPlayerMigration,
+    // Player Lifecycle (link / swap / delete)
+    linkUserToPlayerSlot,
+    swapPlayerInSlot,
+    deletePlayerSlot,
+    isPlayerLinked,
 
-        // Backward Compatibility
-        getPlayerDisplayInfo
-    };
-}
+    // Migration
+    migrateToNormalizedPlayers,
+    needsPlayerMigration,
+
+    // Backward Compatibility
+    getPlayerDisplayInfo
+};
+
+if (typeof window !== 'undefined') window.PlayerUtils = PlayerUtils;
+if (typeof module !== 'undefined' && module.exports) module.exports = PlayerUtils;

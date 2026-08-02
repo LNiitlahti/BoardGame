@@ -293,14 +293,30 @@ class TeamManager {
             const players = team.players || [];
             const canAddMore = players.length < MAX_PLAYERS_PER_TEAM;
 
-            const playersList = players.map((player, idx) => `
+            const playersList = players.map((player, idx) => {
+                const isLinked = !!player.uid;
+                const swapHint = isLinked
+                    ? `<button class="btn-link" title="Swap this linked player for someone else (Users tab)"
+                               onclick="closePlayerManager(); window.switchGodTab && window.switchGodTab('users')"
+                               style="background:none;border:none;color:var(--text-tertiary);font-size:0.7rem;cursor:pointer;text-decoration:underline;">
+                          Swap
+                      </button>`
+                    : '';
+                return `
                 <div class="pm-player">
-                    <input type="text" value="${this.escapeHtml(player.name || '')}"
-                           onchange="updatePlayerName(${team.id}, ${idx}, this.value)"
-                           placeholder="Player name">
-                    <button class="btn-remove" onclick="removePlayerFromTeam(${team.id}, ${idx})" title="Remove player">\u2715</button>
+                    <div class="pm-player-info" style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+                        <input type="text" value="${this.escapeHtml(player.name || '')}"
+                               onchange="updatePlayerName(${team.id}, ${idx}, this.value)"
+                               placeholder="Player name">
+                        <span class="pm-player-badge" style="font-size:0.7rem;color:${isLinked ? '#10b981' : '#f59e0b'};">
+                            ${isLinked ? '\u25cf Linked' : '\u25cb Placeholder'}
+                        </span>
+                    </div>
+                    ${swapHint}
+                    <button class="btn-remove" onclick="removePlayerFromTeam(${team.id}, ${idx})" title="Delete this slot">\u2715</button>
                 </div>
-            `).join('');
+            `;
+            }).join('');
 
             const addPlayerSection = canAddMore ? `
                 <div class="pm-add-player">
@@ -383,23 +399,54 @@ class TeamManager {
         const player = team.players[playerIndex];
         const playerName = player?.name || 'Player';
         const playerId = player?.id;
+        const isLinked = !!player?.uid;
 
-        if (!confirm(`Remove ${playerName} from ${team.name}?`)) return;
+        const confirmMsg = isLinked
+            ? `Delete "${playerName}"'s slot from ${team.name}? This permanently removes their match history attribution and cannot be undone — if you're replacing this player, use Swap instead.`
+            : `Delete this empty slot from ${team.name}? This cannot be undone.`;
+        if (!confirm(confirmMsg)) return;
 
-        team.players.splice(playerIndex, 1);
-
-        if (playerId) {
-            if (team.playerIds) {
+        if (playerId && window.PlayerUtils) {
+            window.PlayerUtils.deletePlayerSlot(this._gameState, teamId, playerId);
+        } else {
+            team.players.splice(playerIndex, 1);
+            if (playerId && team.playerIds) {
                 team.playerIds = team.playerIds.filter(id => id !== playerId);
             }
-            if (this._gameState.players?.[playerId]) {
-                delete this._gameState.players[playerId];
+        }
+
+        // Linked players need their Firestore user doc unhooked too, or a
+        // stale assignedTeamId strands them on a team they've been removed
+        // from (home.html's banner and team-controls.js's bootstrap both
+        // trust that field directly, with no roster check).
+        if (isLinked && window.firebaseDB) {
+            try {
+                if (!team.formerPlayers) team.formerPlayers = [];
+                team.formerPlayers.push({
+                    uid: player.uid, playerId, name: playerName,
+                    leftAt: new Date().toISOString(), pointsWhenLeft: team.points || 0
+                });
+                // Only clear if their account still points at this exact
+                // slot — they may have since been linked into a different
+                // tournament, whose assignment must not get wiped out here.
+                const userRef = window.firebaseDB.collection('users').doc(player.uid);
+                const userSnap = await userRef.get();
+                if (window.UserAssignment.shouldClearUserAssignment(userSnap.data(), { tournamentId: this._gameState.tournamentId, playerId })) {
+                    await userRef.update({
+                        assignedTournamentId: null, assignedTeamId: null, assignedTeamName: null,
+                        assignedPlayerId: null, isPlayer: false,
+                        unassignedAt: new Date().toISOString(),
+                        unassignedBy: firebase.auth().currentUser?.uid || 'admin'
+                    });
+                }
+            } catch (error) {
+                console.error('[TeamManager] Failed to clear removed player\'s user doc:', error);
             }
         }
 
         await this._save();
         this._logAction('player_removed', 'admin', {
-            teamId, teamName: team.name, playerName, playerId
+            teamId, teamName: team.name, playerName, playerId, wasLinked: isLinked
         }, { player });
         this.renderPlayerManager();
         this.renderTeamsList();
