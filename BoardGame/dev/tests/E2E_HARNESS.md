@@ -104,6 +104,42 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   — once a slot reaches `'playing'`, there is genuinely no UI path left to
   confirm Discord/lobby readiness. Snapshots/restores `gameQueue`,
   `currentPhase`, and `lobbyReady` in a `finally` block.
+- `e2e-hex-placement-gate.js` — re-verification test for the hex_placement_1/2
+  phase gate (TODO.md: the "Match N hex placed" requirement "felt too loosely
+  satisfied during smoke testing... needs re-verification... once there's
+  something real to place"). Read the gate source first: phase-manager.js's
+  `_calculateRequirements('hex_placement_1'|'hex_placement_2')` (~line 1094)
+  is gated purely by `_getPendingHexCount() === 0`; on god.html that's wired
+  (god-app.js:171) to `ResultManager._pendingHexWins.length` — an in-memory
+  instance field, never written to Firestore, so it always starts at 0 on a
+  fresh page load and needs no snapshot/restore of its own. Seeds a synthetic
+  queue entry (same pattern as `e2e-round-advance.js`) using REAL player ids
+  from `e2e-disposable-1`'s actual Team Alpha/Team Beta rosters (2 players
+  each side, so `confirmResult()` gives both "full credit" and the pending
+  win entry's `teamIds` is genuinely populated — exercises the real
+  per-teamId match in `_clearPendingHexWin`, not the degenerate
+  always-filtered empty-`teamIds` case), then drives everything else through
+  the real production functions: `ResultManager.quickConfirmResult()` (same
+  as the "Confirm Result" button) to generate a genuine pending hex win,
+  `PhaseManager.advancePhase()` (same as "Next Phase") to prove it's blocked
+  before placement and allowed after, and `BoardManager.assignTeamToHex()`
+  (same as the team-picker "assign team to hex" button) to place it. Confirms
+  both gate states against live data: `advancePhase()` returns `false` and
+  `currentPhase` stays `hex_placement_1` while the win is pending; once
+  placed, `advancePhase()` returns `true` and `currentPhase` moves to
+  `spell_window_1` (the real next phase). Only tests hex_placement_1 —
+  hex_placement_2 shares the identical `_getPendingHexCount() === 0`
+  condition with no phase-specific branching, so a second run would add no
+  coverage. Snapshots/restores `gameQueue`, `currentPhase`, `teams` (win/
+  loss/points stats get mutated by `confirmResult()`), `gamesPlayed`, and
+  `gameHistory` in a `finally` block. The placed hex is cleared via the real
+  `assignTeamToHex(coord, null)` "Clear Hex" path rather than by restoring a
+  `board` snapshot — `saveGameState()`'s Firestore `set(..., {merge:true})`
+  merges nested map fields key-by-key instead of replacing them wholesale, so
+  writing back an old `board` object would silently leave the test's added
+  coordinate behind forever; `assignTeamToHex(coord, null)` issues the
+  explicit `FieldValue.delete()` needed to actually remove it, and is called
+  unconditionally (safe even if placement never happened).
 - `.env.e2e` (gitignored, not in git) — real credentials. Copy `.env.e2e.example`
   to create it if missing.
 
@@ -209,3 +245,20 @@ and is safe for later tasks to keep reusing/mutating.
   (`gameQueue: []`, `currentPhase` field deleted — that tournament's true
   baseline, confirmed via the tournament-list view showing
   `Status: setup | Round: 0 | Matches played: 0` before any test touched it).
+- **`saveGameState()`'s Firestore `set(data, {merge: true})` does NOT delete
+  nested map keys you simply omit.** For array-valued gameState fields
+  (`gameQueue`, `teams`, `gameHistory`, ...) `merge: true` replaces the whole
+  array wholesale, so snapshot/restore-by-reassignment works fine and is the
+  established pattern in every script above. But `board` (`{ "q1r2": teamId,
+  ... }`) is a nested Firestore MAP field, and merge-set on a map field only
+  adds/overwrites the keys present in the write — keys that exist remotely
+  but are absent from what you write are left untouched, not removed. So if
+  a test adds `gameState.board[coord] = teamId` and later "restores" by
+  reassigning `gameState.board` back to a pre-mutation snapshot and saving,
+  the added coord is silently NOT deleted and leaks into the live tournament
+  forever. The real "Clear Hex" UI button avoids this by calling
+  `assignTeamToHex(coord, null)`, which issues an explicit
+  `firebase.firestore.FieldValue.delete()` for that one field path — use that
+  (or the equivalent explicit-delete pattern) to clean up any `board`
+  mutation a test makes, not a snapshot/reassign. Found and worked around
+  while building `e2e-hex-placement-gate.js`.
