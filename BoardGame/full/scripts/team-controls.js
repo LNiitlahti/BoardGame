@@ -1808,106 +1808,51 @@ async function saveTeamName() {
  */
 function renderPhaseOverlays() {
     const currentPhase = gameData.currentPhase?.name;
-    const preGameOverlay = document.getElementById('preGameInstructionsOverlay');
-    const lobbyOverlay = document.getElementById('lobbyReadyOverlay');
+    const matchOverlay = document.getElementById('matchPanelOverlay');
     const spellOverlay = document.getElementById('spellPhaseOverlay');
 
     // Hide all by default
-    if (preGameOverlay) preGameOverlay.style.display = 'none';
-    if (lobbyOverlay) lobbyOverlay.style.display = 'none';
+    if (matchOverlay) matchOverlay.style.display = 'none';
     if (spellOverlay) spellOverlay.style.display = 'none';
 
     const myOverlaySlot = currentPhase === 'matches_in_progress' ? _getMyActiveSlot() : null;
     const mySlotSub = myOverlaySlot ? gameData?.currentPhase?.slots?.[myOverlaySlot] : null;
 
-    if (mySlotSub === 'setup') {
-        renderPreGameInstructions();
-        if (preGameOverlay) preGameOverlay.style.display = 'flex';
-    } else if (mySlotSub === 'lobby') {
-        renderLobbyReady();
-        if (lobbyOverlay) lobbyOverlay.style.display = 'flex';
+    if (mySlotSub === 'setup' || mySlotSub === 'lobby') {
+        renderMatchPanel(mySlotSub === 'lobby');
+        if (matchOverlay) matchOverlay.style.display = 'flex';
     } else if (currentPhase && currentPhase.startsWith('spell_window')) {
         renderSpellPhaseOverlay();
     }
 }
 
 /**
- * Render match assignment cards for the pre-game instructions overlay.
+ * Render the single "Your Next Match" panel. The match-assignment cards
+ * (game, opponent, Discord channel, lobby creator) are always shown as soon
+ * as a match is assigned; the ready-check controls (Game Lobby / Discord
+ * buttons, teammate-confirm list, per-team readiness) are revealed in place
+ * -- same panel, no overlay swap -- once the TD opens the lobby for this
+ * match (isLobbyPhase === true).
  */
-function renderPreGameInstructions() {
-    const container = document.getElementById('matchAssignmentCards');
-    if (!container) return;
-    renderMatchCardsInto(container);
-}
-
-/**
- * Render match assignment cards into a given container.
- * Shared by both pre-game instructions and lobby ready overlays.
- */
-function renderMatchCardsInto(container) {
-    const queue = gameData.gameQueue || [];
-
-    // Find matches involving this team that are pending/ongoing
-    const teamMatches = queue.filter(match => {
-        if (match.isBreak || match.status === 'completed') return false;
-        return (match.sides || []).some(side =>
-            (side.players || []).some(p =>
-                teamData.players?.some(tp =>
-                    tp.uid === p.uid || tp.name === p.name || tp.email === p.email
-                )
-            )
-        );
-    });
-
-    if (teamMatches.length === 0) {
-        container.innerHTML = '<div class="empty-state">No matches assigned this round. Relax!</div>';
-        return;
-    }
-
-    container.innerHTML = teamMatches.map(match => {
-        const gameId = match.gameType || match.game || '';
-        const gameName = resolveGameName(gameId);
-        const gameImage = resolveGameImage(gameId);
-
-        // Find opponent side
-        const opponentSide = (match.sides || []).find(side =>
-            !(side.players || []).some(p =>
-                teamData.players?.some(tp => tp.uid === p.uid || tp.name === p.name)
-            )
-        );
-        const opponentNames = opponentSide
-            ? (opponentSide.players || []).map(p => resolveCurrentPlayerName(p.id || p.uid, p.teamId, p.name)).join(', ')
-            : 'TBD';
-
-        // Find opponent team
-        const opponentTeamId = opponentSide?.players?.[0]?.teamId;
-        const opponentTeam = opponentTeamId != null
-            ? gameData.teams?.find(t => String(t.id) === String(opponentTeamId))
-            : null;
-        const opponentTeamName = opponentTeam?.name || 'Opponent';
-        const opponentColor = getHexColor(opponentTeam?.color);
-
-        return `
-            <div class="match-assignment-card">
-                ${gameImage ? `<img src="${gameImage}" class="game-image" alt="${gameName}" onerror="this.style.display='none'">` : ''}
-                <div class="game-name">${gameName}</div>
-                <div class="opponent-info">
-                    vs <span style="color: ${opponentColor}; font-weight: 600;">${opponentTeamName}</span>
-                </div>
-                <div class="opponent-players">${opponentNames}</div>
-            </div>
-        `;
-    }).join('');
-}
-
-/**
- * Render the lobby ready overlay with two-button readiness, Discord info, and lobby creator role.
- */
-function renderLobbyReady() {
-    const cardsContainer = document.getElementById('matchAssignmentCardsLobby');
+function renderMatchPanel(isLobbyPhase) {
+    const cardsContainer = document.getElementById('matchAssignmentCards');
     if (cardsContainer) {
         renderMatchCardsWithDiscord(cardsContainer);
     }
+
+    const subtitle = document.getElementById('matchPanelSubtitle');
+    const waitingFooter = document.getElementById('matchPanelWaitingFooter');
+    const readyControls = document.getElementById('lobbyReadyControls');
+
+    if (subtitle) {
+        subtitle.textContent = isLobbyPhase
+            ? 'Join your game lobby and Discord channel, then confirm ready'
+            : 'Review your upcoming match for this round';
+    }
+    if (waitingFooter) waitingFooter.style.display = isLobbyPhase ? 'none' : '';
+    if (readyControls) readyControls.style.display = isLobbyPhase ? '' : 'none';
+
+    if (!isLobbyPhase) return;
 
     // Update two-button ready state
     const lobbyReady = gameData.lobbyReady || {};
@@ -1975,21 +1920,23 @@ function renderTeammateConfirmRow() {
 
 /**
  * Render match cards enriched with Discord channel and lobby creator info.
+ * Now also the persistent match-info area shown as soon as a match is
+ * assigned (see renderMatchPanel) -- not just the lobby-phase view.
+ *
+ * Uses the same "which side is mine" resolution as `_matchInvolvesUs()`
+ * (checking both the real `teams[].playerIds` shape and the legacy/synthetic
+ * `sides[].players[]` shape via `getMatchSidePlayers()`) -- the previous
+ * version here only checked `side.players[]`, which never matched a real
+ * match (real queue entries are always `teams[].playerIds`), so this card
+ * never actually rendered outside of synthetic test data. Found while
+ * merging the pre-game/lobby overlays for Task 13.
  */
 function renderMatchCardsWithDiscord(container) {
     const queue = gameData.gameQueue || [];
 
-    const teamMatches = queue.filter(match => {
-        if (match.isBreak || match.status === 'completed') return false;
-        const sides = match.teams || match.sides || [];
-        return sides.some(side =>
-            (side.players || []).some(p =>
-                teamData.players?.some(tp =>
-                    tp.uid === p.uid || tp.name === p.name || tp.email === p.email
-                )
-            )
-        );
-    });
+    const teamMatches = queue.filter(match =>
+        !match.isBreak && match.status !== 'completed' && _matchInvolvesUs(match)
+    );
 
     if (teamMatches.length === 0) {
         container.innerHTML = '<div class="empty-state">No matches assigned this round. Relax!</div>';
@@ -2002,12 +1949,16 @@ function renderMatchCardsWithDiscord(container) {
         const gameImage = resolveGameImage(gameId);
         const matchTeams = match.teams || match.sides || [];
 
-        // Find which side we're on
-        const mySide = matchTeams.find(side =>
-            (side.players || []).some(p =>
-                teamData.players?.some(tp => tp.uid === p.uid || tp.name === p.name)
+        // Resolve each side's players uniformly (handles both real and
+        // legacy/synthetic side shapes), then find which side is ours.
+        const resolvedSides = matchTeams.map(side => ({ side, players: getMatchSidePlayers(side) }));
+        const mine = resolvedSides.find(({ players }) =>
+            players.some(p =>
+                (currentUser?.uid && p.id === currentUser.uid) ||
+                teamData.players?.some(tp => tp.uid === p.id || tp.id === p.id || tp.name === p.name)
             )
         );
+        const mySide = mine?.side;
         const mySideId = mySide?.id || 'TEAM_A';
 
         // Discord channel for our side
@@ -2027,11 +1978,11 @@ function renderMatchCardsWithDiscord(container) {
             : '';
 
         // Opponent info
-        const opponentSide = matchTeams.find(side => side !== mySide);
-        const opponentNames = opponentSide
-            ? (opponentSide.players || []).map(p => resolveCurrentPlayerName(p.id || p.uid, p.teamId, p.name)).join(', ')
+        const opponentEntry = resolvedSides.find(r => r.side !== mySide);
+        const opponentNames = opponentEntry?.players?.length
+            ? opponentEntry.players.map(p => p.name).join(', ')
             : 'TBD';
-        const opponentTeamId = opponentSide?.players?.[0]?.teamId;
+        const opponentTeamId = opponentEntry?.players?.[0]?.teamId;
         const opponentTeam = opponentTeamId != null
             ? gameData.teams?.find(t => String(t.id) === String(opponentTeamId))
             : null;

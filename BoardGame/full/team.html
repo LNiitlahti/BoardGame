@@ -48,36 +48,26 @@
 
         <div class="team-status-message" id="statusMessage" style="display: none;"></div>
 
-        <!-- Pre-Game Instructions Overlay -->
-        <div class="lobby-overlay" id="preGameInstructionsOverlay" style="display: none;">
+        <!-- Match Panel: one evolving overlay for "you have a match" -> "lobby is open, ready up".
+             Match info (matchAssignmentCards) is always shown once a match exists. The ready-check
+             section (lobbyReadyControls) is revealed in place -- no overlay swap -- once the TD
+             opens the lobby for this match. -->
+        <div class="lobby-overlay" id="matchPanelOverlay" style="display: none;">
             <div class="lobby-overlay-content">
                 <div class="lobby-overlay-header">
-                    <h2>Your Match Assignments</h2>
-                    <p>Review your upcoming matches for this round</p>
+                    <h2>Your Next Match</h2>
+                    <p id="matchPanelSubtitle">Review your upcoming match for this round</p>
                 </div>
                 <div id="matchAssignmentCards" class="match-assignment-grid">
-                    <!-- Dynamically populated -->
+                    <!-- Dynamically populated: game, opponent, Discord channel + lobby creator info -->
                 </div>
-                <div class="lobby-overlay-footer">
-                    Waiting for admin to advance to lobby...
+                <div class="lobby-overlay-footer" id="matchPanelWaitingFooter">
+                    Waiting for admin to open the lobby...
                 </div>
-            </div>
-        </div>
-
-        <!-- Lobby Ready Overlay -->
-        <div class="lobby-overlay" id="lobbyReadyOverlay" style="display: none;">
-            <div class="lobby-overlay-content">
-                <div class="lobby-overlay-header">
-                    <h2>Lobby Ready Check</h2>
-                    <p>Join your game lobby and Discord channel, then confirm ready</p>
-                </div>
-                <div id="lobbyCreatorRole" style="display: none;">
-                    <!-- Shows lobby creator banner if applicable -->
-                </div>
-                <div id="matchAssignmentCardsLobby" class="match-assignment-grid">
-                    <!-- Dynamically populated with Discord channel + lobby creator info -->
-                </div>
-                <div class="lobby-ready-controls">
+                <div class="lobby-ready-controls" id="lobbyReadyControls" style="display: none;">
+                    <div id="lobbyCreatorRole" style="display: none;">
+                        <!-- Shows lobby creator banner if applicable -->
+                    </div>
                     <div class="lobby-ready-buttons">
                         <button class="btn primary lobby-ready-btn" id="readyGameLobbyBtn" onclick="setReadyStatus('gameLobby')">
                             &#x1F3AE; Game Lobby
