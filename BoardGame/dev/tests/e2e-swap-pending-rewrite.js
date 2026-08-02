@@ -1,6 +1,8 @@
 /**
  * e2e-swap-pending-rewrite.js — regression test for TODO.md's "Pending
- * (unplayed) matches keep showing retired player after a swap" finding.
+ * (unplayed) matches keep showing retired player after a swap" finding,
+ * plus TODO.md Task 10's follow-up decision that mid-match (ongoing) swaps
+ * should ALSO reassign credit to the new occupant.
  *
  * ROOT CAUSE (confirmed, see TODO.md): getMatchTeamPlayers()
  * (team-manager.js:69-87) resolves each match's players via a live
@@ -16,12 +18,16 @@
  * helper, rewritePendingQueueReferences(gameState, oldPlayerId,
  * newPlayerId), right after a successful swap (PlayerUtils.swapPlayerInSlot
  * succeeds). It walks gameState.gameQueue and rewrites teams[].playerIds
- * entries matching the old id to the new id, but ONLY for matches whose
- * status is neither 'ongoing' nor 'completed' — completed match history
- * must keep pointing at whoever actually played, and mid-match swaps are a
- * separate, not-yet-decided question (TODO.md's Task 10, not this one).
- * gameQueue is only included in the Firestore save when at least one entry
- * was actually touched (matches the file's existing minimal-payload style).
+ * entries matching the old id to the new id, for every match whose status
+ * is NOT 'completed' — pending, queued, AND ongoing all get rewritten now.
+ * Completed match history must keep pointing at whoever actually played;
+ * that's the one exclusion. (Task 10 investigated whether rewriting an
+ * ongoing match's playerIds mid-play could desync anything — it can't:
+ * result-manager.js's confirm-result path resolves playerIds live off the
+ * queue entry at confirmation time, not a match-start snapshot, and turn
+ * state is keyed by teamId, not playerId.) gameQueue is only included in
+ * the Firestore save when at least one entry was actually touched (matches
+ * the file's existing minimal-payload style).
  *
  * WHAT THIS TEST DOES: drives the REAL replacePlayerWithUser() on god.html
  * end-to-end (not a reimplementation) —
@@ -44,12 +50,13 @@
  *      to account B, auto-accepting the native confirm() dialog the swap
  *      path shows (same technique as e2e-multitab-freeze.js).
  *   5. Asserts:
- *        - Both pending/queued entries' playerIds now reference the NEW
- *          player id, not the old one (the fix, positive case).
- *        - The ongoing and completed entries' playerIds are UNCHANGED,
- *          still referencing the OLD id (the scope boundary the fix must
- *          respect — the important negative case, since the whole point of
- *          NOT touching completed history depends on this).
+ *        - The pending, queued, AND ongoing entries' playerIds now reference
+ *          the NEW player id, not the old one (the fix, positive case,
+ *          scope = pending AND ongoing).
+ *        - The completed entry's playerIds are UNCHANGED, still referencing
+ *          the OLD id (the scope boundary the fix must respect — the
+ *          important negative case, since the whole point of NOT touching
+ *          completed history depends on this).
  *
  * BURNED-UID GOTCHA (E2E_HARNESS.md): a roster swap permanently burns the
  * incoming user's uid in the tournament's player registry (replacePlayerWithUser
@@ -241,28 +248,29 @@ async function main() {
       const findMatch = (id) => swapResult.finalQueue.find(m => m.id === id);
       const playerIdsFor = (match) => match.teams.find(t => t.id === 'TEAM_A').playerIds;
 
-      // ── POSITIVE CASE: pending/queued entries must now reference the NEW
-      // player id, not the old one. This is the actual bug fix. ──
+      // ── POSITIVE CASE: pending, queued, AND ongoing entries must now
+      // reference the NEW player id, not the old one. This is the fix's
+      // scope as of Task 10 — mid-match swaps reassign credit to the new
+      // occupant, same as not-yet-started matches. ──
       const pendingMatch = findMatch(outcome.pendingId);
       const queuedMatch = findMatch(outcome.queuedId);
+      const ongoingMatch = findMatch(outcome.ongoingId);
       assert(pendingMatch, 'pending queue entry should still exist');
       assert(queuedMatch, 'queued queue entry should still exist');
+      assert(ongoingMatch, 'ongoing queue entry should still exist');
       assert(playerIdsFor(pendingMatch).includes(newPlayerId) && !playerIdsFor(pendingMatch).includes(outcome.oldPlayerId),
         `Pending entry should be rewritten to the new player id, got playerIds: ${JSON.stringify(playerIdsFor(pendingMatch))}`);
       assert(playerIdsFor(queuedMatch).includes(newPlayerId) && !playerIdsFor(queuedMatch).includes(outcome.oldPlayerId),
         `Queued entry should be rewritten to the new player id, got playerIds: ${JSON.stringify(playerIdsFor(queuedMatch))}`);
+      assert(playerIdsFor(ongoingMatch).includes(newPlayerId) && !playerIdsFor(ongoingMatch).includes(outcome.oldPlayerId),
+        `Ongoing entry should be rewritten to the new player id (Task 10 scope change), got playerIds: ${JSON.stringify(playerIdsFor(ongoingMatch))}`);
 
-      // ── NEGATIVE CASE (the scope boundary the fix depends on): ongoing
-      // and completed entries must be UNTOUCHED, still referencing the OLD
-      // id — completed match history must never be retroactively
-      // reattributed, and mid-match swaps are a separate, undecided
-      // question (TODO.md Task 10). ──
-      const ongoingMatch = findMatch(outcome.ongoingId);
+      // ── NEGATIVE CASE (the scope boundary the fix depends on): the
+      // completed entry must be UNTOUCHED, still referencing the OLD id —
+      // completed match history must never be retroactively reattributed.
+      // This is the one status the rewrite must never touch. ──
       const completedMatch = findMatch(outcome.completedId);
-      assert(ongoingMatch, 'ongoing queue entry should still exist');
       assert(completedMatch, 'completed queue entry should still exist');
-      assert(playerIdsFor(ongoingMatch).includes(outcome.oldPlayerId) && !playerIdsFor(ongoingMatch).includes(newPlayerId),
-        `Ongoing entry must NOT be rewritten (scope boundary), got playerIds: ${JSON.stringify(playerIdsFor(ongoingMatch))}`);
       assert(playerIdsFor(completedMatch).includes(outcome.oldPlayerId) && !playerIdsFor(completedMatch).includes(newPlayerId),
         `Completed entry must NOT be rewritten (scope boundary), got playerIds: ${JSON.stringify(playerIdsFor(completedMatch))}`);
 

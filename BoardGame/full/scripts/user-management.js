@@ -600,14 +600,19 @@ function renderTeamAssignmentSlots() {
 }
 
 /**
- * After a roster swap, retarget not-yet-started gameQueue entries whose
- * teams[].playerIds still reference the retired old player id, so pending
- * matches display the new occupant instead of a stale reference frozen in
- * at queue-creation time. Ongoing/completed matches are deliberately left
- * alone: completed match history must keep pointing at whoever actually
- * played (team-manager.js's getMatchTeamPlayers already resolves live for
- * display, but the stored playerIds themselves must not be rewritten), and
- * mid-match swaps are a separate, not-yet-decided question. Mutates
+ * After a roster swap, retarget not-yet-completed gameQueue entries (pending
+ * AND ongoing) whose teams[].playerIds still reference the retired old
+ * player id, so those matches display and credit the new occupant instead
+ * of a stale reference frozen in at queue-creation time. A swap that lands
+ * mid-match reassigns that match's credit to the new occupant going
+ * forward — result-manager.js's confirm-result path resolves playerIds live
+ * off the queue entry at confirmation time (not a match-start snapshot), and
+ * turn state (board-manager.js's currentTurn) is keyed by teamId, not
+ * playerId, so this rewrite doesn't desync anything mid-play. Completed
+ * matches are the one exclusion: finished match history must keep pointing
+ * at whoever actually played them. (team-manager.js's getMatchTeamPlayers
+ * also resolves live for display, but that's a separate, orthogonal
+ * concern from whether the stored playerIds get rewritten.) Mutates
  * gameState.gameQueue in place; returns the number of entries changed (0 if
  * none) so the caller knows whether gameQueue needs to be included in the
  * save.
@@ -619,7 +624,7 @@ function renderTeamAssignmentSlots() {
 function rewritePendingQueueReferences(gameState, oldPlayerId, newPlayerId) {
     let touched = 0;
     for (const match of gameState.gameQueue || []) {
-        if (match.status === 'ongoing' || match.status === 'completed') continue;
+        if (match.status === 'completed') continue;
         let changed = false;
         for (const team of match.teams || []) {
             if (!Array.isArray(team.playerIds)) continue;
@@ -702,9 +707,9 @@ async function replacePlayerWithUser(teamId, playerId) {
 
         const newPlayerId = isSwap ? mutation.newPlayerId : playerId;
 
-        // On a swap, also retarget any not-yet-started queue entries still
-        // pointing at the retired old player id (see
-        // rewritePendingQueueReferences doc comment for why ongoing/
+        // On a swap, also retarget any not-yet-completed queue entries
+        // (pending or ongoing) still pointing at the retired old player id
+        // (see rewritePendingQueueReferences doc comment for why only
         // completed matches are excluded).
         const rewrittenMatchCount = isSwap
             ? rewritePendingQueueReferences(window.gameState, playerId, newPlayerId)

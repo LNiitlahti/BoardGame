@@ -222,21 +222,34 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   mismatch — recreate the suspected scenario on a disposable tournament
   instead.
 - `e2e-swap-pending-rewrite.js` — regression test for TODO.md's "Pending
-  (unplayed) matches keep showing retired player after a swap" finding. Root
-  cause (confirmed): `getMatchTeamPlayers()` (team-manager.js:69-87) resolves
-  a match's players via a live `PlayerUtils.getPlayerDisplayInfo()` lookup —
-  correct and intentional, since that's what protects COMPLETED match
-  history from ever being retroactively relabeled — but a PENDING
-  (not-yet-played) queue entry's `teams[].playerIds` still holds the
-  concrete old player id frozen in at queue-creation time, since nothing
-  previously re-targeted already-queued-but-unplayed matches to a slot's new
-  occupant after a swap. Fix: `user-management.js`'s `replacePlayerWithUser`
-  now calls a new helper, `rewritePendingQueueReferences(gameState,
-  oldPlayerId, newPlayerId)`, right after a successful
-  `PlayerUtils.swapPlayerInSlot()` — it rewrites `gameQueue` entries'
-  `teams[].playerIds` from old to new id, but ONLY for matches whose status
-  is neither `'ongoing'` nor `'completed'` (mid-match swaps are a separate,
-  not-yet-decided question). This test drives the REAL
+  (unplayed) matches keep showing retired player after a swap" finding, plus
+  TODO.md Task 10's follow-up decision that mid-match (`'ongoing'`) swaps
+  should ALSO reassign credit to the new occupant, not stay pinned to
+  whoever was there at match-start. Root cause (confirmed):
+  `getMatchTeamPlayers()` (team-manager.js:69-87) resolves a match's players
+  via a live `PlayerUtils.getPlayerDisplayInfo()` lookup — correct and
+  intentional, since that's what protects COMPLETED match history from ever
+  being retroactively relabeled — but a PENDING (not-yet-played) queue
+  entry's `teams[].playerIds` still holds the concrete old player id frozen
+  in at queue-creation time, since nothing previously re-targeted
+  already-queued-but-unplayed matches to a slot's new occupant after a swap.
+  Fix: `user-management.js`'s `replacePlayerWithUser` now calls a new
+  helper, `rewritePendingQueueReferences(gameState, oldPlayerId,
+  newPlayerId)`, right after a successful `PlayerUtils.swapPlayerInSlot()` —
+  it rewrites `gameQueue` entries' `teams[].playerIds` from old to new id,
+  for every match whose status is NOT `'completed'` — pending, queued, AND
+  ongoing all get rewritten (as of Task 10; the original Task 9 cut of this
+  fix excluded `'ongoing'` too, pending that follow-up decision). Completed
+  match history is the one exclusion that stays forever: it must never be
+  retroactively reattributed. Task 10 also checked whether rewriting an
+  ongoing match's `playerIds` mid-play could desync anything a
+  currently-playing user's screen or the result-confirmation flow depends
+  on — it can't: `result-manager.js`'s confirm-result path resolves
+  `playerIds` live off the queue entry at confirmation time (not a
+  match-start snapshot), `display-manager.js`'s live-match rendering does
+  the same and its change-detection signature includes `playerIds` so it
+  re-renders correctly, and turn state (`board-manager.js`'s `currentTurn`)
+  is keyed by `teamId`, not `playerId`. This test drives the REAL
   `replacePlayerWithUser()` end-to-end (not a reimplementation): seeds a
   temporary synthetic team with one slot pre-linked to a freshly created
   disposable account, seeds 4 `gameQueue` entries referencing that slot's
@@ -245,14 +258,15 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   `replacePlayerWithUser()` functions (auto-accepting the native `confirm()`
   dialog the swap path shows, same technique as `e2e-multitab-freeze.js`) to
   swap the slot to a second freshly created disposable account. Asserts both
-  the positive case (pending/queued entries rewritten to the new id) and the
-  negative case (ongoing/completed entries left untouched, still pointing at
-  the old id) — the negative case is the scope boundary the whole fix's
-  safety depends on. Uses two never-before-used disposable accounts created
-  inline with timestamped names every run (see the burned-uid gotcha below —
-  a fixed pair reused across runs would fail on the second run). Confirmed
-  passing twice in a row against live `e2e-disposable-1`. Snapshots/restores
-  `teams`, `players`, `gameQueue` in a `finally` block — see the new
+  the positive case (pending, queued, AND ongoing entries all rewritten to
+  the new id) and the negative case (the completed entry left untouched,
+  still pointing at the old id) — the negative case is the scope boundary
+  the whole fix's safety depends on. Uses two never-before-used disposable
+  accounts created inline with timestamped names every run (see the
+  burned-uid gotcha below — a fixed pair reused across runs would fail on
+  the second run). Confirmed passing against live `e2e-disposable-1` with
+  the Task 10 scope change (ongoing now a positive case). Snapshots/restores
+  `teams`, `players`, `gameQueue` in a `finally` block — see the
   `players`-is-a-map-field gotcha below, found and fixed the hard way on
   this test's very first live run (two registry entries briefly leaked into
   `e2e-disposable-1` and were manually repaired before this file was
