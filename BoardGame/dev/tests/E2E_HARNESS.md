@@ -140,6 +140,49 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   coordinate behind forever; `assignTeamToHex(coord, null)` issues the
   explicit `FieldValue.delete()` needed to actually remove it, and is called
   unconditionally (safe even if placement never happened).
+- `e2e-asymmetric-teams.js` — coverage for asymmetric team-size matches
+  (TODO.md: "Match 1 as a 3v3 + 2v2 combined/split match — unclear how slot
+  logic and scoring handle that shape"). Read from source first, not guessed
+  from the wording: this maps onto a real, already-built feature —
+  `games-config.js`'s `splitFormat`/`format: '3v3+2v2'` games (aoe4/wc3/sc2/
+  dow2), implemented by `balance-optimizer.js`'s `selectOptimal3v3_2v2()` and
+  `smart-match-generator.js`'s `generate3v3_2v2Match()`. ONE "combined" round
+  slot = TWO linked gameQueue entries (`playType: '3v3'` and `'2v2'`,
+  `isSimultaneous: true`) sharing the same `slot`/`roundNumber`; each entry
+  is internally symmetric (3-vs-3 or 2-vs-2) — the asymmetry is ACROSS the
+  pair, not within either match's two sides. Of the 5 teams involved, 1
+  "split" team contributes exactly 1 player to EACH side of the 3v3 leg
+  (its own two players end up on opposing sides) and 0 players to the 2v2
+  leg, so it never has 2+ players on one side of either leg and — per
+  result-manager.js's `confirmResult()` "2+ players on a side = full
+  credit" rule — gets NEITHER a win nor a loss from the combined match, only
+  a `splitCount` increment (tagged on the 3v3 leg only). Since
+  e2e-disposable-1 only has 2 real teams but `BalanceOptimizer`/
+  `SmartMatchGenerator` hard-require exactly 5 teams of 2 players to compute
+  a partition, the test temporarily adds 3 synthetic teams built from real
+  already-unassigned player accounts sitting in the registry, runs the real
+  optimizer/generator methods directly (not through `confirmAutoMatch()` —
+  see below), confirms both linked legs via `ResultManager
+  .quickConfirmResult()` with *different* winner indices per leg, and
+  asserts: `PhaseManager.getSlotRequirements()` treats the pair as ONE slot
+  (not met while either leg is ongoing, met only once both are confirmed);
+  each of the 4 full-representation teams gets exactly the right win/loss/
+  points/gamesPlayed delta for its leg; the split team gets zero win/loss/
+  points delta and exactly `splitCount + 1`. Also found and reports (without
+  fixing) a real bug along the way: god-app.js:1190-1191 wires
+  `window.confirmAutoMatch`/`window.generateSuggestedMatches` on god.html to
+  `MatchCreationManager` methods whose completion path unconditionally
+  touches `#autoMatchModal`/`#autoMatchContent` DOM elements that only exist
+  in `full/admin.html`, not god.html — calling `confirmAutoMatch()` on
+  god.html throws `Cannot read properties of null (reading 'classList')`.
+  The test demonstrates this live as a diagnostic (not a pass/fail gate, so
+  a future DOM fix on either page doesn't spuriously break this scoring
+  test) and works around it by calling the same non-DOM-dependent
+  `BalanceOptimizer`/`SmartMatchGenerator` methods `confirmAutoMatch()`
+  itself delegates to, building the resulting queue entries the same way its
+  source does. Snapshots/restores `teams`, `players`, `gameQueue`,
+  `currentPhase`, `gamesPlayed`, `gameHistory` in a `finally` block — see
+  the two new gotchas below, both discovered while building this test.
 - `.env.e2e` (gitignored, not in git) — real credentials. Copy `.env.e2e.example`
   to create it if missing.
 
@@ -262,3 +305,48 @@ and is safe for later tasks to keep reusing/mutating.
   (or the equivalent explicit-delete pattern) to clean up any `board`
   mutation a test makes, not a snapshot/reassign. Found and worked around
   while building `e2e-hex-placement-gate.js`.
+- **After `await window.godApp.saveGameState()`, a previously-held reference
+  to a `gameState.gameQueue` (or other array-field) entry object can become
+  stale.** `godApp.gameState` itself keeps its identity (per the gotcha
+  above), but the Firestore `onSnapshot` listener's `Object.assign(gameState,
+  snapshotData)` still REPLACES array-valued fields like `gameQueue`/`teams`
+  wholesale with freshly-deserialized objects (same data, new object
+  identity) — and that listener can fire and process between two `await`
+  points in a test, not just at page load. A test that does
+  `const entry = {...}; gs.gameQueue.push(entry); await saveGameState();
+  entry.status = 'ongoing'; await saveGameState();` can silently no-op the
+  second mutation: by the time it runs, `entry` may already be orphaned from
+  the live `gs.gameQueue`, so `entry.status = 'ongoing'` mutates a detached
+  copy nobody reads. Symptom: `getSlotRequirements()`/similar reads keep
+  reporting the OLD value after a mutate-then-save you were sure took effect.
+  Fix: don't hold onto entry references across a `saveGameState()` call —
+  look the entry up fresh by id (`gs.gameQueue.find(e => e.id === id)`)
+  immediately before mutating it, the same way `ResultManager
+  .quickConfirmResult(id, ...)` itself does internally (which is exactly why
+  calling real API methods by id, rather than passing them a held object
+  reference, is the safe pattern used throughout this harness). Found and
+  fixed while building `e2e-asymmetric-teams.js`.
+- **Adding a team whose `.players` roster references real player ids without
+  also updating those players' `teamId` in `gameState.players` can silently
+  delete OTHER, unrelated players from the tournament.** `PlayerUtils
+  .needsPlayerMigration(gameState)` (player-utils.js) runs on every Firestore
+  `onSnapshot` callback (deliberately not gated behind a one-time flag) and
+  returns true if any team's roster player has a registry `teamId` that
+  disagrees with the team it's rostered on. If so, `migrateToNormalizedPlayers()`
+  auto-runs and — as part of legitimately rebuilding `team.playerIds` from
+  `team.players` — PRUNES every `gameState.players` registry entry not
+  referenced by ANY team's roster (its intended purpose: drop orphans left by
+  real roster edits). A test that adds a temporary team by pushing a raw
+  `players: [...]` array (pointing at real, currently-unassigned player
+  accounts) without also setting `player.teamId` on those registry entries
+  will trigger this, and since the prune target is "everyone not on a team,"
+  it silently deletes every OTHER unassigned player in the tournament too —
+  not just the ones the test is using. This actually happened while building
+  `e2e-asymmetric-teams.js`: an early version left 12 real free-agent players
+  in `e2e-disposable-1` stamped with orphaned `teamId` values pointing at
+  teams the test had already removed again; required a manual repair. Fix:
+  when a test adds a team referencing existing player-registry entries, set
+  those entries' `teamId` to the new team's id at the same time (mirroring
+  what `player-utils.js`'s `updatePlayerInRegistry` does for a real
+  "assign player to team" action) — and snapshot/restore `gameState.players`
+  in the `finally` block as a second safety net regardless.
