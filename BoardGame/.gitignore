@@ -26,6 +26,7 @@ shared/scripts/firebase.*.js
 .env
 .env.local
 .env.*.local
+dev/tests/.env.e2e
 
 # Credentials
 credentials.json
