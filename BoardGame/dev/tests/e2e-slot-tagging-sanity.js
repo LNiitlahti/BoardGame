@@ -80,7 +80,18 @@
  * mismatch reported live as a real bug — per TODO.md's own instruction to
  * "re-verify slot-tagging is sane on a freshly-generated queue before
  * trusting any... mismatch as a real bug going forward." It needs at least 2
- * teams with >=1 player each in whatever tournament it targets.
+ * teams with >=1 player each, AND at least one game in `selectedGames`, in
+ * whatever tournament it targets (fails loudly with a clear error if not).
+ *
+ * ONLY RUN AGAINST A QUIET TOURNAMENT — no active TD session, no live
+ * spectator/big-screen display open. The restore is a plain client-side
+ * read-modify-write (`gameState.gameQueue = ...; await saveGameState()`),
+ * not a Firestore transaction: while this runs, connected viewers briefly
+ * see the fake test queue/phase, and any real concurrent write landing in
+ * the snapshot-restore window is silently lost (last-write-wins). Never run
+ * this against a tournament during active play, including to "just check" a
+ * live slot mismatch — reproduce the suspected scenario on a disposable
+ * tournament instead. See E2E_HARNESS.md for the full caveat.
  *
  * Run: cd BoardGame && node dev/tests/e2e-slot-tagging-sanity.js
  */

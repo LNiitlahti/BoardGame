@@ -211,6 +211,16 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   is exactly what TODO.md asked for going forward. Real Firestore writes
   happen (each `addMatchToQueue()` call saves for real); snapshots/restores
   `gameQueue`/`currentPhase` in a `finally` block like every sibling script.
+  **Only run this while the target tournament is quiet — no active TD
+  session, no live spectator/big-screen display open.** The restore is a
+  plain client-side read-modify-write (`gameState.gameQueue = ...; await
+  saveGameState()`), not a Firestore transaction: while it runs, any
+  connected viewer briefly sees the fake `roundNumber: 999801` queue/reset
+  slot state, and any real concurrent write landing in the snapshot-restore
+  window is silently lost (last-write-wins). Never run this against a
+  tournament during active play, including to "just check" a live slot
+  mismatch — recreate the suspected scenario on a disposable tournament
+  instead.
 - `.env.e2e` (gitignored, not in git) — real credentials. Copy `.env.e2e.example`
   to create it if missing.
 
