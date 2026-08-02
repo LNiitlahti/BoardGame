@@ -224,15 +224,45 @@
 
 /* ==================== STATUS MESSAGE ==================== */
 
-/* Fixed toast so messages never push the layout around */
+/* Fixed toast so messages never push the layout around.
+   Anchored to the BOTTOM of the viewport (not top: 4.5rem) so it never
+   overlaps the score strip / phase banner that sit at the top of the page
+   (see TODO.md "vote-submitted toast overlaps team scores section").
+
+   Width is shrunk symmetrically (min() of three candidates, not just
+   capped at 520px) so the box's RIGHT edge can never reach the chat
+   widget's floating action button (shared/scripts/chat-module.js's
+   `.chat-module-wrap`: position: fixed; right: 20px; bottom: 20px --
+   a 56px circular button occupying the rightmost ~76px of the viewport,
+   mounted unconditionally for every team member on this page). 192px
+   below = 2x a 96px clearance (76px FAB zone + ~20px gap), doubled
+   because shrinking a horizontally-centered box removes width equally
+   from both sides. Since the box is centered, this guarantees BOTH
+   edges clear the FAB zone -- so no horizontal overlap is possible
+   regardless of message length/height, which is what actually matters:
+   two rects can't intersect without overlapping on both axes, so a
+   guaranteed horizontal gap makes the vertical position irrelevant. On
+   any viewport >= 712px (520 + 192) the min() still resolves to
+   520px, same as before -- no visual change on desktop/tablet, this
+   only kicks in on phone-width viewports.
+
+   box-sizing: border-box is required for the FAB-clearance math above to
+   actually hold: this rule also sets padding: 12px 16px and a 4px
+   border-left, and the default content-box sizing would add all of that
+   ON TOP of the computed `width`, quietly eating ~36px out of the
+   intended 96px clearance zone (measured only ~2px of actual margin from
+   the FAB in testing before this was added -- too fragile to rely on).
+   With border-box, `width` is the box's actual rendered width, so the
+   clearance math above applies directly. */
 .team-status-message {
   position: fixed;
-  top: 4.5rem;
+  bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 3000;
   max-width: 520px;
-  width: calc(100% - 40px);
+  width: min(calc(100% - 40px), calc(100% - 192px), 520px);
+  box-sizing: border-box;
   background:
     linear-gradient(
       180deg,
@@ -273,7 +303,7 @@
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 

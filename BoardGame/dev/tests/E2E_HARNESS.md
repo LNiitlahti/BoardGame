@@ -420,6 +420,76 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   (`task13-panel-waiting.png`/`task13-panel-lobby-open.png`, not committed).
   Snapshots/restores `gameQueue`/`currentPhase`/`lobbyReady` in a `finally`
   block.
+- `e2e-vote-toast-position.js` — regression test for TODO.md Task 14
+  ("team.html: the vote-submitted notification/toast overlaps the team
+  scores section"). Root cause: team.html's vote-submitted message is NOT
+  the shared `shared/scripts/toast.js` component (that file isn't loaded by
+  team.html at all — only statistics.html/onboarding.html/god.html/
+  admin.html load it) — it's a page-local `showStatus()` function
+  (`full/scripts/team-controls.js` ~2179) that toggles a single always-
+  present `#statusMessage` element (`full/team.html` ~line 49). Its CSS,
+  `.team-status-message` (`full/css/team-modern.css`, was ~227-233), was
+  `position: fixed; top: 4.5rem` (72px) — directly on top of `#scoreStrip`
+  (~84-140px from viewport top: 60px fixed navbar + `body.team-page`'s
+  `padding-top: 4rem` + `.team-container`'s own 20px padding), since the
+  score strip is always the first thing rendered on team.html regardless of
+  match/phase state. Fix: `.team-status-message` now anchors to the BOTTOM
+  of the viewport (`bottom: 24px`) instead, so it can never overlap
+  anything living at the top of the page; the `slideIn` keyframe was
+  flipped to slide up (from `translateY(8px)`) instead of down, to match.
+  Confirmed page-scoped and safe: `team-status-message` as a selector
+  appears nowhere else except an inapplicable `body.dark-mode
+  .team-status-message` rule in `shared/css/dark-theme.css` (only
+  replay.html loads that file, and team.html's body never has a
+  `dark-mode` class) — no risk to god.html/admin.html's actual shared
+  toast.js component. This test seeds a real 'ongoing' `gameQueue` match
+  (`e2e-disposable-1`'s Team Alpha id 1, real-linked "TD (E2E)" +
+  "E2ePlayer14", vs Team Beta's two placeholders — same roster
+  `e2e-team-match-panel-merge.js` uses) with no `votes` yet, logs in as
+  E2ePlayer14, clicks a vote option and Submit Vote (single vote out of 4
+  match players = 25%, below the 90% consensus threshold, so `submitVote()`
+  takes the plain "Vote submitted successfully!" path matching TODO.md's
+  exact repro), and asserts via `getBoundingClientRect()` that the toast's
+  box does not intersect the score-strip's box — confirmed this genuinely
+  catches the regression by temporarily `git stash`-ing the CSS fix and
+  re-running (toast top=64/bottom=108 vs score-strip top=80/bottom=136 —
+  intersecting, assertion correctly failed) before restoring the fix and
+  confirming green again. Also asserts non-intersection with the phase
+  banner and navbar, as a self-review check that the fix didn't just
+  relocate the overlap onto some OTHER top-of-page element (the navbar
+  check first asserts its selector resolved at all, so a renamed/missing
+  selector fails loudly instead of silently no-op'ing the check).
+  **Follow-up found in code review of the first cut**: moving the toast to
+  the bottom exposed a second, TODO.md-unmentioned overlap candidate —
+  `shared/scripts/chat-module.js`'s `.chat-module-wrap`, a `position:
+  fixed; right: 20px; bottom: 20px` 56px floating action button, mounted
+  unconditionally for every verified team member
+  (`team-controls.js:129-131`) — sitting in the same bottom-right corner.
+  The toast's old `width: calc(100% - 40px)` (capped at `max-width: 520px`)
+  nearly fills phone-width viewports, so its right edge could reach into
+  the FAB's zone while visible (5s per vote). Fixed by changing `width` to
+  `min(calc(100% - 40px), calc(100% - 192px), 520px)` plus `box-sizing:
+  border-box` (the box also has padding/a border, and content-box sizing
+  was quietly eating ~36px out of the intended clearance — first attempt
+  without `border-box` left only a ~2px real gap from the FAB, caught by
+  rerunning the test rather than trusting the formula) — guarantees a
+  20px+ horizontal gap from the FAB on any viewport, which alone is enough
+  to prevent intersection regardless of message height. The test now runs
+  the full seed → vote → assert flow at TWO viewport sizes, each against
+  its own freshly seeded (never-voted) match: desktop (1280×900,
+  matchNumber 999501, matching this harness's usual size) and phone
+  (390×844 — iPhone 12/13-class, matchNumber 999502 — the width that
+  actually exercises the FAB fix; the pre-fix width would have put the
+  toast's right edge well inside the FAB's zone at this size) — asserting
+  the toast doesn't intersect the FAB too (same selector-resolved guard as
+  the navbar check). Each viewport run creates/tears down its own player
+  browser context in its own `finally`, so a thrown assertion still cleans
+  up rather than leaking the context until the outer `browser.close()`.
+  Confirmed passing against live `e2e-disposable-1` at both viewports.
+  Takes throwaway visual-review screenshots
+  (`task14-vote-toast-{desktop,phone}-{before,after}.png`, not committed).
+  Snapshots/restores `gameQueue` (array field, plain reassign+save is
+  sufficient) in a `finally` block.
 - `.env.e2e` (gitignored, not in git) — real credentials. Copy `.env.e2e.example`
   to create it if missing.
 
