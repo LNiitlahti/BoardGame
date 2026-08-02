@@ -709,6 +709,12 @@ async function replacePlayerWithUser(teamId, playerId) {
         const rewrittenMatchCount = isSwap
             ? rewritePendingQueueReferences(window.gameState, playerId, newPlayerId)
             : 0;
+        // Captured immediately after the rewrite, before the `await` below —
+        // a remote Firestore snapshot landing during that await replaces
+        // window.gameState.gameQueue wholesale (see god-app.js's
+        // _onFirebaseSnapshot Object.assign), which would silently discard
+        // the in-memory rewrite if we re-read window.gameState.gameQueue later.
+        const rewrittenGameQueue = rewrittenMatchCount > 0 ? window.gameState.gameQueue : null;
 
         // Save to Firestore
         const batch = window.firebaseDB.batch();
@@ -766,7 +772,7 @@ async function replacePlayerWithUser(teamId, playerId) {
             teams: window.gameState.teams,
             players: window.gameState.players || {},
             lastModified: new Date().toISOString(),
-            ...(rewrittenMatchCount > 0 ? { gameQueue: window.gameState.gameQueue } : {})
+            ...(rewrittenGameQueue ? { gameQueue: rewrittenGameQueue } : {})
         }, (_key, value) => value === undefined ? null : value));
 
         const tournamentRef = window.firebaseDB.collection('tournaments').doc(window.gameState.tournamentId);
