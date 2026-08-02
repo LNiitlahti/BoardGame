@@ -66,6 +66,44 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   Default Rooms"). Snapshots/restores the tournament's `rooms` field in a
   `finally` block, since `loadDefaultRooms()` persists the loaded rooms
   back to the tournament doc via `_save()`.
+- `e2e-ready-check.js` — verification test for the Discord/Game Lobby
+  ready-check confirm-button flow (see TODO.md's "Verify the Discord/Game
+  Lobby ready-check confirm buttons..." entry). Found and confirms a real bug
+  while doing so: `_getPlayersWhoMustReadyForSlot()` in phase-manager.js reads
+  `match.sides[].players[].teamId`, but no real match-creation code path
+  (match-creation-manager.js) ever writes a `.sides` field shaped that way —
+  every real queue entry only has `.teams: [{id, playerIds: [...]}]`. So
+  `mustReady` is unconditionally empty for every real match ever created,
+  regardless of linked accounts — not just a data-setup fluke in
+  cl32-smoke-test as TODO.md speculated. Part 1 proves this live with 100%
+  real match-creation shape (setup->lobby->playing in under 1.1s, zero player
+  interaction). Part 2 seeds a synthetic `.sides` workaround (clearly marked
+  as such) purely to verify the confirm-button/Firestore-write/auto-advance
+  mechanics work correctly in isolation from the population bug — confirmed
+  they do (only the population source is broken) — using a real disposable
+  player account (`PLAYER14` in `.env.e2e`, already linked into
+  `e2e-disposable-1`'s Team Alpha). Along the way this also found and fixed a
+  trivial one-line bug blocking the test itself:
+  `getGameDisplayName()` in team-controls.js called `GAMES_CONFIG.games.find(...)`
+  treating the games registry (a plain object keyed by id) as an array, which
+  threw a TypeError on every call and silently aborted team.html's whole
+  render pass for that snapshot (since the render loop has no per-call
+  try/catch and marks its signature as "rendered" before running); fixed to
+  do the direct `GAMES_CONFIG.games[gameId]` lookup, matching the already-
+  correct `GAMES_CONFIG.getGame()`/`getGameName()` pattern used elsewhere in
+  the same file. Also reports (without fixing) a related, separate bug:
+  `renderMatchCardsWithDiscord()`'s "does this match involve my team" filter
+  checks `side.players[]` (uid/name/email objects) and never falls back to
+  the real `side.playerIds` (plain id string) shape the way `_matchInvolvesUs()`
+  elsewhere in the same file correctly does — so the lobby overlay's own
+  match-info card (game name, opponent, Discord channel, lobby creator) never
+  renders for any real match. Part 3 confirms TODO.md's other open question
+  ("once live in playing, is there a way to retroactively confirm?") is a
+  real, still-present gap: `renderPhaseOverlays()` and `renderTeammates()`
+  both gate their confirm UI strictly on the slot's sub-phase being `'lobby'`
+  — once a slot reaches `'playing'`, there is genuinely no UI path left to
+  confirm Discord/lobby readiness. Snapshots/restores `gameQueue`,
+  `currentPhase`, and `lobbyReady` in a `finally` block.
 - `.env.e2e` (gitignored, not in git) — real credentials. Copy `.env.e2e.example`
   to create it if missing.
 

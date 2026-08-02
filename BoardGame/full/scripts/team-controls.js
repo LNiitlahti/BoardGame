@@ -1242,7 +1242,12 @@ function getGameDisplayName(gameId) {
         return gameData.gameDefinitions[gameId].name || gameId;
     }
     if (typeof GAMES_CONFIG !== 'undefined' && GAMES_CONFIG.games) {
-        const game = GAMES_CONFIG.games.find(g => g.id === gameId);
+        // GAMES_CONFIG.games is an object keyed by id (see games-config.js),
+        // not an array — .find() doesn't exist on it and threw a TypeError
+        // unconditionally (gameData.gameDefinitions is never written
+        // anywhere, so this fallback always ran). Look it up directly, same
+        // as GAMES_CONFIG.getGame()/getGameName() do.
+        const game = GAMES_CONFIG.games[gameId];
         if (game) return game.name;
     }
     return gameId;
