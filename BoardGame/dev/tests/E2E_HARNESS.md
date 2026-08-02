@@ -456,11 +456,40 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   intersecting, assertion correctly failed) before restoring the fix and
   confirming green again. Also asserts non-intersection with the phase
   banner and navbar, as a self-review check that the fix didn't just
-  relocate the overlap onto some OTHER top-of-page element. Confirmed
-  passing against live `e2e-disposable-1`. Takes throwaway visual-review
-  screenshots (`task14-vote-toast-before.png`/`task14-vote-toast-after.png`,
-  not committed). Snapshots/restores `gameQueue` (array field, plain
-  reassign+save is sufficient) in a `finally` block.
+  relocate the overlap onto some OTHER top-of-page element (the navbar
+  check first asserts its selector resolved at all, so a renamed/missing
+  selector fails loudly instead of silently no-op'ing the check).
+  **Follow-up found in code review of the first cut**: moving the toast to
+  the bottom exposed a second, TODO.md-unmentioned overlap candidate —
+  `shared/scripts/chat-module.js`'s `.chat-module-wrap`, a `position:
+  fixed; right: 20px; bottom: 20px` 56px floating action button, mounted
+  unconditionally for every verified team member
+  (`team-controls.js:129-131`) — sitting in the same bottom-right corner.
+  The toast's old `width: calc(100% - 40px)` (capped at `max-width: 520px`)
+  nearly fills phone-width viewports, so its right edge could reach into
+  the FAB's zone while visible (5s per vote). Fixed by changing `width` to
+  `min(calc(100% - 40px), calc(100% - 192px), 520px)` plus `box-sizing:
+  border-box` (the box also has padding/a border, and content-box sizing
+  was quietly eating ~36px out of the intended clearance — first attempt
+  without `border-box` left only a ~2px real gap from the FAB, caught by
+  rerunning the test rather than trusting the formula) — guarantees a
+  20px+ horizontal gap from the FAB on any viewport, which alone is enough
+  to prevent intersection regardless of message height. The test now runs
+  the full seed → vote → assert flow at TWO viewport sizes, each against
+  its own freshly seeded (never-voted) match: desktop (1280×900,
+  matchNumber 999501, matching this harness's usual size) and phone
+  (390×844 — iPhone 12/13-class, matchNumber 999502 — the width that
+  actually exercises the FAB fix; the pre-fix width would have put the
+  toast's right edge well inside the FAB's zone at this size) — asserting
+  the toast doesn't intersect the FAB too (same selector-resolved guard as
+  the navbar check). Each viewport run creates/tears down its own player
+  browser context in its own `finally`, so a thrown assertion still cleans
+  up rather than leaking the context until the outer `browser.close()`.
+  Confirmed passing against live `e2e-disposable-1` at both viewports.
+  Takes throwaway visual-review screenshots
+  (`task14-vote-toast-{desktop,phone}-{before,after}.png`, not committed).
+  Snapshots/restores `gameQueue` (array field, plain reassign+save is
+  sufficient) in a `finally` block.
 - `.env.e2e` (gitignored, not in git) — real credentials. Copy `.env.e2e.example`
   to create it if missing.
 
