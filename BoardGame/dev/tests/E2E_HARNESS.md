@@ -362,6 +362,64 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   including the explicit `FieldValue.delete()` for leaked
   `players`-map keys (same pattern as `e2e-swap-pending-rewrite.js`, per
   the map-field gotcha below).
+- `e2e-team-match-panel-merge.js` — verification test for TODO.md Task 13
+  ("team.html: combine the 'next match' section with the Discord/Game Lobby
+  ready-check info ... Merge into one clear panel"). team.html used to show
+  TWO SEPARATE full-screen `.lobby-overlay` elements one after another:
+  `#preGameInstructionsOverlay` (match cards + "waiting for admin" footer,
+  shown during a slot's 'setup' sub-phase) and `#lobbyReadyOverlay` (Discord/
+  Game Lobby ready buttons + teammate-confirm list + per-team readiness,
+  shown once the slot enters 'lobby'). Merged into a single
+  `#matchPanelOverlay` (team.html ~line 55): the match-assignment cards +
+  header are always shown once a match exists, and `#lobbyReadyControls`
+  (ready buttons/teammate-confirm list/ready status/lobby-creator banner) is
+  revealed IN PLACE inside the same overlay once the lobby opens — no
+  overlay swap, one panel that grows. `team-controls.js`'s
+  `renderPhaseOverlays()`/new `renderMatchPanel(isLobbyPhase)` (replacing the
+  old `renderPreGameInstructions()`/`renderLobbyReady()` pair) drive this.
+  Also fixed a real, pre-existing bug found while consolidating the two
+  match-card population functions into one: `renderMatchCardsWithDiscord()`'s
+  "does this match involve my team" filter only checked the legacy/synthetic
+  `side.players[]` shape, never the real `side.playerIds` shape every actual
+  match-creation path produces (already reported, not fixed, by
+  `e2e-ready-check.js`'s Part 2) — so the match-info card never rendered for
+  any real match, in EITHER of the old overlays. Now reuses the same
+  dual-shape resolution `_matchInvolvesUs()`/`getMatchSidePlayers()` already
+  had. This test seeds a real-shaped queue entry (`teams[].playerIds`, real
+  `discordChannels`/`lobbyCreators`) against `e2e-disposable-1`'s Team Alpha
+  (real linked "TD (E2E)" + "E2ePlayer14") vs Team Beta (placeholders), logs
+  in as E2ePlayer14, and asserts: the old overlay/container ids no longer
+  exist in the DOM at all (confirms the merge, not just a rename); the match
+  card shows real game/opponent/Discord/creator info (not the empty state);
+  the waiting footer is visible and ready-controls hidden during 'setup';
+  then flips slot 1 to 'lobby' and re-asserts the SAME `#matchPanelOverlay`
+  element is still the one visible (still exactly 2 `.lobby-overlay`
+  elements on the page total, counting `#spellPhaseOverlay`), the match card
+  info persisted (grew in place, wasn't replaced), the footer is now hidden,
+  and the ready buttons/teammate-confirm-for-"TD (E2E)"/lobby-creator banner
+  are now visible. **Gotcha found while building this test**: god.html's
+  live `window.godApp.phase` (PhaseManager) reactively auto-advances a slot
+  from 'lobby' to 'playing' ~100ms after any write that leaves
+  `getSlotRequirements()` fully met — which, given the still-unfixed
+  `_getPlayersWhoMustReadyForSlot()` bug (empty mustReady for any real
+  match), is true the instant a slot enters 'lobby'. Simply setting
+  `currentPhase.slots[1] = 'lobby'` with the TD's god.html tab open (needed
+  to call `saveGameState()`) is enough to trigger this and flip the slot to
+  'playing' before Puppeteer can screenshot the lobby-open state. Worked
+  around exactly like `e2e-ready-check.js` Part 2: add a synthetic `.sides`
+  field (ignored by every real-match render path, which all prefer
+  `match.teams` via `match.teams || match.sides`) purely to populate
+  mustReady with real uids, keeping the slot genuinely stuck in 'lobby'
+  since the test never clicks the ready buttons. Also documents (without
+  fixing, logged as a console finding rather than a failing assertion) a
+  third instance of the same field-shape bug family in
+  `renderReadinessStatus()` (`side.players[]` only, no `side.playerIds`
+  fallback) — the ready-status container is correctly wired into the merged
+  panel, its own data-shape handling just isn't fixed. Confirmed passing
+  against live `e2e-disposable-1`. Takes throwaway visual-review screenshots
+  (`task13-panel-waiting.png`/`task13-panel-lobby-open.png`, not committed).
+  Snapshots/restores `gameQueue`/`currentPhase`/`lobbyReady` in a `finally`
+  block.
 - `.env.e2e` (gitignored, not in git) — real credentials. Copy `.env.e2e.example`
   to create it if missing.
 

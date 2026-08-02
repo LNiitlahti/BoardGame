@@ -1333,9 +1333,15 @@
 }
 
 /* Lobby Ready Controls */
+/* Revealed in place inside the match panel once the lobby opens, growing the
+   same panel rather than swapping to a different overlay -- give it a
+   visible seam from the match cards/footer above it. */
 
 .lobby-ready-controls {
   text-align: center;
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(200, 179, 126, 0.15);
 }
 
 .lobby-ready-buttons {

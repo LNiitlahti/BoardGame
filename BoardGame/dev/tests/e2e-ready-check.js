@@ -56,9 +56,24 @@
  *   `lobbyReady` (simulating a player who never confirmed before the slot
  *   went live) and reload team.html for that player. Assert BOTH surfaces
  *   that could offer a confirm control while playing stay non-interactive:
- *   the lobby overlay (`#lobbyReadyOverlay`) never becomes visible, and the
- *   Teammates sidebar falls back to read-only status dots instead of
- *   clickable ready buttons. Confirms the gap is real and still present.
+ *   the match panel overlay (`#matchPanelOverlay`) never becomes visible,
+ *   and the Teammates sidebar falls back to read-only status dots instead
+ *   of clickable ready buttons. Confirms the gap is real and still present.
+ *
+ * UPDATED (Task 13): team.html's `#preGameInstructionsOverlay` and
+ * `#lobbyReadyOverlay` were merged into a single `#matchPanelOverlay` that
+ * shows match-assignment info as soon as a match exists and reveals its
+ * `#lobbyReadyControls` section in place once the lobby opens, instead of
+ * swapping to a different overlay element. `#matchAssignmentCardsLobby` was
+ * folded into the single persistent `#matchAssignmentCards` container. This
+ * script's element-id references were updated accordingly (Part 2's
+ * "overlay visible" check now also confirms `#lobbyReadyControls` is
+ * revealed, since `#matchPanelOverlay` alone is visible during 'setup' too;
+ * Part 3's "overlay hidden while playing" check is otherwise unchanged
+ * semantics, just renamed). Task 13 also fixed the PART 2 "related bug"
+ * documented below (`renderMatchCardsWithDiscord()` not falling back to
+ * `side.playerIds`) — the card assertion below now expects real content,
+ * not the empty state.
  *
  * Snapshots/restores gameQueue, currentPhase, lobbyReady in a `finally`
  * block so no synthetic data is left behind in e2e-disposable-1.
@@ -259,33 +274,40 @@ async function main() {
         { timeout: 40000 }
       );
 
-      // Confirm the ready-check overlay is visible.
+      // Confirm the merged match panel is visible AND has grown into its
+      // ready-check state. Task 13 merged the old separate
+      // #lobbyReadyOverlay into #matchPanelOverlay, which is now ALSO
+      // visible during the 'setup' sub-phase — so display:flex on the panel
+      // alone no longer proves we're specifically in 'lobby'. Also check
+      // #lobbyReadyControls, the section revealed only once the lobby
+      // opens (see renderMatchPanel() in team-controls.js).
       await playerPage.waitForFunction(
-        () => document.getElementById('lobbyReadyOverlay')?.style.display === 'flex',
+        () => document.getElementById('matchPanelOverlay')?.style.display === 'flex' &&
+              getComputedStyle(document.getElementById('lobbyReadyControls')).display !== 'none',
         { timeout: 15000 }
       );
-      const overlayVisible = await playerPage.evaluate(() => document.getElementById('lobbyReadyOverlay').style.display);
-      console.log('--- PART 2: team.html lobbyReadyOverlay display ---', overlayVisible);
-      assert(overlayVisible === 'flex', 'PART 2: lobby ready overlay should be visible for the player in this slot\'s lobby sub-phase');
+      const overlayVisible = await playerPage.evaluate(() => document.getElementById('matchPanelOverlay').style.display);
+      const readyControlsVisible = await playerPage.evaluate(() => getComputedStyle(document.getElementById('lobbyReadyControls')).display !== 'none');
+      console.log('--- PART 2: team.html matchPanelOverlay display / lobbyReadyControls visible ---', overlayVisible, readyControlsVisible);
+      assert(overlayVisible === 'flex', 'PART 2: match panel overlay should be visible for the player in this slot\'s lobby sub-phase');
+      assert(readyControlsVisible === true, 'PART 2: ready-check controls section should be revealed once the slot is in lobby sub-phase');
 
-      // RELATED BUG FOUND (separate from Part 1's mustReady bug, same root
-      // cause family): renderMatchCardsWithDiscord()'s "does this match
-      // involve my team" filter checks `side.players[].uid/.name/.email`,
-      // but real queue entries only ever have `side.playerIds` (plain id
-      // strings) — no `.players` objects at all (confirmed in
-      // match-creation-manager.js). So the match-info card inside the lobby
-      // overlay (game name, opponent, Discord channel, lobby creator) NEVER
-      // renders for any real match; it always falls back to the empty
-      // state. _matchInvolvesUs() (used for phase/slot detection elsewhere
-      // in this same file) already has the correct `side.players ||
-      // side.playerIds` fallback — renderMatchCardsWithDiscord() just never
-      // got it. Documenting as-is rather than fixing (broader than a
-      // one-line change; affects renderMatchCardsInto() too). This does NOT
-      // block the ready-check buttons themselves — those are static markup
-      // keyed off currentUser.uid, not the match card.
-      const cardHtml = await playerPage.evaluate(() => document.getElementById('matchAssignmentCardsLobby')?.innerHTML || '');
-      console.log('--- PART 2: matchAssignmentCardsLobby innerHTML ---', cardHtml.slice(0, 200));
+      // RELATED BUG, FIXED BY TASK 13 (was: separate from Part 1's
+      // mustReady bug, same root-cause family): renderMatchCardsWithDiscord()'s
+      // "does this match involve my team" filter used to check only
+      // `side.players[].uid/.name/.email`, never falling back to the real
+      // `side.playerIds` shape every real queue entry actually has — so the
+      // match-info card inside the lobby overlay (game name, opponent,
+      // Discord channel, lobby creator) never rendered for any real match.
+      // Task 13's merge of the two overlays fixed this by reusing
+      // `_matchInvolvesUs()`/`getMatchSidePlayers()`'s existing correct
+      // dual-shape resolution. This is now a regression-guard assertion,
+      // not just a documented finding: the card must show real content.
+      const cardHtml = await playerPage.evaluate(() => document.getElementById('matchAssignmentCards')?.innerHTML || '');
+      console.log('--- PART 2: matchAssignmentCards innerHTML ---', cardHtml.slice(0, 200));
       const cardShowsEmptyState = /No matches assigned/.test(cardHtml);
+      assert(cardShowsEmptyState === false,
+        `PART 2 REGRESSION: match-info card should show real match content (game/opponent/Discord/creator), not the empty state. Got: ${cardHtml.slice(0, 200)}`);
 
       // Click own Discord + Game Lobby confirm buttons.
       await playerPage.waitForSelector('#readyDiscordBtn:not([disabled])', { timeout: 10000 });
@@ -352,16 +374,10 @@ async function main() {
       findings.push('PART 2 CONFIRMED: the confirm-button UI, Firestore writes (lobbyReady.{uid}.discord/gameLobby), ' +
         'the "confirm for teammate" flow, and the auto-advance gate all work correctly once mustReady is populated — ' +
         'the ONLY defect is the population source demonstrated in Part 1.');
-      if (cardShowsEmptyState) {
-        findings.push('PART 2 RELATED BUG (new, minor): the lobby overlay\'s own match-info card ' +
-          '(renderMatchCardsWithDiscord in team-controls.js — game name, opponent, Discord channel, lobby creator) ' +
-          'never renders for a real match; it always falls back to "No matches assigned this round." This is the same ' +
-          'field-shape bug family as Part 1 (checks side.players[].uid/.name/.email, but real queue entries only ever ' +
-          'have side.playerIds — plain id strings, no .players objects). _matchInvolvesUs() elsewhere in the same file ' +
-          'already has the correct `side.players || side.playerIds` fallback; renderMatchCardsWithDiscord() (and ' +
-          'renderMatchCardsInto(), used for the pre-lobby "Your Match Assignments" overlay) never got it. Does not ' +
-          'block the ready-check buttons themselves (they key off currentUser.uid, not the match card) — reporting, not fixing.');
-      }
+      findings.push('PART 2 (Task 13 update): the match-info card (renderMatchCardsWithDiscord in team-controls.js — ' +
+        'game name, opponent, Discord channel, lobby creator) now correctly renders for a real match, confirmed via ' +
+        'cardShowsEmptyState === false above. Previously never rendered (same field-shape bug family as Part 1); ' +
+        'fixed as part of Task 13\'s overlay merge.');
 
       // ============================================================
       // PART 3 — retroactive-confirm-in-playing gap
@@ -383,7 +399,10 @@ async function main() {
       await new Promise(r => setTimeout(r, 1000));
 
       const part3 = await playerPage.evaluate(() => {
-        const overlay = document.getElementById('lobbyReadyOverlay');
+        // Task 13 merged #lobbyReadyOverlay into #matchPanelOverlay; the
+        // "hidden while playing" semantics are unchanged (renderPhaseOverlays()
+        // only shows the panel for 'setup'/'lobby' sub-phases), just renamed.
+        const overlay = document.getElementById('matchPanelOverlay');
         const teammatesHtml = document.getElementById('teammatesList')?.innerHTML || '';
         return {
           overlayDisplay: overlay ? getComputedStyle(overlay).display : null,
@@ -393,7 +412,7 @@ async function main() {
       });
       console.log('--- PART 3: team.html state while slot 1 is playing and lobbyReady is empty ---', JSON.stringify(part3));
 
-      assert(part3.overlayDisplay === 'none', `PART 3: lobby ready overlay should NOT be visible while the slot is in 'playing', got display='${part3.overlayDisplay}'`);
+      assert(part3.overlayDisplay === 'none', `PART 3: match panel overlay should NOT be visible while the slot is in 'playing', got display='${part3.overlayDisplay}'`);
       assert(part3.hasClickableReadyButtons === false, 'PART 3: Teammates sidebar should NOT render clickable setReadyStatus buttons while the slot is in \'playing\'');
       assert(part3.hasReadOnlyIndicatorsOnly === true, 'PART 3: Teammates sidebar should fall back to read-only status dots while the slot is in \'playing\'');
 
