@@ -36,6 +36,22 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   <tournamentId> [--apply] [--mode=retag|purge]`. Dry-run by default; refuses
   to run against `cl32-smoke-test`/`fast-test-2` (hardcoded blocklist, checked
   before touching Firestore).
+- `e2e-next-up-availability.js` — regression test for the "Next up" match
+  selection bug (see TODO.md's "HIGHER PRIORITY" entry, and the fix in
+  admin-improved-adapter.js's `_excludeLiveConflicts`/
+  `getPlayersInLiveMatches`): a slot's Next-up pick and the Match Queue
+  panel's NEXT badge could both propose starting a match whose players were
+  already live in a currently-ongoing match elsewhere. Unlike the other
+  scripts here, this one drives **full/admin.html**, not god.html — both
+  buggy selection functions live only in admin-improved-adapter.js, which
+  admin.html loads and god.html does not. Seeds `gameState.gameQueue`/
+  `currentPhase` **in-memory only** (via the page's bare `gameState`
+  binding — admin.js declares it as a top-level `let`, not
+  `window.gameState`, but it's accessible the same way from
+  page.evaluate/waitForFunction since they share the page's global scope)
+  and calls the page's global `updateDisplay()` to force a synchronous
+  re-render — no `saveGameState()` call, so it never touches Firestore at
+  all, nothing to restore server-side.
 - `.env.e2e` (gitignored, not in git) — real credentials. Copy `.env.e2e.example`
   to create it if missing.
 
@@ -119,6 +135,18 @@ and is safe for later tasks to keep reusing/mutating.
   match created through god.html's UI is permanently untagged
   (`slot`/`roundNumber` both undefined) unless a test stamps those fields
   itself when constructing the queue entry.
+- **admin.html requires `action-logger.js` to load BEFORE `admin.js`.**
+  admin.js instantiates `new ActionLogger(...)` eagerly at its own top level
+  (not lazily). If action-logger.js loads after admin.js, that throws a
+  ReferenceError which aborts the rest of admin.js's top-level execution —
+  including its `document.addEventListener('firebase-ready', ...)`
+  registration — so the tournament silently never loads (`gameState.teams`
+  stays `undefined` forever, no visible error unless you have a
+  `page.on('pageerror', ...)` listener attached). This actually regressed in
+  commit e1d9aea and was caught/fixed while building
+  `e2e-next-up-availability.js`; if a future admin.html test hangs on
+  `waitForFunction(() => gameState.teams.length > 0)`, check this script
+  order first before assuming your test's own logic is wrong.
 - **When deliberately reproducing a bug by temporarily reverting a fix
   (`git stash push -- <file>`) and running a test against it, wrap the test's
   cleanup/restore step in `try/finally`.** An assertion failure (the expected
