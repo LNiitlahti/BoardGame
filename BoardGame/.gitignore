@@ -26,6 +26,7 @@ shared/scripts/firebase.*.js
 .env
 .env.local
 .env.*.local
+dev/tests/.env.e2e
 
 # Credentials
 credentials.json
@@ -215,6 +216,7 @@ dev/package.json
 dev/package-lock.json
 package.json
 package-lock.json
+dev/tests/*.png
 
 # ===========================
 # MISC

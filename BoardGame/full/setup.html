@@ -20,6 +20,7 @@
     <script src="../shared/scripts/games-config.js"></script>
     <script src="../shared/scripts/player-utils.js"></script>
     <script src="../shared/scripts/user-picker.js"></script>
+    <script src="../shared/scripts/default-rooms.js"></script>
     <script src="scripts/match-scheduler.js"></script>
 
     <!-- Dosis Font -->
@@ -1160,12 +1161,12 @@
          */
         async function loadDefaultRoomsSetup() {
             try {
-                const doc = await db.collection('config').doc('defaultRooms').get();
-                if (!doc.exists || !doc.data().rooms?.length) {
+                const loadedRooms = await loadDefaultRoomsDoc(db);
+                if (!loadedRooms) {
                     alert('Ei tallennettuja oletushuoneita vielä.');
                     return;
                 }
-                rooms = [...doc.data().rooms];
+                rooms = loadedRooms;
                 renderRoomBoard();
             } catch (error) {
                 console.error('Error loading default rooms:', error);
@@ -1175,10 +1176,7 @@
 
         async function saveDefaultRoomsSetup() {
             try {
-                await db.collection('config').doc('defaultRooms').set({
-                    rooms: [...rooms],
-                    updatedAt: new Date().toISOString()
-                });
+                await saveDefaultRoomsDoc(db, rooms);
                 alert(`Tallennettu ${rooms.length} huonetta oletukseksi.`);
             } catch (error) {
                 console.error('Error saving default rooms:', error);

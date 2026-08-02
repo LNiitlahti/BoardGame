@@ -888,17 +888,47 @@ class PhaseManager {
      * Requirements for one match slot's current sub-phase (setup/lobby/
      * playing/done). Mirrors the old per-phase match_N_setup/lobby/playing
      * logic, generalized by slot and filtered to that slot's own queue
-     * entries (entry.slot === slot). Untagged entries (created before slot
-     * tagging existed, or genuinely ambiguous) always count for either slot —
-     * safer than silently hiding a real match.
+     * entries (entry.slot === slot).
+     *
+     * Tagged entries (entry.slot set) are trusted for the slot number, but
+     * ONLY for the round they were tagged for (entry.roundNumber undefined,
+     * or equal to the round in progress) — otherwise a match tagged "slot 2"
+     * in a long-past round that was left pending/ongoing and never resolved
+     * would block every future round's slot 2 forever.
+     *
+     * Untagged entries (created before slot tagging existed, or via a path
+     * that never tags — e.g. god.html's match creation has no tagging step
+     * at all) count for either slot — safer than silently hiding a real
+     * match — but ONLY if they were created at/after the CURRENT round's
+     * matches phase began (entry.createdAt >= currentPhase.startedAt).
+     * Checking "roundNumber is undefined" alone is NOT a safe stand-in for
+     * "created this round": it's true forever for legacy leftovers with no
+     * roundNumber field at all, so it would let an indefinitely-growing
+     * pool of untagged matches count as pending for every future round
+     * forever — a slot could never reach 'done' (see TODO.md's "match slot
+     * never reaches done" writeup: ~61 leftover queued matches from before
+     * slot-tagging existed kept a round from ever reaching round_advance).
+     * Comparing createdAt against the CURRENT phase's startedAt correctly
+     * lets genuinely-ambiguous matches created THIS round still count for
+     * both slots (preserving the safe-by-default behavior for new
+     * ambiguous cases) while excluding anything older.
      */
     getSlotRequirements(slot) {
         const gs = this._gameState;
         const queue = gs.gameQueue || [];
         const sub = this.getSlotSubPhase(slot);
+        const currentRoundNumber = gs.currentPhase?.roundNumber;
+        const phaseStartedAt = gs.currentPhase?.startedAt;
 
-        const belongsToSlot = m => !m.isBreak && m.isChallenge !== true &&
-            (m.slot === undefined || m.slot === slot);
+        const belongsToSlot = m => {
+            if (m.isBreak || m.isChallenge === true) return false;
+            if (m.slot !== undefined) {
+                return m.slot === slot &&
+                    (m.roundNumber === undefined || m.roundNumber === currentRoundNumber);
+            }
+            if (!m.createdAt || !phaseStartedAt) return false;
+            return m.createdAt >= phaseStartedAt;
+        };
         const pendingMatches = () => queue.filter(m => belongsToSlot(m) &&
             (m.status === 'pending' || m.status === undefined || m.status === 'queued'));
         const ongoingMatches = () => queue.filter(m => belongsToSlot(m) && m.status === 'ongoing');

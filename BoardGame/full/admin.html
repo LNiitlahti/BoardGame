@@ -729,9 +729,19 @@
     <script defer src="../shared/scripts/player-utils.js"></script>
     <script defer src="../shared/scripts/toast.js"></script>
     <script defer src="../shared/scripts/chat-module.js"></script>
-    <!-- Phase system (OOP modules + improved guided adapter) -->
+    <script defer src="../shared/scripts/default-rooms.js"></script>
+    <!-- action-logger.js must load BEFORE admin.js: admin.js instantiates
+         `new ActionLogger(...)` eagerly at its own top level (not lazily),
+         so ActionLogger must already be defined by the time admin.js's
+         script body runs, or that top-level `new ActionLogger(...)` throws
+         a ReferenceError that aborts the rest of admin.js's top-level
+         execution — including its `document.addEventListener('firebase-
+         ready', ...)` registration, which silently breaks the ENTIRE page
+         (tournament never loads; commit e1d9aea introduced the eager
+         ActionLogger instantiation without also moving this script tag). -->
     <script defer src="scripts/action-logger.js"></script>
     <script defer src="scripts/admin.js"></script>
+    <!-- Phase system (OOP modules + improved guided adapter) -->
     <script defer src="scripts/phase-manager.js"></script>
     <script defer src="scripts/admin-improved-adapter.js"></script>
 </body>
