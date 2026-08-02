@@ -1814,6 +1814,9 @@
     <script defer src="../shared/scripts/player-utils.js"></script>
     <script defer src="scripts/scoring-ceremony.js"></script>
     <script defer src="scripts/display-manager.js"></script>
+    <!-- Not deferred: the inline block below reads resolveTournamentId()
+         synchronously at parse time, before deferred scripts would run. -->
+    <script src="../shared/scripts/resolve-tournament-id.js"></script>
 
     <script>
     // ====================================================================
@@ -1829,8 +1832,11 @@
     let onboardingState = null;
     let resultLogCache = [];
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const tournamentId = urlParams.get('tournamentId') || urlParams.get('tournament') || urlParams.get('gameId');
+    const tournamentId = resolveTournamentId({
+        search: window.location.search,
+        paramNames: ['tournamentId', 'tournament', 'gameId'],
+        cached: sessionStorage.getItem('currentTournamentId') || localStorage.getItem('currentTournamentId')
+    });
 
     // Team color defaults (maps to CSS variables --t1 through --t5)
     const TEAM_COLORS = {

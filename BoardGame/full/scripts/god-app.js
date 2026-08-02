@@ -1494,9 +1494,14 @@ document.addEventListener('firebase-ready', async function () {
             // Load tournaments
             await godApp.loadTournamentsList();
 
-            // Auto-load from URL (navbar uses 'tournament', other links may use 'tournamentId')
-            const urlParams = new URLSearchParams(window.location.search);
-            const tournamentId = urlParams.get('tournament') || urlParams.get('tournamentId');
+            // Auto-load from URL (navbar uses 'tournament', other links may use 'tournamentId'),
+            // falling back to the shared storage contract the navbar maintains so a link that
+            // forgot to carry the id (or a stale bookmark) doesn't strand the page tournament-less.
+            const tournamentId = resolveTournamentId({
+                search: window.location.search,
+                paramNames: ['tournament', 'tournamentId'],
+                cached: sessionStorage.getItem('currentTournamentId') || localStorage.getItem('currentTournamentId')
+            });
             if (tournamentId) {
                 await godApp.loadTournament(tournamentId);
             }
