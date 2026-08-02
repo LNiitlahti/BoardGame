@@ -22,6 +22,15 @@ Built once here; don't recreate it in future sessions, just reuse these files.
 - `e2e-inspect-tournament.js` / `e2e-inspect-user.js` — quick read-only Firestore
   dumps (tournament team/player registry; a single user doc by email) for
   debugging test state without opening the app UI by hand.
+  **`e2e-inspect-tournament.js` ignores any CLI positional argument** — it
+  only ever reads `process.env.TEST_TOURNAMENT_ID` (defaults to
+  `e2e-disposable-1` in `.env.e2e`). Run it as
+  `TEST_TOURNAMENT_ID=<id> node dev/tests/e2e-inspect-tournament.js`, not
+  `node dev/tests/e2e-inspect-tournament.js <id>` — the latter silently
+  dumps `e2e-disposable-1` (or whatever `.env.e2e` defaults to) regardless
+  of what you typed. Found while building `e2e-navbar-primary-switch.js`:
+  two "inspect a different tournament" calls with a positional arg both
+  silently returned `e2e-disposable-1` again.
 - `e2e-round-advance.js` — regression test for the "match slot never reaches
   done" bug (stale/untagged gameQueue entries blocking a slot forever — see
   TODO.md and phase-manager.js's `getSlotRequirements`). Seeds Match Slot 2 via
@@ -271,6 +280,46 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   this test's very first live run (two registry entries briefly leaked into
   `e2e-disposable-1` and were manually repaired before this file was
   committed).
+- `e2e-navbar-primary-switch.js` — regression test for TODO.md Task 11
+  ("navbar.js `buildNavUrl()` reads stale cached tournament/team"). Root
+  cause: `buildNavUrl()` (`shared/scripts/navbar.js:105-132`) builds every
+  nav link href purely from `sessionStorage`/`localStorage`'s cached
+  `currentTournamentId`/`currentTeamId` and never re-reads Firestore;
+  `getCurrentTournamentId()` (navbar.js:504-512) only falls back to the
+  user doc's fresh `assignedTournamentId` when the cache is completely
+  empty, so once cached, a value wins forever even after the real primary
+  changes server-side. `home.html`'s `window.setPrimaryTournament` ("Set as
+  primary" button, ~line 1395) already re-synced `currentTournamentId`/
+  `currentTournamentName` after its Firestore write but never
+  `currentTeamId` — so after switching primary tournaments the cached
+  tournament id and team id silently pointed at two DIFFERENT tournaments
+  (new tournament, OLD team), and the "My Team" nav link would send the
+  user to `team.html?tournamentId=<NEW>&teamId=<OLD-numeric-id>`, which
+  team-controls.js's own "Team not found in tournament" guard usually
+  bounces straight back out to `index.html`. Fix: `setPrimaryTournament`
+  now also writes `currentTeamId` to both storages
+  (`full/home.html` ~1417-1418). This test drives the real UI end-to-end
+  with a disposable player account (`PLAYER14`, already linked into
+  `e2e-disposable-1`'s Team Alpha, id 1) linked into a SECOND tournament
+  too (created idempotently by the script itself: `e2e-navbar-secondary`,
+  a minimal one-team tournament, team id 55 — deliberately a DIFFERENT
+  numeric id than 1, so a stale-teamId bug is observable and not
+  accidentally masked by both tournaments coincidentally using the same
+  id). Clicks the real "Set as primary" button for the second tournament,
+  **reloads the page** (this is what actually exercises `buildNavUrl()`
+  against whatever ended up cached — the pre-switch navbar render still
+  shows the old href regardless of any storage fix, since nothing
+  re-renders the navbar in place after a same-page click), then clicks the
+  real "My Team" nav link and asserts the resulting navigation's
+  `tournamentId`/`teamId` query params match the NEW primary. Confirmed
+  reproducing the bug against the pre-fix code (`teamId` stayed `1` after
+  switching to the tournament where PLAYER14's real team id is `55`) before
+  applying the fix. `e2e-navbar-secondary` is a lasting fixture (like
+  `e2e-disposable-1`), not deleted after the run — safe for later tasks to
+  reuse. PLAYER14's own user doc (the actual primary pointer:
+  `assignedTournamentId`/`assignedTeamId`/etc) IS snapshotted/restored in a
+  `finally` block, since other scripts (`e2e-ready-check.js`) depend on its
+  baseline pointing at `e2e-disposable-1`/Team Alpha.
 - `.env.e2e` (gitignored, not in git) — real credentials. Copy `.env.e2e.example`
   to create it if missing.
 
@@ -459,3 +508,23 @@ and is safe for later tasks to keep reusing/mutating.
   (not instead of) the normal snapshot/reassign/`saveGameState()` restore —
   same pattern `assignTeamToHex(coord, null)` uses for `board`, just without
   a ready-made helper function for `players`.
+- **A tournament card's "Enter" button and its "Set as primary" button are
+  BOTH plain non-disabled `<button>`s in the same card** (`full/home.html`'s
+  `displayTournaments()`, ~line 1337-1338: `<button class="btn-enter">Enter
+  </button>${starBtn}`) — `page.click('#tcard-<id> button:not([disabled])')`
+  clicks "Enter" (document order), not "Set as primary", and for a player
+  role with a team, "Enter" does a full-page navigation straight to
+  `team.html`, silently blowing past whatever the test expected to happen
+  next on `home.html`. Scope the selector to the button's `title` attribute
+  (`button[title="Set as your primary tournament"]`) instead. Found while
+  building `e2e-navbar-primary-switch.js`.
+- **Puppeteer's default viewport (800×600) is below the unified navbar's
+  mobile breakpoint** (`shared/css/navbar.css`), which collapses
+  `.navbar-nav`'s links into an off-screen slide-out menu only reachable via
+  the hamburger toggle — `page.click('.navbar-link[data-page="..."]')` then
+  fails with "Node is either not clickable or not an Element" even though
+  `waitForSelector` found it (it exists in the DOM, just not visible/in
+  the viewport). Any test that clicks a navbar link needs
+  `await page.setViewport({ width: 1280, height: 900 })` (or similar) right
+  after creating the page. Found while building
+  `e2e-navbar-primary-switch.js`.

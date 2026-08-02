@@ -1409,10 +1409,18 @@
         const profile = appState.get('userProfile') || {};
         appState.set('userProfile', { ...profile, ...updates });
 
+        // Keep navbar.js's cached read path (buildNavUrl(), navbar.js:105-132)
+        // in sync with the Firestore write above — it never re-reads
+        // Firestore itself, only sessionStorage/localStorage, so without this
+        // the "My Team" link keeps pointing at the OLD team (still cached)
+        // even though currentTournamentId below correctly moves to the new
+        // tournament. See TODO.md Task 11.
         sessionStorage.setItem('currentTournamentId', tournamentId);
         localStorage.setItem('currentTournamentId', tournamentId);
         sessionStorage.setItem('currentTournamentName', tournamentName);
         localStorage.setItem('currentTournamentName', tournamentName);
+        sessionStorage.setItem('currentTeamId', teamId);
+        localStorage.setItem('currentTeamId', teamId);
         currentActiveTournament = tournamentId;
 
         errorHandler.showSuccess(`${tournamentName} is now your primary tournament`);
