@@ -41,10 +41,11 @@ stale process before rerunning.
 
 ## Credentials
 
-`.env.e2e` currently holds one TD/god-admin account
-(`lniitlahti+demoadmin@gmail.com`). Player test accounts (`PLAYER1_*`/`PLAYER2_*`)
-are intentionally blank — per-task scripts create disposable player accounts
-programmatically rather than relying on pre-existing ones.
+`.env.e2e` currently holds one TD/god-admin account (see the repo owner for the
+address — not written here since this file is committed to git). Player test
+accounts (`PLAYER1_*`/`PLAYER2_*`) are intentionally blank — per-task scripts
+create disposable player accounts programmatically rather than relying on
+pre-existing ones.
 
 ## Test tournament
 
