@@ -221,6 +221,42 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   tournament during active play, including to "just check" a live slot
   mismatch — recreate the suspected scenario on a disposable tournament
   instead.
+- `e2e-swap-pending-rewrite.js` — regression test for TODO.md's "Pending
+  (unplayed) matches keep showing retired player after a swap" finding. Root
+  cause (confirmed): `getMatchTeamPlayers()` (team-manager.js:69-87) resolves
+  a match's players via a live `PlayerUtils.getPlayerDisplayInfo()` lookup —
+  correct and intentional, since that's what protects COMPLETED match
+  history from ever being retroactively relabeled — but a PENDING
+  (not-yet-played) queue entry's `teams[].playerIds` still holds the
+  concrete old player id frozen in at queue-creation time, since nothing
+  previously re-targeted already-queued-but-unplayed matches to a slot's new
+  occupant after a swap. Fix: `user-management.js`'s `replacePlayerWithUser`
+  now calls a new helper, `rewritePendingQueueReferences(gameState,
+  oldPlayerId, newPlayerId)`, right after a successful
+  `PlayerUtils.swapPlayerInSlot()` — it rewrites `gameQueue` entries'
+  `teams[].playerIds` from old to new id, but ONLY for matches whose status
+  is neither `'ongoing'` nor `'completed'` (mid-match swaps are a separate,
+  not-yet-decided question). This test drives the REAL
+  `replacePlayerWithUser()` end-to-end (not a reimplementation): seeds a
+  temporary synthetic team with one slot pre-linked to a freshly created
+  disposable account, seeds 4 `gameQueue` entries referencing that slot's
+  player id (`'pending'`, `'queued'`, `'ongoing'`, `'completed'`), then calls
+  the real `loadUnassignedUsers()`/`selectUserForAssignment()`/
+  `replacePlayerWithUser()` functions (auto-accepting the native `confirm()`
+  dialog the swap path shows, same technique as `e2e-multitab-freeze.js`) to
+  swap the slot to a second freshly created disposable account. Asserts both
+  the positive case (pending/queued entries rewritten to the new id) and the
+  negative case (ongoing/completed entries left untouched, still pointing at
+  the old id) — the negative case is the scope boundary the whole fix's
+  safety depends on. Uses two never-before-used disposable accounts created
+  inline with timestamped names every run (see the burned-uid gotcha below —
+  a fixed pair reused across runs would fail on the second run). Confirmed
+  passing twice in a row against live `e2e-disposable-1`. Snapshots/restores
+  `teams`, `players`, `gameQueue` in a `finally` block — see the new
+  `players`-is-a-map-field gotcha below, found and fixed the hard way on
+  this test's very first live run (two registry entries briefly leaked into
+  `e2e-disposable-1` and were manually repaired before this file was
+  committed).
 - `.env.e2e` (gitignored, not in git) — real credentials. Copy `.env.e2e.example`
   to create it if missing.
 
@@ -388,3 +424,24 @@ and is safe for later tasks to keep reusing/mutating.
   what `player-utils.js`'s `updatePlayerInRegistry` does for a real
   "assign player to team" action) — and snapshot/restore `gameState.players`
   in the `finally` block as a second safety net regardless.
+- **`gameState.players` is a Firestore MAP field (`{ [playerId]: {...} }`),
+  same category as `board` — NOT an array like `teams`/`gameQueue`/
+  `gameHistory`, and the "`merge:true` doesn't delete omitted map keys"
+  gotcha documented above for `board` applies to it too.** A test that adds
+  entries to `gs.players` (e.g. a synthetic player linked to a temporary
+  team), then "restores" by reassigning `gs.players` back to a pre-mutation
+  snapshot and calling `saveGameState()`, does NOT actually remove the added
+  entries — `saveGameState()`'s `set(data, {merge:true})` merges the
+  `players` map key-by-key, leaving remote keys absent from the snapshot
+  untouched. Found the hard way while building `e2e-swap-pending-rewrite.js`:
+  its first live run left two registry entries (a retired synthetic player
+  and the new id minted by the swap it was testing) sitting in
+  `e2e-disposable-1` after the "restore" step reported success; required a
+  manual `FieldValue.delete()` repair. Fix: compute which `gameState.players`
+  keys exist after the test's mutations but were NOT in the original
+  snapshot, and explicitly `firebase.firestore().collection('tournaments')
+  .doc(tournamentId).update({ [\`players.\${key}\`]:
+  firebase.firestore.FieldValue.delete() })` for each one, in addition to
+  (not instead of) the normal snapshot/reassign/`saveGameState()` restore —
+  same pattern `assignTeamToHex(coord, null)` uses for `board`, just without
+  a ready-made helper function for `players`.

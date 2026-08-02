@@ -600,6 +600,42 @@ function renderTeamAssignmentSlots() {
 }
 
 /**
+ * After a roster swap, retarget not-yet-started gameQueue entries whose
+ * teams[].playerIds still reference the retired old player id, so pending
+ * matches display the new occupant instead of a stale reference frozen in
+ * at queue-creation time. Ongoing/completed matches are deliberately left
+ * alone: completed match history must keep pointing at whoever actually
+ * played (team-manager.js's getMatchTeamPlayers already resolves live for
+ * display, but the stored playerIds themselves must not be rewritten), and
+ * mid-match swaps are a separate, not-yet-decided question. Mutates
+ * gameState.gameQueue in place; returns the number of entries changed (0 if
+ * none) so the caller knows whether gameQueue needs to be included in the
+ * save.
+ * @param {Object} gameState - Tournament game state
+ * @param {string} oldPlayerId - The retired player id being swapped out
+ * @param {string} newPlayerId - The freshly minted player id taking over
+ * @returns {number} Count of queue entries that were rewritten
+ */
+function rewritePendingQueueReferences(gameState, oldPlayerId, newPlayerId) {
+    let touched = 0;
+    for (const match of gameState.gameQueue || []) {
+        if (match.status === 'ongoing' || match.status === 'completed') continue;
+        let changed = false;
+        for (const team of match.teams || []) {
+            if (!Array.isArray(team.playerIds)) continue;
+            for (let i = 0; i < team.playerIds.length; i++) {
+                if (team.playerIds[i] === oldPlayerId) {
+                    team.playerIds[i] = newPlayerId;
+                    changed = true;
+                }
+            }
+        }
+        if (changed) touched++;
+    }
+    return touched;
+}
+
+/**
  * Use the selected user for a roster slot — either a first-time link
  * (slot is a placeholder) or a swap (slot is already linked to someone
  * else). Both share one button/verb ("Use {name} here") since from the
@@ -666,6 +702,14 @@ async function replacePlayerWithUser(teamId, playerId) {
 
         const newPlayerId = isSwap ? mutation.newPlayerId : playerId;
 
+        // On a swap, also retarget any not-yet-started queue entries still
+        // pointing at the retired old player id (see
+        // rewritePendingQueueReferences doc comment for why ongoing/
+        // completed matches are excluded).
+        const rewrittenMatchCount = isSwap
+            ? rewritePendingQueueReferences(window.gameState, playerId, newPlayerId)
+            : 0;
+
         // Save to Firestore
         const batch = window.firebaseDB.batch();
 
@@ -714,11 +758,15 @@ async function replacePlayerWithUser(teamId, playerId) {
             }
         }
 
-        // Save tournament data
+        // Save tournament data. gameQueue is only included when the
+        // rewrite above actually touched something — array-valued
+        // gameState fields are replaced wholesale by this update, so
+        // there's no need to write it back unchanged.
         const cleanData = JSON.parse(JSON.stringify({
             teams: window.gameState.teams,
             players: window.gameState.players || {},
-            lastModified: new Date().toISOString()
+            lastModified: new Date().toISOString(),
+            ...(rewrittenMatchCount > 0 ? { gameQueue: window.gameState.gameQueue } : {})
         }, (_key, value) => value === undefined ? null : value));
 
         const tournamentRef = window.firebaseDB.collection('tournaments').doc(window.gameState.tournamentId);
