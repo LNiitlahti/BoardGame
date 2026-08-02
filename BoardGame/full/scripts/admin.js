@@ -1778,10 +1778,7 @@ async function toggleRoomHex(coord) {
 async function saveDefaultRooms() {
     const rooms = gameState.rooms || [];
     try {
-        await window.firebaseDB.collection('config').doc('defaultRooms').set({
-            rooms: [...rooms],
-            updatedAt: new Date().toISOString()
-        });
+        await saveDefaultRoomsDoc(window.firebaseDB, rooms);
         showStatus(`Saved ${rooms.length} default rooms`, 'success');
     } catch (error) {
         console.error('Error saving default rooms:', error);
@@ -1791,13 +1788,12 @@ async function saveDefaultRooms() {
 
 async function loadDefaultRooms() {
     try {
-        const doc = await window.firebaseDB.collection('config').doc('defaultRooms').get();
-        if (!doc.exists || !doc.data().rooms?.length) {
+        const rooms = await loadDefaultRoomsDoc(window.firebaseDB);
+        if (!rooms) {
             showStatus('No default rooms found', 'error');
             return;
         }
-        const rooms = doc.data().rooms;
-        gameState.rooms = [...rooms];
+        gameState.rooms = rooms;
         boardModule.setRoomHexes(gameState.rooms);
         await saveGameState();
         renderBoard();

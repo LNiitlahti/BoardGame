@@ -293,10 +293,7 @@ class BoardManager {
     async saveDefaultRooms() {
         const rooms = this._gameState.rooms || [];
         try {
-            await window.firebaseDB.collection('config').doc('defaultRooms').set({
-                rooms: [...rooms],
-                updatedAt: new Date().toISOString()
-            });
+            await saveDefaultRoomsDoc(window.firebaseDB, rooms);
             this._ui.showStatus(`Saved ${rooms.length} default rooms`, 'success');
         } catch (error) {
             console.error('Error saving default rooms:', error);
@@ -306,13 +303,12 @@ class BoardManager {
 
     async loadDefaultRooms() {
         try {
-            const doc = await window.firebaseDB.collection('config').doc('defaultRooms').get();
-            if (!doc.exists || !doc.data().rooms?.length) {
+            const rooms = await loadDefaultRoomsDoc(window.firebaseDB);
+            if (!rooms) {
                 this._ui.showStatus('No default rooms found', 'error');
                 return;
             }
-            const rooms = doc.data().rooms;
-            this._gameState.rooms = [...rooms];
+            this._gameState.rooms = rooms;
             this._boardModule.setRoomHexes(this._gameState.rooms);
             await this._save();
             this.renderBoard();
