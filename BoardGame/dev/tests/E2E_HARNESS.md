@@ -321,6 +321,47 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   `assignedTournamentId`/`assignedTeamId`/etc) IS snapshotted/restored in a
   `finally` block, since other scripts (`e2e-ready-check.js`) depend on its
   baseline pointing at `e2e-disposable-1`/Team Alpha.
+- `e2e-use-here-fill-slot.js` — **verification test, not a fix** (TODO.md
+  Task 12: "`replacePlayerWithUser` doesn't fill target placeholder slot").
+  TODO.md's original repro didn't reproduce against current code — there is
+  no corresponding fix commit for this one, deliberately, so don't go
+  looking for one. Root cause investigation: `replacePlayerWithUser`
+  (`user-management.js:652-826`)'s placeholder-link path calls
+  `PlayerUtils.linkUserToPlayerSlot(gameState, team.id, playerId, ...)`
+  (`player-utils.js:297-318`), which resolves the target slot via
+  `getPlayerById(gameState, playerId)` — an exact registry-key lookup keyed
+  off the specific `playerId` argument passed in, not a team-wide or
+  "first placeholder" fallback — and mutates only that one registry entry.
+  The "Use {name} here" button's `onclick` (`renderTeamAssignmentSlots()`,
+  `user-management.js:567`) bakes in that same specific `player.playerId`
+  per row. Both were already correctly scoped by the time this task ran;
+  most likely already fixed as a side effect of the `e1d9aea` "bulletproof
+  player link/swap/remove" rewrite, which postdates TODO.md's original bug
+  report. This test seeds a synthetic team with TWO placeholder slots (A
+  and B — teams are capped at exactly 2 player slots per
+  `renderTeamAssignmentSlots()`'s own comment) so both failure modes from
+  the original report are independently observable: "fills the wrong slot"
+  (asserts placeholder A stays untouched — still no `uid` — after the
+  click) and "appends a new slot instead" (asserts the team still has
+  exactly 2 `playerIds` afterward, not 3). Unlike every other script here
+  that drives a target function directly via `page.evaluate`, this one
+  **clicks the real DOM button** — found by matching the literal rendered
+  `onclick="replacePlayerWithUser(<teamId>, '<playerId>')"` attribute for
+  placeholder B's row specifically — to also rule out a rendering-level bug
+  (the wrong `playerId` baked into the wrong row), not just a logic-level
+  one; `replacePlayerWithUser()` is async and the bare `onclick` doesn't
+  await it, so the test polls `gameState.players[phB].uid` via
+  `page.waitForFunction` rather than assuming completion right after the
+  click. Confirmed passing against live `e2e-disposable-1`. Drives god.html
+  (same reasoning as `e2e-swap-pending-rewrite.js`: god.html and admin.html
+  both render the identical `teamAssignmentSlots` panel via the shared,
+  standalone `user-management.js` — not `admin-improved-adapter.js` — so
+  god.html's `window.godApp.gameState`/`saveGameState()` convenience for
+  seed/restore exercises the same button/handler admin.html's Teams tab
+  uses). Snapshots/restores `teams`/`players` in a `finally` block,
+  including the explicit `FieldValue.delete()` for leaked
+  `players`-map keys (same pattern as `e2e-swap-pending-rewrite.js`, per
+  the map-field gotcha below).
 - `.env.e2e` (gitignored, not in git) — real credentials. Copy `.env.e2e.example`
   to create it if missing.
 
