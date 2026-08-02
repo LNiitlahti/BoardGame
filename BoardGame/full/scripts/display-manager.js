@@ -120,6 +120,8 @@ class DisplayManager {
         // URL param override for rotation interval
         const urlInterval = new URLSearchParams(window.location.search).get('rotateInterval');
         if (urlInterval) this._rotationInterval = parseInt(urlInterval, 10) || 15000;
+
+        this._prevBoardSignature = null;
     }
 
     // ==================================================================
@@ -167,11 +169,15 @@ class DisplayManager {
         // 8. Status strip — handled by local renderStatusStrip() in view.html
         //    (called directly by the onboarding listener)
 
-        // 9. Board
-        if (this._renderBoardFn) {
-            this._renderBoardFn();
-        } else if (this._boardRenderer && gameData.board) {
-            this._boardRenderer.render(gameData);
+        // 9. Board (skip the 91-hex rebuild when board/rooms didn't change)
+        const boardSignature = window.RenderSignature.computeBoardSignature(gameData.board, gameData.rooms);
+        if (boardSignature !== this._prevBoardSignature) {
+            this._prevBoardSignature = boardSignature;
+            if (this._renderBoardFn) {
+                this._renderBoardFn();
+            } else if (this._boardRenderer && gameData.board) {
+                this._boardRenderer.render(gameData);
+            }
         }
 
         // 10. Live indicator dot
