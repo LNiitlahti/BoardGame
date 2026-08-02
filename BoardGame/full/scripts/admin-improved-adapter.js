@@ -264,20 +264,44 @@
     /**
      * Regular (non-challenge) pending matches, optionally narrowed to one
      * round slot (1 or 2). Matches tagged with `slot` by _tagNewQueueEntries
-     * are filtered precisely; untagged matches (created before this feature
-     * existed, or created outside a recognizable match/setup phase) always
-     * count for either slot — safer than silently hiding a real match.
+     * are trusted for the slot number, but only for the round they were
+     * tagged for (roundNumber undefined, or equal to the round in progress)
+     * — otherwise a match tagged "slot 2" in a long-past round that was
+     * left pending/ongoing would block every future round's slot 2 forever.
+     *
+     * Untagged matches (created before slot tagging existed, or created
+     * outside a recognizable match/setup phase) count for either slot —
+     * safer than silently hiding a real match — but ONLY if they were
+     * created at/after the CURRENT matches-in-progress phase began
+     * (createdAt >= currentPhase.startedAt). "roundNumber is undefined"
+     * alone is NOT a safe stand-in for "created this round": it's true
+     * forever for legacy leftovers with no roundNumber field at all, which
+     * is exactly what let ~61 leftover queued matches keep a round from
+     * ever reaching round_advance (see TODO.md's "match slot never reaches
+     * done" writeup). This mirrors phase-manager.js's getSlotRequirements,
+     * which applies the identical gate.
      */
+    function _belongsToCurrentSlot(m, slot) {
+        const currentRoundNumber = gameState.currentPhase?.roundNumber;
+        const phaseStartedAt = gameState.currentPhase?.startedAt;
+        if (m.slot !== undefined) {
+            return m.slot === slot &&
+                (m.roundNumber === undefined || m.roundNumber === currentRoundNumber);
+        }
+        if (!m.createdAt || !phaseStartedAt) return false;
+        return m.createdAt >= phaseStartedAt;
+    }
+
     function _pendingSlotMatches(slot) {
         const all = _queuePendingMatches().filter(m => m.isChallenge !== true);
         if (slot === undefined) return all;
-        return all.filter(m => m.slot === undefined || m.slot === slot);
+        return all.filter(m => _belongsToCurrentSlot(m, slot));
     }
 
     function _ongoingSlotMatches(slot) {
         const all = _queueOngoingMatches().filter(m => m.isChallenge !== true);
         if (slot === undefined) return all;
-        return all.filter(m => m.slot === undefined || m.slot === slot);
+        return all.filter(m => _belongsToCurrentSlot(m, slot));
     }
 
     // ══════════════════════════════════════════════════════════════
