@@ -243,6 +243,53 @@
         return (gameState.gameQueue || []).filter(m => !m.isBreak && m.status === 'ongoing');
     }
 
+    // ── Live-player conflict exclusion ──
+    //
+    // TODO.md "Next up" bug: neither the slot cards' Next-up pick nor the
+    // Match Queue panel's NEXT badge checked whether a pending match's
+    // players were already tied up in a currently-ongoing match elsewhere.
+    // Real repro: match #122 (StarCraft II) was live with Demo + Inffi(GOD)
+    // playing; Match 2's slot picked "#7" as Next Up — which ALSO had
+    // Demo + Inffi(GOD) on it — skipping over "#8", which had zero overlap
+    // with the live match and was actually available. The queue's own NEXT
+    // badge disagreed too (pointed at "#2", also conflicting) — neither
+    // indicator filtered for player availability at all.
+    //
+    // getPlayersInLiveMatches() mirrors the same-named helper documented in
+    // the implementation plan, but is defined locally here (rather than
+    // imported from match-queue-manager.js) because admin.html does not
+    // load that script — and can't safely be made to, since
+    // match-queue-manager.js declares top-level `const BREAK_TYPES`, which
+    // collides (SyntaxError) with admin.js's own top-level `const
+    // BREAK_TYPES` once both scripts share admin.html's global scope.
+
+    /** Set of player IDs currently on ANY ongoing/live match in the queue. */
+    function getPlayersInLiveMatches(gameQueue) {
+        const liveIds = new Set();
+        for (const match of gameQueue || []) {
+            if (match.status !== 'ongoing') continue;
+            for (const team of match.teams || []) {
+                for (const pid of (team.playerIds || [])) liveIds.add(pid);
+            }
+        }
+        return liveIds;
+    }
+
+    /**
+     * Filters a list of candidate matches down to ones that don't share any
+     * player with a currently-live match — used right before picking "the
+     * next match" so a queue-order pick never proposes starting a match
+     * whose players are already mid-game elsewhere. Preserves the original
+     * relative order (skip-to-next-eligible, not a reorder/re-sort).
+     */
+    function _excludeLiveConflicts(matches) {
+        const liveIds = getPlayersInLiveMatches(gameState.gameQueue);
+        if (liveIds.size === 0) return matches;
+        return matches.filter(m =>
+            !(m.teams || []).some(team => (team.playerIds || []).some(pid => liveIds.has(pid)))
+        );
+    }
+
     function _matchShortLabel(game) {
         if (game.isBreak === true) return 'Break';
         const gameName = (typeof getGameDisplayName === 'function')
@@ -534,11 +581,21 @@
             };
         }
         if (pendingSlot.length > 0) {
-            const next = pendingSlot[0];
-            const label = _matchShortLabel(next);
+            // Never propose starting a match whose players are already live
+            // in an ongoing match elsewhere — skip to the next eligible
+            // queued match instead of blindly taking pendingSlot[0].
+            const available = _excludeLiveConflicts(pendingSlot);
+            if (available.length > 0) {
+                const next = available[0];
+                const label = _matchShortLabel(next);
+                return {
+                    text: `Next up: ${_esc(label)}.`,
+                    primary: { label: `▶ Start ${label}`, action: () => window.startMatch(next.id) }
+                };
+            }
             return {
-                text: `Next up: ${_esc(label)}.`,
-                primary: { label: `▶ Start ${label}`, action: () => window.startMatch(next.id) }
+                text: `${pendingSlot.length} match${pendingSlot.length !== 1 ? 'es' : ''} queued, but all share a player with a live match — resolve that match first.`,
+                primary: null
             };
         }
         return {
@@ -1110,15 +1167,20 @@
     function _highlightNextQueueItem() {
         const phase = _phaseManager?.getCurrentPhase() || '';
         let target = null;
+        // Same live-player-conflict exclusion as _computeSlotStep: never
+        // highlight a queued match as "next" if its players are already
+        // tied up in a currently-ongoing match elsewhere (TODO.md — the
+        // NEXT badge disagreeing with the slot's own Next-up pick, and both
+        // being wrong, was this exact bug).
         if (phase === 'challenges' || phase === 'challenge_game' ||
             phase === 'spell_window_2' || phase === 'spell_window_3') {
-            target = _pendingChallengeMatches()[0];
+            target = _excludeLiveConflicts(_pendingChallengeMatches())[0];
         } else if (phase.startsWith('match_1')) {
-            target = _pendingSlotMatches(1)[0];
+            target = _excludeLiveConflicts(_pendingSlotMatches(1))[0];
         } else if (phase.startsWith('match_2')) {
-            target = _pendingSlotMatches(2)[0];
+            target = _excludeLiveConflicts(_pendingSlotMatches(2))[0];
         }
-        if (!target) target = _queuePending()[0];
+        if (!target) target = _excludeLiveConflicts(_queuePending())[0];
 
         const items = document.querySelectorAll('#matchQueue .queue-item');
         items.forEach(el => {

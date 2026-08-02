@@ -16,6 +16,36 @@ if (typeof SIDE_LABELS === 'undefined') {
     var SIDE_LABELS = ['A', 'B', 'C', 'D', 'E'];
 }
 
+/**
+ * Set of player IDs currently on ANY ongoing/live match in the given queue.
+ * Used to exclude a player's OTHER queued matches from "next up"/NEXT-badge
+ * selection — a player can't be starting a second match while already live
+ * in one (see TODO.md's "Next up match selection" writeup: match #122 was
+ * live with two players, and a slot's Next-up + the queue's NEXT badge both
+ * picked a different pending match that ALSO had those same two players on
+ * it, skipping a genuinely available match with zero overlap).
+ *
+ * admin.html's guided Next-up/NEXT-badge selection (admin-improved-
+ * adapter.js) needs the identical logic but cannot import this file
+ * directly — admin.html doesn't load match-queue-manager.js, and can't
+ * safely be made to, since this file's top-level `const BREAK_TYPES` would
+ * collide (SyntaxError) with admin.js's own top-level `const BREAK_TYPES`
+ * once both scripts share admin.html's global scope. admin-improved-
+ * adapter.js therefore keeps a local copy of this same function. Keep both
+ * in sync if the live-match/team data shape ever changes.
+ */
+function getPlayersInLiveMatches(gameQueue) {
+    const liveIds = new Set();
+    for (const match of gameQueue || []) {
+        if (match.status !== 'ongoing') continue;
+        for (const team of match.teams || []) {
+            for (const pid of (team.playerIds || [])) liveIds.add(pid);
+        }
+    }
+    return liveIds;
+}
+window.getPlayersInLiveMatches = getPlayersInLiveMatches;
+
 class MatchQueueManager {
 
     /**
