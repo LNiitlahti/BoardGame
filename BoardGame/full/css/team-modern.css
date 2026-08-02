@@ -224,10 +224,13 @@
 
 /* ==================== STATUS MESSAGE ==================== */
 
-/* Fixed toast so messages never push the layout around */
+/* Fixed toast so messages never push the layout around.
+   Anchored to the BOTTOM of the viewport (not top: 4.5rem) so it never
+   overlaps the score strip / phase banner that sit at the top of the page
+   (see TODO.md "vote-submitted toast overlaps team scores section"). */
 .team-status-message {
   position: fixed;
-  top: 4.5rem;
+  bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 3000;
@@ -273,7 +276,7 @@
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
