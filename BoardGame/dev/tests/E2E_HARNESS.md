@@ -52,6 +52,20 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   and calls the page's global `updateDisplay()` to force a synchronous
   re-render — no `saveGameState()` call, so it never touches Firestore at
   all, nothing to restore server-side.
+- `e2e-load-default-rooms.js` — plumbing test for "Load Default Rooms" on
+  god.html, written after consolidating the three independently-diverged
+  copies of the `config/defaultRooms` Firestore get/set logic (setup.html,
+  board-manager.js, admin.js) into one shared implementation:
+  `shared/scripts/default-rooms.js` (`loadDefaultRoomsDoc`/
+  `saveDefaultRoomsDoc`). Only asserts the plumbing still works end-to-end
+  through the shared function (`gameState.rooms` ends up matching whatever
+  is currently in `config/defaultRooms`) — deliberately does NOT assert any
+  particular room layout is "correct", since `config/defaultRooms` is still
+  a single doc shared across every tournament and curating the right
+  default is an explicitly out-of-scope manual step (see TODO.md "Load
+  Default Rooms"). Snapshots/restores the tournament's `rooms` field in a
+  `finally` block, since `loadDefaultRooms()` persists the loaded rooms
+  back to the tournament doc via `_save()`.
 - `.env.e2e` (gitignored, not in git) — real credentials. Copy `.env.e2e.example`
   to create it if missing.
 
