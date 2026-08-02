@@ -90,6 +90,7 @@ async function main() {
       const doc = await firebase.firestore().collection('users').doc(uid).get();
       return doc.data();
     }, player14Uid);
+    assert(originalUserDoc, `PLAYER14's user doc (uid ${player14Uid}) must exist`);
     assert(originalUserDoc.assignedTournamentId === PRIMARY_TOURNAMENT_ID,
       `Expected PLAYER14's baseline primary to be ${PRIMARY_TOURNAMENT_ID}, got ${originalUserDoc.assignedTournamentId} — ` +
       `harness assumption changed, update this test's PRIMARY_TOURNAMENT_ID/PRIMARY_TEAM_ID constants.`);

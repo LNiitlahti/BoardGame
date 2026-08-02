@@ -298,7 +298,8 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   team-controls.js's own "Team not found in tournament" guard usually
   bounces straight back out to `index.html`. Fix: `setPrimaryTournament`
   now also writes `currentTeamId` to both storages
-  (`full/home.html` ~1417-1418). This test drives the real UI end-to-end
+  (`full/home.html` ~1422-1423, guarded like sibling `enterTournament`).
+  This test drives the real UI end-to-end
   with a disposable player account (`PLAYER14`, already linked into
   `e2e-disposable-1`'s Team Alpha, id 1) linked into a SECOND tournament
   too (created idempotently by the script itself: `e2e-navbar-secondary`,

@@ -1419,8 +1419,10 @@
         localStorage.setItem('currentTournamentId', tournamentId);
         sessionStorage.setItem('currentTournamentName', tournamentName);
         localStorage.setItem('currentTournamentName', tournamentName);
-        sessionStorage.setItem('currentTeamId', teamId);
-        localStorage.setItem('currentTeamId', teamId);
+        if (teamId) {
+          sessionStorage.setItem('currentTeamId', teamId);
+          localStorage.setItem('currentTeamId', teamId);
+        }
         currentActiveTournament = tournamentId;
 
         errorHandler.showSuccess(`${tournamentName} is now your primary tournament`);
