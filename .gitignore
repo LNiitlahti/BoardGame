@@ -42,6 +42,9 @@ docs/superpowers/
 # Local analysis docs (not for git)
 docs/analysis/
 
+# Personal to-do (not for git)
+TODO.md
+
 # Build outputs
 dist/
 build/
