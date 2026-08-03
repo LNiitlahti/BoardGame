@@ -1663,6 +1663,27 @@
     window.forceAdvancePhase = () => {
         _initPhaseAdapter();
         _phaseManager?.openForceAdvanceModal();
+
+        // Phase-specific consequence note (the requirements list alone
+        // doesn't say what force-advancing DOES).
+        document.getElementById('forceConsequenceNote')?.remove();
+        const phase = _phaseManager?.getCurrentPhase();
+        const reqList = document.getElementById('forceAdvanceRequirements');
+        let note = '';
+        if (phase === 'scoring_hex') {
+            note = 'Territory points WILL still be awarded on force-advance (without the preview).';
+        } else if (phase === 'matches_in_progress') {
+            const leftovers = _pendingSlotMatches().length + _ongoingSlotMatches().length;
+            if (leftovers > 0) note = `${leftovers} pending/ongoing match(es) will be left behind in the queue and may confuse later rounds.`;
+        } else if (_phaseManager?.isSpellWindow(phase) && gameState.spellPhase?.isActive) {
+            note = 'The active spell phase will be cleared.';
+        } else if (phase === 'hex_placement_1' || phase === 'hex_placement_2') {
+            note = 'Unplaced hex wins stay pending and will re-gate a future round — consider Waive instead.';
+        }
+        if (note && reqList) {
+            reqList.insertAdjacentHTML('afterend',
+                `<p id="forceConsequenceNote" class="modal-warning-line">${ICON_SVGS.triangleAlert} ${_esc(note)}</p>`);
+        }
     };
 
     window.advanceSlot = async (slot) => {
