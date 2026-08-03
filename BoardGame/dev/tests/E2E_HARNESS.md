@@ -554,6 +554,40 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   `FieldValue.delete()`), same reasoning as `e2e-hex-placement-gate.js`.
   That older test's own snapshot/restore was also updated to include
   `pendingHexWins` now that it's persisted, for the same reason.
+- `e2e-team-added-banner.js` — regression test for TODO.md Task 16
+  ("home.html team-added banner missing tournament name + dismissable
+  check"). Reading the current code (not TODO.md's paraphrase) found the "×"
+  close button (`dismissNewAssignmentBanner()`, home.html) was already fully
+  functional and already persisted its dismissal correctly — it calls
+  `markAssignmentSeen()`, which writes `onboardingPromptSeenAt` to the
+  user's Firestore doc, and `checkNewAssignment()`'s re-show guard
+  (`isNew = !seenAt || new Date(seenAt) < new Date(userData.appointedAt)`)
+  is naturally scoped per-appointment: dismissing only suppresses the
+  appointment it was shown for, and a later genuine re-appointment (a fresh,
+  newer `appointedAt`, same team or a different one) reopens it, corroborated
+  by `docs/guides/TOURNAMENT_FLOW_BUG_TRACKER.md`'s pre-existing note this
+  banner "correctly marks itself seen... so it won't nag again". The one real
+  gap: the banner text only interpolated `assignedTeamName`, never which
+  tournament the assignment was for — ambiguous for a player linked into more
+  than one tournament. Fix: `checkNewAssignment()` (`full/home.html` ~984)
+  is now `async` and fetches `tournaments/{assignedTournamentId}` for its
+  `.name` before rendering, so the banner now reads "You've been added to
+  {team} in {tournament}! ...". This test seeds PLAYER14's user doc with a
+  fresh appointment into `e2e-navbar-secondary` (Task 11's lasting fixture —
+  deliberately NOT `e2e-disposable-1`, whose tournament `.name` happens to
+  equal its id, which would make a fallback-to-id bug pass undetected) and
+  asserts: the banner text contains both the team name and the real
+  tournament name; clicking the real "×" button hides it and persists
+  `onboardingPromptSeenAt` to Firestore; the dismissal survives a real
+  `page.reload()`; and — the self-review/over-matching check — bumping
+  `appointedAt` forward again (simulating a later, genuinely new assignment)
+  correctly REOPENS the banner rather than staying suppressed forever.
+  Confirmed passing against live `e2e-disposable-1`/PLAYER14/
+  `e2e-navbar-secondary`, deterministic across repeated runs. Snapshots/
+  restores PLAYER14's whole user doc via a full (no-merge) `.set()` in a
+  `finally` block, same pattern as `e2e-navbar-primary-switch.js` — confirmed
+  the restore lands back on that script's same baseline assumption
+  (`assignedTournamentId === 'e2e-disposable-1'`, team 1 "Team Alpha").
 - `.env.e2e` (gitignored, not in git) — real credentials. Copy `.env.e2e.example`
   to create it if missing.
 
