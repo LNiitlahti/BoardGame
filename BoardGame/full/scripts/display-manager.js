@@ -14,7 +14,7 @@
 const DISPLAY_MODES = {
     break: {
         name: 'Break',
-        slides: ['next_match_large', 'standings_large', 'board_focus'],
+        slides: ['break_screen', 'standings_large', 'board_focus'],
         hidePanels: true
     },
     // ── Scoring phases ──
@@ -1338,10 +1338,33 @@ class DisplayManager {
             case 'winner_celebration':
                 this._renderWinnerCelebration(primary, data);
                 break;
+            case 'break_screen':
+                this._renderBreakScreen(primary, data);
+                break;
             default:
                 primary.innerHTML = '';
                 break;
         }
+    }
+
+    /**
+     * Explicit "ON BREAK" slide. Previously DISPLAY_MODES.break just
+     * reused ordinary phase-agnostic slides (next_match_large,
+     * standings_large, board_focus) -- none of which say anything about a
+     * break being active, so a break looked like a completely normal
+     * rotation to anyone watching view.html. The small phaseBanner text
+     * strip (renderPhaseDisplay) was the only break indicator anywhere,
+     * easy to miss. Found live during smoke testing, 2026-08-03.
+     */
+    _renderBreakScreen(container, data) {
+        const auto = data.currentPhase?.autoInserted;
+        container.innerHTML = `
+            <div class="dm-break-screen">
+                <div class="dm-break-icon">${ICON_SVGS.pause}</div>
+                <div class="dm-break-title">On Break</div>
+                <div class="dm-break-subtitle">${auto ? 'Scheduled break — ' : ''}The tournament resumes shortly</div>
+            </div>
+        `;
     }
 
     _renderNextMatchLarge(container, data) {
