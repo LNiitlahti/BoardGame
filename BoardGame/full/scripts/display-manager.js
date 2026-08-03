@@ -1873,12 +1873,28 @@ class DisplayManager {
                 sidesHTML += '<div class="dm-side">';
                 const players = this._getMatchTeamPlayers(teamData);
                 if (isChallenge) {
-                    const teamColor = this._getTeamColor(players[0]?.originalTeamId);
-                    const teamName = this._getCurrentTeamName(players[0]?.originalTeamId);
                     const roleLabel = i === 0 ? 'Challenger' : 'Defending';
                     sidesHTML += `<div class="dm-side-role dm-side-role--${i === 0 ? 'challenger' : 'defender'}">${roleLabel}</div>`;
-                    if (teamName) {
-                        sidesHTML += `<div class="dm-side-team-name" style="color: ${teamColor}; border-color: ${teamColor};">${teamName}</div>`;
+                    // A side isn't necessarily one team -- the same
+                    // mixed-roster reality as a regular match side (see the
+                    // team.html match-card fix earlier this session).
+                    // Collapsing to just players[0]'s team silently hid a
+                    // second team sharing the same side. Show one badge per
+                    // DISTINCT team actually present, each in that team's
+                    // own real color -- never a single side-wide color.
+                    const seenTeamIds = new Set();
+                    const teamBadges = [];
+                    players.forEach(p => {
+                        const tid = p.originalTeamId;
+                        if (tid == null || seenTeamIds.has(tid)) return;
+                        seenTeamIds.add(tid);
+                        const teamName = this._getCurrentTeamName(tid);
+                        if (!teamName) return;
+                        const teamColor = this._getTeamColor(tid);
+                        teamBadges.push(`<span class="dm-side-team-name" style="color: ${teamColor}; border-color: ${teamColor};">${teamName}</span>`);
+                    });
+                    if (teamBadges.length > 0) {
+                        sidesHTML += `<div class="dm-side-team-names">${teamBadges.join('')}</div>`;
                     }
                 }
                 // Challenge rosters run up to 5-a-side -- wrap the player

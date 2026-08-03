@@ -1782,11 +1782,16 @@
             animation: dm-pulse 2s infinite;
         }
         .dm-live-match-large .dm-challenge-title svg { width: 30px; height: 30px; }
+        .dm-live-match-large .dm-side-team-names {
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+            margin-bottom: 10px;
+        }
         .dm-live-match-large .dm-side-team-name {
+            display: inline-block;
             font-family: 'Russo One', sans-serif;
-            font-size: 34px; font-weight: 800; text-transform: uppercase;
-            letter-spacing: 1px; margin-bottom: 10px;
-            padding: 6px 22px; border: 3px solid; border-radius: 8px;
+            font-size: 28px; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 6px 20px; border: 3px solid; border-radius: 8px;
             background: var(--bg-glass);
             text-shadow: 0 0 12px currentColor;
         }
