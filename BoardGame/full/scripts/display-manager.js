@@ -1412,7 +1412,7 @@ class DisplayManager {
             const playersHTML = players.map(p => {
                 const color = this._getPlayerCurrentColor(p);
                 const name = this._getPlayerCurrentName(p);
-                const r = lobbyReady[p.uid] || {};
+                const r = lobbyReady[p.id] || {};
                 const gl = r.gameLobby === true || r.ready === true;
                 const dc = r.discord === true || r.ready === true;
                 return `

@@ -260,8 +260,14 @@ async function main() {
       assert(/e2e-test-game/.test(setupState.cardsHtml), 'STEP 1: match card should show the game name');
       assert(/Placeholder A/.test(setupState.cardsHtml) && /Placeholder B/.test(setupState.cardsHtml),
         'STEP 1: match card should show the opponent side\'s actual players (not a collapsed team-name label)');
-      assert(/>YOU/.test(setupState.cardsHtml) && /TD \(E2E\)/.test(setupState.cardsHtml),
-        'STEP 1: match card should show the player\'s own side too (YOU tag + teammate "TD (E2E)")');
+      assert(/TD \(E2E\)/.test(setupState.cardsHtml),
+        'STEP 1: match card should show the player\'s own side too (teammate "TD (E2E)")');
+      // Exactly ONE "YOU" tag -- regression guard for a real bug where the
+      // tag's predicate checked "is this player on my TEAM" (matching any
+      // teammate, including "TD (E2E)") instead of "is this the logged-in
+      // player specifically".
+      const youTagCount = (setupState.cardsHtml.match(/<strong>YOU<\/strong>/g) || []).length;
+      assert(youTagCount === 1, `STEP 1: expected exactly 1 "YOU" tag (only on E2ePlayer14's own row, not teammate "TD (E2E)"), got ${youTagCount}`);
       assert(/Discord Channel #1/.test(setupState.cardsHtml), 'STEP 1: match card should show the assigned Discord channel');
       assert(setupState.footerDisplay !== 'none', 'STEP 1: "waiting for admin" footer should be visible during setup');
       assert(/[Ww]aiting for admin/.test(setupState.footerText || ''), `STEP 1: footer text should mention waiting for admin, got: "${setupState.footerText}"`);

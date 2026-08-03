@@ -1932,9 +1932,15 @@ function renderMatchCardsWithDiscord(container) {
         // Resolve each side's players uniformly (handles both real and
         // legacy/synthetic side shapes), then find which side is ours.
         const resolvedSides = matchTeams.map(side => ({ side, players: getMatchSidePlayers(side) }));
-        const isMe = p => (currentUser?.uid && p.id === currentUser.uid) ||
-            teamData.players?.some(tp => tp.uid === p.id || tp.id === p.id || tp.name === p.name);
-        const mine = resolvedSides.find(({ players }) => players.some(isMe));
+        // Broad "is this player on my TEAM" check, for finding which side is
+        // ours -- deliberately matches any teammate, not just the logged-in
+        // player.
+        const isOnMyTeam = p => teamData.players?.some(tp => tp.uid === p.id || tp.id === p.id || tp.name === p.name);
+        // Narrow "is this specifically the logged-in player" check, for the
+        // "YOU" tag -- must NOT reuse isOnMyTeam here, or every teammate on
+        // the roster gets tagged "YOU" too.
+        const isCurrentUser = p => !!currentUser?.uid && p.id === currentUser.uid;
+        const mine = resolvedSides.find(({ players }) => players.some(isOnMyTeam));
         const mySide = mine?.side;
         const mySideId = mySide?.id || 'TEAM_A';
 
@@ -1954,7 +1960,7 @@ function renderMatchCardsWithDiscord(container) {
             const isMySide = side === mySide;
             const rowsHTML = players.map(p => {
                 const color = getHexColor(p.color);
-                const youTag = isMe(p) ? '<strong>YOU</strong> &middot; ' : '';
+                const youTag = isCurrentUser(p) ? '<strong>YOU</strong> &middot; ' : '';
                 return `<div class="match-side-player" style="color: ${color};">${youTag}${_escapeHtmlSafe(p.name)}</div>`;
             }).join('') || '<div class="match-side-player" style="color:#64748b;">TBD</div>';
             return `<div class="match-side-col${isMySide ? ' match-side-mine' : ''}">${rowsHTML}</div>`;
