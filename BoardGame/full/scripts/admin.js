@@ -1782,8 +1782,16 @@ async function assignTeamToHex(coord, teamId) {
         isHeart: isHeartHex
     });
 
-    // Clear pending hex win notification for this team
-    await clearPendingHexWin(teamId);
+    // Deliberately does NOT auto-clear a pending hex win here anymore.
+    // Assigning a hex is a general board action (spells, admin rulings,
+    // ordinary play) that happens for all kinds of reasons unrelated to a
+    // team's earned match-win credit — it used to consume that credit
+    // unconditionally on ANY assignment, so a team could lose their earned
+    // placement just because the admin placed some other hex for them for
+    // an unrelated reason. Credit consumption is now an explicit, separate
+    // action: see clearPendingHexWin(), called only from the "This Is
+    // Their Earned Placement — Assign" path in the hex team-picker popup
+    // (admin-improved-adapter.js's _augmentTeamPicker).
 
     renderBoard();
 }
@@ -5208,9 +5216,12 @@ function updatePendingHexNotification() {
 }
 
 /**
- * Clear a pending hex win when a team places their hex
- * Called from assignTeamToHex when a hex is assigned
- * Only removes ONE notification per hex placed (the oldest one for this team)
+ * Explicitly consume a team's pending hex-win credit — called ONLY when
+ * the admin confirms a hex assignment IS that team's earned placement
+ * (admin-improved-adapter.js's "This Is Their Earned Placement — Assign"),
+ * not automatically from every assignTeamToHex() call. See that function's
+ * comment for why the two were deliberately decoupled.
+ * Only removes ONE notification per call (the oldest one for this team).
  */
 async function clearPendingHexWin(teamId) {
     let changed = false;

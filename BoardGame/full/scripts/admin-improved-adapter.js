@@ -2212,37 +2212,32 @@
                 badge.innerHTML = ICON_SVGS.hourglass + ' owed';
                 btn.appendChild(badge);
 
-                // This click always consumes the team's oldest pending hex
-                // credit (assignTeamToHex -> clearPendingHexWin), regardless
-                // of WHICH hex is clicked — there's no way to detect "this is
-                // a spell-claimed hex, not their earned placement" from the
-                // coordinate alone (earned placements have no fixed target
-                // hex). Make the designed flow explicit at the one moment it
-                // matters: is this the team's real earned placement, or a
-                // spell claiming an unrelated hex (which should be Waived
-                // first, then assigned separately, so the credit and the
-                // spell-hex don't collapse into one silent click)?
+                // There's no way to detect "this is a spell-claimed hex, not
+                // their earned placement" from the coordinate alone (earned
+                // placements have no fixed target hex) — so make the admin
+                // say which one it is. assignTeamToHex() itself no longer
+                // auto-consumes a team's pending credit (see its comment in
+                // admin.js); credit consumption is this modal's job, and
+                // only on the explicit "earned placement" path below. The
+                // other path is a plain assignment — their credit stays
+                // fully intact, available for a LATER hex click through
+                // this same modal.
                 btn.onclick = (e) => {
                     e.preventDefault();
                     const team = gameState?.teams?.find(t => String(t.id) === teamIdStr);
                     const teamName = team?.name || `Team ${teamIdStr}`;
-                    // The specific win entry this team's credit lives on, so
-                    // the combined waive+assign action below waives exactly
-                    // that credit (mirrors waivePendingHexWin's own "first
-                    // matching entry" policy).
-                    const myWin = pending.find(w => (w.teamIds || []).some(id => String(id) === teamIdStr));
                     _openFlowConfirm({
                         title: 'Earned Placement, or Spell Claim?',
-                        bodyHtml: `<p><strong>${_esc(teamName)}</strong> has an unplaced match-win hex credit. Placing <strong>this</strong> hex will use up that credit — no matter which hex you click here.</p>` +
-                                  `<p>Is this hex <strong>their earned placement</strong>? Assign it below.</p>` +
-                                  `<p>Is this hex from a <strong>spell or an admin ruling</strong> instead (claiming a different hex)? Use the button below to waive their earned credit and assign this hex in one step.</p>`,
+                        bodyHtml: `<p><strong>${_esc(teamName)}</strong> has an unplaced match-win hex credit.</p>` +
+                                  `<p>Is <strong>this</strong> hex their <strong>earned placement</strong>? Assigning it below will also mark their credit as fulfilled.</p>` +
+                                  `<p>Is this hex from a <strong>spell or an admin ruling</strong> instead? Use the button below — it assigns the hex but leaves their earned credit untouched, so they can still place it separately later.</p>`,
                         confirmLabel: 'This Is Their Earned Placement — Assign',
-                        onConfirm: () => window.assignTeamToHex(btnCoord, parseInt(teamIdStr, 10)),
-                        secondaryLabel: myWin ? `${ICON_SVGS.hexagon} Spell / Admin Claim — Waive & Assign` : undefined,
-                        onSecondary: myWin ? async () => {
-                            await window.waivePendingHexWin(myWin.matchNumber, teamIdStr);
+                        onConfirm: async () => {
                             await window.assignTeamToHex(btnCoord, parseInt(teamIdStr, 10));
-                        } : undefined
+                            await window.clearPendingHexWin(teamIdStr);
+                        },
+                        secondaryLabel: `${ICON_SVGS.hexagon} Spell / Admin Claim — Assign, Keep Credit`,
+                        onSecondary: () => window.assignTeamToHex(btnCoord, parseInt(teamIdStr, 10))
                     });
                 };
                 return;
