@@ -1850,11 +1850,11 @@ async function saveTeamName() {
  */
 function renderPhaseOverlays() {
     const currentPhase = gameData.currentPhase?.name;
-    const matchOverlay = document.getElementById('matchPanelOverlay');
+    const matchSection = document.getElementById('matchPanelSection');
     const spellOverlay = document.getElementById('spellPhaseOverlay');
 
     // Hide all by default
-    if (matchOverlay) matchOverlay.style.display = 'none';
+    if (matchSection) matchSection.style.display = 'none';
     if (spellOverlay) spellOverlay.style.display = 'none';
 
     const myOverlaySlot = currentPhase === 'matches_in_progress' ? _getMyActiveSlot() : null;
@@ -1862,7 +1862,7 @@ function renderPhaseOverlays() {
 
     if (mySlotSub === 'setup' || mySlotSub === 'lobby') {
         renderMatchPanel(mySlotSub === 'lobby');
-        if (matchOverlay) matchOverlay.style.display = 'flex';
+        if (matchSection) matchSection.style.display = '';
     } else if (currentPhase && currentPhase.startsWith('spell_window')) {
         renderSpellPhaseOverlay();
     }
@@ -1923,7 +1923,7 @@ function renderMatchPanel(isLobbyPhase) {
 }
 
 /**
- * Render per-teammate confirm buttons in the lobby overlay so team members
+ * Render per-teammate confirm buttons in the match panel so team members
  * can confirm Discord/lobby status on each other's behalf.
  */
 function renderTeammateConfirmRow() {

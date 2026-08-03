@@ -56,7 +56,7 @@
  *   `lobbyReady` (simulating a player who never confirmed before the slot
  *   went live) and reload team.html for that player. Assert BOTH surfaces
  *   that could offer a confirm control while playing stay non-interactive:
- *   the match panel overlay (`#matchPanelOverlay`) never becomes visible,
+ *   the match panel section (`#matchPanelSection`) never becomes visible,
  *   and the Teammates sidebar falls back to read-only status dots instead
  *   of clickable ready buttons. Confirms the gap is real and still present.
  *
@@ -74,6 +74,16 @@
  * documented below (`renderMatchCardsWithDiscord()` not falling back to
  * `side.playerIds`) — the card assertion below now expects real content,
  * not the empty state.
+ *
+ * UPDATED AGAIN (later): the merged panel was pulled out of the full-screen
+ * `.lobby-overlay` treatment entirely and made an inline sidebar section
+ * (`#matchPanelSection`, a plain `.team-section` placed under Teammates) so
+ * players aren't blocked from the rest of team.html while readying up. Same
+ * single-panel, no-swap-between-setup/lobby behavior as Task 13 established
+ * — only the container changed from a fixed-position overlay (`display:
+ * flex`/`none`) to a normal block section (`display: ''`/`none`). This
+ * script's assertions were updated accordingly: 'flex' checks became
+ * "not 'none'" checks, and the id was renamed.
  *
  * Snapshots/restores gameQueue, currentPhase, lobbyReady in a `finally`
  * block so no synthetic data is left behind in e2e-disposable-1.
@@ -275,21 +285,20 @@ async function main() {
       );
 
       // Confirm the merged match panel is visible AND has grown into its
-      // ready-check state. Task 13 merged the old separate
-      // #lobbyReadyOverlay into #matchPanelOverlay, which is now ALSO
-      // visible during the 'setup' sub-phase — so display:flex on the panel
-      // alone no longer proves we're specifically in 'lobby'. Also check
+      // ready-check state. The panel (#matchPanelSection) is ALSO visible
+      // during the 'setup' sub-phase — so "not hidden" alone no longer
+      // proves we're specifically in 'lobby'. Also check
       // #lobbyReadyControls, the section revealed only once the lobby
       // opens (see renderMatchPanel() in team-controls.js).
       await playerPage.waitForFunction(
-        () => document.getElementById('matchPanelOverlay')?.style.display === 'flex' &&
+        () => document.getElementById('matchPanelSection')?.style.display !== 'none' &&
               getComputedStyle(document.getElementById('lobbyReadyControls')).display !== 'none',
         { timeout: 15000 }
       );
-      const overlayVisible = await playerPage.evaluate(() => document.getElementById('matchPanelOverlay').style.display);
+      const sectionVisible = await playerPage.evaluate(() => document.getElementById('matchPanelSection').style.display !== 'none');
       const readyControlsVisible = await playerPage.evaluate(() => getComputedStyle(document.getElementById('lobbyReadyControls')).display !== 'none');
-      console.log('--- PART 2: team.html matchPanelOverlay display / lobbyReadyControls visible ---', overlayVisible, readyControlsVisible);
-      assert(overlayVisible === 'flex', 'PART 2: match panel overlay should be visible for the player in this slot\'s lobby sub-phase');
+      console.log('--- PART 2: team.html matchPanelSection display / lobbyReadyControls visible ---', sectionVisible, readyControlsVisible);
+      assert(sectionVisible === true, 'PART 2: match panel section should be visible for the player in this slot\'s lobby sub-phase');
       assert(readyControlsVisible === true, 'PART 2: ready-check controls section should be revealed once the slot is in lobby sub-phase');
 
       // RELATED BUG, FIXED BY TASK 13 (was: separate from Part 1's
@@ -399,20 +408,21 @@ async function main() {
       await new Promise(r => setTimeout(r, 1000));
 
       const part3 = await playerPage.evaluate(() => {
-        // Task 13 merged #lobbyReadyOverlay into #matchPanelOverlay; the
-        // "hidden while playing" semantics are unchanged (renderPhaseOverlays()
-        // only shows the panel for 'setup'/'lobby' sub-phases), just renamed.
-        const overlay = document.getElementById('matchPanelOverlay');
+        // The "hidden while playing" semantics are unchanged
+        // (renderPhaseOverlays() only shows the panel for 'setup'/'lobby'
+        // sub-phases) regardless of whether the panel is a fixed overlay or
+        // an inline section — just renamed to #matchPanelSection.
+        const section = document.getElementById('matchPanelSection');
         const teammatesHtml = document.getElementById('teammatesList')?.innerHTML || '';
         return {
-          overlayDisplay: overlay ? getComputedStyle(overlay).display : null,
+          sectionDisplay: section ? getComputedStyle(section).display : null,
           hasClickableReadyButtons: /onclick="[^"]*setReadyStatus/.test(teammatesHtml),
           hasReadOnlyIndicatorsOnly: /teammate-ready-indicators/.test(teammatesHtml)
         };
       });
       console.log('--- PART 3: team.html state while slot 1 is playing and lobbyReady is empty ---', JSON.stringify(part3));
 
-      assert(part3.overlayDisplay === 'none', `PART 3: match panel overlay should NOT be visible while the slot is in 'playing', got display='${part3.overlayDisplay}'`);
+      assert(part3.sectionDisplay === 'none', `PART 3: match panel section should NOT be visible while the slot is in 'playing', got display='${part3.sectionDisplay}'`);
       assert(part3.hasClickableReadyButtons === false, 'PART 3: Teammates sidebar should NOT render clickable setReadyStatus buttons while the slot is in \'playing\'');
       assert(part3.hasReadOnlyIndicatorsOnly === true, 'PART 3: Teammates sidebar should fall back to read-only status dots while the slot is in \'playing\'');
 

@@ -419,7 +419,14 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   against live `e2e-disposable-1`. Takes throwaway visual-review screenshots
   (`task13-panel-waiting.png`/`task13-panel-lobby-open.png`, not committed).
   Snapshots/restores `gameQueue`/`currentPhase`/`lobbyReady` in a `finally`
-  block.
+  block. **Updated (later)**: the panel was pulled out of the full-screen
+  `.lobby-overlay` treatment entirely and made an inline sidebar section
+  (renamed `#matchPanelSection`, a plain `.team-section` placed under
+  Teammates, `display: ''`/`none` instead of `flex`/`none`) so players
+  aren't blocked from the rest of team.html while readying up —
+  `#spellPhaseOverlay` is now the only `.lobby-overlay` element left on the
+  page, and this test's assertions were updated to match (1 overlay, not 2;
+  "not 'none'" instead of "'flex'").
 - `e2e-vote-toast-position.js` — regression test for TODO.md Task 14
   ("team.html: the vote-submitted notification/toast overlaps the team
   scores section"). Root cause: team.html's vote-submitted message is NOT

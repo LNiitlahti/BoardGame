@@ -32,7 +32,7 @@
  *      `discordChannels`/`lobbyCreators` keyed by side id, exactly like
  *      `assignDiscordAndLobby()` produces) with slot 1 in the 'setup'
  *      sub-phase. Log in as E2ePlayer14, open team.html, assert:
- *        - #matchPanelOverlay is visible; #preGameInstructionsOverlay,
+ *        - #matchPanelSection is visible; #preGameInstructionsOverlay,
  *          #lobbyReadyOverlay, #matchAssignmentCardsLobby no longer exist
  *          in the DOM at all (confirms the merge, not just a visual
  *          rename).
@@ -52,7 +52,7 @@
  *      it can inspect the lobby-open view. Reload is not needed — the
  *      player's page re-renders reactively off the same onSnapshot
  *      listener. Assert:
- *        - #matchPanelOverlay is STILL the same single element (no
+ *        - #matchPanelSection is STILL the same single element (no
  *          different overlay id became visible instead).
  *        - #matchAssignmentCards STILL shows the same match info (grew in
  *          place, didn't get replaced).
@@ -86,6 +86,15 @@
  *
  * Screenshots are throwaway visual-review artifacts written to
  * dev/tests/task13-panel-*.png — not committed.
+ *
+ * UPDATED (later): the merged panel was pulled out of the full-screen
+ * `.lobby-overlay` treatment entirely and made an inline sidebar section
+ * (`#matchPanelSection`, a plain `.team-section` placed under Teammates,
+ * `display: ''`/`none` instead of `flex`/`none`) so players aren't blocked
+ * from the rest of team.html while readying up. `#spellPhaseOverlay` is the
+ * only `.lobby-overlay` element left on the page. This script's element-id
+ * references and the "exactly 2 .lobby-overlay elements" assertions were
+ * updated accordingly (now 1).
  *
  * Run: cd BoardGame && node dev/tests/e2e-team-match-panel-merge.js
  */
@@ -200,7 +209,7 @@ async function main() {
       );
 
       await playerPage.waitForFunction(
-        () => document.getElementById('matchPanelOverlay')?.style.display === 'flex',
+        () => document.getElementById('matchPanelSection')?.style.display !== 'none',
         { timeout: 15000 }
       );
 
@@ -220,7 +229,7 @@ async function main() {
       assert(setupState.oldPreGameOverlayExists === false, 'STEP 1: #preGameInstructionsOverlay should no longer exist in the DOM (merged away)');
       assert(setupState.oldLobbyOverlayExists === false, 'STEP 1: #lobbyReadyOverlay should no longer exist in the DOM (merged away)');
       assert(setupState.oldLobbyCardsExists === false, 'STEP 1: #matchAssignmentCardsLobby should no longer exist in the DOM (merged into #matchAssignmentCards)');
-      assert(setupState.overlayCount === 2, `STEP 1: expected exactly 2 .lobby-overlay elements left on the page (matchPanelOverlay + spellPhaseOverlay), got ${setupState.overlayCount}`);
+      assert(setupState.overlayCount === 1, `STEP 1: expected exactly 1 .lobby-overlay element left on the page (spellPhaseOverlay -- #matchPanelSection is now a plain inline section, not an overlay), got ${setupState.overlayCount}`);
       assert(!/No matches assigned/.test(setupState.cardsHtml), 'STEP 1 (regression check for the renderMatchCardsWithDiscord fix): match card should show real match info, not the empty state');
       assert(/e2e-test-game/.test(setupState.cardsHtml), 'STEP 1: match card should show the game name');
       assert(/Team Beta/.test(setupState.cardsHtml), 'STEP 1: match card should show the opponent team name');
@@ -259,7 +268,7 @@ async function main() {
         oldPreGameOverlayExists: !!document.getElementById('preGameInstructionsOverlay'),
         oldLobbyOverlayExists: !!document.getElementById('lobbyReadyOverlay'),
         overlayCount: document.querySelectorAll('.lobby-overlay').length,
-        matchPanelDisplay: getComputedStyle(document.getElementById('matchPanelOverlay')).display,
+        matchPanelDisplay: getComputedStyle(document.getElementById('matchPanelSection')).display,
         cardsHtml: document.getElementById('matchAssignmentCards')?.innerHTML || '',
         footerDisplay: getComputedStyle(document.getElementById('matchPanelWaitingFooter')).display,
         controlsDisplay: getComputedStyle(document.getElementById('lobbyReadyControls')).display,
@@ -275,8 +284,8 @@ async function main() {
 
       assert(lobbyState.oldPreGameOverlayExists === false, 'STEP 2: #preGameInstructionsOverlay should still not exist');
       assert(lobbyState.oldLobbyOverlayExists === false, 'STEP 2: #lobbyReadyOverlay should still not exist (no overlay swap happened)');
-      assert(lobbyState.overlayCount === 2, `STEP 2: still expect exactly 2 .lobby-overlay elements (same #matchPanelOverlay, not a new one), got ${lobbyState.overlayCount}`);
-      assert(lobbyState.matchPanelDisplay === 'flex', 'STEP 2: #matchPanelOverlay (the SAME element from step 1) should still be the one visible');
+      assert(lobbyState.overlayCount === 1, `STEP 2: still expect exactly 1 .lobby-overlay element (spellPhaseOverlay only), got ${lobbyState.overlayCount}`);
+      assert(lobbyState.matchPanelDisplay !== 'none', 'STEP 2: #matchPanelSection (the SAME element from step 1) should still be the one visible');
       assert(!/No matches assigned/.test(lobbyState.cardsHtml), 'STEP 2: match card should still show real match info');
       assert(/Discord Channel #1/.test(lobbyState.cardsHtml), 'STEP 2: match card should still show the Discord channel (grew in place, did not lose info)');
       assert(lobbyState.footerDisplay === 'none', 'STEP 2: "waiting for admin" footer should now be hidden');

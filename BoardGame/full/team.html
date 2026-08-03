@@ -48,44 +48,6 @@
 
         <div class="team-status-message" id="statusMessage" style="display: none;"></div>
 
-        <!-- Match Panel: one evolving overlay for "you have a match" -> "lobby is open, ready up".
-             Match info (matchAssignmentCards) is always shown once a match exists. The ready-check
-             section (lobbyReadyControls) is revealed in place -- no overlay swap -- once the TD
-             opens the lobby for this match. -->
-        <div class="lobby-overlay" id="matchPanelOverlay" style="display: none;">
-            <div class="lobby-overlay-content">
-                <div class="lobby-overlay-header">
-                    <h2>Your Next Match</h2>
-                    <p id="matchPanelSubtitle">Review your upcoming match for this round</p>
-                </div>
-                <div id="matchAssignmentCards" class="match-assignment-grid">
-                    <!-- Dynamically populated: game, opponent, Discord channel + lobby creator info -->
-                </div>
-                <div class="lobby-overlay-footer" id="matchPanelWaitingFooter">
-                    Waiting for admin to open the lobby...
-                </div>
-                <div class="lobby-ready-controls" id="lobbyReadyControls" style="display: none;">
-                    <div id="lobbyCreatorRole" style="display: none;">
-                        <!-- Shows lobby creator banner if applicable -->
-                    </div>
-                    <div class="lobby-ready-buttons">
-                        <button class="btn primary lobby-ready-btn" id="readyGameLobbyBtn" onclick="setReadyStatus('gameLobby')">
-                            &#x1F3AE; Game Lobby
-                        </button>
-                        <button class="btn primary lobby-ready-btn" id="readyDiscordBtn" onclick="setReadyStatus('discord')">
-                            &#x1F3A7; Discord
-                        </button>
-                    </div>
-                    <div id="teammateConfirmList" class="teammate-confirm-list">
-                        <!-- Dynamically populated: confirm on behalf of teammates -->
-                    </div>
-                    <div id="readyStatus" class="ready-status">
-                        <!-- Dynamically populated: per-team two-status readiness -->
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Spell Phase Overlay -->
         <div class="lobby-overlay" id="spellPhaseOverlay" style="display: none;">
             <div class="lobby-overlay-content">
@@ -115,6 +77,42 @@
                     <div class="team-section-header">Teammates</div>
                     <div id="teammatesList">
                         <p class="empty-state-inline">Loading teammates...</p>
+                    </div>
+                </div>
+
+                <!-- Match Panel: one evolving section for "you have a match" -> "lobby is
+                     open, ready up". Match info (matchAssignmentCards) is always shown once
+                     a match exists. The ready-check section (lobbyReadyControls) is revealed
+                     in place once the TD opens the lobby for this match. Inline in the
+                     sidebar rather than a blocking overlay, so the rest of the page (board,
+                     teammates, etc.) stays usable while a player readies up. -->
+                <div class="team-section" id="matchPanelSection" style="display: none;">
+                    <div class="team-section-header">Your Next Match</div>
+                    <p id="matchPanelSubtitle" class="empty-state-inline">Review your upcoming match for this round</p>
+                    <div id="matchAssignmentCards" class="match-assignment-grid">
+                        <!-- Dynamically populated: game, opponent, Discord channel + lobby creator info -->
+                    </div>
+                    <div class="lobby-overlay-footer" id="matchPanelWaitingFooter">
+                        Waiting for admin to open the lobby...
+                    </div>
+                    <div class="lobby-ready-controls" id="lobbyReadyControls" style="display: none;">
+                        <div id="lobbyCreatorRole" style="display: none;">
+                            <!-- Shows lobby creator banner if applicable -->
+                        </div>
+                        <div class="lobby-ready-buttons">
+                            <button class="btn primary lobby-ready-btn" id="readyGameLobbyBtn" onclick="setReadyStatus('gameLobby')">
+                                &#x1F3AE; Game Lobby
+                            </button>
+                            <button class="btn primary lobby-ready-btn" id="readyDiscordBtn" onclick="setReadyStatus('discord')">
+                                &#x1F3A7; Discord
+                            </button>
+                        </div>
+                        <div id="teammateConfirmList" class="teammate-confirm-list">
+                            <!-- Dynamically populated: confirm on behalf of teammates -->
+                        </div>
+                        <div id="readyStatus" class="ready-status">
+                            <!-- Dynamically populated: per-team two-status readiness -->
+                        </div>
                     </div>
                 </div>
 
