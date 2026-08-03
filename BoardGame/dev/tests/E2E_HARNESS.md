@@ -588,6 +588,75 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   `finally` block, same pattern as `e2e-navbar-primary-switch.js` — confirmed
   the restore lands back on that script's same baseline assumption
   (`assignedTournamentId === 'e2e-disposable-1'`, team 1 "Team Alpha").
+- `e2e-force-advance-parity.js` — regression/verification test for TODO.md
+  Task 18 ("'⚠ Force' label rename + per-slot Force parity"). Found a THIRD
+  "⚠ Force" label the original scoping missed: besides the global button in
+  `admin-improved-adapter.js:1257` (JS-built copy, used by
+  `_restoreFlowPanelDOM()`) and the per-slot button in `phase-manager.js:1513`
+  (rendered into `#phaseIndicatorBar`, which only exists on god.html — so
+  that button was previously reachable only there), `full/admin.html:120`
+  has its own STATIC copy of the same global-button markup baked directly
+  into the page's initial HTML — all three now read "⚠ Force Advance" (kept
+  the emoji, matching the pre-existing Force Advance confirmation modal's own
+  "⚠ Force Advance Phase" heading at `admin.html:600`). Also added the actual
+  parity feature: `_renderMatchSlotCards()` (admin-improved-adapter.js
+  ~line 644) now renders a per-slot "⚠ Force Advance" button on admin.html's
+  match slot cards, wired to the already-existing (previously unwired)
+  `window.forceAdvanceSlot(slot)` handler (admin-improved-adapter.js:1516),
+  hidden once that slot is `done` — same convention phase-manager.js's own
+  per-slot button already used. Part 1 (admin.html) seeds `matches_in_progress`
+  with both slots in 'setup' and zero queued matches for either (so slot 1's
+  sole requirement is unmet and the normal "Open Lobby ▶" button doesn't even
+  render — only "⚡ Auto-Generate" does), confirms the new button is present/
+  visible/labeled correctly, clicks it (real DOM click) and asserts slot 1
+  force-advances past 'setup' despite the unmet requirement while slot 2
+  (never clicked) stays untouched, and non-destructively verifies the
+  EXISTING global Force button still opens/cancels its modal correctly
+  without touching phase state, THEN (added after code review flagged that
+  nothing in dev/tests/ actually exercised the global button's CONFIRM
+  action) opens the modal a second time against a freshly-seeded
+  `hex_placement_1` with a genuinely unmet requirement (a synthetic
+  `pendingHexWins` entry — the same gate e2e-hex-placement-gate.js proves
+  BLOCKS a normal, unforced `advancePhase()`) and clicks the real "Force
+  Advance" confirm button (`confirmForceAdvance()` ->
+  `_phaseManager.advancePhase(true)`), asserting `currentPhase` actually
+  bypasses the gate and lands on `spell_window_1` (the real next phase) —
+  closing the "per-slot force is tested, whole-phase force-bypass itself
+  isn't" gap. Part 2 (god.html) repeats the seed/click/assert shape (per-slot
+  only — god.html has no global Force button/modal to test, per the
+  investigation above) against the pre-existing per-slot button in
+  `#phaseIndicatorBar` to confirm the rename didn't break it. **Auto-advance
+  gotcha found while building this test**: force-advancing a slot with zero
+  queued matches from 'setup' to 'lobby' means `_getPlayersWhoMustReadyForSlot()`
+  has nobody to wait for, so the slot's 'lobby' requirements report `met:
+  true` immediately and `recheckRequirements()`'s existing 100ms lobby-auto-
+  advance timer pushes it on to 'playing' right after — a second real
+  Firestore write from the app's own reactive logic, not something the test
+  triggers. The test tolerates either resulting state (`!== 'setup'`, not a
+  specific value) and waits 2s of quiet time before restoring so that
+  trailing write can't clobber the restore. **A second race found building
+  the confirm-path scenario**: `confirmForceAdvance()` is async and awaits
+  `advancePhase(true)` (which flips `gameState.currentPhase` synchronously,
+  well before its own internal Firestore save resolves) BEFORE calling
+  `closeForceAdvanceModal()` — polling on the phase change alone races the
+  modal-close call, which only runs once the whole `advancePhase(true)`
+  promise (save + logAction + re-render) has settled. Fixed by polling on
+  the modal's `display` becoming `'none'` instead (the last thing
+  `confirmForceAdvance()` does), which transitively guarantees the phase
+  change already landed too. Also hit and fixed a render crash while seeding
+  the synthetic `pendingHexWins` entry: `_renderActionItems()`
+  (admin-improved-adapter.js ~line 1009) unconditionally reads
+  `win.teamNames[idx]` for every relevant pending win with no fallback for a
+  missing `teamNames` array — a synthetic entry needs both `teamIds` AND a
+  same-length `teamNames` array or the very next display update throws and
+  aborts admin.js's render pass (same failure shape as the
+  `getGameDisplayName()` bug `e2e-ready-check.js` found). Confirmed passing
+  (multiple runs, deterministic) against live `e2e-disposable-1`. Snapshots/
+  restores `currentPhase`/`lobbyReady` on both pages, plus `pendingHexWins`
+  on admin.html (Scenario B only), in `finally` blocks — plain reassign +
+  `saveGameState()` is safe for all three here (unlike `board`/`players`)
+  since the test only ever writes back the exact same key set each field
+  already had, never adds a new key.
 - `.env.e2e` (gitignored, not in git) — real credentials. Copy `.env.e2e.example`
   to create it if missing.
 

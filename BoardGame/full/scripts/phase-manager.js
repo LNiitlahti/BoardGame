@@ -1510,7 +1510,7 @@ class PhaseManager {
                     </div>
                     <div class="match-slot-reqs">${reqsHtml}</div>
                     ${isDone ? '' : `<button class="btn-small primary" ${allMet ? '' : 'disabled'} onclick="advanceSlot(${slot})">Advance Match ${slot} ▶</button>`}
-                    <button class="btn-small secondary" onclick="forceAdvanceSlot(${slot})" title="Force advance (skip requirements)" ${isDone ? 'style="display:none"' : ''}>⚠ Force</button>
+                    <button class="btn-small secondary" onclick="forceAdvanceSlot(${slot})" title="Force advance (skip requirements)" ${isDone ? 'style="display:none"' : ''}>⚠ Force Advance</button>
                 </div>`;
         }).join('');
     }

@@ -649,6 +649,7 @@
                     </div>
                     <div class="match-slot-guidance">${_esc(step.text)}</div>
                     ${btnHtml}
+                    <button class="btn-small secondary" onclick="forceAdvanceSlot(${slot})" title="Force advance (skip requirements)" ${isDone ? 'style="display:none"' : ''}>⚠ Force Advance</button>
                 </div>`;
         }).join('');
     }
@@ -1254,7 +1255,7 @@
                         '<span id="phaseExtraControls" style="display: none;"></span>' +
                         '<span id="lobbyAdminControls" style="display: none;"></span>' +
                         '<span id="spellWindowControls" style="display: none;"></span>' +
-                        '<button class="btn-small secondary" id="forceAdvanceBtn" onclick="forceAdvancePhase()" title="Force advance (skip requirements)">⚠ Force</button>' +
+                        '<button class="btn-small secondary" id="forceAdvanceBtn" onclick="forceAdvancePhase()" title="Force advance (skip requirements)">⚠ Force Advance</button>' +
                         '<button class="btn-small secondary" id="insertBreakBtn" onclick="insertBreak()" title="Insert break">⏸ Break</button>' +
                         '<button class="btn-small secondary" id="broadcastToggleBtn" onclick="toggleBroadcastBar()" title="Broadcast a message to view screens">\u{1F4E2}</button>' +
                         '<span id="breakIntervalBadge" class="break-interval-badge" onclick="openBreakSettings()" title="Break interval settings" style="display: none;"></span>' +
