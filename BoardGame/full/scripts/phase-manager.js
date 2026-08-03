@@ -961,6 +961,26 @@ class PhaseManager {
                 }, 100);
             });
         }
+
+        // Challenge lobby auto-advances the same way: 'lobby' -> 'ready'
+        // (not a Start yet — mirrors slots' lobby->playing, where the admin
+        // still clicks Start on the actual match afterward) the moment
+        // everyone's ready.
+        if (phase === 'challenge_game' && this.isChallengeLobbyActive() && !this._autoAdvanceChallengeLobbyPending) {
+            if (this.getChallengeLobbyRequirements().every(r => r.met)) {
+                this._autoAdvanceChallengeLobbyPending = true;
+                setTimeout(async () => {
+                    if (this.isChallengeLobbyActive()) {
+                        this._gameState.currentPhase.challengeLobbyState = 'ready';
+                        await this._save();
+                        this._ui.showStatus('Challenge lobby ready — start the match.', 'success');
+                        this.recheckRequirements();
+                        this.renderPhaseIndicator();
+                    }
+                    this._autoAdvanceChallengeLobbyPending = false;
+                }, 100);
+            }
+        }
     }
 
     getPhaseRequirements() {
@@ -1346,6 +1366,12 @@ class PhaseManager {
      * than the one in progress, are excluded (a mass-imported future round
      * must not inflate this round's ready list). Untagged matches count for
      * either slot, matching getSlotRequirements' policy.
+     *
+     * `slot` also accepts the pseudo-slot 'challenge' — challenge matches
+     * are already tagged `.slot === 'challenge'` at creation (see
+     * admin-improved-adapter.js's _computeCurrentSlot), so this same
+     * function resolves a challenge match's ready-list too, just inverting
+     * which side of the isChallenge check counts.
      * @returns {string[]}
      */
     _getPlayersWhoMustReadyForSlot(slot) {
@@ -1357,7 +1383,8 @@ class PhaseManager {
         const activeTeamIds = new Set();
         const activePlayerIds = new Set();
         queue.forEach(match => {
-            if (match.isBreak || match.status === 'completed' || match.isChallenge) return;
+            if (match.isBreak || match.status === 'completed') return;
+            if (slot === 'challenge' ? match.isChallenge !== true : match.isChallenge === true) return;
             if (match.slot !== undefined && match.slot !== slot) return;
             if (match.roundNumber !== undefined && currentRoundNumber !== undefined &&
                 match.roundNumber !== currentRoundNumber) return;
@@ -1449,6 +1476,120 @@ class PhaseManager {
             playerCount: mustReady.length,
             roundNumber: gs.currentPhase?.roundNumber,
             matchSlot: slot
+        }, { lobbyReady: prevLobbyState });
+    }
+
+    // ── Challenge Lobby ─────────────────────────────────────────
+    //
+    // Challenges never got the setup->lobby->playing->done sub-phase
+    // machine matches_in_progress's slots have — challenge_game is a flat
+    // phase, so a challenge went straight from "queued" to "ongoing" with
+    // no ready-check at all. This is a smaller parallel state machine
+    // (just lobby->ready, since only one challenge is ever in flight at a
+    // time — challengeLobbyState naturally resets to undefined on every
+    // fresh entry to challenge_game, since advancePhase()/loopBack() both
+    // replace currentPhase wholesale) reusing the same lobbyReady
+    // tombstone/dual-status/auto-advance mechanics as the match slots,
+    // via the 'challenge' pseudo-slot _getPlayersWhoMustReadyForSlot
+    // already supports.
+
+    /** 'lobby' | 'ready' | null (not opened yet, or not in challenge_game) */
+    getChallengeLobbyState() {
+        if (this.getCurrentPhase() !== 'challenge_game') return null;
+        return this._gameState.currentPhase?.challengeLobbyState || null;
+    }
+
+    isChallengeLobbyActive() {
+        return this.getChallengeLobbyState() === 'lobby';
+    }
+
+    /** Same shape as getSlotRequirements('lobby'), standalone for challenges. */
+    getChallengeLobbyRequirements() {
+        const gs = this._gameState;
+        const lobbyReady = gs.lobbyReady || {};
+        const mustReady = this._getPlayersWhoMustReadyForSlot('challenge');
+
+        if (mustReady.length === 0) {
+            return [{ label: 'No players need to ready up', met: true }];
+        }
+
+        const lobbyCount = mustReady.filter(uid => {
+            const r = lobbyReady[uid];
+            return r?.gameLobby === true || r?.ready === true;
+        }).length;
+        const discordCount = mustReady.filter(uid => {
+            const r = lobbyReady[uid];
+            return r?.discord === true || r?.ready === true;
+        }).length;
+
+        return [
+            { label: `Game lobby: ${lobbyCount}/${mustReady.length}`, met: lobbyCount === mustReady.length },
+            { label: `Discord: ${discordCount}/${mustReady.length}`, met: discordCount === mustReady.length }
+        ];
+    }
+
+    /** Open the ready-check for the current pending challenge. */
+    async openChallengeLobby() {
+        if (this.getCurrentPhase() !== 'challenge_game') {
+            this._ui.showStatus('Not currently in the challenge game phase.', 'warning');
+            return false;
+        }
+        const gs = this._gameState;
+        gs.currentPhase.challengeLobbyState = 'lobby';
+
+        const prevLobbyReady = { ...(gs.lobbyReady || {}) };
+        this._resetLobbyReadyForSlot('challenge');
+        this._logAction('lobby_reset', 'phase', {
+            roundNumber: gs.currentPhase.roundNumber,
+            matchSlot: 'challenge'
+        }, { lobbyReady: prevLobbyReady });
+
+        await this._save();
+        this._ui.showStatus('Challenge lobby opened — waiting for players to ready up.', 'success');
+        this.recheckRequirements();
+        this.renderPhaseIndicator();
+        return true;
+    }
+
+    /** Force all challenge participants to ready status (admin override). */
+    forceAllChallengeReady() {
+        if (!this.isChallengeLobbyActive()) return;
+
+        const gs = this._gameState;
+        if (!gs.lobbyReady) gs.lobbyReady = {};
+
+        const mustReady = this._getPlayersWhoMustReadyForSlot('challenge');
+        const teams = gs.teams || [];
+        const prevLobbyState = { ...(gs.lobbyReady || {}) };
+
+        const now = new Date().toISOString();
+        mustReady.forEach(uid => {
+            const existing = gs.lobbyReady[uid];
+            if (existing?.gameLobby && existing?.discord) return;
+            let playerName = uid;
+            let teamId = null;
+            for (const team of teams) {
+                const player = (team.players || []).find(p => p.uid === uid);
+                if (player) {
+                    playerName = player.name || player.email || uid;
+                    teamId = team.id;
+                    break;
+                }
+            }
+            gs.lobbyReady[uid] = {
+                gameLobby: true,
+                discord: true,
+                gameLobbyAt: existing?.gameLobbyAt || now,
+                discordAt: existing?.discordAt || now,
+                teamId: teamId,
+                name: playerName
+            };
+        });
+
+        this._logAction('force_all_ready', 'admin', {
+            playerCount: mustReady.length,
+            roundNumber: gs.currentPhase?.roundNumber,
+            matchSlot: 'challenge'
         }, { lobbyReady: prevLobbyState });
     }
 
