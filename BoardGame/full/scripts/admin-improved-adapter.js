@@ -725,6 +725,29 @@
                 ? `<button class="btn-small primary" ${step.primary.disabled ? 'disabled' : ''} onclick="runSlotPrimaryAction(${slot})">${_esc(step.primary.label)}</button>`
                 : '';
 
+            // While a match is live, show what's ACTUALLY being played (game +
+            // matchup) instead of just a generic "N match(es) live" count, and
+            // let the admin confirm the result directly from the slot card —
+            // previously the only way in was to go find the same match's card
+            // in the separate Match Queue panel below.
+            const liveMatchesHtml = sub === 'playing'
+                ? _ongoingSlotMatches(slot).map(game => {
+                    const gameName = (typeof getGameDisplayName === 'function')
+                        ? getGameDisplayName(game.game || game.gameType) : (game.game || 'Match');
+                    const matchup = (game.teams || game.sides || [])
+                        .map(side => getMatchTeamPlayers(side).map(p => p.name).filter(Boolean).join(', ') || 'TBD')
+                        .join(' vs ');
+                    return `
+                        <div class="live-match-card">
+                            <div class="live-match-info">
+                                <span class="live-match-game">${_esc(game.matchNumber ? '#' + game.matchNumber + ' ' : '')}${_esc(gameName)}</span>
+                                <span class="live-match-players">${_esc(matchup)}</span>
+                            </div>
+                            <button class="btn-small primary" onclick="event.stopPropagation(); openQuickConfirm(${game.id})">${ICON_SVGS.check} Confirm Game Result</button>
+                        </div>`;
+                }).join('')
+                : '';
+
             return `
                 <div class="match-slot-panel${isDone ? ' slot-done' : ''}${isTarget ? ' slot-target' : ''}">
                     <div class="match-slot-header">
@@ -733,6 +756,7 @@
                         ${sub === 'setup' ? `<button class="btn-small secondary" onclick="setTargetMatchSlot(${slot})" title="New matches go to this slot">${isTarget ? ICON_SVGS.check + ' Target' : 'Set Target'}</button>` : ''}
                     </div>
                     <div class="match-slot-guidance">${_esc(step.text)}</div>
+                    ${liveMatchesHtml}
                     ${btnHtml}
                     <button class="btn-small secondary" onclick="forceAdvanceSlot(${slot})" title="Force advance (skip requirements)" ${isDone ? 'style="display:none"' : ''}>${ICON_SVGS.triangleAlert} Force Advance</button>
                 </div>`;

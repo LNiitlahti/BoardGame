@@ -479,6 +479,47 @@
   align-self: flex-start;
 }
 
+/* Live match info + direct "Confirm Game Result" shortcut on a playing
+   slot card — previously the slot card only said "N match(es) live",
+   giving no indication of what was actually being played, and the admin
+   had to go find the same match's card in the separate Match Queue panel
+   to record a result. */
+.live-match-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-sm, 6px);
+  padding: 8px 10px;
+}
+
+.live-match-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.live-match-game {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary, #f7f0e3);
+}
+
+.live-match-players {
+  font-size: 0.72rem;
+  color: var(--text-tertiary, rgba(247, 240, 227, 0.6));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-match-card .btn-small {
+  flex-shrink: 0;
+}
+
 /* ==================== ANIMATION ==================== */
 
 @keyframes fadeIn {
