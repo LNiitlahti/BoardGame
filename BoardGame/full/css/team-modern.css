@@ -1351,15 +1351,39 @@
   letter-spacing: 0.04em;
 }
 
-.match-assignment-card .opponent-info {
-  color: #9aa1ad;
-  font-size: 0.9rem;
+.match-assignment-card .match-sides {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.match-assignment-card .opponent-players {
-  font-size: 0.8rem;
-  color: #64748b;
-  margin-top: 6px;
+.match-side-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 80px;
+}
+
+.match-side-col.match-side-mine .match-side-player {
+  background: rgba(200, 179, 126, 0.08);
+  border: 1px solid rgba(200, 179, 126, 0.25);
+  border-radius: 6px;
+}
+
+.match-side-player {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 3px 8px;
+}
+
+.match-vs {
+  font-family: 'Russo One', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #c8b37e;
+  padding: 0 4px;
 }
 
 /* Lobby Ready Controls */

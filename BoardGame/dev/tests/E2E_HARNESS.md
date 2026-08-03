@@ -439,7 +439,14 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   was removed from every page — not part of the team's workflow yet, may
   come back later. `lobbyCreators` is still seeded on this test's synthetic
   queue entry (harmless, matches real assignment output) but no longer
-  asserted against, since nothing renders it now.
+  asserted against, since nothing renders it now. **Updated again (later,
+  richer match info)**: the match card's "vs `<opponent team name>`" line
+  (wrong/incomplete for a split-format side spanning more than one team)
+  was replaced with every side's actual players, color-coded by team, with
+  a "YOU" tag on the player's own row — also now surfaces teammates on your
+  own side, which the old card never showed. STEP 1's "opponent team name"
+  assertion was replaced with assertions that both opponent placeholders'
+  names appear and that the player's own side (self + teammate) does too.
 - `e2e-vote-toast-position.js` — regression test for TODO.md Task 14
   ("team.html: the vote-submitted notification/toast overlaps the team
   scores section"). Root cause: team.html's vote-submitted message is NOT

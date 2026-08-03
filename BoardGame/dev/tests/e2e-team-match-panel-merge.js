@@ -112,6 +112,16 @@
  * synthetic queue entry below (harmless, matches real `assignDiscordAndLobby()`
  * output) but no longer asserted against, since nothing renders it now.
  *
+ * UPDATED AGAIN (later, richer match info): the card's "vs <opponent team
+ * name>" line (which collapsed to a single team name from just the first
+ * opponent player found — wrong/incomplete for a split-format side drawing
+ * from more than one team) was replaced with every side's actual players,
+ * color-coded by team, with a "YOU" tag on the current player's own row.
+ * This also surfaces teammates on your own side, which the old card never
+ * showed at all. STEP 1's "opponent team name" assertion was replaced with
+ * assertions that both opponent placeholders' names appear, and that the
+ * player's own side (self + teammate) does too.
+ *
  * Run: cd BoardGame && node dev/tests/e2e-team-match-panel-merge.js
  */
 require('dotenv').config({ path: __dirname + '/.env.e2e' });
@@ -248,7 +258,10 @@ async function main() {
       assert(setupState.overlayCount === 1, `STEP 1: expected exactly 1 .lobby-overlay element left on the page (spellPhaseOverlay -- #matchPanelSection is now a plain inline section, not an overlay), got ${setupState.overlayCount}`);
       assert(!/No matches assigned/.test(setupState.cardsHtml), 'STEP 1 (regression check for the renderMatchCardsWithDiscord fix): match card should show real match info, not the empty state');
       assert(/e2e-test-game/.test(setupState.cardsHtml), 'STEP 1: match card should show the game name');
-      assert(/Team Beta/.test(setupState.cardsHtml), 'STEP 1: match card should show the opponent team name');
+      assert(/Placeholder A/.test(setupState.cardsHtml) && /Placeholder B/.test(setupState.cardsHtml),
+        'STEP 1: match card should show the opponent side\'s actual players (not a collapsed team-name label)');
+      assert(/>YOU/.test(setupState.cardsHtml) && /TD \(E2E\)/.test(setupState.cardsHtml),
+        'STEP 1: match card should show the player\'s own side too (YOU tag + teammate "TD (E2E)")');
       assert(/Discord Channel #1/.test(setupState.cardsHtml), 'STEP 1: match card should show the assigned Discord channel');
       assert(setupState.footerDisplay !== 'none', 'STEP 1: "waiting for admin" footer should be visible during setup');
       assert(/[Ww]aiting for admin/.test(setupState.footerText || ''), `STEP 1: footer text should mention waiting for admin, got: "${setupState.footerText}"`);

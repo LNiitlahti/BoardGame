@@ -1925,17 +1925,16 @@ function renderMatchCardsWithDiscord(container) {
         const gameId = match.gameType || match.game || '';
         const gameName = resolveGameName(gameId);
         const gameImage = resolveGameImage(gameId);
+        const matchNumber = match.matchNumber;
+        const gameLabel = matchNumber ? `#${matchNumber} ${gameName}` : gameName;
         const matchTeams = match.teams || match.sides || [];
 
         // Resolve each side's players uniformly (handles both real and
         // legacy/synthetic side shapes), then find which side is ours.
         const resolvedSides = matchTeams.map(side => ({ side, players: getMatchSidePlayers(side) }));
-        const mine = resolvedSides.find(({ players }) =>
-            players.some(p =>
-                (currentUser?.uid && p.id === currentUser.uid) ||
-                teamData.players?.some(tp => tp.uid === p.id || tp.id === p.id || tp.name === p.name)
-            )
-        );
+        const isMe = p => (currentUser?.uid && p.id === currentUser.uid) ||
+            teamData.players?.some(tp => tp.uid === p.id || tp.id === p.id || tp.name === p.name);
+        const mine = resolvedSides.find(({ players }) => players.some(isMe));
         const mySide = mine?.side;
         const mySideId = mySide?.id || 'TEAM_A';
 
@@ -1945,26 +1944,27 @@ function renderMatchCardsWithDiscord(container) {
             ? `<div class="discord-channel-badge">${ICON_SVGS.headphones} Discord Channel #${discordChannel}</div>`
             : '';
 
-        // Opponent info
-        const opponentEntry = resolvedSides.find(r => r.side !== mySide);
-        const opponentNames = opponentEntry?.players?.length
-            ? opponentEntry.players.map(p => p.name).join(', ')
-            : 'TBD';
-        const opponentTeamId = opponentEntry?.players?.[0]?.teamId;
-        const opponentTeam = opponentTeamId != null
-            ? gameData.teams?.find(t => String(t.id) === String(opponentTeamId))
-            : null;
-        const opponentTeamName = opponentTeam?.name || 'Opponent';
-        const opponentColor = getHexColor(opponentTeam?.color);
+        // Show every side's actual players, not a single "opponent team"
+        // label -- a split-format side (e.g. the 2v2 half of a linked
+        // 3v3+2v2 pair) can draw players from more than one team, so
+        // collapsing it to "vs <first player's team>" was often wrong or
+        // incomplete. This also directly answers "who am I playing WITH"
+        // (teammates on my own side) as well as "who am I playing AGAINST".
+        const sidesHTML = resolvedSides.map(({ side, players }) => {
+            const isMySide = side === mySide;
+            const rowsHTML = players.map(p => {
+                const color = getHexColor(p.color);
+                const youTag = isMe(p) ? '<strong>YOU</strong> &middot; ' : '';
+                return `<div class="match-side-player" style="color: ${color};">${youTag}${_escapeHtmlSafe(p.name)}</div>`;
+            }).join('') || '<div class="match-side-player" style="color:#64748b;">TBD</div>';
+            return `<div class="match-side-col${isMySide ? ' match-side-mine' : ''}">${rowsHTML}</div>`;
+        }).join('<div class="match-vs">VS</div>');
 
         return `
             <div class="match-assignment-card">
                 ${gameImage ? `<img src="${gameImage}" class="game-image" alt="${gameName}" onerror="this.style.display='none'">` : ''}
-                <div class="game-name">${gameName}</div>
-                <div class="opponent-info">
-                    vs <span style="color: ${opponentColor}; font-weight: 600;">${opponentTeamName}</span>
-                </div>
-                <div class="opponent-players">${opponentNames}</div>
+                <div class="game-name">${gameLabel}</div>
+                <div class="match-sides">${sidesHTML}</div>
                 ${discordHTML}
             </div>
         `;
