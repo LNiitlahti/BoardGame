@@ -801,6 +801,15 @@ class GodApp {
             this.phase.renderPhaseIndicator();
         }
 
+        // Standing pending-hex-placement banner — stays visible across EVERY
+        // phase (not just hex_placement_1/2), until each team's entry is
+        // cleared by a real placement (TODO.md Task 15). Must be re-rendered
+        // on every updateDisplay() pass, not just right after
+        // confirmResult()/clearPendingHexWin(), so a page refresh restores it
+        // from the now-persisted gameState.pendingHexWins instead of it
+        // staying hidden until the next hex-related action on this page.
+        if (this.result) this.result.updatePendingHexNotification();
+
         // Spell phase turn advancement (detect team.html direct writes)
         if (this.spells && this.gameState.spellPhase?.isActive) {
             this.spells.checkTurnAdvancement();
@@ -1201,7 +1210,6 @@ class GodApp {
         window.openQuickConfirm = (id) => app.result.openQuickConfirm(id);
         window.closeResultConfirm = () => app.result.closeResultConfirm();
         window.quickConfirmResult = (id, idx) => app.result.quickConfirmResult(id, idx);
-        window.dismissPendingHexBanner = () => app.result.dismissPendingHexBanner();
         window.openCorrectResultModal = (id) => app.result.openCorrectResultModal(id);
         window.closeCorrectResultModal = () => app.result.closeCorrectResultModal();
         window.selectCorrectedWinner = (id, idx) => app.result.selectCorrectedWinner(id, idx);

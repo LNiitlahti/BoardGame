@@ -249,7 +249,7 @@ class BoardManager {
             }, { heartHexControl: { [coord]: oldOccupier || null } });
         }
 
-        this._clearPendingHexWin(teamId);
+        await this._clearPendingHexWin(teamId);
 
         // Room hex spell draw (SpellEngine integration)
         const isRoomHex = (this._gameState.rooms || []).includes(coord);

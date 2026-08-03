@@ -37,3 +37,22 @@ Most correct, most invasive. Requires Firestore rules changes to actually enforc
 - Testing: re-run the Round 2 two-simultaneous-winners scenario from this session, confirm the picker now excludes non-pending teams, confirm a forced page reload mid-round doesn't lose the pending list.
 
 Not scheduled — logged here so it's not re-discovered from scratch next time it comes up.
+
+## Status update (2026-08-02, TODO.md Task 15)
+
+**Option A is now done.** `pendingHexWins`/`ResultManager._pendingHexWins` is
+persisted to `gameState.pendingHexWins` (accessor pair on `ResultManager` in
+result-manager.js; a `window` accessor in admin.js), restored automatically
+on every Firestore snapshot — a refresh mid-hex-placement no longer resets
+the gate. See `dev/tests/e2e-pending-hex-persistence.js` and
+`dev/tests/E2E_HARNESS.md` for the full writeup and verification.
+
+**Option B (restricting the team-picker to pending-eligible teams) turned
+out to already be built**, independently of this doc's recommendation — see
+admin-improved-adapter.js's `_augmentTeamPicker`/`_pendingTeamIdsSet`
+(gates every non-owed team behind a skippable warning, badges the correct
+team). Not touched as part of Task 15; only the persistence layer it reads
+from (`pendingHexWins`) changed.
+
+Option C (full transactional placement queue) remains out of scope, per the
+original recommendation.

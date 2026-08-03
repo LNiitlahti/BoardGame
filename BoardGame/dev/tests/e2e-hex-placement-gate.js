@@ -22,10 +22,18 @@
  *     per `confirmResult()` call for a non-challenge match, holding the
  *     `teamIds` of whichever team(s) got full credit — see result-manager.js
  *     lines 634-651).
- *   - `_pendingHexWins` is an in-memory instance field on ResultManager,
- *     never written into `gameState` / Firestore. It always starts empty on
- *     a fresh page load, so this test needs no cross-run snapshot/restore
- *     for it (there is nothing in Firestore to restore).
+ *   - UPDATE (TODO.md Task 15): `_pendingHexWins` used to be a plain
+ *     in-memory instance field on ResultManager, never written into
+ *     `gameState`/Firestore — always starting empty on a fresh page load,
+ *     needing no cross-run snapshot/restore. It's now backed by
+ *     `gameState.pendingHexWins` (a get/set accessor pair on ResultManager,
+ *     see result-manager.js), persisted the same way `gameQueue`/`teams`
+ *     are, specifically so a refresh mid-hex-placement no longer resets this
+ *     gate to "all clear". That means this test DOES now need to
+ *     snapshot/restore `gameState.pendingHexWins` too (see below) — if an
+ *     assertion throws between pushing the pending win and clearing it via
+ *     real placement, without a restore that entry would leak into
+ *     `e2e-disposable-1` permanently instead of vanishing with the page.
  *   - Placing a hex via `BoardManager.assignTeamToHex(coord, teamId)` (the
  *     same function the "assign team to hex" UI button calls) ends with
  *     `this._clearPendingHexWin(teamId)`, which removes `teamId` from the
@@ -150,7 +158,9 @@ async function main() {
       currentPhase: JSON.parse(JSON.stringify(window.godApp.gameState.currentPhase || null)),
       teams: JSON.parse(JSON.stringify(window.godApp.gameState.teams || [])),
       gamesPlayed: window.godApp.gameState.gamesPlayed || 0,
-      gameHistory: JSON.parse(JSON.stringify(window.godApp.gameState.gameHistory || []))
+      gameHistory: JSON.parse(JSON.stringify(window.godApp.gameState.gameHistory || [])),
+      // Now persisted (TODO.md Task 15) — must be restored too, see header comment.
+      pendingHexWins: JSON.parse(JSON.stringify(window.godApp.gameState.pendingHexWins || []))
     }));
 
     const matchId = Date.now();
@@ -283,9 +293,10 @@ async function main() {
         gs.teams = orig.teams;
         gs.gamesPlayed = orig.gamesPlayed;
         gs.gameHistory = orig.gameHistory;
+        gs.pendingHexWins = orig.pendingHexWins;
         return window.godApp.saveGameState();
       }, original);
-      console.log('Cleared test hex and restored original gameQueue/currentPhase/teams/gamesPlayed/gameHistory.');
+      console.log('Cleared test hex and restored original gameQueue/currentPhase/teams/gamesPlayed/gameHistory/pendingHexWins.');
     }
   } finally {
     await browser.close();

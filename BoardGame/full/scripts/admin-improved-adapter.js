@@ -1447,9 +1447,19 @@
         _highlightNextQueueItem();
         _injectLiveMatchControls();
 
-        // Suppress the old pendingHexBanner (Flow Panel handles it now)
-        const oldBanner = document.getElementById('pendingHexBanner');
-        if (oldBanner) oldBanner.remove();
+        // Keep the standing pendingHexBanner in sync on every render, across
+        // EVERY phase — not just hex_placement_1/2 (TODO.md Task 15). It used
+        // to be unconditionally removed here with a "Flow Panel handles it
+        // now" comment, but the Flow Panel's own inline hex_placement_1/2
+        // text (_computeNextStep) and action-item pills (_renderActionItems)
+        // only ever appear for that one phase's/action's own rendering —
+        // there was no indication left anywhere once the admin moved on to a
+        // later phase (spell_window, board_resolved, ...) while a team's hex
+        // was still outstanding. updatePendingHexNotification() itself
+        // already no-ops into removing the banner once pendingHexWins is
+        // empty, so this call is safe to run on every render regardless of
+        // phase or whether anything is actually pending.
+        if (typeof updatePendingHexNotification === 'function') updatePendingHexNotification();
     };
 
     // ══════════════════════════════════════════════════════════════
@@ -2163,6 +2173,15 @@
             if (win) {
                 win.roundNumber = roundNumber;
                 win.slot = slot;
+                // _origConfirmResult() already persisted the pushed entry
+                // (see admin.js confirmResult), but that save ran BEFORE
+                // this slot/roundNumber tagging — without this second save,
+                // the tag would only reach Firestore incidentally, on
+                // whatever unrelated save happens to run next. Since
+                // _relevantPendingWinsForPhase() depends on `.slot` to keep
+                // Match 1 / Match 2's hex_placement gates independent, this
+                // needs to be reliably persisted too.
+                await saveGameState();
             }
         }
     };

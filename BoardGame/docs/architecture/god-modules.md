@@ -210,7 +210,7 @@ flowchart TD
 | BoardManager | 4 | `assignTeamToHex`, `toggleRoomHex`, `closeTeamPicker`, `highlightValidPlacements` |
 | MatchQueueManager | 14 | `startMatch`, `removeFromQueue`, `dragQueueItem`, `addBreakToQueue`, `confirmClearQueue` |
 | MatchCreationManager | 24 | `dragTeam`, `dropToSide`, `addMatchToQueue`, `confirmChallengeSetup`, `generateSuggestedMatches`, `openGameManager` |
-| ResultManager | 9 | `openQuickConfirm`, `closeResultConfirm`, `quickConfirmResult`, `dismissPendingHexBanner`, `openCorrectResultModal`, `closeCorrectResultModal`, `selectCorrectedWinner`, `confirmCorrectResult`, `acceptVotedResult`, `overrideVotedResult` |
+| ResultManager | 8 | `openQuickConfirm`, `closeResultConfirm`, `quickConfirmResult`, `openCorrectResultModal`, `closeCorrectResultModal`, `selectCorrectedWinner`, `confirmCorrectResult`, `acceptVotedResult`, `overrideVotedResult` |
 | StatsManager | 6 | `recalculateTeamStats`, `advanceRound`, `closeNextRoundModal`, `confirmAdvanceRound`, `adjustPointsWithReason`, `setTeamPointsWithReason` |
 | BackupManager | 3 | `createManualBackup`, `refreshBackups`, `restoreFromBackup` |
 | UndoManager | 3 | `openUndoConfirmModal`, `closeUndoConfirmModal`, `confirmUndoAction` |
