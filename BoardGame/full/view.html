@@ -1457,23 +1457,32 @@
         #broadcastTicker .bt-text { opacity: 0; transition: opacity 0.35s ease; }
         #broadcastTicker.bt-text-visible .bt-text { opacity: 1; }
 
-        /* ── Hex Phase overlay (scoring_hex / hex_placement_1/2) ─── */
+        /* ── Hex Phase overlay (scoring_hex / hex_placement_1/2) ───
+           Replaces the dual-arena's two idle "VS" boxes (same region:
+           top var(--header-h), height var(--arena-h)) rather than floating
+           over the hex board -- neither phase ever has a live match, so
+           that space is otherwise wasted. Rows use flex-wrap instead of a
+           single column so the extra width (a full arena's worth, not a
+           narrow floating card) gets used instead of leaving it empty. */
         .dm-hex-phase-overlay {
-            position: absolute; top: 90px; left: 50%; transform: translateX(-50%);
-            z-index: 5; pointer-events: none;
-            background: var(--bg-glass); border: 1px solid var(--border-gold, rgba(200,179,126,0.3));
-            border-radius: 14px; padding: 18px 28px;
-            min-width: 320px; max-width: 90%;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+            position: absolute; top: var(--header-h); left: 0; right: 0; height: var(--arena-h);
+            z-index: 26; pointer-events: none;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: var(--bg-glass); border-bottom: 1px solid var(--border-gold, rgba(200,179,126,0.3));
+            padding: 16px 40px; box-sizing: border-box; overflow: hidden;
         }
         .dm-hex-score-title {
             display: flex; align-items: center; justify-content: center; gap: 8px;
-            font-family: 'Russo One', sans-serif; font-size: 22px; font-weight: 800;
+            font-family: 'Russo One', sans-serif; font-size: 24px; font-weight: 800;
             color: var(--gold-bright); text-transform: uppercase; letter-spacing: 2px;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
-        .dm-hex-score-title svg { width: 22px; height: 22px; }
-        .dm-hex-score-rows { display: flex; flex-direction: column; gap: 6px; }
+        .dm-hex-score-title svg { width: 24px; height: 24px; }
+        .dm-hex-score-rows {
+            display: flex; flex-flow: row wrap; justify-content: center;
+            gap: 10px 24px; max-width: 1700px;
+        }
+        .dm-hex-score-row, .dm-hex-placement-row { min-width: 280px; }
         .dm-hex-score-row {
             display: flex; align-items: center; gap: 16px;
             padding: 6px 12px; border-radius: 8px;
@@ -1875,6 +1884,15 @@
 
     </div>
 
+    <!-- Hex phase info overlay -- replaces the dual-arena's two idle "VS"
+         boxes during scoring_hex/hex_placement_1/2 (no match is ever live
+         in either phase, so those boxes have nothing real to show anyway).
+         Populated by DisplayManager._renderHexPhaseOverlay(), called every
+         onFirebaseSnapshot tick independent of the slide/rotation system.
+         Occupies the exact same region as .dual-arena (which gets hidden
+         while this is shown) rather than floating over the hex board. -->
+    <div class="dm-hex-phase-overlay" id="hexPhaseOverlay" style="display:none;"></div>
+
     <!-- ====== BOTTOM ZONE ====== -->
     <div class="bottom-zone">
 
@@ -1899,14 +1917,6 @@
                 </div>
             </div>
             <div class="board-wrap"><div class="scene-3d" id="cineScene"><div class="rig-3d" id="cineRig"><div id="hexBoard"></div></div></div><div id="cineWash"></div></div>
-            <!-- Hex phase info overlay -- populated by
-                 DisplayManager._renderHexPhaseOverlay(), called every
-                 onFirebaseSnapshot tick independent of the slide/rotation
-                 system. Shows the live scoring preview during scoring_hex,
-                 the pending placement queue during hex_placement_1/2, and
-                 is hidden/cleared for every other phase (incl. the other
-                 board_focus phase, board_resolved). -->
-            <div class="dm-hex-phase-overlay" id="hexPhaseOverlay" style="display:none;"></div>
         </div>
 
         <!-- UPCOMING QUEUE — Right panel -->

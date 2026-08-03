@@ -1659,9 +1659,14 @@ class DisplayManager {
     }
 
     /**
-     * Hex-phase info overlay on top of the board -- covers BOTH scoring_hex
-     * (live preview of what each team is about to score) and
-     * hex_placement_1/2 (the pending placement queue for that match slot).
+     * Hex-phase info overlay -- covers BOTH scoring_hex (live preview of
+     * what each team is about to score) and hex_placement_1/2 (the pending
+     * placement queue for that match slot). Replaces the dual-arena's two
+     * "VS" boxes (#match1/#match2) for the duration, since neither phase
+     * ever has a live match to show there anyway -- reuses that already-
+     * prominent, otherwise-idle space instead of floating a panel over the
+     * hex board.
+     *
      * Called unconditionally every onFirebaseSnapshot tick, independent of
      * the DISPLAY_MODES slide/rotation system entirely -- board_focus's
      * slide renderer used to own this, but hex_placement_1/2 have
@@ -1672,6 +1677,7 @@ class DisplayManager {
      */
     _renderHexPhaseOverlay(data) {
         const overlay = document.getElementById('hexPhaseOverlay');
+        const arena = document.querySelector('.dual-arena');
         if (!overlay) return;
 
         const phase = data.currentPhase?.name;
@@ -1682,8 +1688,10 @@ class DisplayManager {
         } else {
             overlay.style.display = 'none';
             overlay.innerHTML = '';
+            if (arena) arena.style.display = '';
             return;
         }
+        if (arena) arena.style.display = 'none';
         overlay.style.display = '';
     }
 
