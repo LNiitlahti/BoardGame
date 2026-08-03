@@ -14,18 +14,18 @@
 const DISPLAY_MODES = {
     break: {
         name: 'Break',
-        slides: ['break_screen', 'standings_large', 'board_focus'],
+        slides: ['break_screen'],
         hidePanels: true
     },
     // ── Scoring phases ──
     scoring_vp: {
         name: 'Scoring: Victory Points',
-        slides: ['results_large', 'standings_large'],
+        slides: ['results_large'],
         hidePanels: true
     },
     scoring_hex: {
         name: 'Scoring: Hex',
-        slides: ['board_focus', 'standings_large'],
+        slides: ['board_focus'],
         hidePanels: true
     },
     // ── Hex placement phases ──
@@ -72,13 +72,13 @@ const DISPLAY_MODES = {
     // ── Round advance ──
     round_advance: {
         name: 'Round Advance',
-        slides: ['results_large', 'standings_large'],
+        slides: ['results_large'],
         hidePanels: true
     },
     // ── Tournament end ──
     tournament_end: {
         name: 'Tournament End',
-        slides: ['winner_celebration', 'standings_large'],
+        slides: ['winner_celebration'],
         hidePanels: true
     }
 };
