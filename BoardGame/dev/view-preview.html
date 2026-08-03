@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>view.html Preview Harness</title>
+<style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: #0b0d10; color: #d6d9df; font-family: system-ui, sans-serif; }
+    .layout { display: grid; grid-template-columns: 340px 1fr; height: 100%; }
+    .panel {
+        overflow-y: auto; padding: 14px; background: #111318;
+        border-right: 1px solid rgba(255,255,255,0.08);
+    }
+    .panel h1 { font-size: 16px; margin: 0 0 4px; color: #f7ba32; }
+    .panel .sub { font-size: 12px; color: #8a8fa0; margin-bottom: 16px; }
+    .group { margin-bottom: 18px; }
+    .group h2 {
+        font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+        color: #8a8fa0; margin: 0 0 6px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 4px;
+    }
+    .scenario-btn {
+        display: block; width: 100%; text-align: left; margin-bottom: 4px;
+        padding: 7px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08);
+        background: rgba(255,255,255,0.03); color: #d6d9df; font-size: 13px; cursor: pointer;
+    }
+    .scenario-btn:hover { background: rgba(247,186,50,0.12); border-color: rgba(247,186,50,0.4); }
+    .scenario-btn.active { background: rgba(247,186,50,0.2); border-color: #f7ba32; color: #f7ba32; }
+    .broadcast-box {
+        margin-bottom: 18px; padding: 10px; border-radius: 8px;
+        background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.25);
+    }
+    .broadcast-box label { font-size: 11px; text-transform: uppercase; color: #00d4ff; display: block; margin-bottom: 6px; }
+    .broadcast-box input {
+        width: 100%; padding: 6px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15);
+        background: #0b0d10; color: #d6d9df; font-size: 13px; margin-bottom: 6px;
+    }
+    .broadcast-box .row { display: flex; gap: 6px; }
+    .broadcast-box button {
+        flex: 1; padding: 6px; border-radius: 4px; border: none; cursor: pointer; font-size: 12px; font-weight: 600;
+    }
+    .broadcast-box .set-btn { background: #00d4ff; color: #04101a; }
+    .broadcast-box .clear-btn { background: rgba(255,255,255,0.1); color: #d6d9df; }
+    .frame-wrap { position: relative; background: #000; }
+    iframe { width: 100%; height: 100%; border: 0; display: block; }
+    .status {
+        position: absolute; top: 8px; left: 8px; z-index: 10;
+        font-size: 11px; padding: 4px 10px; border-radius: 4px;
+        background: rgba(0,0,0,0.6); color: #6ee7b7; font-family: monospace;
+    }
+</style>
+</head>
+<body>
+<div class="layout">
+    <div class="panel">
+        <h1>view.html Preview Harness</h1>
+        <div class="sub">Feeds synthetic gameData straight into DisplayManager via window.__devPreviewSnapshot() -- no Firestore, no real tournament. See BoardGame/dev/tests/E2E_HARNESS.md for the real e2e suite; this is for fast manual/visual QA of each phase.</div>
+
+        <div class="broadcast-box">
+            <label>Broadcast Message (layers on top of whichever scenario is active)</label>
+            <input type="text" id="broadcastText" placeholder="e.g. Round 5 starts in 5 minutes!">
+            <div class="row">
+                <button class="set-btn" onclick="setBroadcast()">Show</button>
+                <button class="clear-btn" onclick="clearBroadcast()">Clear</button>
+            </div>
+        </div>
+
+        <div id="groups"></div>
+    </div>
+    <div class="frame-wrap">
+        <div class="status" id="status">loading iframe…</div>
+        <iframe id="previewFrame" src="../full/view.html?tournamentId=__dev_preview__"></iframe>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// Mock data builders
+// ============================================================
+
+const TEAM_COLORS = ['#de392c', '#2278a3', '#2e9158', '#f7ba32', '#7a4fbf'];
+const TEAM_NAMES = ['Tiimi 1', 'Tiimi 2', 'Tiimi 3', 'Tiimi 4', 'Tiimi 5'];
+// Real board-module.js coordinates (see BoardGame/shared/scripts/board-module.js):
+// mountain-heart (center, +2pts) = q0r0; side-hearts (+1pt each) = the 6 below.
+const MOUNTAIN_HEART = 'q0r0';
+const SIDE_HEARTS = ['q-4r2', 'q-2r-2', 'q2r-4', 'q4r-2', 'q2r2', 'q-2r4'];
+
+function makePlayerRegistry() {
+    // uid set only on the first two players of Team 1 (mirrors this
+    // tournament's real "Inffi (GOD)"/"E2ePlayer6" linked-account setup) --
+    // everyone else is an unlinked placeholder (uid: null), same as most
+    // teams in the real disposable test tournament this was built against.
+    const players = {};
+    let n = 1;
+    TEAM_NAMES.forEach((_, teamIdx) => {
+        const teamId = teamIdx + 1;
+        const count = teamIdx === 0 ? 5 : (teamIdx === 3 ? 3 : (teamIdx === 4 ? 2 : 4));
+        for (let i = 0; i < count; i++) {
+            const pid = `p_mock${n}`;
+            const isLinked = teamId === 1 && i < 2;
+            players[pid] = {
+                id: pid,
+                name: isLinked ? (i === 0 ? 'Inffi (GOD)' : 'E2ePlayer6') : `placeh${n}`,
+                teamId,
+                uid: isLinked ? `mockuid_${pid}` : null
+            };
+            n++;
+        }
+    });
+    return players;
+}
+
+function makeTeams(players) {
+    return TEAM_NAMES.map((name, i) => {
+        const teamId = i + 1;
+        const teamPlayers = Object.values(players).filter(p => p.teamId === teamId);
+        return {
+            id: teamId, name, color: TEAM_COLORS[i],
+            points: [4, 2, 2, 2, 1][i] || 0,
+            gamesWon: [3, 2, 2, 2, 0][i] || 0,
+            gamesLost: [1, 0, 0, 0, 1][i] || 0,
+            players: teamPlayers.map(p => ({ id: p.id, uid: p.uid, name: p.name }))
+        };
+    });
+}
+
+function playerIdsForTeam(players, teamId, count) {
+    return Object.values(players).filter(p => p.teamId === teamId).slice(0, count).map(p => p.id);
+}
+
+let matchNumberCounter = 6;
+function makeMatch(players, { teamsSides, game = 'aoe4', playType = '2v2', status = 'pending', slot, roundNumber, winnerIndex, matchNumber, isChallenge }) {
+    const num = matchNumber || matchNumberCounter++;
+    const teams = teamsSides.map((teamId, i) => ({
+        id: `TEAM_${String.fromCharCode(65 + i)}`,
+        playerIds: playerIdsForTeam(players, teamId, playType.split('v').map(Number)[i] || 2)
+    }));
+    const entry = {
+        id: 1000 + num, matchNumber: num, game, playType, teams, status,
+        createdAt: new Date().toISOString()
+    };
+    if (slot !== undefined) entry.slot = slot;
+    if (roundNumber !== undefined) entry.roundNumber = roundNumber;
+    if (isChallenge) entry.isChallenge = true;
+    if (status === 'completed') {
+        entry.winnerIndex = winnerIndex ?? 0;
+        entry.winningSide = ['A', 'B', 'C'][winnerIndex ?? 0];
+    }
+    return entry;
+}
+
+function baseData(overrides = {}) {
+    const players = makePlayerRegistry();
+    const teams = makeTeams(players);
+    return Object.assign({
+        name: 'scratch-tournament1 (PREVIEW)',
+        players,
+        teams,
+        gameQueue: [],
+        currentPhase: { name: null, roundNumber: 4 },
+        heartHexControl: {},
+        pendingHexWins: [],
+        lobbyReady: {},
+        gameHistory: [],
+        gamesPlayed: 8
+    }, overrides);
+}
+
+// ============================================================
+// Scenarios
+// ============================================================
+
+const SCENARIOS = [
+{ group: 'Break', items: [
+    { label: 'On Break (manual)', build: () => baseData({ currentPhase: { name: 'break', roundNumber: 4, autoInserted: false } }) },
+    { label: 'On Break (scheduled)', build: () => baseData({ currentPhase: { name: 'break', roundNumber: 4, autoInserted: true } }) },
+]},
+{ group: 'Scoring VP / Round Advance (Latest Results)', items: [
+    { label: 'No results yet', build: () => baseData({ currentPhase: { name: 'scoring_vp', roundNumber: 1 } }) },
+    { label: '4 results (2v2/3v3 mix)', build: () => {
+        const players = makePlayerRegistry();
+        const teams = makeTeams(players);
+        const mkEvent = (matchNumber, gameName, aTeam, bTeam, winSide) => {
+            const sideA = playerIdsForTeam(players, aTeam, 2).map(pid => ({ id: pid, name: players[pid].name, originalTeamId: aTeam, originalTeamColor: TEAM_COLORS[aTeam - 1] }));
+            const sideB = playerIdsForTeam(players, bTeam, 2).map(pid => ({ id: pid, name: players[pid].name, originalTeamId: bTeam, originalTeamColor: TEAM_COLORS[bTeam - 1] }));
+            return {
+                type: 'game_win', matchNumber, gameName, winningSide: winSide,
+                sideAPlayers: sideA, sideBPlayers: sideB,
+                winningPlayers: winSide === 'A' ? sideA : sideB,
+                losingPlayers: winSide === 'A' ? sideB : sideA,
+                timestamp: new Date()
+            };
+        };
+        window.__mockResultLog = [
+            mkEvent(9, 'Age of Empires IV', 2, 4, 'A'),
+            mkEvent(8, 'Age of Empires IV', 1, 3, 'A'),
+            mkEvent(7, 'Counter-Strike 2', 5, 1, 'B'),
+            mkEvent(6, 'Age of Empires IV', 3, 2, 'B'),
+        ];
+        return baseData({ teams, currentPhase: { name: 'round_advance', roundNumber: 4 } });
+    }},
+]},
+{ group: 'Scoring: Hex', items: [
+    { label: 'No hexes controlled', build: () => baseData({ currentPhase: { name: 'scoring_hex', roundNumber: 4 } }) },
+    { label: 'Mixed control (mountain + side hearts)', build: () => baseData({
+        currentPhase: { name: 'scoring_hex', roundNumber: 4 },
+        heartHexControl: {
+            [MOUNTAIN_HEART]: 1,
+            [SIDE_HEARTS[0]]: 1,
+            [SIDE_HEARTS[1]]: 2,
+            [SIDE_HEARTS[2]]: 2,
+            [SIDE_HEARTS[3]]: 3,
+            [SIDE_HEARTS[4]]: 4,
+        }
+    }) },
+]},
+{ group: 'Hex Placement', items: [
+    { label: 'Match 1: empty queue', build: () => baseData({ currentPhase: { name: 'hex_placement_1', roundNumber: 4 } }) },
+    { label: 'Match 1: 3 pending (1 up next)', build: () => baseData({
+        currentPhase: { name: 'hex_placement_1', roundNumber: 4 },
+        pendingHexWins: [
+            { matchNumber: 6, teamNames: ['Tiimi 2'], teamIds: [2], slot: 1, timestamp: new Date(Date.now() - 60000).toISOString() },
+            { matchNumber: 8, teamNames: ['Tiimi 1'], teamIds: [1], slot: 1, timestamp: new Date(Date.now() - 30000).toISOString() },
+            { matchNumber: 10, teamNames: ['Tiimi 4', 'Tiimi 5'], teamIds: [4, 5], slot: 1, timestamp: new Date().toISOString() },
+        ]
+    }) },
+    { label: 'Match 2: 2 pending (1 up next)', build: () => baseData({
+        currentPhase: { name: 'hex_placement_2', roundNumber: 4 },
+        pendingHexWins: [
+            { matchNumber: 7, teamNames: ['Tiimi 3'], teamIds: [3], slot: 2, timestamp: new Date(Date.now() - 45000).toISOString() },
+            { matchNumber: 9, teamNames: ['Tiimi 2'], teamIds: [2], slot: 2, timestamp: new Date().toISOString() },
+        ]
+    }) },
+]},
+{ group: 'Matches In Progress', items: [
+    { label: 'Both slots: setup', build: () => baseData({
+        currentPhase: { name: 'matches_in_progress', roundNumber: 4, slots: { 1: 'setup', 2: 'setup' } },
+        gameQueue: (p => [
+            makeMatch(p, { teamsSides: [1, 2], slot: 1, status: 'pending', matchNumber: 8 }),
+            makeMatch(p, { teamsSides: [3, 4], slot: 2, status: 'pending', matchNumber: 9 }),
+        ])(makePlayerRegistry())
+    }) },
+    { label: 'Both slots: lobby (nobody ready)', build: () => baseData({
+        currentPhase: { name: 'matches_in_progress', roundNumber: 4, slots: { 1: 'lobby', 2: 'lobby' } },
+        gameQueue: (p => [
+            makeMatch(p, { teamsSides: [1, 2], slot: 1, status: 'pending', matchNumber: 8 }),
+            makeMatch(p, { teamsSides: [3, 4], slot: 2, status: 'pending', matchNumber: 9 }),
+        ])(makePlayerRegistry()),
+        lobbyReady: {}
+    }) },
+    { label: 'Slot 1: lobby (partially ready) / Slot 2: playing', build: () => {
+        const p = makePlayerRegistry();
+        const uid1 = Object.values(p).find(pl => pl.teamId === 1 && pl.uid)?.uid;
+        return baseData({
+            currentPhase: { name: 'matches_in_progress', roundNumber: 4, slots: { 1: 'lobby', 2: 'playing' } },
+            gameQueue: [
+                makeMatch(p, { teamsSides: [1, 2], slot: 1, status: 'pending', matchNumber: 8 }),
+                makeMatch(p, { teamsSides: [3, 4], slot: 2, status: 'ongoing', matchNumber: 9 }),
+            ],
+            lobbyReady: uid1 ? { [uid1]: { discord: true, gameLobby: false } } : {}
+        });
+    }},
+    { label: 'Split-format pair (3v3+2v2) both live', build: () => baseData({
+        currentPhase: { name: 'matches_in_progress', roundNumber: 4, slots: { 1: 'playing', 2: 'setup' } },
+        gameQueue: (p => [
+            makeMatch(p, { teamsSides: [1, 2], slot: 1, playType: '3v3', status: 'ongoing', matchNumber: 8 }),
+            makeMatch(p, { teamsSides: [1, 2], slot: 1, playType: '2v2', status: 'ongoing', matchNumber: 9 }),
+        ])(makePlayerRegistry())
+    }) },
+    { label: 'Slot 1: done (winner shown) / Slot 2: playing', build: () => baseData({
+        currentPhase: { name: 'matches_in_progress', roundNumber: 4, slots: { 1: 'done', 2: 'playing' } },
+        gameQueue: (p => [
+            makeMatch(p, { teamsSides: [1, 2], slot: 1, status: 'completed', matchNumber: 6, winnerIndex: 0 }),
+            makeMatch(p, { teamsSides: [3, 4], slot: 2, status: 'ongoing', matchNumber: 9 }),
+        ])(makePlayerRegistry())
+    }) },
+    { label: 'Both slots: done', build: () => baseData({
+        currentPhase: { name: 'matches_in_progress', roundNumber: 4, slots: { 1: 'done', 2: 'done' } },
+        gameQueue: (p => [
+            makeMatch(p, { teamsSides: [1, 2], slot: 1, status: 'completed', matchNumber: 6, winnerIndex: 0 }),
+            makeMatch(p, { teamsSides: [3, 4], slot: 2, status: 'completed', matchNumber: 7, winnerIndex: 1 }),
+        ])(makePlayerRegistry())
+    }) },
+]},
+{ group: 'Challenges / Board', items: [
+    { label: 'Challenge Game (live_matches_large)', build: () => baseData({
+        currentPhase: { name: 'challenge_game', roundNumber: 4 },
+        gameQueue: (p => [ makeMatch(p, { teamsSides: [1, 3], status: 'ongoing', isChallenge: true, matchNumber: 12 }) ])(makePlayerRegistry())
+    }) },
+    { label: 'Board Resolved (bare board)', build: () => baseData({ currentPhase: { name: 'board_resolved', roundNumber: 4 } }) },
+]},
+{ group: 'Tournament End', items: [
+    { label: 'Winner Celebration', build: () => baseData({
+        currentPhase: { name: 'tournament_end', roundNumber: 8 },
+        teams: makeTeams(makePlayerRegistry()).map((t, i) => Object.assign(t, { points: [50, 38, 30, 22, 14][i] }))
+    }) },
+]},
+{ group: 'Reset', items: [
+    { label: 'Clear (idle / no phase)', build: () => baseData({ currentPhase: { name: null, roundNumber: 4 } }) },
+]},
+];
+
+// ============================================================
+// Wiring
+// ============================================================
+
+const frame = document.getElementById('previewFrame');
+const statusEl = document.getElementById('status');
+let currentData = null;
+let ready = false;
+
+frame.addEventListener('load', () => {
+    // Give view.html's own DOMContentLoaded/board init a moment to settle
+    // before we start poking it.
+    setTimeout(() => {
+        ready = typeof frame.contentWindow.__devPreviewSnapshot === 'function';
+        statusEl.textContent = ready ? 'ready' : 'ERROR: __devPreviewSnapshot not found (check view.html)';
+        statusEl.style.color = ready ? '#6ee7b7' : '#ef4444';
+    }, 300);
+});
+
+function send(data) {
+    currentData = data;
+    if (!ready) {
+        statusEl.textContent = 'not ready yet, retrying…';
+        setTimeout(() => send(data), 200);
+        return;
+    }
+    // Result log must land BEFORE the snapshot -- _renderResultsLarge reads
+    // it synchronously during the very same onFirebaseSnapshot() call that
+    // __devPreviewSnapshot triggers below.
+    if (typeof frame.contentWindow.__devSetResultLog === 'function') {
+        frame.contentWindow.__devSetResultLog(window.__mockResultLog || []);
+    }
+    frame.contentWindow.__devPreviewSnapshot(data);
+}
+
+function setBroadcast() {
+    const text = document.getElementById('broadcastText').value.trim();
+    if (!text || !currentData) return;
+    send(Object.assign({}, currentData, { broadcastMessage: { text } }));
+}
+function clearBroadcast() {
+    if (!currentData) return;
+    const { broadcastMessage, ...rest } = currentData;
+    send(rest);
+}
+
+const groupsEl = document.getElementById('groups');
+SCENARIOS.forEach(group => {
+    const g = document.createElement('div');
+    g.className = 'group';
+    g.innerHTML = `<h2>${group.group}</h2>`;
+    group.items.forEach(item => {
+        const btn = document.createElement('button');
+        btn.className = 'scenario-btn';
+        btn.textContent = item.label;
+        btn.onclick = () => {
+            document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            // Reset before build() -- only the "Latest Results" scenarios
+            // set this, so a leftover value from a previous pick must not
+            // leak into an unrelated scenario.
+            window.__mockResultLog = [];
+            send(item.build());
+        };
+        g.appendChild(btn);
+    });
+    groupsEl.appendChild(g);
+});
+</script>
+</body>
+</html>

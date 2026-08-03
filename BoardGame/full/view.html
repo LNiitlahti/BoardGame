@@ -2344,6 +2344,27 @@
         displayManager.onFirebaseSnapshot(gameState);
     }
 
+    // Dev-only hook for BoardGame/dev/view-preview.html: lets an external
+    // control page feed synthetic gameData straight into DisplayManager,
+    // bypassing Firestore/gameState entirely so every phase/edge case can
+    // be previewed without a real (or even disposable) tournament. Nothing
+    // in production calls this -- it's inert unless a preview tool
+    // explicitly reaches in and invokes it.
+    window.__devPreviewSnapshot = function (mockData) {
+        if (!displayManager) initDisplayManager();
+        displayManager.onFirebaseSnapshot(mockData);
+    };
+
+    // Dev-only hook: resultLogCache is normally filled by
+    // setupResultLogListener()'s Firestore eventLog subscription, which
+    // __devPreviewSnapshot bypasses entirely (it feeds DisplayManager
+    // directly, never touches gameState/resultLogCache). The "Latest
+    // Results" preview scenarios call this first so _renderResultsLarge
+    // has something to read via getResultLogCache().
+    window.__devSetResultLog = function (events) {
+        resultLogCache = events || [];
+    };
+
     // Note: applyTeamColors, renderScoreBars, renderMatches, renderArenaMatch,
     // renderQueue, buildResultCardHTML, renderResults, renderScoreStrip,
     // and all utility functions (getGameDisplayName, getTeamColor, etc.)
