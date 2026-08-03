@@ -1860,10 +1860,17 @@ class DisplayManager {
                         sidesHTML += `<div class="dm-side-team-name" style="color: ${teamColor}; border-color: ${teamColor};">${teamName}</div>`;
                     }
                 }
+                // Challenge rosters run up to 5-a-side -- wrap the player
+                // list in its own row-wrap grid (a whole team's worth
+                // stacked in one column overflowed the fixed screen
+                // height) while the team name stays its own full-width
+                // heading above, not just another wrapped grid item.
+                if (isChallenge) sidesHTML += '<div class="dm-side-players">';
                 players.forEach(p => {
                     const color = this._getPlayerCurrentColor(p);
                     sidesHTML += `<div class="dm-player-name${isChallenge ? ' dm-player-name--sub' : ''}" style="border-color: ${color}; color: ${color};">${this._getPlayerCurrentName(p)}</div>`;
                 });
+                if (isChallenge) sidesHTML += '</div>';
                 sidesHTML += '</div>';
             });
 
