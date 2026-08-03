@@ -1430,7 +1430,11 @@
            in once the expansion finishes (see renderBroadcastMessage's
            setTimeout choreography, timed to this transition's duration).
            Closing reverses: text fades out, then the band collapses back
-           to a line. */
+           to a line. `visibility` is truly hidden while idle (no permanent
+           1px line on screen) -- its own transition is delayed so it only
+           flips to hidden AFTER the collapse animation finishes closing,
+           but flips to visible with NO delay when opening (needed so the
+           very first "thin line" frame of the expand animation is seen). */
         #broadcastTicker {
             position: fixed; left: 0; right: 0; top: 16.67%; height: 66.66%;
             z-index: 999999; display: flex; align-items: center; justify-content: center;
@@ -1441,10 +1445,15 @@
             background: rgba(4,10,18,0.96);
             border-top: 4px solid #00d4ff; border-bottom: 4px solid #00d4ff;
             letter-spacing: 1px; pointer-events: none;
+            visibility: hidden;
             transform: scaleY(0.001); transform-origin: center;
-            transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+            transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0.5s;
         }
-        #broadcastTicker.bt-open { transform: scaleY(1); }
+        #broadcastTicker.bt-open {
+            visibility: visible;
+            transform: scaleY(1);
+            transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0s;
+        }
         #broadcastTicker .bt-text { opacity: 0; transition: opacity 0.35s ease; }
         #broadcastTicker.bt-text-visible .bt-text { opacity: 1; }
 
