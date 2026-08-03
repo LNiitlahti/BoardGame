@@ -1403,7 +1403,7 @@
 
     // Global functions for buttons
     window.manageTournament = function(tournamentId) {
-      window.location.href = `god.html?tournament=${tournamentId}`;
+      window.location.href = `god.html?tournamentId=${tournamentId}`;
     };
 
     window.goToTeamControls = function(tournamentId, teamId) {
@@ -1474,7 +1474,7 @@
       }
 
       if (userRole === 'god') {
-        window.location.href = `god.html?tournament=${tournamentId}`;
+        window.location.href = `god.html?tournamentId=${tournamentId}`;
       } else if (userRole === 'admin') {
         window.location.href = `admin.html?tournamentId=${tournamentId}`;
       } else if (teamId) {
@@ -1582,7 +1582,7 @@
         const selectedTournament = tournaments[selectedIndex];
 
         // Redirect to god.html with tournament selected
-        window.location.href = `god.html?tournament=${selectedTournament.id}`;
+        window.location.href = `god.html?tournamentId=${selectedTournament.id}`;
 
       } catch (error) {
         console.error('[Home] Error loading tournaments:', error);

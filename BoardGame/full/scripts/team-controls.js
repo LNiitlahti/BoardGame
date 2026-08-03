@@ -41,15 +41,18 @@ document.addEventListener('firebase-ready', function() {
         console.log('[Team Controls] User authenticated:', user.uid);
         currentUser = user;
 
-        // Get gameId and teamId from URL params
+        // Get tournamentId and teamId from URL params
         const urlParams = new URLSearchParams(window.location.search);
-        currentTournamentId = urlParams.get('tournamentId') || urlParams.get('gameId');
+        if (urlParams.has('gameId')) {
+            console.warn('[team-controls] Ignoring legacy query param "gameId" — use "tournamentId" instead.');
+        }
+        currentTournamentId = urlParams.get('tournamentId');
         currentTeamId = parseInt(urlParams.get('teamId'));
 
         console.log('[Team Controls] Tournament ID:', currentTournamentId, 'Team ID:', currentTeamId);
 
         if (!currentTournamentId || isNaN(currentTeamId)) {
-            console.warn('[Team Controls] Missing gameId or teamId in URL');
+            console.warn('[Team Controls] Missing tournamentId or teamId in URL');
 
             // Try to get from user document
             try {

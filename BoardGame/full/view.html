@@ -1834,7 +1834,8 @@
 
     const tournamentId = resolveTournamentId({
         search: window.location.search,
-        paramNames: ['tournamentId', 'tournament', 'gameId'],
+        paramNames: ['tournamentId'],
+        legacyParamNames: ['tournament', 'gameId'],
         cached: sessionStorage.getItem('currentTournamentId') || localStorage.getItem('currentTournamentId')
     });
 

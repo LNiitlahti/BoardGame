@@ -734,6 +734,48 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   `board`/`players`: `merge:true` doesn't delete omitted map keys), so the
   restore explicitly `FieldValue.delete()`s the two synthetic hex keys in
   addition to the normal reassign-and-save.
+- `e2e-tournament-param-unify.js` — regression test for TODO.md Task 20
+  ("Unify `tournament` vs `tournamentId` query param naming across pages").
+  Live investigation found the split was much bigger than the plan's
+  original 3 files (admin.js/god-app.js/view.html): `navbar.js`'s
+  `buildNavUrl()` special-cased `href === 'god.html'` to emit `?tournament=`
+  while every other generated link got `?tournamentId=` — the actual live
+  source of god.html links using the old name — plus `getUrlTournamentParamName()`/
+  `getCurrentTournamentId()` (navbar.js) and 8 more pages
+  (`team-controls.js`, `onboarding-status.html`, `match-queue.html`,
+  `replay.html`, `view-onboarding-layout.html`, `view-onboarding.html`,
+  `onboarding.js`, `statistics.js`) independently accepted
+  `tournament`/`gameId`/`game` as silent aliases, plus three `home.html`
+  button handlers (`manageTournament`, `enterTournament`,
+  `manageTeams`'s numbered-list redirect) that generated `god.html?tournament=`
+  links themselves — found via a repo-wide grep for `[?&](tournament|gameId|game)=`
+  after fixing navbar.js, not in the original scoping. Fix: `tournamentId` is
+  now the only accepted param everywhere; `resolve-tournament-id.js`'s
+  `resolveTournamentId()` grew an optional `legacyParamNames` list — if
+  present in the URL it's ignored for resolution (falls through to
+  `cached`/null exactly as if absent, never a UI toast/banner) and logs a
+  dev-facing `console.warn`. This test drives admin.html, god.html, and
+  view.html against live `e2e-disposable-1`: confirms `?tournamentId=<id>`
+  alone still resolves and loads the tournament (golden-path regression
+  check) with zero legacy warnings, and confirms a legacy-only
+  `?tournament=`/`?gameId=` (using an obviously-fake sentinel id,
+  `e2e-legacy-value-should-be-ignored`, in the URL) never gets its value
+  read as the tournament id — asserted by `!== sentinel` rather than
+  `=== null`, since the TD test account has its own `assignedTournamentId`
+  fallback (a separate, legitimate resolution path via navbar.js) that
+  independently resolves to `e2e-disposable-1` even with URL/cache both
+  empty, which would make a strict-null assertion flaky/misleading — plus
+  the expected `console.warn`. **Gotcha found building this test**:
+  view.html has no fallback like admin/god.html's cache, so the legacy-only
+  case resolves to a falsy `tournamentId` and its own `DOMContentLoaded`
+  handler immediately redirects to home.html, destroying the page's JS
+  context before `tournamentId` can be read directly — worked around by
+  treating the redirect itself as the proof (it only fires when
+  `tournamentId` is falsy) and waiting for `location.pathname` to land on
+  `/home.html` instead of reading the variable. Read-only against
+  Firestore tournament data (only ever GETs the tournament doc/list via the
+  pages' own normal load code) — nothing to snapshot/restore. Confirmed
+  passing (7/7 scenarios) against live `e2e-disposable-1`.
 - `.env.e2e` (gitignored, not in git) — real credentials. Copy `.env.e2e.example`
   to create it if missing.
 

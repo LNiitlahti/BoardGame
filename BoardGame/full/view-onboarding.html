@@ -588,6 +588,7 @@
     <script src="../shared/scripts/firebase-loader.js"></script>
     <script defer src="../shared/scripts/hex-image-preloader.js"></script>
     <script src="../shared/scripts/games-config.js"></script>
+    <script src="../shared/scripts/resolve-tournament-id.js"></script>
 
     <script>
         // =================================================================
@@ -607,8 +608,11 @@
         // =================================================================
 
         document.addEventListener('DOMContentLoaded', function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            tournamentId = urlParams.get('tournamentId') || urlParams.get('tournament');
+            tournamentId = resolveTournamentId({
+                search: window.location.search,
+                paramNames: ['tournamentId'],
+                legacyParamNames: ['tournament']
+            });
 
             if (!tournamentId) {
                 showError('No tournament ID specified. Use ?tournamentId=xxx');

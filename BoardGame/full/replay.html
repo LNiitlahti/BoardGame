@@ -189,6 +189,7 @@
 <script defer src="scripts/replay-engine.js"></script>
 <script defer src="scripts/summary-generator.js"></script>
 <script defer src="scripts/action-export.js"></script>
+<script src="../shared/scripts/resolve-tournament-id.js"></script>
 
 <script>
     // ===== State =====
@@ -198,8 +199,11 @@
     let boardModule = null;
     let boardRenderer = null;
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const tournamentId = urlParams.get('tournamentId') || urlParams.get('tournament');
+    const tournamentId = resolveTournamentId({
+        search: window.location.search,
+        paramNames: ['tournamentId'],
+        legacyParamNames: ['tournament']
+    });
 
     // ===== Initialization =====
     document.addEventListener('DOMContentLoaded', () => {

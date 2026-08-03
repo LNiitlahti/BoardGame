@@ -282,12 +282,16 @@
     <script defer src="../shared/scripts/hex-image-preloader.js"></script>
     <script src="../shared/scripts/games-config.js"></script>
     <script src="../shared/scripts/player-utils.js"></script>
+    <script src="../shared/scripts/resolve-tournament-id.js"></script>
 
     <script>
         let gameState = null;
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const tournamentId = urlParams.get('tournamentId') || urlParams.get('tournament');
+        const tournamentId = resolveTournamentId({
+            search: window.location.search,
+            paramNames: ['tournamentId'],
+            legacyParamNames: ['tournament']
+        });
 
         document.addEventListener('firebase-ready', () => {
             if (!tournamentId) {
