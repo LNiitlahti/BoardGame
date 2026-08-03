@@ -1988,14 +1988,19 @@ function renderReadinessStatus() {
     const teams = gameData.teams || [];
     const queue = gameData.gameQueue || [];
 
-    // Find team IDs with pending/ongoing matches
+    // Find team IDs with pending/ongoing matches. Uses getMatchSidePlayers()
+    // (same dual-shape resolution as renderMatchCardsWithDiscord/
+    // _matchInvolvesUs) instead of reading side.players[] directly -- every
+    // real queue entry is teams[].playerIds, which side.players[] never
+    // matches, so this used to report "No teams need to ready up." for
+    // every real match (documented but left unfixed by Task 13; fixed now).
     const activeTeamIds = new Set();
     queue.forEach(match => {
         if (match.isBreak || match.status === 'completed') return;
         const sides = match.teams || match.sides || [];
         sides.forEach(side => {
-            (side.players || []).forEach(p => {
-                if (p.teamId !== undefined) activeTeamIds.add(String(p.teamId));
+            getMatchSidePlayers(side).forEach(p => {
+                if (p.teamId !== undefined && p.teamId !== null) activeTeamIds.add(String(p.teamId));
             });
         });
     });
