@@ -1535,6 +1535,11 @@
         _phaseManager?.endBreak();
     };
 
+    window.endTournamentViaPhase = async () => {
+        _initPhaseAdapter();
+        await _phaseManager?.endTournament();
+    };
+
     window.openBreakSettings = () => {
         _phaseManager?.openBreakSettings();
     };

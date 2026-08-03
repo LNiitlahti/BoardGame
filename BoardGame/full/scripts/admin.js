@@ -520,6 +520,29 @@ async function confirmStateChange(newState) {
         return;
     }
 
+    // ── Phase-system coupling ──
+    // "finished" must go through the phase machine (endTournament sets both
+    // currentPhase and status atomically); otherwise the next phase advance
+    // silently flips status back to 'playing'.
+    if (newState === 'finished' && gameState.currentPhase &&
+        gameState.currentPhase.name !== 'tournament_end') {
+        if (!confirm('End the tournament? The phase flow jumps to Tournament End. This cannot be undone.')) return;
+        closeStateChangeModal();
+        if (typeof window.endTournamentViaPhase === 'function') {
+            await window.endTournamentViaPhase();
+            updateTournamentStateButton();
+        } else {
+            showStatus('Phase adapter not ready — try again in a moment.', 'warning');
+        }
+        return;
+    }
+    // Going back to "setup" while the phase flow is running would desync the
+    // two state systems permanently (the Flow Panel keys off currentPhase).
+    if (newState === 'setup' && gameState.currentPhase) {
+        showStatus('Phase flow is already running — cannot return to setup. Use Set Phase (god) if you need to rewind.', 'warning');
+        return;
+    }
+
     // Archive requires confirmation
     if (newState === 'archived') {
         if (!confirm('Archive this tournament? Archived tournaments are protected from edits. Only God users can unarchive.')) {
