@@ -4020,6 +4020,33 @@ async function removeFromQueue(gameId) {
     showStatus('Match removed from queue', 'success');
 }
 
+/**
+ * Deliberately dismiss a pending hex placement (team absent / declined).
+ * The alternative — force-advancing past the gate — leaves the win queued
+ * forever, where it re-gates a future round's placement phase.
+ * pendingHexWins is the accessor over gameState.pendingHexWins, so
+ * mutations here persist via saveGameState().
+ */
+async function waivePendingHexWin(matchNumber, teamId) {
+    const win = (pendingHexWins || []).find(w => w.matchNumber === matchNumber);
+    if (!win) return;
+    const idx = (win.teamIds || []).findIndex(id => String(id) === String(teamId));
+    if (idx === -1) return;
+    const teamName = (win.teamNames && win.teamNames[idx]) || `Team ${teamId}`;
+    win.teamIds.splice(idx, 1);
+    if (win.teamNames) win.teamNames.splice(idx, 1);
+    pendingHexWins = pendingHexWins.filter(w => w.teamIds.length > 0);
+    await saveGameState();
+    logEvent('hex_win_waived', {
+        matchNumber, teamId, teamName,
+        message: `Hex placement waived for ${teamName} (match #${matchNumber})`
+    });
+    showStatus(`Hex placement waived for ${teamName}.`, 'info');
+    if (typeof updatePendingHexNotification === 'function') updatePendingHexNotification();
+    if (typeof updateDisplay === 'function') updateDisplay();
+}
+window.waivePendingHexWin = waivePendingHexWin;
+
 // =============================================================================
 // RESULT CONFIRMATION
 // =============================================================================

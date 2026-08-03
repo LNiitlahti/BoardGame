@@ -1150,7 +1150,8 @@
                 const color = team?.color || 'var(--accent-warning)';
                 html += `<span class="flow-action-item action-pending" title="Match ${matchLabel}: ${teamName} needs to place a hex plate">` +
                         `<span class="flow-action-icon">${ICON_SVGS.hexagon}</span> ` +
-                        `<span class="flow-action-team" style="color: ${color}">${_esc(teamName)}</span> hex</span>`;
+                        `<span class="flow-action-team" style="color: ${color}">${_esc(teamName)}</span> hex` +
+                        `<button class="flow-waive-btn" onclick="confirmWaiveHex(${win.matchNumber || 0}, '${String(teamId)}')" title="Waive this placement (team absent/declined)">&times;</button></span>`;
             });
         });
 
@@ -1730,6 +1731,17 @@
     window.endTournamentViaPhase = async () => {
         _initPhaseAdapter();
         await _phaseManager?.endTournament();
+    };
+
+    window.confirmWaiveHex = (matchNumber, teamId) => {
+        _openFlowConfirm({
+            title: 'Waive Hex Placement?',
+            bodyHtml: '<p>The team’s earned hex placement is dismissed and the phase gate clears.</p>' +
+                      '<p>This cannot be restored automatically (a hex can still be assigned manually on the board).</p>',
+            confirmLabel: 'Waive',
+            danger: true,
+            onConfirm: () => window.waivePendingHexWin(matchNumber, teamId)
+        });
     };
 
     const SET_PHASE_CHOICES = [
