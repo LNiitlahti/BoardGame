@@ -1137,7 +1137,13 @@ class DisplayManager {
         if (!ticker) {
             ticker = document.createElement('div');
             ticker.id = 'broadcastTicker';
-            ticker.style.cssText = 'position:absolute; left:0; right:0; z-index:39; text-align:center; padding:10px 20px; font-family:"Quantico",sans-serif; font-size:18px; font-weight:600; background:rgba(0,212,255,0.12); color:#00d4ff; display:none; border-bottom:1px solid rgba(0,212,255,0.3); letter-spacing:0.5px;';
+            // z-index/position:fixed deliberately beat every other overlay on
+            // the page (ceremony overlay ~200, the cinematic board zoom's
+            // body-reparented .board-wrap at 10000, etc.) -- an admin
+            // broadcast is meant to always be visible, no exceptions, so it
+            // must outrank anything that could ever be layered on top of it,
+            // present or future.
+            ticker.style.cssText = 'position:fixed; left:0; right:0; z-index:999999; text-align:center; padding:10px 20px; font-family:"Quantico",sans-serif; font-size:18px; font-weight:600; background:rgba(0,212,255,0.12); color:#00d4ff; display:none; border-bottom:1px solid rgba(0,212,255,0.3); letter-spacing:0.5px;';
             // Position below header (or phaseBanner if present)
             const phaseBanner = document.getElementById('phaseBanner');
             const ref = phaseBanner || document.querySelector('.header');
