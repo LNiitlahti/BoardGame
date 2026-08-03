@@ -1430,6 +1430,38 @@ class DisplayManager {
     }
 
     /**
+     * Renders a completed queue match's result: same stacked-columns/VS
+     * layout as _renderMatchGroup, but with the winning side (queue entry's
+     * own `winnerIndex`, set by ResultManager.confirmResult()) highlighted
+     * instead of ready-dots (the match is over, readiness is moot). Used so
+     * a slot that finished stays informative — "who won" — instead of
+     * collapsing to a bare "Complete" label while the other slot is still
+     * playing.
+     */
+    _renderMatchResult(m) {
+        const gameName = this._getGameDisplayName(m.game || m.gameType);
+        const gameLabel = m.matchNumber ? `#${m.matchNumber} ${gameName}` : gameName;
+        const teams = m.teams || m.sides || [];
+
+        const sidesHTML = teams.map((t, i) => {
+            const isWinner = i === m.winnerIndex;
+            const players = this._getMatchTeamPlayers(t);
+            const playersHTML = players.map(p => {
+                const color = this._getPlayerCurrentColor(p);
+                const name = this._getPlayerCurrentName(p);
+                return `<div class="dm-dual-ready-row">
+                        <span class="dm-dual-ready-name" style="color:${color};">${name}</span>
+                    </div>`;
+            }).join('');
+            const label = isWinner ? `<div class="dm-dual-winner-label">${ICON_SVGS.crown} Winner</div>` : '';
+            const side = `<div class="dm-dual-ready-side${isWinner ? ' dm-dual-winner-side' : ''}">${label}${playersHTML}</div>`;
+            return (i > 0 ? '<div class="dm-dual-vs">VS</div>' : '') + side;
+        }).join('');
+
+        return `<div class="dm-dual-live-match"><div class="dm-dual-game-name">${gameLabel}</div><div class="dm-dual-ready-sides">${sidesHTML}</div></div>`;
+    }
+
+    /**
      * Match 1 / Match 2 side-by-side, replacing the old
      * live_matches_large/readiness_large/next_match_large rotation for
      * matches_in_progress. The two slots can be in completely different
@@ -1459,7 +1491,15 @@ class DisplayManager {
             let bodyHTML = '';
 
             if (sub === 'done') {
-                bodyHTML = `<div class="dm-dual-slot-status">Complete</div>`;
+                // Keep showing who won this slot's match(es) instead of
+                // collapsing to a bare "Complete" label -- stays visible
+                // through the whole matches_in_progress phase, including
+                // while the OTHER slot is still playing, until the admin
+                // advances past this phase entirely.
+                const completed = queue.filter(m => m.status === 'completed' && slotMatches(m));
+                bodyHTML = completed.length > 0
+                    ? completed.map(m => this._renderMatchResult(m)).join('')
+                    : `<div class="dm-dual-slot-status">Complete</div>`;
             } else if (active.length > 0) {
                 bodyHTML = active.map(m => this._renderMatchGroup(m, data)).join('');
             } else if (sub === 'lobby') {
