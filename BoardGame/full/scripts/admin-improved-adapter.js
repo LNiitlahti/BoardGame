@@ -1590,6 +1590,14 @@
         }
 
         _phaseManager.recheckRequirements();
+
+        // Stranded round_advance recovery: a crash between the two chained
+        // saves can persist this auto-phase, whose UI has no advance button.
+        // advancePhase()'s in-flight guard makes duplicates harmless.
+        if (_phaseManager.getCurrentPhase() === 'round_advance') {
+            _phaseManager.advancePhase();
+        }
+
         _renderFlowPanel();
         _highlightNextQueueItem();
         _injectLiveMatchControls();
