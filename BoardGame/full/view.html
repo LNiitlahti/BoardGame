@@ -1757,7 +1757,15 @@
         }
         .dm-live-match-large--challenge .dm-side-players {
             display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center;
-            gap: 10px;
+            gap: 18px;
+        }
+        /* One cluster per team on a mixed-roster side -- keeps that team's
+           players visually grouped instead of interleaving with another
+           team's players in the same wrapped row. */
+        .dm-live-match-large--challenge .dm-side-team-group {
+            display: flex; flex-wrap: wrap; justify-content: center;
+            gap: 10px; padding: 8px; border-radius: 10px;
+            background: rgba(255,255,255,0.03);
         }
         .dm-live-match-large .dm-side-role {
             font-family: 'Quantico', sans-serif;

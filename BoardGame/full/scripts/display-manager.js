@@ -1897,17 +1897,38 @@ class DisplayManager {
                         sidesHTML += `<div class="dm-side-team-names">${teamBadges.join('')}</div>`;
                     }
                 }
-                // Challenge rosters run up to 5-a-side -- wrap the player
-                // list in its own row-wrap grid (a whole team's worth
-                // stacked in one column overflowed the fixed screen
-                // height) while the team name stays its own full-width
-                // heading above, not just another wrapped grid item.
-                if (isChallenge) sidesHTML += '<div class="dm-side-players">';
-                players.forEach(p => {
-                    const color = this._getPlayerCurrentColor(p);
-                    sidesHTML += `<div class="dm-player-name${isChallenge ? ' dm-player-name--sub' : ''}" style="border-color: ${color}; color: ${color};">${this._getPlayerCurrentName(p)}</div>`;
-                });
-                if (isChallenge) sidesHTML += '</div>';
+                if (isChallenge) {
+                    // Challenge rosters run up to 5-a-side across possibly
+                    // more than one team. A flat wrapped list interleaved
+                    // different teams' players into the same row (e.g. one
+                    // team1 box next to one team3 box) -- individually
+                    // colored correctly, but with nothing visually
+                    // clustering "these are team1's players" vs "these are
+                    // team3's". Group into one sub-cluster per team,
+                    // matching the badge order above, instead of one flat
+                    // wrapped grid.
+                    const byTeam = new Map();
+                    players.forEach(p => {
+                        const tid = p.originalTeamId;
+                        if (!byTeam.has(tid)) byTeam.set(tid, []);
+                        byTeam.get(tid).push(p);
+                    });
+                    sidesHTML += '<div class="dm-side-players">';
+                    byTeam.forEach(teamPlayers => {
+                        sidesHTML += '<div class="dm-side-team-group">';
+                        teamPlayers.forEach(p => {
+                            const color = this._getPlayerCurrentColor(p);
+                            sidesHTML += `<div class="dm-player-name dm-player-name--sub" style="border-color: ${color}; color: ${color};">${this._getPlayerCurrentName(p)}</div>`;
+                        });
+                        sidesHTML += '</div>';
+                    });
+                    sidesHTML += '</div>';
+                } else {
+                    players.forEach(p => {
+                        const color = this._getPlayerCurrentColor(p);
+                        sidesHTML += `<div class="dm-player-name" style="border-color: ${color}; color: ${color};">${this._getPlayerCurrentName(p)}</div>`;
+                    });
+                }
                 sidesHTML += '</div>';
             });
 
