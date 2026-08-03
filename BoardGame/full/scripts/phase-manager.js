@@ -155,6 +155,13 @@ class PhaseManager {
         // Guard flag to prevent duplicate auto-advance calls
         this._autoAdvancePending = false;
 
+        // Re-entrancy guards: one in-flight advance at a time (a double-click
+        // during the save used to re-pass the requirements gate against the
+        // previous phase's cached allMet and skip a phase).
+        this._advanceInFlight = false;
+        this._slotAdvanceInFlight = false;
+        this._pendingAutoAdvance = null;
+
         // ── Hooks (wired by GodApp) ──
         // this._onAwardPoints        — fire when leaving scoring_hex
         // this._onScoringCeremony    — fire when entering scoring_vp
@@ -356,6 +363,22 @@ class PhaseManager {
      * @returns {Promise<boolean>}  true if advanced
      */
     async advancePhase(force = false) {
+        if (this._advanceInFlight) return false;
+        this._advanceInFlight = true;
+        try {
+            return await this._advancePhaseInner(force);
+        } finally {
+            this._advanceInFlight = false;
+            // Auto-advance (round_advance) runs AFTER the guard is released
+            // so its recursive advancePhase() call isn't swallowed by it.
+            const auto = this._pendingAutoAdvance;
+            this._pendingAutoAdvance = null;
+            if (auto) await this._handleAutoAdvance(auto);
+        }
+    }
+
+    /** Body of advancePhase — only ever called via the guarded wrapper above. */
+    async _advancePhaseInner(force = false) {
         const gs = this._gameState;
         const current = this.getCurrentPhase();
         if (!current) {
@@ -368,10 +391,12 @@ class PhaseManager {
             return false;
         }
 
-        // Requirements gate
+        // Requirements gate — computed FRESH, never from _cachedReqs (the
+        // cache can still describe the previous phase mid-save).
         if (!force) {
-            const reqs = this.getPhaseRequirements();
-            if (!reqs.allMet) {
+            const items = this._calculateRequirements(current);
+            const allMet = items.length === 0 || items.every(r => r.met);
+            if (!allMet) {
                 this._ui.showStatus('Requirements not met. Use force advance to override.', 'warning');
                 return false;
             }
@@ -486,9 +511,10 @@ class PhaseManager {
             );
         }
 
-        // Auto-advance if this is a transitional phase
+        // Auto-advance (round_advance) is deferred to the wrapper's finally
+        // block so it runs after the in-flight guard is released.
         if (AUTO_ADVANCE_PHASES.includes(nextPhase)) {
-            await this._handleAutoAdvance(nextPhase);
+            this._pendingAutoAdvance = nextPhase;
         }
 
         this.recheckRequirements();
@@ -1025,6 +1051,17 @@ class PhaseManager {
      * @param {boolean} force  Skip requirements check
      */
     async advanceSlot(slot, force = false) {
+        if (this._slotAdvanceInFlight) return false;
+        this._slotAdvanceInFlight = true;
+        try {
+            return await this._advanceSlotInner(slot, force);
+        } finally {
+            this._slotAdvanceInFlight = false;
+        }
+    }
+
+    /** Body of advanceSlot — only ever called via the guarded wrapper above. */
+    async _advanceSlotInner(slot, force = false) {
         const gs = this._gameState;
         if (this.getCurrentPhase() !== 'matches_in_progress') {
             this._ui.showStatus('Not currently in the matches segment.', 'warning');
