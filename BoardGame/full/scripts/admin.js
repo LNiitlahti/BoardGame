@@ -3755,7 +3755,16 @@ function renderMatchQueue() {
         g.status === 'pending' || g.status === undefined || g.status === 'queued'
     );
 
-    countEl.textContent = allGames.length;
+    const curRound = gameState?.currentPhase?.roundNumber;
+    const isFutureRound = g => !g.isBreak && curRound !== undefined &&
+        g.roundNumber !== undefined && g.roundNumber > curRound;
+
+    if (curRound !== undefined) {
+        const thisRound = allGames.filter(g => !isFutureRound(g)).length;
+        countEl.textContent = `${thisRound} now · ${allGames.length} total`;
+    } else {
+        countEl.textContent = allGames.length;
+    }
 
     // Render ongoing matches first, then queued
     const allToRender = [...ongoingGames, ...queuedGames];
@@ -3833,8 +3842,19 @@ function renderMatchQueue() {
         // Challenge badge HTML
         const challengeBadge = isChallenge ? '<span class="challenge-badge">CHALLENGE</span>' : '';
 
+        // Round/slot tag badge — makes the phase system's invisible tagging
+        // visible (this is what every slot gate actually keys off of).
+        let tagBadge = '';
+        if (game.slot === 'challenge' || game.isChallenge === true) {
+            tagBadge = ''; // CHALLENGE badge already communicates it
+        } else if (game.roundNumber === undefined && game.slot === undefined) {
+            tagBadge = '<span class="tag-badge tag-untagged" title="No round/slot tag — counts for either slot this round">R?</span>';
+        } else {
+            tagBadge = `<span class="tag-badge" title="Round / match slot tag">R${game.roundNumber !== undefined ? game.roundNumber : '?'}${game.slot !== undefined ? '·M' + game.slot : ''}</span>`;
+        }
+
         return `
-            <div class="queue-item ${isOngoing ? 'ongoing' : ''} ${isChallenge ? 'challenge' : ''}"
+            <div class="queue-item ${isOngoing ? 'ongoing' : ''} ${isChallenge ? 'challenge' : ''}${isFutureRound(game) ? ' future-round' : ''}"
                  draggable="${!isOngoing}"
                  data-queue-id="${game.id}"
                  onclick="openQuickConfirm(${game.id})"
@@ -3846,7 +3866,7 @@ function renderMatchQueue() {
                 <span class="drag-handle">${isOngoing ? ICON_SVGS.play : ICON_SVGS.menu}</span>
                 <div class="game-info">
                     <div class="game-type-row">
-                        <div class="game-type">${challengeBadge}${matchNumber}${gameName}${playType ? ' (' + playType + ')' : ''}</div>
+                        <div class="game-type">${tagBadge}${challengeBadge}${matchNumber}${gameName}${playType ? ' (' + playType + ')' : ''}</div>
                         <div class="match-actions">
                             ${!isOngoing ? `<button class="start-btn" onclick="event.stopPropagation(); startMatch(${game.id})" title="Start match">${ICON_SVGS.play}</button>` : ''}
                             ${!isOngoing ? `<button class="edit-btn" onclick="event.stopPropagation(); openEditMatchModal(${game.id})" title="Edit match">${ICON_SVGS.settings}</button>` : ''}
