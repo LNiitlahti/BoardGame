@@ -1812,6 +1812,15 @@ class DisplayManager {
         this._container.removeAttribute('data-display-mode');
     }
 
+    /**
+     * Shared by the ordinary live-matches slide AND challenge_game -- a
+     * challenge match previously looked identical to a normal one here
+     * (same LIVE badge, same bare player names), with no indication it was
+     * a heart-hex challenge at all, let alone which TEAMS were involved --
+     * only individual player names showed, so a spectator had no quick way
+     * to tell who was challenging whom without already knowing every
+     * player's team by heart.
+     */
     _renderLiveMatchesLarge(container, data) {
         const queue = data.gameQueue || [];
         const ongoing = queue.filter(m => m.status === 'ongoing' && !m.isBreak);
@@ -1829,12 +1838,22 @@ class DisplayManager {
             const gameImage = this._getGameImagePath(match.game);
             const logoHtml = gameImage ? `<img class="dm-game-logo" src="${gameImage}" alt="${gameName}">` : '';
             const teams = match.teams || [];
+            const challengeBadge = match.isChallenge
+                ? `<div class="dm-challenge-badge">${ICON_SVGS.swords} Challenge</div>`
+                : '';
 
             let sidesHTML = '';
             teams.forEach((teamData, i) => {
                 if (i > 0) sidesHTML += '<div class="dm-vs">VS</div>';
                 sidesHTML += '<div class="dm-side">';
                 const players = this._getMatchTeamPlayers(teamData);
+                if (match.isChallenge) {
+                    const teamColor = this._getTeamColor(players[0]?.originalTeamId);
+                    const teamName = this._getCurrentTeamName(players[0]?.originalTeamId);
+                    if (teamName) {
+                        sidesHTML += `<div class="dm-side-team-name" style="color: ${teamColor};">${teamName}</div>`;
+                    }
+                }
                 players.forEach(p => {
                     const color = this._getPlayerCurrentColor(p);
                     sidesHTML += `<div class="dm-player-name" style="border-color: ${color}; color: ${color};">${this._getPlayerCurrentName(p)}</div>`;
@@ -1845,6 +1864,7 @@ class DisplayManager {
             matchesHTML += `
                 <div class="dm-live-match-large">
                     <div class="dm-live-badge">\u25CF LIVE</div>
+                    ${challengeBadge}
                     <div class="dm-game-header">${logoHtml}<span class="dm-game-name">${gameName}</span></div>
                     <div class="dm-sides">${sidesHTML}</div>
                 </div>
