@@ -204,7 +204,14 @@
                     const relevant = _relevantPendingWinsForPhase(phaseName);
                     const count = relevant.reduce((sum, w) => sum + w.teamIds.length, 0);
                     if (count === 0) {
-                        return [{ label: `${slotLabel} hex placed`, met: true }];
+                        // Not "hex placed" — this phase gates the PREVIOUS
+                        // round's Match N win (hex_placement_1/2 run before
+                        // this round's own matches_in_progress). Zero
+                        // pending is equally true in round 1 (nothing has
+                        // ever existed to place) as after a real placement —
+                        // "hex placed" wrongly implies the former is the
+                        // latter, which read as a bug on a fresh round 1.
+                        return [{ label: `No pending ${slotLabel} hex placement`, met: true }];
                     }
                     return [{
                         label: `${count} team${count !== 1 ? 's' : ''} (${slotLabel}) need to place plates`,
@@ -915,7 +922,7 @@
                     };
                 }
                 return {
-                    text: `${slotLabel} hex placed.`,
+                    text: `No pending ${slotLabel} hex placement.`,
                     primary: { label: 'Continue ▶', action: advance },
                     primaryIsAdvance: true
                 };

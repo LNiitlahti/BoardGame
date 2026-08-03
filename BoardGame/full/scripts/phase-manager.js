@@ -1201,7 +1201,12 @@ class PhaseManager {
             case 'hex_placement_2': {
                 const pendingHex = this._getPendingHexCount();
                 if (pendingHex === 0) {
-                    return [{ label: 'All hex plates placed', met: true }];
+                    // Not "all placed" — this phase gates the PREVIOUS
+                    // round's match win, so zero pending is equally true on
+                    // a fresh round 1 (nothing ever existed to place) as
+                    // after a real placement. "All placed" wrongly implies
+                    // the former is the latter.
+                    return [{ label: 'No pending hex placements', met: true }];
                 }
                 return [{
                     label: `${pendingHex} team${pendingHex !== 1 ? 's' : ''} need to place plates`,

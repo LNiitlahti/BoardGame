@@ -62,9 +62,12 @@
  *      `false` and leaves `currentPhase.name` as 'hex_placement_1' (does
  *      NOT advance).
  *   2. AFTER placing the hex for the winning team: pending count is 0,
- *      requirements report "All hex plates placed" (met: true), and
- *      `advancePhase()` returns `true` and moves `currentPhase.name` to
- *      'spell_window_1' (the real next phase in PHASE_ORDER).
+ *      requirements report "No pending hex placements" (met: true — renamed
+ *      from "All hex plates placed", which wrongly implied a placement had
+ *      just happened even on a fresh round 1 where nothing was ever
+ *      pending), and `advancePhase()` returns `true` and moves
+ *      `currentPhase.name` to 'spell_window_1' (the real next phase in
+ *      PHASE_ORDER).
  *
  * Only tests hex_placement_1 — hex_placement_2 shares the exact same
  * `_getPendingHexCount() === 0` gate condition (see source excerpt above;
@@ -267,8 +270,8 @@ async function main() {
         `After placing the hex, pending count should be 0, got ${outcome.pendingAfterPlacement}`);
       assert(outcome.reqsAfterPlacement.allMet === true,
         `After placing the hex, hex_placement_1 requirements should be met, got: ${JSON.stringify(outcome.reqsAfterPlacement)}`);
-      assert(outcome.reqsAfterPlacement.items.some(r => /All hex plates placed/.test(r.label) && r.met === true),
-        `After placing the hex, requirements should report "All hex plates placed", got: ${JSON.stringify(outcome.reqsAfterPlacement.items)}`);
+      assert(outcome.reqsAfterPlacement.items.some(r => /No pending hex placements/.test(r.label) && r.met === true),
+        `After placing the hex, requirements should report "No pending hex placements", got: ${JSON.stringify(outcome.reqsAfterPlacement.items)}`);
       assert(outcome.advanceAfterPlacement === true,
         'advancePhase() should return true (allowed) once the pending hex win is placed');
       assert(outcome.phaseAfterSuccessfulAdvance === 'spell_window_1',
