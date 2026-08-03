@@ -348,11 +348,11 @@ class GodApp {
             return;
         }
 
-        const statusEmoji = { setup: '⚙️', playing: '🎮', finished: '🏆', archived: '📦' };
+        const statusEmoji = { setup: ICON_SVGS.settings, playing: ICON_SVGS.gamepad2, finished: ICON_SVGS.trophy, archived: ICON_SVGS.package };
 
         container.innerHTML = tournaments.map(t => {
             const status = t.status || 'setup';
-            const emoji = statusEmoji[status] || '📋';
+            const emoji = statusEmoji[status] || ICON_SVGS.scrollText;
             const teamCount = t.teams?.length || 0;
             const matchCount = t.gameHistory?.length || 0;
             return `
@@ -363,10 +363,10 @@ class GodApp {
                         Round: ${t.currentRound || 0} | Matches played: ${matchCount}
                     </div>
                     <div class="tournament-actions">
-                        <button class="btn-view" onclick="window.open('view.html?tournamentId=${encodeURIComponent(t.id)}', '_blank')">👁️ View</button>
-                        <button class="btn-small secondary" onclick="openEditTournamentModal('${t.id}')" title="Edit name / win condition">✏️ Edit</button>
-                        <button class="btn-small secondary" onclick="duplicateTournamentFromList('${t.id}')" title="Duplicate this tournament">📋 Duplicate</button>
-                        <button class="btn-small danger" onclick="deleteTournamentFromList('${t.id}')" title="Permanently delete">🗑️ Delete</button>
+                        <button class="btn-view" onclick="window.open('view.html?tournamentId=${encodeURIComponent(t.id)}', '_blank')">${ICON_SVGS.eye} View</button>
+                        <button class="btn-small secondary" onclick="openEditTournamentModal('${t.id}')" title="Edit name / win condition">${ICON_SVGS.pencil} Edit</button>
+                        <button class="btn-small secondary" onclick="duplicateTournamentFromList('${t.id}')" title="Duplicate this tournament">${ICON_SVGS.copy} Duplicate</button>
+                        <button class="btn-small danger" onclick="deleteTournamentFromList('${t.id}')" title="Permanently delete">${ICON_SVGS.trash2} Delete</button>
                     </div>
                 </div>
             `;
@@ -851,7 +851,7 @@ class GodApp {
             }
             const pauseBtn = document.getElementById('ceremonyPauseBtn');
             if (pauseBtn) {
-                pauseBtn.textContent = cs.isPaused ? '\u25B6 Resume' : '\u23F8 Pause';
+                pauseBtn.innerHTML = cs.isPaused ? (ICON_SVGS.play + ' Resume') : (ICON_SVGS.pause + ' Pause');
                 pauseBtn.onclick = cs.isPaused
                     ? () => this.ceremony?.play()
                     : () => this.ceremony?.pause();

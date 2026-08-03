@@ -36,6 +36,7 @@
     <link rel="stylesheet" href="../shared/css/brand-theme.css">
     <link rel="stylesheet" href="../shared/css/toast.css">
     <link rel="stylesheet" href="css/onboarding.css">
+    <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
     <!-- Loading Overlay -->
@@ -66,13 +67,13 @@
             </div>
             <div class="header-status">
                 <div class="status-emojis" id="statusEmojis">
-                    <button class="status-btn" data-status="eating" onclick="togglePlayerStatus('eating')" title="Eating">🍔</button>
-                    <button class="status-btn" data-status="smoking" onclick="togglePlayerStatus('smoking')" title="Smoke break">🚬</button>
-                    <button class="status-btn" data-status="wc" onclick="togglePlayerStatus('wc')" title="Bathroom">🚽</button>
-                    <button class="status-btn" data-status="sleeping" onclick="togglePlayerStatus('sleeping')" title="Sleeping">😴</button>
-                    <button class="status-btn" data-status="alert" onclick="togglePlayerStatus('alert')" title="Need attention">❗</button>
-                    <button class="status-btn" data-status="question" onclick="togglePlayerStatus('question')" title="Have a question">❓</button>
-                    <button class="status-btn popup-btn" onclick="openStatusPopup()" title="Open mini panel">⏏️</button>
+                    <button class="status-btn" data-status="eating" onclick="togglePlayerStatus('eating')" title="Eating"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:#f97316"><path d="m12 14-1 1"/><path d="m13.75 18.25-1.25 1.42"/><path d="M17.775 5.654a15.68 15.68 0 0 0-12.121 12.12"/><path d="M18.8 9.3a1 1 0 0 0 2.1 7.7"/><path d="M21.964 20.732a1 1 0 0 1-1.232 1.232l-18-5a1 1 0 0 1-.695-1.232A19.68 19.68 0 0 1 15.732 2.037a1 1 0 0 1 1.232.695z"/></svg></button>
+                    <button class="status-btn" data-status="smoking" onclick="togglePlayerStatus('smoking')" title="Smoke break"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:#fef9c3"><path d="M17 12H3a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h14"/><path d="M18 8c0-2.5-2-2.5-2-5"/><path d="M21 16a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M22 8c0-2.5-2-2.5-2-5"/><path d="M7 12v4"/></svg></button>
+                    <button class="status-btn" data-status="wc" onclick="togglePlayerStatus('wc')" title="Bathroom"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:#9ca3af"><path d="M7 12h13a1 1 0 0 1 1 1 5 5 0 0 1-5 5h-.598a.5.5 0 0 0-.424.765l1.544 2.47a.5.5 0 0 1-.424.765H5.402a.5.5 0 0 1-.424-.765L7 18"/><path d="M8 18a5 5 0 0 1-5-5V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8"/></svg></button>
+                    <button class="status-btn" data-status="sleeping" onclick="togglePlayerStatus('sleeping')" title="Sleeping"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:#818cf8"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg></button>
+                    <button class="status-btn" data-status="alert" onclick="togglePlayerStatus('alert')" title="Need attention"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:#ef4444"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg></button>
+                    <button class="status-btn" data-status="question" onclick="togglePlayerStatus('question')" title="Have a question"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:#f59e0b"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></button>
+                    <button class="status-btn popup-btn" onclick="openStatusPopup()" title="Open mini panel"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></button>
                 </div>
                 <div class="progress-ring" id="progressRing" style="--progress: 0;">
                     <span id="progressPercent">0%</span>
@@ -204,6 +205,7 @@
 
     <!-- Scripts -->
     <script>window.BOARDGAME_BASE = '..';</script>
+    <script src="../shared/scripts/icon-svgs.js"></script>
     <script src="../shared/scripts/firebase-loader.js"></script>
     <script defer src="../shared/scripts/hex-image-preloader.js"></script>
     <script src="../shared/scripts/games-config.js"></script>

@@ -8,10 +8,10 @@
 const SIDE_LABELS_RM = ['A', 'B', 'C', 'D', 'E'];
 
 const BREAK_TYPES_RM = {
-    piss:      { label: 'Piss Break',      emoji: '\uD83D\uDEBD' },
-    cigarette: { label: 'Cigarette Break',  emoji: '\uD83D\uDEAC' },
-    food:      { label: 'Food Break',       emoji: '\uD83C\uDF55' },
-    sleep:     { label: 'Sleep',            emoji: '\uD83D\uDE34' }
+    piss:      { label: 'Piss Break',      emoji: iconSvg('toilet', '#9ca3af') },
+    cigarette: { label: 'Cigarette Break',  emoji: iconSvg('cigarette', '#fef9c3') },
+    food:      { label: 'Food Break',       emoji: iconSvg('pizza', '#f97316') },
+    sleep:     { label: 'Sleep',            emoji: iconSvg('moon', '#818cf8') }
 };
 
 class ResultManager {
@@ -103,7 +103,7 @@ class ResultManager {
 
         // Break entries get a simplified confirm modal
         if (game.isBreak === true) {
-            const breakDef = BREAK_TYPES_RM[game.breakType] || { label: game.breakLabel || 'Break', emoji: '\u23F8' };
+            const breakDef = BREAK_TYPES_RM[game.breakType] || { label: game.breakLabel || 'Break', emoji: ICON_SVGS.pause };
             const isOngoing = game.status === 'ongoing';
             const modal = document.getElementById('resultConfirmModal');
             const content = document.getElementById('resultConfirmContent');
@@ -752,7 +752,7 @@ class ResultManager {
         }).join('');
 
         banner.innerHTML = `
-            <span class="pending-hex-icon">\u26A0\uFE0F</span>
+            <span class="pending-hex-icon">${ICON_SVGS.triangleAlert}</span>
             <span class="pending-hex-text">Pending hex placement:</span>
             ${pendingList}
         `;

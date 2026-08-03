@@ -670,7 +670,7 @@ function renderTeamsList() {
                  draggable="true"
                  ondragstart="dragPlayer(event, ${team.id}, ${idx})"
                  ondragend="dragEnd(event)">
-                <span class="player-drag-handle">⋮⋮</span>
+                <span class="player-drag-handle">${ICON_SVGS.gripVertical}</span>
                 <span class="player-name">${escapeHtml(p.name)}</span>
             </div>
         `).join('');
@@ -830,7 +830,7 @@ function renderPlayerManager() {
                         ${isLinked ? '● Linked' : '○ Placeholder'}
                     </span>
                 </div>
-                <button class="btn-remove" onclick="removePlayerFromTeam(${team.id}, ${idx})" title="Delete this slot">✕</button>
+                <button class="btn-remove" onclick="removePlayerFromTeam(${team.id}, ${idx})" title="Delete this slot">${ICON_SVGS.x}</button>
             </div>
         `;
         }).join('');
@@ -1648,15 +1648,15 @@ function handleHexClick(coord) {
             <button class="team-picker-btn ${isRoom ? 'room-active' : ''}"
                     onclick="toggleRoomHex('${coord}')"
                     style="border-left: 4px solid #8b5cf6;">
-                ${isRoom ? '🚪 Remove Room' : '🚪 Mark as Room'}
+                ${isRoom ? ICON_SVGS.doorOpen + ' Remove Room' : ICON_SVGS.doorOpen + ' Mark as Room'}
             </button>
         `;
     } else {
         optionsHtml += `
             <div class="team-picker-hint" style="padding: 8px; color: var(--text-tertiary); font-size: 0.8rem;">
-                ${hexType === 'mountain-heart' ? '❤️❤️ Mountain Heart' :
-                  hexType === 'side-heart' ? '❤️ Side Heart' :
-                  '⭐ Starting Location'} - Cannot be a room
+                ${hexType === 'mountain-heart' ? ICON_SVGS.heart + ICON_SVGS.heart + ' Mountain Heart' :
+                  hexType === 'side-heart' ? ICON_SVGS.heart + ' Side Heart' :
+                  ICON_SVGS.star + ' Starting Location'} - Cannot be a room
             </div>
         `;
     }
@@ -2082,10 +2082,10 @@ async function addMatchToQueue(triggerBtn) {
 // =============================================================================
 
 const BREAK_TYPES = {
-    piss:      { label: 'Piss Break',      emoji: '🚽' },
-    cigarette: { label: 'Cigarette Break',  emoji: '🚬' },
-    food:      { label: 'Food Break',       emoji: '🍕' },
-    sleep:     { label: 'Sleep',            emoji: '😴' }
+    piss:      { label: 'Piss Break',      emoji: iconSvg('toilet', '#9ca3af') },
+    cigarette: { label: 'Cigarette Break',  emoji: iconSvg('cigarette', '#fef9c3') },
+    food:      { label: 'Food Break',       emoji: iconSvg('pizza', '#f97316') },
+    sleep:     { label: 'Sleep',            emoji: iconSvg('moon', '#818cf8') }
 };
 
 let _breakMenuCloseHandler = null;
@@ -2146,7 +2146,7 @@ async function addBreakToQueue(breakType) {
     }
 
     await saveGameState();
-    showStatus(`${def.emoji} ${def.label} added — playing next`, 'success');
+    showStatus(`${def.label} added — playing next`, 'success');
 }
 
 async function completeBreak(breakId) {
@@ -2170,7 +2170,7 @@ async function completeBreak(breakId) {
             message: `${breakEntry.breakEmoji || ''} ${breakEntry.breakLabel} completed`
         });
 
-        showStatus(`${breakEntry.breakEmoji || ''} ${breakEntry.breakLabel} completed!`, 'success');
+        showStatus(`${breakEntry.breakLabel} completed!`, 'success');
         closeResultConfirm();
     } finally { _asyncBusy = false; }
 }
@@ -3123,7 +3123,7 @@ function renderEditMatchModal() {
                     <span class="edit-player-team">${teamName}</span>
                     <div class="edit-player-actions">
                         ${moveOptions}
-                        <button class="edit-player-remove" onclick="removePlayerFromEdit(${sideIdx}, ${playerIdx})" title="Remove">✕</button>
+                        <button class="edit-player-remove" onclick="removePlayerFromEdit(${sideIdx}, ${playerIdx})" title="Remove">${ICON_SVGS.x}</button>
                     </div>
                 </div>
             `;
@@ -3584,7 +3584,7 @@ function buildBalanceInfo(stats) {
     const isBalanced = withRange <= 2 && againstRange <= 2;
 
     const statusClass = isBalanced ? 'good' : 'warn';
-    const statusIcon = isBalanced ? '✓' : '⚠';
+    const statusIcon = isBalanced ? ICON_SVGS.check : ICON_SVGS.triangleAlert;
 
     return `
         <div class="balance-info ${statusClass}">
@@ -3741,7 +3741,7 @@ function renderMatchQueue() {
 
         // Break entries get simplified rendering
         if (isBreak) {
-            const breakDef = BREAK_TYPES[game.breakType] || { label: game.breakLabel || 'Break', emoji: '⏸' };
+            const breakDef = BREAK_TYPES[game.breakType] || { label: game.breakLabel || 'Break', emoji: ICON_SVGS.pause };
             return `
                 <div class="queue-item ${isOngoing ? 'ongoing' : ''} break"
                      draggable="${!isOngoing}"
@@ -3752,14 +3752,14 @@ function renderMatchQueue() {
                      ondragleave="leaveQueueDrop(event)"
                      ondrop="dropQueueItem(event, ${game.id})"
                      ondragend="endQueueDrag(event)">
-                    <span class="drag-handle">${isOngoing ? '▶' : '☰'}</span>
+                    <span class="drag-handle">${isOngoing ? ICON_SVGS.play : ICON_SVGS.menu}</span>
                     <div class="game-info">
                         <div class="game-type-row">
                             <div class="game-type"><span class="break-badge">BREAK</span>${breakDef.emoji} ${breakDef.label}</div>
                             <div class="match-actions">
-                                ${!isOngoing ? `<button class="start-btn" onclick="event.stopPropagation(); startMatch(${game.id})" title="Start break">▶</button>` : ''}
-                                ${!isOngoing ? `<button class="move-top-btn" onclick="event.stopPropagation(); moveMatchToTop(${game.id})" title="Play next">⤴</button>` : ''}
-                                <button class="delete-btn" onclick="event.stopPropagation(); removeFromQueue(${game.id})" title="Remove">✕</button>
+                                ${!isOngoing ? `<button class="start-btn" onclick="event.stopPropagation(); startMatch(${game.id})" title="Start break">${ICON_SVGS.play}</button>` : ''}
+                                ${!isOngoing ? `<button class="move-top-btn" onclick="event.stopPropagation(); moveMatchToTop(${game.id})" title="Play next">${ICON_SVGS.arrowUpToLine}</button>` : ''}
+                                <button class="delete-btn" onclick="event.stopPropagation(); removeFromQueue(${game.id})" title="Remove">${ICON_SVGS.x}</button>
                             </div>
                         </div>
                     </div>
@@ -3813,15 +3813,15 @@ function renderMatchQueue() {
                  ondragleave="leaveQueueDrop(event)"
                  ondrop="dropQueueItem(event, ${game.id})"
                  ondragend="endQueueDrag(event)">
-                <span class="drag-handle">${isOngoing ? '▶' : '☰'}</span>
+                <span class="drag-handle">${isOngoing ? ICON_SVGS.play : ICON_SVGS.menu}</span>
                 <div class="game-info">
                     <div class="game-type-row">
                         <div class="game-type">${challengeBadge}${matchNumber}${gameName}${playType ? ' (' + playType + ')' : ''}</div>
                         <div class="match-actions">
-                            ${!isOngoing ? `<button class="start-btn" onclick="event.stopPropagation(); startMatch(${game.id})" title="Start match">▶</button>` : ''}
-                            ${!isOngoing ? `<button class="edit-btn" onclick="event.stopPropagation(); openEditMatchModal(${game.id})" title="Edit match">⚙</button>` : ''}
-                            ${!isOngoing ? `<button class="move-top-btn" onclick="event.stopPropagation(); moveMatchToTop(${game.id})" title="Play next">⤴</button>` : ''}
-                            <button class="delete-btn" onclick="event.stopPropagation(); removeFromQueue(${game.id})" title="Remove">✕</button>
+                            ${!isOngoing ? `<button class="start-btn" onclick="event.stopPropagation(); startMatch(${game.id})" title="Start match">${ICON_SVGS.play}</button>` : ''}
+                            ${!isOngoing ? `<button class="edit-btn" onclick="event.stopPropagation(); openEditMatchModal(${game.id})" title="Edit match">${ICON_SVGS.settings}</button>` : ''}
+                            ${!isOngoing ? `<button class="move-top-btn" onclick="event.stopPropagation(); moveMatchToTop(${game.id})" title="Play next">${ICON_SVGS.arrowUpToLine}</button>` : ''}
+                            <button class="delete-btn" onclick="event.stopPropagation(); removeFromQueue(${game.id})" title="Remove">${ICON_SVGS.x}</button>
                         </div>
                     </div>
                     <div class="matchup-players">${matchupHtml || fallbackMatchup || 'TBD'}</div>
@@ -3973,7 +3973,7 @@ function renderOngoingMatches() {
 
         // Break entries get simplified rendering with a Done button
         if (isBreak) {
-            const breakDef = BREAK_TYPES[game.breakType] || { label: game.breakLabel || 'Break', emoji: '⏸' };
+            const breakDef = BREAK_TYPES[game.breakType] || { label: game.breakLabel || 'Break', emoji: ICON_SVGS.pause };
             return `
                 <div class="ongoing-match break" onclick="openQuickConfirm(${game.id})">
                     <div class="ongoing-game-name"><span class="break-badge">BREAK</span> ${breakDef.emoji} ${breakDef.label}</div>
@@ -4064,7 +4064,7 @@ function openQuickConfirm(gameId) {
 
     // Break entries get a simplified confirm modal
     if (game.isBreak === true) {
-        const breakDef = BREAK_TYPES[game.breakType] || { label: game.breakLabel || 'Break', emoji: '⏸' };
+        const breakDef = BREAK_TYPES[game.breakType] || { label: game.breakLabel || 'Break', emoji: ICON_SVGS.pause };
         const isOngoing = game.status === 'ongoing';
         const modal = document.getElementById('resultConfirmModal');
         const content = document.getElementById('resultConfirmContent');
@@ -5086,7 +5086,7 @@ function updatePendingHexNotification() {
     }).join('');
 
     banner.innerHTML = `
-        <span class="pending-hex-icon">⚠️</span>
+        <span class="pending-hex-icon">${ICON_SVGS.triangleAlert}</span>
         <span class="pending-hex-text">Pending hex placement:</span>
         ${pendingList}
     `;

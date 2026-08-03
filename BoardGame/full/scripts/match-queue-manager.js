@@ -6,10 +6,10 @@
  */
 
 const BREAK_TYPES = {
-    piss:      { label: 'Piss Break',     emoji: '\uD83D\uDEBD' },
-    cigarette: { label: 'Cigarette Break', emoji: '\uD83D\uDEAC' },
-    food:      { label: 'Food Break',      emoji: '\uD83C\uDF55' },
-    sleep:     { label: 'Sleep',           emoji: '\uD83D\uDE34' }
+    piss:      { label: 'Piss Break',     emoji: iconSvg('toilet', '#9ca3af') },
+    cigarette: { label: 'Cigarette Break', emoji: iconSvg('cigarette', '#fef9c3') },
+    food:      { label: 'Food Break',      emoji: iconSvg('pizza', '#f97316') },
+    sleep:     { label: 'Sleep',           emoji: iconSvg('moon', '#818cf8') }
 };
 
 if (typeof SIDE_LABELS === 'undefined') {
@@ -139,7 +139,7 @@ class MatchQueueManager {
 
         container.innerHTML = ongoing.map(game => {
             if (game.isBreak === true) {
-                const breakDef = BREAK_TYPES[game.breakType] || { label: game.breakLabel || 'Break', emoji: '\u23F8' };
+                const breakDef = BREAK_TYPES[game.breakType] || { label: game.breakLabel || 'Break', emoji: ICON_SVGS.pause };
                 return `
                     <div class="ongoing-match break" onclick="openQuickConfirm(${game.id})">
                         <div class="ongoing-game-name"><span class="break-badge">BREAK</span> ${breakDef.emoji} ${breakDef.label}</div>
@@ -415,7 +415,7 @@ class MatchQueueManager {
 
         await this._save();
         this._logAction('break_started', 'phase', { breakType, breakLabel: def.label, breakId: breakEntry.id }, { breakId: breakEntry.id });
-        this._ui.showStatus(`${def.emoji} ${def.label} added \u2014 playing next`, 'success');
+        this._ui.showStatus(`${def.label} added \u2014 playing next`, 'success');
     }
 
     async completeBreak(breakId) {
@@ -435,14 +435,14 @@ class MatchQueueManager {
             this._logEvent('break_completed', {
                 breakType: breakEntry.breakType,
                 breakLabel: breakEntry.breakLabel,
-                message: `${breakEntry.breakEmoji || ''} ${breakEntry.breakLabel} completed`
+                message: `${breakEntry.breakLabel} completed`
             });
             this._logAction('break_ended', 'phase', {
                 breakType: breakEntry.breakType, breakLabel: breakEntry.breakLabel,
                 breakId: breakEntry.id
             }, { breakId: breakEntry.id, status: 'ongoing' });
 
-            this._ui.showStatus(`${breakEntry.breakEmoji || ''} ${breakEntry.breakLabel} completed!`, 'success');
+            this._ui.showStatus(`${breakEntry.breakLabel} completed!`, 'success');
             this._closeResultConfirm();
         } finally { this._asyncBusy = false; }
     }
@@ -452,7 +452,7 @@ class MatchQueueManager {
     // ------------------------------------------------------------------
 
     _renderBreakItem(game, isOngoing) {
-        const breakDef = BREAK_TYPES[game.breakType] || { label: game.breakLabel || 'Break', emoji: '\u23F8' };
+        const breakDef = BREAK_TYPES[game.breakType] || { label: game.breakLabel || 'Break', emoji: ICON_SVGS.pause };
         return `
             <div class="queue-item ${isOngoing ? 'ongoing' : ''} break"
                  draggable="${!isOngoing}"
@@ -463,14 +463,14 @@ class MatchQueueManager {
                  ondragleave="leaveQueueDrop(event)"
                  ondrop="dropQueueItem(event, ${game.id})"
                  ondragend="endQueueDrag(event)">
-                <span class="drag-handle">${isOngoing ? '\u25B6' : '\u2630'}</span>
+                <span class="drag-handle">${isOngoing ? ICON_SVGS.play : ICON_SVGS.menu}</span>
                 <div class="game-info">
                     <div class="game-type-row">
                         <div class="game-type"><span class="break-badge">BREAK</span>${breakDef.emoji} ${breakDef.label}</div>
                         <div class="match-actions">
-                            ${!isOngoing ? `<button class="start-btn" onclick="event.stopPropagation(); startMatch(${game.id})" title="Start break">\u25B6</button>` : ''}
-                            ${!isOngoing ? `<button class="move-top-btn" onclick="event.stopPropagation(); moveMatchToTop(${game.id})" title="Play next">\u2934</button>` : ''}
-                            <button class="delete-btn" onclick="event.stopPropagation(); removeFromQueue(${game.id})" title="Remove">\u2715</button>
+                            ${!isOngoing ? `<button class="start-btn" onclick="event.stopPropagation(); startMatch(${game.id})" title="Start break">${ICON_SVGS.play}</button>` : ''}
+                            ${!isOngoing ? `<button class="move-top-btn" onclick="event.stopPropagation(); moveMatchToTop(${game.id})" title="Play next">${ICON_SVGS.arrowUpToLine}</button>` : ''}
+                            <button class="delete-btn" onclick="event.stopPropagation(); removeFromQueue(${game.id})" title="Remove">${ICON_SVGS.x}</button>
                         </div>
                     </div>
                 </div>
@@ -515,15 +515,15 @@ class MatchQueueManager {
                  ondragleave="leaveQueueDrop(event)"
                  ondrop="dropQueueItem(event, ${game.id})"
                  ondragend="endQueueDrag(event)">
-                <span class="drag-handle">${isOngoing ? '\u25B6' : '\u2630'}</span>
+                <span class="drag-handle">${isOngoing ? ICON_SVGS.play : ICON_SVGS.menu}</span>
                 <div class="game-info">
                     <div class="game-type-row">
                         <div class="game-type">${challengeBadge}${matchNumber}${gameName}${playType ? ' (' + playType + ')' : ''}</div>
                         <div class="match-actions">
-                            ${!isOngoing ? `<button class="start-btn" onclick="event.stopPropagation(); startMatch(${game.id})" title="Start match">\u25B6</button>` : ''}
-                            ${!isOngoing ? `<button class="edit-btn" onclick="event.stopPropagation(); openEditMatchModal(${game.id})" title="Edit match">\u2699</button>` : ''}
-                            ${!isOngoing ? `<button class="move-top-btn" onclick="event.stopPropagation(); moveMatchToTop(${game.id})" title="Play next">\u2934</button>` : ''}
-                            <button class="delete-btn" onclick="event.stopPropagation(); removeFromQueue(${game.id})" title="Remove">\u2715</button>
+                            ${!isOngoing ? `<button class="start-btn" onclick="event.stopPropagation(); startMatch(${game.id})" title="Start match">${ICON_SVGS.play}</button>` : ''}
+                            ${!isOngoing ? `<button class="edit-btn" onclick="event.stopPropagation(); openEditMatchModal(${game.id})" title="Edit match">${ICON_SVGS.settings}</button>` : ''}
+                            ${!isOngoing ? `<button class="move-top-btn" onclick="event.stopPropagation(); moveMatchToTop(${game.id})" title="Play next">${ICON_SVGS.arrowUpToLine}</button>` : ''}
+                            <button class="delete-btn" onclick="event.stopPropagation(); removeFromQueue(${game.id})" title="Remove">${ICON_SVGS.x}</button>
                         </div>
                     </div>
                     <div class="matchup-players">${matchupHtml || fallbackMatchup || 'TBD'}</div>

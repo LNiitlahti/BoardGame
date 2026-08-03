@@ -668,22 +668,22 @@ class SpellEngine {
     _getEffectIcon(def) {
         const type = def.effect?.type;
         const icons = {
-            multiplier: '\u2728',      // ✨
-            destroy_adjacent: '\u{1F4A5}', // 💥
-            streak_bonus: '\u{1F525}',  // 🔥
-            shield: '\u{1F6E1}',        // 🛡️
-            copy_spell: '\u{1F4CB}',    // 📋
-            challenge: '\u2694',        // ⚔
-            bonus_points: '\u2B50',     // ⭐
-            ban: '\u{1F6AB}',          // 🚫
-            modifier: '\u{1F3B2}',     // 🎲
-            permanent_buff: '\u{1F48E}', // 💎
-            extra_placement: '\u{1F9E9}', // 🧩
-            silence: '\u{1F507}',      // 🔇
-            bet: '\u{1F3B0}',          // 🎰
-            counter: '\u{1F6E1}'       // 🛡️
+            multiplier: ICON_SVGS.sparkles,
+            destroy_adjacent: ICON_SVGS.bomb,
+            streak_bonus: ICON_SVGS.flame,
+            shield: ICON_SVGS.shield,
+            copy_spell: ICON_SVGS.copy,
+            challenge: ICON_SVGS.swords,
+            bonus_points: ICON_SVGS.star,
+            ban: ICON_SVGS.ban,
+            modifier: ICON_SVGS.dices,
+            permanent_buff: ICON_SVGS.gem,
+            extra_placement: ICON_SVGS.puzzle,
+            silence: ICON_SVGS.volumeX,
+            bet: ICON_SVGS.coins,
+            counter: ICON_SVGS.shield
         };
-        return icons[type] || '\u{1F52E}'; // 🔮 default
+        return icons[type] || ICON_SVGS.wandSparkles;
     }
 
     /** Calculate when an effect expires */
@@ -1033,7 +1033,7 @@ class SpellEngine {
                 <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px;
                             margin-bottom: 6px; border-left: 3px solid ${teamColor};
                             background: rgba(168, 85, 247, 0.08); border-radius: 6px;">
-                    <span style="font-size: 20px;">${eff.icon || '\u{1F52E}'}</span>
+                    <span style="font-size: 20px;">${eff.icon || ICON_SVGS.wandSparkles}</span>
                     <div style="flex: 1;">
                         <div style="font-size: 0.85rem; color: var(--text-primary);">
                             <strong>${this._teams?.escapeHtml(eff.spellName) || eff.spellName}</strong>

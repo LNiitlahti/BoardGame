@@ -1215,7 +1215,7 @@ class MatchCreationManager {
                         <span class="edit-player-team">${teamName}</span>
                         <div class="edit-player-actions">
                             ${moveOptions}
-                            <button class="edit-player-remove" onclick="removePlayerFromEdit(${sideIdx}, ${playerIdx})" title="Remove">\u2715</button>
+                            <button class="edit-player-remove" onclick="removePlayerFromEdit(${sideIdx}, ${playerIdx})" title="Remove">${ICON_SVGS.x}</button>
                         </div>
                     </div>
                 `;
@@ -1647,7 +1647,7 @@ class MatchCreationManager {
         const isBalanced = withRange <= 2 && againstRange <= 2;
 
         const statusClass = isBalanced ? 'good' : 'warn';
-        const statusIcon = isBalanced ? '\u2713' : '\u26A0';
+        const statusIcon = isBalanced ? ICON_SVGS.check : ICON_SVGS.triangleAlert;
 
         return `
             <div class="balance-info ${statusClass}">

@@ -45,6 +45,9 @@ docs/analysis/
 # Personal to-do (not for git)
 TODO.md
 
+# Campaign guide (not for git)
+KAMPANJAOPAS.md
+
 # Build outputs
 dist/
 build/

@@ -631,6 +631,7 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
   <!-- Navbar container - populated by navbar.js (includes connection status) -->
@@ -639,7 +640,7 @@
   <!-- Referral Codes Modal -->
   <div id="referralCodesModal" class="custom-modal-overlay" onclick="closeReferralCodesModal(event)">
     <div class="custom-modal" onclick="event.stopPropagation()">
-      <h2>🎫 Referral Codes</h2>
+      <h2><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg> Referral Codes</h2>
       <div id="referralCodesContent"></div>
       <div class="modal-footer">
         <div class="modal-footer-stats" id="modalFooterStats"></div>
@@ -716,17 +717,17 @@
 
       <div class="dashboard-grid">
         <div class="dashboard-card">
-          <h3><span class="card-icon">🎮</span> Game Management</h3>
+          <h3><span class="card-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/></svg></span> Game Management</h3>
           <div class="action-buttons" style="flex-wrap: wrap;">
-            <button class="btn-small btn-god" onclick="goToPage('god.html')">👑 God Panel</button>
-            <button class="btn-small btn-secondary" onclick="goToPage('setup.html')">🎮 New Game</button>
-            <button class="btn-small btn-primary" onclick="manageTeams()">👥 Manage Teams</button>
-            <button class="btn-small btn-primary" onclick="manageSpells()">✨ Manage Spells</button>
+            <button class="btn-small btn-god" onclick="goToPage('god.html')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg> God Panel</button>
+            <button class="btn-small btn-secondary" onclick="goToPage('setup.html')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/></svg> New Game</button>
+            <button class="btn-small btn-primary" onclick="manageTeams()"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg> Manage Teams</button>
+            <button class="btn-small btn-primary" onclick="manageSpells()"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg> Manage Spells</button>
           </div>
         </div>
 
         <div class="dashboard-card">
-          <h3><span class="card-icon">👥</span> User Management</h3>
+          <h3><span class="card-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg></span> User Management</h3>
           <div class="stat-value" id="totalUsers">0</div>
           <div class="stat-label">Total Users</div>
           <div class="action-buttons">
@@ -735,7 +736,7 @@
         </div>
 
         <div class="dashboard-card">
-          <h3><span class="card-icon">🏆</span> Tournament Overview</h3>
+          <h3><span class="card-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2"/><path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2"/><path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3"/></svg></span> Tournament Overview</h3>
           <div class="stat-value" id="activeTournaments">0</div>
           <div class="stat-label">Active Tournaments</div>
           <div class="action-buttons">
@@ -744,7 +745,7 @@
         </div>
 
         <div class="dashboard-card">
-          <h3><span class="card-icon">⚙️</span> System Status</h3>
+          <h3><span class="card-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg></span> System Status</h3>
           <div class="stat-label">All systems operational</div>
           <div class="action-buttons">
             <button class="btn-small btn-secondary" onclick="viewLogs()">View Logs</button>
@@ -752,7 +753,7 @@
         </div>
 
         <div class="dashboard-card">
-          <h3><span class="card-icon">🎫</span> Referral Codes</h3>
+          <h3><span class="card-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg></span> Referral Codes</h3>
           <div class="stat-value" id="totalReferralCodes">0</div>
           <div class="stat-label"><span id="usedReferralCodes">0</span> used, <span id="unusedReferralCodes">0</span> available</div>
           <div class="action-buttons">
@@ -762,7 +763,7 @@
         </div>
 
         <div class="dashboard-card">
-          <h3><span class="card-icon">🗺️</span> Dev Tools & Sitemap</h3>
+          <h3><span class="card-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg></span> Dev Tools & Sitemap</h3>
           <div class="stat-label">Every page, incl. dev-only tools (spell generator, board test, match scheduler)</div>
           <div class="action-buttons">
             <button class="btn-small btn-secondary" onclick="goToPage('../development-landing-page.html')">Open Sitemap</button>
@@ -777,7 +778,7 @@
 
       <div class="dashboard-grid">
         <div class="dashboard-card">
-          <h3><span class="card-icon">🎮</span> Current Game</h3>
+          <h3><span class="card-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/></svg></span> Current Game</h3>
           <div class="stat-value" id="adminCurrentRound">1</div>
           <div class="stat-label">Current Round</div>
           <div class="action-buttons">
@@ -786,7 +787,7 @@
         </div>
 
         <div class="dashboard-card">
-          <h3><span class="card-icon">📋</span> Pending Matches</h3>
+          <h3><span class="card-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/></svg></span> Pending Matches</h3>
           <div class="stat-value" id="adminPendingMatches">0</div>
           <div class="stat-label">Awaiting Results</div>
           <div class="action-buttons">
@@ -795,7 +796,7 @@
         </div>
 
         <div class="dashboard-card">
-          <h3><span class="card-icon">👥</span> Teams</h3>
+          <h3><span class="card-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg></span> Teams</h3>
           <div class="stat-value" id="adminTotalTeams">0</div>
           <div class="stat-label">Active Teams</div>
           <div class="action-buttons">
@@ -811,7 +812,7 @@
 
       <div class="dashboard-grid">
         <div class="dashboard-card">
-          <h3><span class="card-icon">👥</span> My Team</h3>
+          <h3><span class="card-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg></span> My Team</h3>
           <div class="stat-value" id="playerTeamName">Loading...</div>
           <div class="stat-label" id="playerTeamPoints">0 points</div>
           <div class="action-buttons">
@@ -820,13 +821,13 @@
         </div>
 
         <div class="dashboard-card">
-          <h3><span class="card-icon">🏆</span> My Stats</h3>
+          <h3><span class="card-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2"/><path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2"/><path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3"/></svg></span> My Stats</h3>
           <div class="stat-value" id="playerWins">0</div>
           <div class="stat-label">Games Won</div>
         </div>
 
         <div class="dashboard-card">
-          <h3><span class="card-icon">🎴</span> Spell Cards</h3>
+          <h3><span class="card-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg></span> Spell Cards</h3>
           <div class="stat-value" id="playerSpellCards">0</div>
           <div class="stat-label">Available Cards</div>
           <div class="action-buttons">
@@ -835,7 +836,7 @@
         </div>
 
         <div class="dashboard-card">
-          <h3><span class="card-icon">📅</span> Next Match</h3>
+          <h3><span class="card-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg></span> Next Match</h3>
           <div class="stat-label" id="playerNextMatch">No matches scheduled</div>
           <div class="action-buttons">
             <button class="btn-small btn-primary" onclick="viewSchedule()">View Schedule</button>
@@ -849,7 +850,7 @@
       <h2 class="section-title">User Dashboard</h2>
 
       <div class="dashboard-card">
-        <h3><span class="card-icon">ℹ️</span> Welcome</h3>
+        <h3><span class="card-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span> Welcome</h3>
         <p style="color: #9aa1ad;">
           You're logged in but don't have an assigned role yet.
           Contact an administrator to be assigned to a team.
@@ -865,22 +866,22 @@
     <div class="board-preview" style="margin-top: 30px;">
       <h3>Resources</h3>
       <div class="action-buttons" style="flex-wrap: wrap; margin-top: 12px;">
-        <button class="btn-small btn-secondary" onclick="goToPage('../rulebook.html')">📖 Rulebook</button>
-        <button class="btn-small btn-secondary" onclick="goToPage('statistics.html')">📊 Statistics</button>
-        <button class="btn-small btn-secondary" onclick="goToOnboarding()">🧭 Player Onboarding</button>
+        <button class="btn-small btn-secondary" onclick="goToPage('../rulebook.html')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v16"/><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"/></svg> Rulebook</button>
+        <button class="btn-small btn-secondary" onclick="goToPage('statistics.html')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> Statistics</button>
+        <button class="btn-small btn-secondary" onclick="goToOnboarding()"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/></svg> Player Onboarding</button>
       </div>
 
       <!-- Dev tools (god only) -->
       <div id="devToolsRow" style="display: none; margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06);">
         <div style="font-size: 0.75rem; color: #9aa1ad; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px;">Dev Tools</div>
         <div class="action-buttons" style="flex-wrap: wrap;">
-          <button class="btn-small btn-secondary" onclick="goToPage('../dev/dev-tools.html')">🛠️ Dev Tools Viewer</button>
-          <button class="btn-small btn-secondary" onclick="goToPage('../dev/board-test2.html')">🎲 Board Test</button>
-          <button class="btn-small btn-secondary" onclick="goToPage('../dev/dev-matchscheduler.html')">📅 Match Scheduler</button>
-          <button class="btn-small btn-secondary" onclick="goToPage('../tools/hex-tile-slicer.html')">🔪 Hex Tile Slicer</button>
-          <button class="btn-small btn-secondary" onclick="goToPage('../tools/spell-generator.html')">🔮 Spell Generator</button>
-          <button class="btn-small btn-secondary" onclick="goToPage('../tools/upload-spells.html')">📤 Upload Spells</button>
-          <button class="btn-small btn-secondary" onclick="goToPage('../development-landing-page.html')">🗺️ Sitemap</button>
+          <button class="btn-small btn-secondary" onclick="goToPage('../dev/dev-tools.html')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"/></svg> Dev Tools Viewer</button>
+          <button class="btn-small btn-secondary" onclick="goToPage('../dev/board-test2.html')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="12" height="12" x="2" y="10" rx="2" ry="2"/><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6"/><path d="M6 18h.01"/><path d="M10 14h.01"/><path d="M15 6h.01"/><path d="M18 9h.01"/></svg> Board Test</button>
+          <button class="btn-small btn-secondary" onclick="goToPage('../dev/dev-matchscheduler.html')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg> Match Scheduler</button>
+          <button class="btn-small btn-secondary" onclick="goToPage('../tools/hex-tile-slicer.html')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg> Hex Tile Slicer</button>
+          <button class="btn-small btn-secondary" onclick="goToPage('../tools/spell-generator.html')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg> Spell Generator</button>
+          <button class="btn-small btn-secondary" onclick="goToPage('../tools/upload-spells.html')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg> Upload Spells</button>
+          <button class="btn-small btn-secondary" onclick="goToPage('../development-landing-page.html')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg> Sitemap</button>
         </div>
       </div>
     </div>
@@ -1740,7 +1741,7 @@
       // Available codes section
       if (unusedCodes.length > 0) {
         html += '<div class="code-section">';
-        html += '<h3>✅ Available Codes <span style="font-size: 0.75rem; opacity: 0.7; font-weight: normal;">(Click to copy URL)</span></h3>';
+        html += '<h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> Available Codes <span style="font-size: 0.75rem; opacity: 0.7; font-weight: normal;">(Click to copy URL)</span></h3>';
         unusedCodes.forEach(c => {
           const createdDate = c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Unknown';
           html += `
@@ -1762,7 +1763,7 @@
       // Used codes section
       if (usedCodes.length > 0) {
         html += '<div class="code-section">';
-        html += '<h3>❌ Used Codes</h3>';
+        html += '<h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg> Used Codes</h3>';
         usedCodes.forEach(c => {
           const usedDate = c.usedAt ? new Date(c.usedAt).toLocaleDateString() : 'No date';
           const userName = c.assignedName || c.assignedEmail || 'Unknown';

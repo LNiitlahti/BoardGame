@@ -504,7 +504,7 @@ class DisplayManager {
         // Break entries
         if (match.isBreak === true) {
             const breakLabel = match.breakLabel || 'Break';
-            const breakEmoji = match.breakEmoji || '\u23F8';
+            const breakEmoji = match.breakEmoji || ICON_SVGS.pause;
 
             if (match.startedAt?.toDate) {
                 this._matchStartTimes[matchId] = match.startedAt.toDate().getTime();
@@ -524,7 +524,7 @@ class DisplayManager {
                     <span class="a-live-badge" style="background:rgba(247,186,50,0.2);color:#f7ba32;border-color:rgba(247,186,50,0.4);">\u25CF BREAK</span>
                     <span class="a-game-name" style="font-size:48px;">${breakEmoji}</span>
                     <span class="a-vs" style="color:#f7ba32;">${breakLabel}</span>
-                    <span class="a-timer">\u23F1 <span id="elapsed${slotNum}">00:00</span></span>
+                    <span class="a-timer">${ICON_SVGS.timer} <span id="elapsed${slotNum}">00:00</span></span>
                 </div>
                 <div class="a-side right" style="--side-color:#f7ba32"></div>
             `;
@@ -596,7 +596,7 @@ class DisplayManager {
                 <div class="a-center" style="position:absolute;top:calc(50% + 100px);left:50%;transform:translate(-50%,-50%);width:auto;">
                     <span class="a-game-name">${gameName}</span>
                     <span class="a-format">${playType}</span>
-                    <span class="a-timer">\u23F1 <span id="elapsed${slotNum}">00:00</span></span>
+                    <span class="a-timer">${ICON_SVGS.timer} <span id="elapsed${slotNum}">00:00</span></span>
                 </div>
             `;
         } else {
@@ -612,7 +612,7 @@ class DisplayManager {
                     <span class="a-game-name">${gameName}</span>
                     <span class="a-vs">VS</span>
                     <span class="a-format">${playType}</span>
-                    <span class="a-timer">\u23F1 <span id="elapsed${slotNum}">00:00</span></span>
+                    <span class="a-timer">${ICON_SVGS.timer} <span id="elapsed${slotNum}">00:00</span></span>
                 </div>
                 <div class="a-side right" style="--side-color:${rightColor}">
                     <div class="a-players">${buildSidePlayers(teams[1])}</div>
@@ -650,7 +650,7 @@ class DisplayManager {
             // Break entries
             if (match.isBreak === true) {
                 const breakLabel = match.breakLabel || 'Break';
-                const breakEmoji = match.breakEmoji || '\u23F8';
+                const breakEmoji = match.breakEmoji || ICON_SVGS.pause;
                 if (isNext) {
                     return `
                         <div class="q-card q-next break">
@@ -693,7 +693,7 @@ class DisplayManager {
                     return `
                         <div class="q-card q-next ${isChallenge ? 'challenge' : ''}">
                             <div class="q-next-top">
-                                <span class="q-next-game">${isChallenge ? '\u2694 ' : ''}${gameName}</span>
+                                <span class="q-next-game">${isChallenge ? ICON_SVGS.swords + ' ' : ''}${gameName}</span>
                                 <span class="q-next-badge">NEXT</span>
                             </div>
                             <div class="q-next-matchup">
@@ -710,7 +710,7 @@ class DisplayManager {
                 return `
                     <div class="q-card q-next ${isChallenge ? 'challenge' : ''}">
                         <div class="q-next-top">
-                            <span class="q-next-game">${isChallenge ? '\u2694 ' : ''}${gameName}</span>
+                            <span class="q-next-game">${isChallenge ? ICON_SVGS.swords + ' ' : ''}${gameName}</span>
                             <span class="q-next-badge">NEXT</span>
                         </div>
                         <div class="q-next-matchup">
@@ -736,7 +736,7 @@ class DisplayManager {
                 return `
                     <div class="q-card q-compact ${isChallenge ? 'challenge' : ''}">
                         <div class="qc-top">
-                            <span class="qc-game">${isChallenge ? '\u2694 ' : ''}${this._getGameDisplayName(match.game)}${playType ? ' \u00B7 ' + playType : ''}</span>
+                            <span class="qc-game">${isChallenge ? ICON_SVGS.swords + ' ' : ''}${this._getGameDisplayName(match.game)}${playType ? ' \u00B7 ' + playType : ''}</span>
                         </div>
                         <div class="qc-matchup">
                             <div class="qc-side a">${buildCompactSide(teams[0], 'a')}</div>
@@ -752,7 +752,7 @@ class DisplayManager {
             return `
                 <div class="q-card q-compact ${isChallenge ? 'challenge' : ''}">
                     <div class="qc-top">
-                        <span class="qc-game">${isChallenge ? '\u2694 ' : ''}${this._getGameDisplayName(match.game)}${playType ? ' \u00B7 ' + playType : ''}</span>
+                        <span class="qc-game">${isChallenge ? ICON_SVGS.swords + ' ' : ''}${this._getGameDisplayName(match.game)}${playType ? ' \u00B7 ' + playType : ''}</span>
                     </div>
                     <div class="qc-matchup">
                         <div class="qc-side a">${buildCompactSide(teams[0], 'a')}</div>
@@ -877,7 +877,7 @@ class DisplayManager {
             return `
                 <div class="r-card" data-result-id="${event.id}" ${isChallenge ? 'style="border-left: 3px solid var(--danger)"' : ''}>
                     <div class="r-top">
-                        <span class="r-game">${isChallenge ? '\u2694 ' : ''}${gameName}${playType ? ' \u00B7 ' + playType : ''}</span>
+                        <span class="r-game">${isChallenge ? ICON_SVGS.swords + ' ' : ''}${gameName}${playType ? ' \u00B7 ' + playType : ''}</span>
                         <span class="r-time">${time}</span>
                     </div>
                     <div class="r-matchup" style="gap:4px;align-items:flex-start;">
@@ -906,7 +906,7 @@ class DisplayManager {
         return `
             <div class="r-card" data-result-id="${event.id}" ${isChallenge ? 'style="border-left: 3px solid var(--danger)"' : ''}>
                 <div class="r-top">
-                    <span class="r-game">${isChallenge ? '\u2694 ' : ''}${gameName}${playType ? ' \u00B7 ' + playType : ''}</span>
+                    <span class="r-game">${isChallenge ? ICON_SVGS.swords + ' ' : ''}${gameName}${playType ? ' \u00B7 ' + playType : ''}</span>
                     <span class="r-time">${time}</span>
                 </div>
                 <div class="r-matchup">
@@ -980,7 +980,14 @@ class DisplayManager {
             return;
         }
 
-        const STATUS_EMOJIS = { eating: '\uD83C\uDF54', smoking: '\uD83D\uDEAC', wc: '\uD83D\uDEBD', sleeping: '\uD83D\uDE34', alert: '\u2757', question: '\u2753' };
+        const STATUS_EMOJIS = {
+            eating: iconSvg('pizza', '#f97316'),
+            smoking: iconSvg('cigarette', '#fef9c3'),
+            wc: iconSvg('toilet', '#9ca3af'),
+            sleeping: iconSvg('moon', '#818cf8'),
+            alert: iconSvg('circleAlert', '#ef4444'),
+            question: iconSvg('circleQuestionMark', '#f59e0b')
+        };
         const teams = this._gameData?.teams || [];
 
         let html = '';
@@ -988,7 +995,7 @@ class DisplayManager {
             const status = statusObj?.status;
             if (!status || status === 'available') continue;
 
-            const emoji = STATUS_EMOJIS[status] || '\u2753';
+            const emoji = STATUS_EMOJIS[status] || iconSvg('circleQuestionMark', '#f59e0b');
 
             // Find player name and team color
             let playerName = playerId;
@@ -1175,7 +1182,7 @@ class DisplayManager {
                 ? ` <span style="color:var(--text-dim);">(until R${eff.expiresAfterRound})</span>`
                 : '';
             return `<div style="padding:5px 12px; margin:3px 0; border-left:4px solid ${borderColor}; background:rgba(168,85,247,0.06); border-radius:4px; font-family:'Quantico',sans-serif; font-size:16px; font-weight:500; color:var(--text-bright);">
-                <span style="margin-right:6px;">${eff.icon || '\uD83D\uDD2E'}</span>${text}${expiryNote}
+                <span style="margin-right:6px;">${eff.icon || ICON_SVGS.wandSparkles}</span>${text}${expiryNote}
             </div>`;
         }).join('');
     }
@@ -1414,7 +1421,7 @@ class DisplayManager {
         let standingsHTML = '';
         teams.forEach((team, idx) => {
             const color = team.color || '#888';
-            const medals = ['\uD83E\uDD47', '\uD83E\uDD48', '\uD83E\uDD49'];
+            const medals = [iconSvg('medal', '#eab308'), iconSvg('medal', '#cbd5e1'), iconSvg('medal', '#b45309')];
             const medal = idx < 3 ? medals[idx] : `${idx + 1}.`;
             const totalPts = this._getTeamTotalPoints(team);
             standingsHTML += `
@@ -1429,7 +1436,7 @@ class DisplayManager {
         container.innerHTML = `
             <div class="dm-winner-celebration">
                 <div class="dm-confetti-container" id="confettiContainer"></div>
-                <div class="dm-winner-trophy">\uD83C\uDFC6</div>
+                <div class="dm-winner-trophy">${ICON_SVGS.trophy}</div>
                 <div class="dm-winner-name" style="color: ${winnerColor}; text-shadow: 0 0 30px ${winnerColor}40;">${winner.name || 'Winner'}</div>
                 <div class="dm-winner-subtitle">Tournament Champion</div>
                 <div class="dm-winner-points">${this._getTeamTotalPoints(winner)} points</div>
@@ -1525,12 +1532,13 @@ class DisplayManager {
                 const gl = r.gameLobby === true || r.ready === true;
                 const dc = r.discord === true || r.ready === true;
                 const isCreator = lobbyCreatorUids.has(p.uid);
-                const creatorIcon = isCreator ? '<span style="margin-right: 4px;">\u2B50</span>' : '';
+                const creatorIcon = isCreator ? `<span style="margin-right: 4px;">${ICON_SVGS.star}</span>` : '';
+                const dotSvg = (ready) => `<svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="color:${ready ? '#22c55e' : '#ef4444'}"><circle cx="12" cy="12" r="8"/></svg>`;
 
                 playersHTML += `
                     <div class="dm-ready-player-row">
-                        <span class="dm-ready-indicator" style="color: ${gl ? '#10b981' : '#ef4444'};">${gl ? '\uD83D\uDFE2' : '\uD83D\uDD34'}\uD83C\uDFAE</span>
-                        <span class="dm-ready-indicator" style="color: ${dc ? '#10b981' : '#ef4444'};">${dc ? '\uD83D\uDFE2' : '\uD83D\uDD34'}\uD83C\uDFA7</span>
+                        <span class="dm-ready-indicator" style="color: ${gl ? '#10b981' : '#ef4444'};">${dotSvg(gl)}${ICON_SVGS.gamepad2}</span>
+                        <span class="dm-ready-indicator" style="color: ${dc ? '#10b981' : '#ef4444'};">${dotSvg(dc)}${ICON_SVGS.headphones}</span>
                         ${creatorIcon}<span class="dm-ready-player-name">${p.name || 'Player'}</span>
                     </div>
                 `;
@@ -1552,7 +1560,7 @@ class DisplayManager {
             <div class="dm-readiness-large">
                 <div class="dm-readiness-title">Ready Check</div>
                 <div class="dm-readiness-legend" style="text-align: center; font-size: 14px; color: #9aa1ad; margin-bottom: 12px;">
-                    \uD83C\uDFAE = Game Lobby &nbsp; \uD83C\uDFA7 = Discord &nbsp; \u2B50 = Lobby Creator
+                    ${ICON_SVGS.gamepad2} = Game Lobby &nbsp; ${ICON_SVGS.headphones} = Discord &nbsp; ${ICON_SVGS.star} = Lobby Creator
                 </div>
                 ${rowsHTML}
             </div>

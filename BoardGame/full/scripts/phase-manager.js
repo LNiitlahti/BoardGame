@@ -53,22 +53,22 @@ const PHASE_ORDER = [
 ];
 
 const PHASE_DISPLAY = {
-    pre_game_setup:   { name: 'Pre-Game Setup',       icon: '\u2699' },
-    scoring_vp:       { name: 'Scoring: Victory Points', icon: '\u{1F3C6}' },
-    scoring_hex:      { name: 'Scoring: Hex',         icon: '\u2B22' },
-    hex_placement_1:  { name: 'Hex Placement — Game 1', icon: '\u{1F5FA}' },
-    spell_window_1:   { name: 'Spell Window',         icon: '\u2728' },
-    hex_placement_2:  { name: 'Hex Placement — Game 2', icon: '\u{1F5FA}' },
-    challenges:       { name: 'Challenges Issued',    icon: '\u2694' },
-    spell_window_2:   { name: 'Spell Window',         icon: '\u2728' },
-    challenge_game:   { name: 'Challenge Game',       icon: '\u{1F3AE}' },
-    spell_window_3:   { name: 'Spell Window',         icon: '\u2728' },
-    board_resolved:   { name: 'Board Resolved',       icon: '\u{1F6E1}' },
-    spell_window_4:   { name: 'Spell Window',         icon: '\u2728' },
-    matches_in_progress: { name: 'Matches In Progress', icon: '🎮' },
-    round_advance:    { name: 'Round Advance',        icon: '\u23ED' },
-    break:            { name: 'Break',                icon: '\u23F8' },
-    tournament_end:   { name: 'Tournament End',       icon: '\u{1F3C6}' }
+    pre_game_setup:   { name: 'Pre-Game Setup',       icon: ICON_SVGS.settings },
+    scoring_vp:       { name: 'Scoring: Victory Points', icon: ICON_SVGS.trophy },
+    scoring_hex:      { name: 'Scoring: Hex',         icon: ICON_SVGS.hexagon },
+    hex_placement_1:  { name: 'Hex Placement — Game 1', icon: ICON_SVGS.map },
+    spell_window_1:   { name: 'Spell Window',         icon: ICON_SVGS.sparkles },
+    hex_placement_2:  { name: 'Hex Placement — Game 2', icon: ICON_SVGS.map },
+    challenges:       { name: 'Challenges Issued',    icon: ICON_SVGS.swords },
+    spell_window_2:   { name: 'Spell Window',         icon: ICON_SVGS.sparkles },
+    challenge_game:   { name: 'Challenge Game',       icon: ICON_SVGS.gamepad2 },
+    spell_window_3:   { name: 'Spell Window',         icon: ICON_SVGS.sparkles },
+    board_resolved:   { name: 'Board Resolved',       icon: ICON_SVGS.shield },
+    spell_window_4:   { name: 'Spell Window',         icon: ICON_SVGS.sparkles },
+    matches_in_progress: { name: 'Matches In Progress', icon: ICON_SVGS.gamepad2 },
+    round_advance:    { name: 'Round Advance',        icon: ICON_SVGS.skipForward },
+    break:            { name: 'Break',                icon: ICON_SVGS.pause },
+    tournament_end:   { name: 'Tournament End',       icon: ICON_SVGS.trophy }
 };
 
 /** Phases that auto-advance immediately (no admin interaction needed) */
@@ -90,10 +90,10 @@ const AUTO_ADVANCE_WHEN_MET = [];
 const SLOT_SUB_PHASES = ['setup', 'lobby', 'playing', 'done'];
 
 const SLOT_SUB_PHASE_DISPLAY = {
-    setup:   { name: 'Setup',   icon: '\u{1F3DF}' },
-    lobby:   { name: 'Lobby',   icon: '\u{1F3AE}' },
-    playing: { name: 'Playing', icon: '\u{1F3AE}' },
-    done:    { name: 'Done',    icon: '✅' }
+    setup:   { name: 'Setup',   icon: ICON_SVGS.settings },
+    lobby:   { name: 'Lobby',   icon: ICON_SVGS.gamepad2 },
+    playing: { name: 'Playing', icon: ICON_SVGS.gamepad2 },
+    done:    { name: 'Done',    icon: ICON_SVGS.circleCheck }
 };
 
 /** Phases skipped in normal linear flow (only entered via dedicated methods) */
@@ -1400,7 +1400,7 @@ class PhaseManager {
             } else {
                 listEl.innerHTML = reqs.items.map(r =>
                     `<span class="phase-req-item ${r.met ? 'met' : 'unmet'}" title="${r.label}">` +
-                    `<span class="phase-req-check">${r.met ? '\u2713' : '\u2717'}</span> ` +
+                    `<span class="phase-req-check">${r.met ? ICON_SVGS.check : ICON_SVGS.x}</span> ` +
                     `${this._escHtml(r.label)}</span>`
                 ).join('');
             }
@@ -1414,7 +1414,7 @@ class PhaseManager {
         if (advBtn) {
             const isBreak = phase === 'break';
             const isEnd = phase === 'tournament_end';
-            advBtn.textContent = isBreak ? 'End Break \u25B6' : 'Next Phase \u25B6';
+            advBtn.innerHTML = (isBreak ? 'End Break ' : 'Next Phase ') + ICON_SVGS.play;
             advBtn.disabled = isEnd || (!isBreak && !this._cachedReqs.allMet);
             advBtn.onclick = isBreak
                 ? () => window.endBreak()
@@ -1457,7 +1457,7 @@ class PhaseManager {
                 const isActive = sp?.isActive;
                 let html = '';
                 if (!isActive) {
-                    html += `<button class="btn-small primary" onclick="beginSpells()" title="Start spell casting phase">\u2728 Begin Spells</button>`;
+                    html += `<button class="btn-small primary" onclick="beginSpells()" title="Start spell casting phase">${ICON_SVGS.sparkles} Begin Spells</button>`;
                 }
                 // Loop button
                 const loopInfo = this.getLoopInfo();
@@ -1481,7 +1481,7 @@ class PhaseManager {
             if (bs && bs.intervalRounds > 0 && phase !== 'break' && phase !== 'tournament_end' && phase !== 'pre_game_setup') {
                 const since = bs.roundsSinceLastBreak || 0;
                 const interval = bs.intervalRounds;
-                breakBadge.textContent = `\u23F8 ${since}/${interval}`;
+                breakBadge.innerHTML = `${ICON_SVGS.pause} ${since}/${interval}`;
                 breakBadge.style.display = '';
                 breakBadge.className = 'break-interval-badge' + (since >= interval ? ' break-due' : '');
             } else {
@@ -1522,7 +1522,7 @@ class PhaseManager {
 
             const reqsHtml = reqs.map(r =>
                 `<span class="phase-req-item ${r.met ? 'met' : 'unmet'}">` +
-                `<span class="phase-req-check">${r.met ? '✓' : '✗'}</span> ${this._escHtml(r.label)}</span>`
+                `<span class="phase-req-check">${r.met ? ICON_SVGS.check : ICON_SVGS.x}</span> ${this._escHtml(r.label)}</span>`
             ).join('');
 
             return `
@@ -1532,8 +1532,8 @@ class PhaseManager {
                         <span class="match-slot-name">${this._escHtml(info.name)}</span>
                     </div>
                     <div class="match-slot-reqs">${reqsHtml}</div>
-                    ${isDone ? '' : `<button class="btn-small primary" ${allMet ? '' : 'disabled'} onclick="advanceSlot(${slot})">Advance Match ${slot} ▶</button>`}
-                    <button class="btn-small secondary" onclick="forceAdvanceSlot(${slot})" title="Force advance (skip requirements)" ${isDone ? 'style="display:none"' : ''}>⚠ Force Advance</button>
+                    ${isDone ? '' : `<button class="btn-small primary" ${allMet ? '' : 'disabled'} onclick="advanceSlot(${slot})">Advance Match ${slot} ${ICON_SVGS.play}</button>`}
+                    <button class="btn-small secondary" onclick="forceAdvanceSlot(${slot})" title="Force advance (skip requirements)" ${isDone ? 'style="display:none"' : ''}>${ICON_SVGS.triangleAlert} Force Advance</button>
                 </div>`;
         }).join('');
     }
@@ -1549,7 +1549,7 @@ class PhaseManager {
             const reqs = this._cachedReqs;
             listEl.innerHTML = reqs.items.map(r =>
                 `<div class="force-advance-req ${r.met ? 'met' : 'unmet'}">` +
-                `<span>${r.met ? '\u2713' : '\u2717'}</span> ${this._escHtml(r.label)}</div>`
+                `<span>${r.met ? ICON_SVGS.check : ICON_SVGS.x}</span> ${this._escHtml(r.label)}</div>`
             ).join('');
         }
 

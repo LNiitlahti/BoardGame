@@ -168,7 +168,7 @@ class TeamManager {
                      draggable="true"
                      ondragstart="dragPlayer(event, ${team.id}, ${idx})"
                      ondragend="dragEnd(event)">
-                    <span class="player-drag-handle">\u22ee\u22ee</span>
+                    <span class="player-drag-handle">${ICON_SVGS.gripVertical}</span>
                     <span class="player-name">${this.escapeHtml(p.name)}</span>
                 </div>
             `).join('');
@@ -313,7 +313,7 @@ class TeamManager {
                         </span>
                     </div>
                     ${swapHint}
-                    <button class="btn-remove" onclick="removePlayerFromTeam(${team.id}, ${idx})" title="Delete this slot">\u2715</button>
+                    <button class="btn-remove" onclick="removePlayerFromTeam(${team.id}, ${idx})" title="Delete this slot">${ICON_SVGS.x}</button>
                 </div>
             `;
             }).join('');

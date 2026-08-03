@@ -1662,6 +1662,7 @@
             background: rgba(0, 216, 128, 0.15); color: var(--live);
         }
     </style>
+    <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
 
@@ -1723,7 +1724,7 @@
                 <span class="a-game-name"></span>
                 <span class="a-vs">VS</span>
                 <span class="a-format"></span>
-                <span class="a-timer">⏱ <span id="elapsed1">--:--</span></span>
+                <span class="a-timer"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg> <span id="elapsed1">--:--</span></span>
             </div>
             <div class="a-side right">
                 <div class="a-players"></div>
@@ -1743,7 +1744,7 @@
                 <span class="a-game-name"></span>
                 <span class="a-vs">VS</span>
                 <span class="a-format"></span>
-                <span class="a-timer">⏱ <span id="elapsed2">--:--</span></span>
+                <span class="a-timer"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg> <span id="elapsed2">--:--</span></span>
             </div>
             <div class="a-side right">
                 <div class="a-players"></div>
@@ -1805,6 +1806,7 @@
     window.addEventListener('load', applyScale);
     applyScale();
     </script>
+    <script defer src="../shared/scripts/icon-svgs.js"></script>
     <script defer src="../shared/scripts/render-signature.js"></script>
     <script defer src="../shared/scripts/firebase-loader.js"></script>
     <script defer src="../shared/scripts/hex-image-preloader.js"></script>
@@ -2112,7 +2114,14 @@
     // ONBOARDING STATUS LISTENER
     // ====================================================================
 
-    const STATUS_EMOJIS = { eating: '🍔', smoking: '🚬', wc: '🚽', sleeping: '😴', alert: '❗', question: '❓' };
+    const STATUS_EMOJIS = {
+        eating: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:#f97316"><path d="m12 14-1 1"/><path d="m13.75 18.25-1.25 1.42"/><path d="M17.775 5.654a15.68 15.68 0 0 0-12.121 12.12"/><path d="M18.8 9.3a1 1 0 0 0 2.1 7.7"/><path d="M21.964 20.732a1 1 0 0 1-1.232 1.232l-18-5a1 1 0 0 1-.695-1.232A19.68 19.68 0 0 1 15.732 2.037a1 1 0 0 1 1.232.695z"/></svg>',
+        smoking: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:#fef9c3"><path d="M17 12H3a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h14"/><path d="M18 8c0-2.5-2-2.5-2-5"/><path d="M21 16a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M22 8c0-2.5-2-2.5-2-5"/><path d="M7 12v4"/></svg>',
+        wc: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:#9ca3af"><path d="M7 12h13a1 1 0 0 1 1 1 5 5 0 0 1-5 5h-.598a.5.5 0 0 0-.424.765l1.544 2.47a.5.5 0 0 1-.424.765H5.402a.5.5 0 0 1-.424-.765L7 18"/><path d="M8 18a5 5 0 0 1-5-5V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8"/></svg>',
+        sleeping: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:#818cf8"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>',
+        alert: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:#ef4444"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>',
+        question: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:#f59e0b"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>'
+    };
 
     function setupOnboardingListener() {
         if (!tournamentId) return;

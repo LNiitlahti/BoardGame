@@ -66,22 +66,22 @@
     };
 
     const PHASE_ICONS = {
-        pre_game_setup:      '⚙',
-        scoring_vp:          '\u{1F3C6}',
-        scoring_hex:         '⬢',
-        hex_placement_1:     '\u{1F5FA}',
-        spell_window_1:      '✨',
-        hex_placement_2:     '\u{1F5FA}',
-        challenges:          '⚔',
-        spell_window_2:      '✨',
-        challenge_game:      '\u{1F3AE}',
-        spell_window_3:      '✨',
-        board_resolved:      '\u{1F6E1}',
-        spell_window_4:      '✨',
-        matches_in_progress: '\u{1F3AE}',
-        round_advance:       '⏭',
-        break:               '⏸',
-        tournament_end:      '\u{1F3C6}'
+        pre_game_setup:      ICON_SVGS.settings,
+        scoring_vp:          ICON_SVGS.trophy,
+        scoring_hex:         ICON_SVGS.hexagon,
+        hex_placement_1:     ICON_SVGS.map,
+        spell_window_1:      ICON_SVGS.sparkles,
+        hex_placement_2:     ICON_SVGS.map,
+        challenges:          ICON_SVGS.swords,
+        spell_window_2:      ICON_SVGS.sparkles,
+        challenge_game:      ICON_SVGS.gamepad2,
+        spell_window_3:      ICON_SVGS.sparkles,
+        board_resolved:      ICON_SVGS.shield,
+        spell_window_4:      ICON_SVGS.sparkles,
+        matches_in_progress: ICON_SVGS.gamepad2,
+        round_advance:       ICON_SVGS.skipForward,
+        break:               ICON_SVGS.pause,
+        tournament_end:      ICON_SVGS.trophy
     };
 
     const SETUP_PHASES = ['challenges'];
@@ -645,11 +645,11 @@
                     <div class="match-slot-header">
                         <span class="match-slot-icon">${PHASE_ICONS.matches_in_progress}</span>
                         <span class="match-slot-name">Match ${slot} — ${_esc(sub)}</span>
-                        ${sub === 'setup' ? `<button class="btn-small secondary" onclick="setTargetMatchSlot(${slot})" title="New matches go to this slot">${isTarget ? '✓ Target' : 'Set Target'}</button>` : ''}
+                        ${sub === 'setup' ? `<button class="btn-small secondary" onclick="setTargetMatchSlot(${slot})" title="New matches go to this slot">${isTarget ? ICON_SVGS.check + ' Target' : 'Set Target'}</button>` : ''}
                     </div>
                     <div class="match-slot-guidance">${_esc(step.text)}</div>
                     ${btnHtml}
-                    <button class="btn-small secondary" onclick="forceAdvanceSlot(${slot})" title="Force advance (skip requirements)" ${isDone ? 'style="display:none"' : ''}>⚠ Force Advance</button>
+                    <button class="btn-small secondary" onclick="forceAdvanceSlot(${slot})" title="Force advance (skip requirements)" ${isDone ? 'style="display:none"' : ''}>${ICON_SVGS.triangleAlert} Force Advance</button>
                 </div>`;
         }).join('');
     }
@@ -699,7 +699,7 @@
                 if (i > 0) html += '<span class="flow-tl-connector done"></span>';
                 html += `<span class="flow-tl-step done"><span class="flow-tl-dot"></span><span class="flow-tl-label">${PHASE_LABELS[p] || p}</span></span>`;
             });
-            html = '<span class="flow-tl-step active"><span class="flow-tl-dot"></span><span class="flow-tl-label">⏸ Break</span></span>' +
+            html = '<span class="flow-tl-step active"><span class="flow-tl-dot"></span><span class="flow-tl-label">' + ICON_SVGS.pause + ' Break</span></span>' +
                    '<span class="flow-tl-connector"></span>' + html;
             container.innerHTML = html;
             return;
@@ -734,7 +734,7 @@
         const nameEl = document.getElementById('flowPhaseName');
         const roundEl = document.getElementById('flowRoundBadge');
 
-        if (iconEl) iconEl.textContent = PHASE_ICONS[phase] || '';
+        if (iconEl) iconEl.innerHTML = PHASE_ICONS[phase] || '';
         if (nameEl) nameEl.textContent = PHASE_LABELS[phase] || phase;
 
         if (roundEl) {
@@ -996,7 +996,7 @@
         const reqs = _phaseManager.getPhaseRequirements();
         reqs.items.forEach(r => {
             const cls = r.met ? 'req-met' : 'req-unmet';
-            const icon = r.met ? '✓' : '✗';
+            const icon = r.met ? ICON_SVGS.check : ICON_SVGS.x;
             html += `<span class="flow-action-item ${cls}">` +
                     `<span class="flow-action-icon">${icon}</span> ${_esc(r.label)}</span>`;
         });
@@ -1010,7 +1010,7 @@
                 const team = gameState?.teams?.find(t => String(t.id) === String(teamId));
                 const color = team?.color || 'var(--accent-warning)';
                 html += `<span class="flow-action-item action-pending" title="Match ${matchLabel}: ${teamName} needs to place a hex plate">` +
-                        `<span class="flow-action-icon">⬢</span> ` +
+                        `<span class="flow-action-icon">${ICON_SVGS.hexagon}</span> ` +
                         `<span class="flow-action-team" style="color: ${color}">${_esc(teamName)}</span> hex</span>`;
             });
         });
@@ -1023,7 +1023,7 @@
         votedMatches.forEach(m => {
             const gameName = (typeof getGameDisplayName === 'function') ? getGameDisplayName(m.gameId) : (m.gameId || 'Match');
             html += `<span class="flow-action-item action-vote" title="Players voted on result for ${gameName}">` +
-                    `<span class="flow-action-icon">\u{1F5F3}</span> Vote: ${_esc(gameName)}</span>`;
+                    `<span class="flow-action-icon">${ICON_SVGS.vote}</span> Vote: ${_esc(gameName)}</span>`;
         });
 
         container.innerHTML = html;
@@ -1061,7 +1061,7 @@
             const show = !step.primaryIsAdvance &&
                          phase !== 'break' && phase !== 'tournament_end' && phase !== 'round_advance';
             advBtn.style.display = show ? '' : 'none';
-            advBtn.textContent = 'Next Phase ▶';
+            advBtn.innerHTML = 'Next Phase ' + ICON_SVGS.play;
             advBtn.disabled = !reqs.allMet;
             advBtn.onclick = () => window.advancePhase();
         }
@@ -1079,7 +1079,7 @@
             if (phase === 'challenges') {
                 extraControls.style.display = '';
                 extraControls.innerHTML =
-                    '<button class="btn-small challenge" onclick="addChallengeToQueue()" title="Create a challenge match (heart-hex dispute)">⚔ Challenge</button>';
+                    '<button class="btn-small challenge" onclick="addChallengeToQueue()" title="Create a challenge match (heart-hex dispute)">' + ICON_SVGS.swords + ' Challenge</button>';
             } else {
                 extraControls.style.display = 'none';
                 extraControls.innerHTML = '';
@@ -1103,7 +1103,7 @@
             if (bs && bs.intervalRounds > 0 && phase !== 'break' && phase !== 'tournament_end' && phase !== 'pre_game_setup') {
                 const since = bs.roundsSinceLastBreak || 0;
                 const interval = bs.intervalRounds;
-                breakBadge.textContent = `⏸ ${since}/${interval}`;
+                breakBadge.innerHTML = `${ICON_SVGS.pause} ${since}/${interval}`;
                 breakBadge.style.display = '';
                 breakBadge.className = 'break-interval-badge' + (since >= interval ? ' break-due' : '');
             } else {
@@ -1127,7 +1127,7 @@
 
         const sp = gameState.spellPhase;
         if (!sp?.isActive) {
-            html += '<button class="btn-small primary" onclick="beginSpells()" title="Start spell casting phase">✨ Begin Spells</button> ';
+            html += '<button class="btn-small primary" onclick="beginSpells()" title="Start spell casting phase">' + ICON_SVGS.sparkles + ' Begin Spells</button> ';
         }
 
         const loopInfo = _phaseManager.getLoopInfo();
@@ -1209,7 +1209,7 @@
             '<div class="flow-body" style="justify-content: center; padding: 18px 24px;">' +
                 '<div class="flow-current" style="max-width: none;">' +
                     '<div class="flow-phase-header">' +
-                        '<span class="flow-phase-icon">⚙</span>' +
+                        '<span class="flow-phase-icon">' + ICON_SVGS.settings + '</span>' +
                         '<div class="flow-phase-info">' +
                             '<span class="flow-phase-label">TOURNAMENT FLOW</span>' +
                             '<span class="flow-phase-name">Not initialized</span>' +
@@ -1251,13 +1251,13 @@
                 '<div class="flow-controls">' +
                     '<button class="btn primary flow-primary-btn" id="flowPrimaryBtn" onclick="runFlowPrimaryAction()" disabled>---</button>' +
                     '<div class="flow-controls-secondary">' +
-                        '<button class="btn-small secondary" id="advancePhaseBtn" onclick="advancePhase()" disabled>Next Phase ▶</button>' +
+                        '<button class="btn-small secondary" id="advancePhaseBtn" onclick="advancePhase()" disabled>Next Phase ' + ICON_SVGS.play + '</button>' +
                         '<span id="phaseExtraControls" style="display: none;"></span>' +
                         '<span id="lobbyAdminControls" style="display: none;"></span>' +
                         '<span id="spellWindowControls" style="display: none;"></span>' +
-                        '<button class="btn-small secondary" id="forceAdvanceBtn" onclick="forceAdvancePhase()" title="Force advance (skip requirements)">⚠ Force Advance</button>' +
-                        '<button class="btn-small secondary" id="insertBreakBtn" onclick="insertBreak()" title="Insert break">⏸ Break</button>' +
-                        '<button class="btn-small secondary" id="broadcastToggleBtn" onclick="toggleBroadcastBar()" title="Broadcast a message to view screens">\u{1F4E2}</button>' +
+                        '<button class="btn-small secondary" id="forceAdvanceBtn" onclick="forceAdvancePhase()" title="Force advance (skip requirements)">' + ICON_SVGS.triangleAlert + ' Force Advance</button>' +
+                        '<button class="btn-small secondary" id="insertBreakBtn" onclick="insertBreak()" title="Insert break">' + ICON_SVGS.pause + ' Break</button>' +
+                        '<button class="btn-small secondary" id="broadcastToggleBtn" onclick="toggleBroadcastBar()" title="Broadcast a message to view screens">' + ICON_SVGS.megaphone + '</button>' +
                         '<span id="breakIntervalBadge" class="break-interval-badge" onclick="openBreakSettings()" title="Break interval settings" style="display: none;"></span>' +
                     '</div>' +
                 '</div>' +
@@ -1289,7 +1289,7 @@
         if (titleEl) titleEl.textContent = title || 'Confirm';
         if (bodyEl) bodyEl.innerHTML = bodyHtml || '';
         if (btn) {
-            btn.textContent = confirmLabel || 'Confirm';
+            btn.innerHTML = confirmLabel || 'Confirm';
             btn.className = danger ? 'btn danger' : 'btn primary';
             btn.onclick = () => {
                 const fn = _flowConfirmAction;
@@ -1360,13 +1360,13 @@
                    `</div>`;
         }).join('');
         if (frozenCount > 0) {
-            body += `<p class="modal-warning-line" style="margin-top:10px;">⚠ ${frozenCount} contested hex(es) frozen by active challenges — not scored.</p>`;
+            body += `<p class="modal-warning-line" style="margin-top:10px;">${ICON_SVGS.triangleAlert} ${frozenCount} contested hex(es) frozen by active challenges — not scored.</p>`;
         }
 
         _openFlowConfirm({
             title: `Award Round ${round} Points`,
             bodyHtml: body,
-            confirmLabel: 'Award & Continue ▶',
+            confirmLabel: 'Award & Continue ' + ICON_SVGS.play,
             onConfirm: () => window.advancePhase()
         });
     };
@@ -1658,7 +1658,7 @@
             _openFlowConfirm({
                 title: 'Hex Tiles Not Placed',
                 bodyHtml: `<p><strong>${pendingPlacements}</strong> hex placement${pendingPlacements !== 1 ? 's are' : ' is'} still pending from earlier results — teams should place their tiles before the next match starts.</p>`,
-                confirmLabel: 'Start Anyway ▶',
+                confirmLabel: 'Start Anyway ' + ICON_SVGS.play,
                 danger: true,
                 onConfirm: () => window.startMatch(gameId, true)
             });
@@ -1683,7 +1683,7 @@
             _openFlowConfirm({
                 title: 'Start Match Early?',
                 bodyHtml: `<p>You are in <strong>${_esc(phaseLabel)}</strong>. Starting <strong>${_esc(matchLabel)}</strong> now skips ${skips} and jumps straight to the playing phase.</p>`,
-                confirmLabel: 'Start & Skip ▶',
+                confirmLabel: 'Start & Skip ' + ICON_SVGS.play,
                 onConfirm: () => _startMatchThenAdvance(gameId)
             });
             return;
@@ -1697,7 +1697,7 @@
                 title: 'Players Not Ready Yet',
                 bodyHtml: `<p>Lobby status: <strong>${summary || 'unknown'}</strong>.</p>` +
                           `<p>Start <strong>${_esc(matchLabel)}</strong> anyway? The remaining ready checks will be skipped.</p>`,
-                confirmLabel: 'Start Anyway ▶',
+                confirmLabel: 'Start Anyway ' + ICON_SVGS.play,
                 onConfirm: () => _startMatchThenAdvance(gameId)
             });
             return;
@@ -1902,7 +1902,7 @@
                 btn.classList.add('team-picker-pending');
                 const badge = document.createElement('span');
                 badge.className = 'pending-badge';
-                badge.textContent = '⏳ owed';
+                badge.innerHTML = ICON_SVGS.hourglass + ' owed';
                 btn.appendChild(badge);
                 return;
             }
@@ -2054,7 +2054,7 @@
         _openFlowConfirm({
             title: 'Move Match Back to Queue',
             bodyHtml: `<p><strong>${_esc(_matchShortLabel(game))}</strong> will return to the queue as not started. Use this when a match was started by mistake or needs a full restart.</p>`,
-            confirmLabel: 'Back to Queue ⏪',
+            confirmLabel: 'Back to Queue ' + ICON_SVGS.rewind,
             onConfirm: async () => {
                 game.status = 'pending';
                 delete game.startedAt;
@@ -2079,13 +2079,13 @@
             const editBtn = document.createElement('button');
             editBtn.className = 'edit-btn live-edit-btn';
             editBtn.title = 'Edit live match (players / game)';
-            editBtn.textContent = '⚙';
+            editBtn.innerHTML = ICON_SVGS.settings;
             editBtn.onclick = (e) => { e.stopPropagation(); window.openEditMatchModal(game.id); };
 
             const revertBtn = document.createElement('button');
             revertBtn.className = 'move-top-btn live-revert-btn';
             revertBtn.title = 'Move back to queue (undo start)';
-            revertBtn.textContent = '⏪';
+            revertBtn.innerHTML = ICON_SVGS.rewind;
             revertBtn.onclick = (e) => { e.stopPropagation(); window.revertMatchToQueue(game.id); };
 
             actions.insertBefore(revertBtn, actions.firstChild);
@@ -2105,7 +2105,7 @@
             const editBtn = document.createElement('button');
             editBtn.className = 'btn-small secondary live-edit-btn';
             editBtn.title = 'Edit live match (players / game)';
-            editBtn.textContent = '⚙';
+            editBtn.innerHTML = ICON_SVGS.settings;
             editBtn.onclick = (e) => { e.stopPropagation(); window.openEditMatchModal(game.id); };
             actions.appendChild(editBtn);
         });

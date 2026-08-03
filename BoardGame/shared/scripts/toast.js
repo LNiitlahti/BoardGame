@@ -35,10 +35,10 @@
     }
 
     const ICONS = {
-        success: '\u2714',  // checkmark
-        error: '\u2716',    // x mark
-        warning: '\u26A0',  // warning triangle
-        info: '\u2139'      // info circle
+        success: (window.ICON_SVGS && window.ICON_SVGS.circleCheck) || '\u2714',
+        error: (window.ICON_SVGS && window.ICON_SVGS.circleX) || '\u2716',
+        warning: (window.ICON_SVGS && window.ICON_SVGS.triangleAlert) || '\u26A0',
+        info: (window.ICON_SVGS && window.ICON_SVGS.info) || '\u2139'
     };
 
     /**
@@ -60,7 +60,7 @@
 
         var icon = document.createElement('span');
         icon.className = 'toast-icon';
-        icon.textContent = ICONS[type] || ICONS.info;
+        icon.innerHTML = ICONS[type] || ICONS.info;
 
         var content = document.createElement('span');
         content.className = 'toast-content';

@@ -142,11 +142,11 @@ function displayUsers() {
                 <td>${createdDate}</td>
                 <td>${lastLoginDate}</td>
                 <td>
-                    <button class="btn-small btn-edit" onclick="editUser('${user.uid}')">✏️ Edit</button>
+                    <button class="btn-small btn-edit" onclick="editUser('${user.uid}')">${ICON_SVGS.pencil} Edit</button>
                     <button class="btn-small btn-toggle" onclick="toggleUserStatus('${user.uid}', ${!isEnabled})">
-                        ${isEnabled ? '🚫 Disable' : '✅ Enable'}
+                        ${isEnabled ? ICON_SVGS.ban + ' Disable' : ICON_SVGS.circleCheck + ' Enable'}
                     </button>
-                    <button class="btn-small btn-delete" onclick="deleteUser('${user.uid}', '${escapeHtml(user.displayName || user.email)}')">🗑️</button>
+                    <button class="btn-small btn-delete" onclick="deleteUser('${user.uid}', '${escapeHtml(user.displayName || user.email)}')">${ICON_SVGS.trash2}</button>
                 </td>
             </tr>
         `;
@@ -166,7 +166,7 @@ function escapeHtml(text) {
  * Show create user modal
  */
 function showCreateUserModal() {
-    document.getElementById('userModalTitle').textContent = '➕ Create User';
+    document.getElementById('userModalTitle').innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Create User';
     document.getElementById('userFormUid').value = '';
     document.getElementById('userFormEmail').value = '';
     document.getElementById('userFormEmail').disabled = false;
@@ -192,7 +192,7 @@ function editUser(uid) {
         return;
     }
 
-    document.getElementById('userModalTitle').textContent = '✏️ Edit User';
+    document.getElementById('userModalTitle').innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg> Edit User';
     document.getElementById('userFormUid').value = uid;
     document.getElementById('userFormEmail').value = user.email || '';
     document.getElementById('userFormEmail').disabled = true; // Cannot change email in Firestore (read-only)
@@ -979,7 +979,7 @@ function renderTournamentRoster() {
                             <button onclick="startEditTeamName(${team.id})"
                                     style="background: rgba(255, 255, 255, 0.1); border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; color: #9aa1ad; font-size: 0.75rem;"
                                     title="Edit team name">
-                                ✏️
+                                ${ICON_SVGS.pencil}
                             </button>
                         </div>
                         <div id="teamName-edit-${team.id}" style="display: none; margin-bottom: 8px;">
@@ -1279,7 +1279,7 @@ async function saveTeamName(teamId) {
             showStatus(`Team renamed: "${oldName}" → "${newName}"`, 'success');
         }
         if (typeof addLog === 'function') {
-            addLog(`📝 Team renamed: "${oldName}" → "${newName}"`, 'info');
+            addLog(`${ICON_SVGS.pencil} Team renamed: "${oldName}" → "${newName}"`, 'info');
         }
 
         console.log(`[User Management] Team ${teamId} renamed from "${oldName}" to "${newName}"`);

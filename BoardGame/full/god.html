@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="css/god-modern.css">
     <link rel="stylesheet" href="css/ceremony.css">
     <link rel="stylesheet" href="../shared/css/toast.css">
+    <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
     <!-- Navbar container - populated by navbar.js (includes connection status) -->
@@ -35,25 +36,25 @@
         <!-- Main Navigation Tabs -->
         <nav class="god-nav">
             <button class="god-nav-tab active" data-tab="tournaments" onclick="switchGodTab('tournaments')">
-                🏆 Tournaments
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2"/><path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2"/><path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3"/></svg> Tournaments
             </button>
             <button class="god-nav-tab" data-tab="board" data-role="god" onclick="switchGodTab('board')">
-                🎯 Board
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> Board
             </button>
             <button class="god-nav-tab" data-tab="teams" onclick="switchGodTab('teams')">
-                👥 Teams
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg> Teams
             </button>
             <button class="god-nav-tab" data-tab="users" data-role="god" onclick="switchGodTab('users')">
-                👤 Users
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Users
             </button>
             <button class="god-nav-tab" data-tab="spells" data-role="god" onclick="switchGodTab('spells')">
-                🔮 Spells
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg> Spells
             </button>
             <button class="god-nav-tab god-nav-tab-deprioritized" data-tab="activityLog" data-role="god" onclick="switchGodTab('activityLog')" title="Not actively maintained — may be removed">
-                📋 Activity Log
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/></svg> Activity Log
             </button>
             <button class="god-nav-tab" data-tab="seasons" data-role="god" onclick="switchGodTab('seasons')">
-                📅 Seasons
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg> Seasons
             </button>
         </nav>
 
@@ -100,7 +101,7 @@
         <div id="tournamentsPanel" class="god-tab-panel active">
             <!-- Tournament Management Panel (moved from left sidebar) -->
             <div class="panel">
-                <h3>🏆 Tournament Management</h3>
+                <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2"/><path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2"/><path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3"/></svg> Tournament Management</h3>
 
                 <!-- Active Tournament (loaded via the navbar) — state control -->
                 <div id="activeTournamentBar" style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; padding: 10px 12px; background: rgba(11, 13, 16, 0.4); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08);">
@@ -127,7 +128,7 @@
 
                 <!-- Search -->
                 <div class="form-group" style="margin-bottom: 10px;">
-                    <input type="text" id="tournamentSearch" placeholder="🔍 Search tournaments..."
+                    <input type="text" id="tournamentSearch" placeholder="Search tournaments..."
                            oninput="filterTournaments()"
                            style="width: 100%; padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white; font-size: 1rem;">
                 </div>
@@ -186,21 +187,21 @@
                 </div>
                 <div id="hexBoard"></div>
                 <div style="text-align: center; margin-top: 8px;">
-                    <button class="btn-small secondary" onclick="saveDefaultRooms()" title="Save current rooms as default for new tournaments">💾 Save Default Rooms</button>
-                    <button class="btn-small secondary" onclick="loadDefaultRooms()" title="Load default room hexes">📥 Load Default Rooms</button>
+                    <button class="btn-small secondary" onclick="saveDefaultRooms()" title="Save current rooms as default for new tournaments"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg> Save Default Rooms</button>
+                    <button class="btn-small secondary" onclick="loadDefaultRooms()" title="Load default room hexes"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg> Load Default Rooms</button>
                 </div>
             </section>
 
             <!-- Board Controls -->
             <div class="panel" style="width: 100%; margin-top: 15px;">
                 <div id="currentTurnInfoBoard" style="text-align: center; padding: 15px; background: rgba(255, 215, 0, 0.2); border-radius: 10px; margin-bottom: 15px;">
-                    <strong>⏳ No active turn</strong>
+                    <strong><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg> No active turn</strong>
                 </div>
                 <div style="text-align: center; margin-bottom: 10px;">
-                    <button class="btn-small" id="undoBtn" onclick="undoAction()" disabled>⬅️ Undo</button>
-                    <button class="btn-small" id="redoBtn" onclick="redoAction()" disabled>➡️ Redo</button>
-                    <button class="btn-small" onclick="highlightValidPlacements()">🔍 Valid Placements</button>
-                    <button class="btn-small" onclick="clearHighlights()">🧹 Clear</button>
+                    <button class="btn-small" id="undoBtn" onclick="undoAction()" disabled><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg> Undo</button>
+                    <button class="btn-small" id="redoBtn" onclick="redoAction()" disabled><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13"/></svg> Redo</button>
+                    <button class="btn-small" onclick="highlightValidPlacements()"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg> Valid Placements</button>
+                    <button class="btn-small" onclick="clearHighlights()"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21H8a2 2 0 0 1-1.42-.587l-3.994-3.999a2 2 0 0 1 0-2.828l10-10a2 2 0 0 1 2.829 0l5.999 6a2 2 0 0 1 0 2.828L12.834 21"/><path d="m5.082 11.09 8.828 8.828"/></svg> Clear</button>
                     <span id="actionHistoryStatus" style="margin-left: 10px; opacity: 0.7; font-size: 0.85rem;">No actions yet</span>
                 </div>
             </div>
@@ -208,7 +209,7 @@
             <!-- Action History -->
             <div class="panel" style="width: 100%; margin-top: 10px;">
                 <h4 style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleActionHistory()">
-                    📜 Action History
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/></svg> Action History
                     <span id="actionHistoryToggle">▼</span>
                 </h4>
                 <div id="actionHistoryPanel" style="display: none; max-height: 300px; overflow-y: auto; background: rgba(15, 23, 42, 0.5); padding: 10px; border-radius: 8px; margin-top: 10px;">
@@ -263,7 +264,7 @@
     <!-- Tab 6: Spells Panel -->
     <div id="spellsPanel" class="god-tab-panel">
         <div class="panel">
-            <h3>🔮 Spell Card Management</h3>
+            <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg> Spell Card Management</h3>
 
             <div class="stat-cards stat-cards--3" style="margin-bottom: 20px;">
                 <div class="stat-card stat-card--lg stat-card--purple">
@@ -283,22 +284,22 @@
             <div style="display: flex; gap: 10px; margin-bottom: 20px;">
                 <button class="btn" onclick="loadAllSpells()" style="flex: 1;"
                         data-tooltip="Load all 15 spell cards from Firebase">
-                    📥 Load Spell Definitions
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg> Load Spell Definitions
                 </button>
                 <button class="btn secondary" onclick="window.open('../tools/upload-spells.html', '_blank')" style="flex: 1;"
                         data-tooltip="Open spell upload utility in new tab">
-                    ⬆️ Upload Spells
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg> Upload Spells
                 </button>
                 <button class="btn secondary" onclick="initializeSpellPiles(3)" style="flex: 1;"
                         data-tooltip="Create shuffled draw piles with 3 cards per team">
-                    🃏 Initialize Draw Piles
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18v4"/><path d="M2 14.499a5.5 5.5 0 0 0 9.591 3.675.6.6 0 0 1 .818.001A5.5 5.5 0 0 0 22 14.5c0-2.29-1.5-4-3-5.5l-5.492-5.312a2 2 0 0 0-3-.02L5 8.999c-1.5 1.5-3 3.2-3 5.5"/></svg> Initialize Draw Piles
                 </button>
             </div>
         </div>
 
         <!-- Team Spell Distribution -->
         <div class="panel" style="margin-top: 20px;">
-            <h3>📦 Distribute Spells to Teams</h3>
+            <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg> Distribute Spells to Teams</h3>
             <p style="color: #9aa1ad; font-size: 0.9rem; margin-bottom: 15px;">
                 Select a team and spell cards to add to their hand
             </p>
@@ -335,13 +336,13 @@
                     <button class="btn" onclick="distributeSpellToTeam()" id="distributeBtn" disabled
                             style="width: 100%; background: #a855f7; margin-bottom: 10px;"
                             data-tooltip="Add selected spell to selected team's hand">
-                        ➕ Add Spell to Team
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Add Spell to Team
                     </button>
 
                     <button class="btn secondary" onclick="distributeRandomSpells()"
                             style="width: 100%;"
                             data-tooltip="Give random spells to all teams (you choose how many)">
-                        🎲 Distribute Random Spells
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="12" height="12" x="2" y="10" rx="2" ry="2"/><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6"/><path d="M6 18h.01"/><path d="M10 14h.01"/><path d="M15 6h.01"/><path d="M18 9h.01"/></svg> Distribute Random Spells
                     </button>
                 </div>
             </div>
@@ -349,9 +350,9 @@
 
         <!-- Available Spells Library -->
         <div class="panel" style="margin-top: 20px;">
-            <h3>📚 Available Spell Cards</h3>
+            <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></svg> Available Spell Cards</h3>
             <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <input type="text" id="spellSearchInput" placeholder="🔍 Search spells..."
+                <input type="text" id="spellSearchInput" placeholder="Search spells..."
                        oninput="filterSpells()"
                        style="flex: 1; padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white;">
                 <select id="spellTypeFilter" onchange="filterSpells()"
@@ -375,7 +376,7 @@
 
         <!-- Spell Usage History -->
         <div class="panel" style="margin-top: 20px;">
-            <h3>📜 Spell Cast History</h3>
+            <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/></svg> Spell Cast History</h3>
             <div id="spellHistory" style="max-height: 400px; overflow-y: auto; background: rgba(15, 23, 42, 0.5); padding: 15px; border-radius: 10px;">
                 <p style="text-align: center; opacity: 0.7;">No spells cast yet</p>
             </div>
@@ -383,7 +384,7 @@
 
         <!-- Active Effects Admin -->
         <div class="panel" style="margin-top: 20px;">
-            <h3>⚡ Active Effects</h3>
+            <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></svg> Active Effects</h3>
             <p style="color: #9aa1ad; font-size: 0.9rem; margin-bottom: 10px;">
                 Currently active spell conditions and buffs
             </p>
@@ -442,7 +443,7 @@
     <!-- Tab 8: Users Panel -->
     <div id="usersPanel" class="god-tab-panel">
         <div class="panel">
-            <h3>👤 User Management</h3>
+            <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> User Management</h3>
 
             <!-- Statistics -->
             <div class="stat-cards stat-cards--4">
@@ -466,7 +467,7 @@
 
             <!-- Search & Filter -->
             <div style="display: grid; grid-template-columns: 1fr 200px 150px; gap: 10px; margin-bottom: 15px;">
-                <input type="text" id="userSearch" placeholder="🔍 Search by name, email, or UID..."
+                <input type="text" id="userSearch" placeholder="Search by name, email, or UID..."
                        oninput="filterUsers()"
                        style="padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white; font-size: 1rem;">
                 <select id="roleFilter" onchange="filterUsers()"
@@ -478,7 +479,7 @@
                     <option value="user">User</option>
                 </select>
                 <button class="btn primary" onclick="showCreateUserModal()" style="white-space: nowrap;">
-                    ➕ Create User
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Create User
                 </button>
             </div>
 
@@ -694,7 +695,7 @@
     <div id="editTournamentModal" class="modal" style="display: none;">
         <div class="modal-content" style="max-width: 480px;">
             <div class="modal-header">
-                <h2>✏️ Edit Tournament</h2>
+                <h2><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg> Edit Tournament</h2>
                 <button onclick="closeEditModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">×</button>
             </div>
             <div class="modal-body" id="editTournamentForm">
@@ -707,7 +708,7 @@
     <div id="userManagementModal" class="modal" style="display: none;">
         <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
-                <h2 id="userModalTitle">➕ Create User</h2>
+                <h2 id="userModalTitle"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Create User</h2>
                 <button onclick="closeUserModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">×</button>
             </div>
             <div class="modal-body">
@@ -784,6 +785,7 @@
     <script>window.BOARDGAME_BASE = '..';</script>
 
     <!-- Shared dependencies -->
+    <script defer src="../shared/scripts/icon-svgs.js"></script>
     <script defer src="../shared/scripts/render-signature.js"></script>
     <script defer src="../shared/scripts/resolve-tournament-id.js"></script>
     <script defer src="../shared/scripts/user-assignment.js"></script>
@@ -1059,7 +1061,7 @@
                     if (canUndo) {
                         // Store entry reference for onclick
                         const entryIdx = _activityLogAllEntries.indexOf(entry);
-                        undoBtnHtml = `<button class="activity-log-undo-btn" onclick="event.stopPropagation(); openUndoConfirmModal(_activityLogAllEntries[${entryIdx}])" title="Undo">↩</button>`;
+                        undoBtnHtml = `<button class="activity-log-undo-btn" onclick="event.stopPropagation(); openUndoConfirmModal(_activityLogAllEntries[${entryIdx}])" title="Undo"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20v-7a4 4 0 0 0-4-4H4"/><path d="M9 14 4 9l5-5"/></svg></button>`;
                     }
                 }
 

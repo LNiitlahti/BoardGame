@@ -118,14 +118,14 @@ class BoardManager {
                 <button class="team-picker-btn ${isRoom ? 'room-active' : ''}"
                         onclick="toggleRoomHex('${coord}')"
                         style="border-left: 4px solid #8b5cf6;">
-                    ${isRoom ? '\uD83D\uDEAA Remove Room' : '\uD83D\uDEAA Mark as Room'}
+                    ${isRoom ? ICON_SVGS.doorOpen + ' Remove Room' : ICON_SVGS.doorOpen + ' Mark as Room'}
                 </button>`;
         } else {
             optionsHtml += `
                 <div class="team-picker-hint" style="padding: 8px; color: var(--text-tertiary); font-size: 0.8rem;">
-                    ${hexType === 'mountain-heart' ? '\u2764\uFE0F\u2764\uFE0F Mountain Heart' :
-                      hexType === 'side-heart' ? '\u2764\uFE0F Side Heart' :
-                      '\u2B50 Starting Location'} - Cannot be a room
+                    ${hexType === 'mountain-heart' ? ICON_SVGS.heart + ICON_SVGS.heart + ' Mountain Heart' :
+                      hexType === 'side-heart' ? ICON_SVGS.heart + ' Side Heart' :
+                      ICON_SVGS.star + ' Starting Location'} - Cannot be a room
                 </div>`;
         }
 
@@ -346,7 +346,7 @@ class BoardManager {
         if (isHeartHex) {
             this._gameState.heartHexControl = this._gameState.heartHexControl || {};
             this._gameState.heartHexControl[coord] = teamId;
-            this._ui.addLog(`\u2764\uFE0F Team ${teamId} captured heart hex ${coord}!`, 'success');
+            this._ui.addLog(`${ICON_SVGS.heart} Team ${teamId} captured heart hex ${coord}!`, 'success');
         }
 
         this.calculatePoints();
@@ -369,7 +369,7 @@ class BoardManager {
             }, { heartHexControl: { [coord]: null } });
         }
 
-        this._ui.addLog(`\u2705 Team ${teamId} placed plate at ${coord}`, 'success');
+        this._ui.addLog(`${ICON_SVGS.circleCheck} Team ${teamId} placed plate at ${coord}`, 'success');
         this._onDisplayRefresh();
     }
 
@@ -407,7 +407,7 @@ class BoardManager {
                 fromPhase: oldPhase || 'playing', toPhase: 'finished',
                 winnerTeamId: winner.id, winnerTeamName: winner.name, winnerPoints: winner.points
             }, { gamePhase: oldPhase });
-            this._ui.addLog(`\uD83C\uDFC6 GAME OVER! ${winner.name} wins with ${winner.points} points!`, 'success');
+            this._ui.addLog(`${ICON_SVGS.trophy} GAME OVER! ${winner.name} wins with ${winner.points} points!`, 'success');
             this._ui.showStatus(`${winner.name} wins the game!`, 'success');
         }
     }

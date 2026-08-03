@@ -240,22 +240,22 @@ function renderScoreStrip() {
  * what the player should do. `action: true` = the player must act now.
  */
 const PHASE_GUIDE = {
-    pre_game_setup:   { icon: '⚙',       name: 'Setup',                    desc: 'The admin is preparing the round. Sit tight.' },
-    scoring_vp:       { icon: '\u{1F3C6}',    name: 'Scoring — Victory Points', desc: 'Victory points are being tallied. Watch the board!' },
-    scoring_hex:      { icon: '⬢',       name: 'Scoring — Hex Points', desc: 'Hex control points are being tallied. Watch the board!' },
-    hex_placement_1:  { icon: '\u{1F5FA}',    name: 'Hex Placement — Game 1', desc: 'Match 1 winners place their hex tiles on the board.' },
-    spell_window_1:   { icon: '✨',       name: 'Spell Window',             desc: 'Teams may cast spells.' },
-    hex_placement_2:  { icon: '\u{1F5FA}',    name: 'Hex Placement — Game 2', desc: 'Match 2 winners place their hex tiles on the board.' },
-    challenges:       { icon: '⚔',       name: 'Challenges',               desc: 'Teams may issue challenges over contested hexes.' },
-    spell_window_2:   { icon: '✨',       name: 'Spell Window',             desc: 'Teams may cast spells.' },
-    challenge_game:   { icon: '\u{1F3AE}',    name: 'Challenge Game',           desc: 'A challenge game is being played.' },
-    spell_window_3:   { icon: '✨',       name: 'Spell Window',             desc: 'Teams may cast spells.' },
-    board_resolved:   { icon: '\u{1F6E1}',    name: 'Board Resolved',           desc: 'The board is settled. Matches are up next.' },
-    spell_window_4:   { icon: '✨',       name: 'Spell Window',             desc: 'Teams may cast spells.' },
-    matches_in_progress: { icon: '\u{1F3AE}', name: 'Matches',  desc: 'Match 1 and Match 2 are running — see below for your assignment.' },
-    round_advance:    { icon: '⏭',       name: 'Round Advancing',          desc: 'Moving on to the next round...' },
-    break:            { icon: '⏸',       name: 'Break',                    desc: 'Take a breather — the tournament resumes shortly.' },
-    tournament_end:   { icon: '\u{1F3C6}',    name: 'Tournament Complete',      desc: 'Thanks for playing! Final results are on the board.' }
+    pre_game_setup:   { icon: ICON_SVGS.settings,   name: 'Setup',                    desc: 'The admin is preparing the round. Sit tight.' },
+    scoring_vp:       { icon: ICON_SVGS.trophy,     name: 'Scoring — Victory Points', desc: 'Victory points are being tallied. Watch the board!' },
+    scoring_hex:      { icon: ICON_SVGS.hexagon,    name: 'Scoring — Hex Points', desc: 'Hex control points are being tallied. Watch the board!' },
+    hex_placement_1:  { icon: ICON_SVGS.map,        name: 'Hex Placement — Game 1', desc: 'Match 1 winners place their hex tiles on the board.' },
+    spell_window_1:   { icon: ICON_SVGS.sparkles,   name: 'Spell Window',             desc: 'Teams may cast spells.' },
+    hex_placement_2:  { icon: ICON_SVGS.map,        name: 'Hex Placement — Game 2', desc: 'Match 2 winners place their hex tiles on the board.' },
+    challenges:       { icon: ICON_SVGS.swords,     name: 'Challenges',               desc: 'Teams may issue challenges over contested hexes.' },
+    spell_window_2:   { icon: ICON_SVGS.sparkles,   name: 'Spell Window',             desc: 'Teams may cast spells.' },
+    challenge_game:   { icon: ICON_SVGS.gamepad2,   name: 'Challenge Game',           desc: 'A challenge game is being played.' },
+    spell_window_3:   { icon: ICON_SVGS.sparkles,   name: 'Spell Window',             desc: 'Teams may cast spells.' },
+    board_resolved:   { icon: ICON_SVGS.shield,     name: 'Board Resolved',           desc: 'The board is settled. Matches are up next.' },
+    spell_window_4:   { icon: ICON_SVGS.sparkles,   name: 'Spell Window',             desc: 'Teams may cast spells.' },
+    matches_in_progress: { icon: ICON_SVGS.gamepad2, name: 'Matches',  desc: 'Match 1 and Match 2 are running — see below for your assignment.' },
+    round_advance:    { icon: ICON_SVGS.skipForward, name: 'Round Advancing',          desc: 'Moving on to the next round...' },
+    break:            { icon: ICON_SVGS.pause,      name: 'Break',                    desc: 'Take a breather — the tournament resumes shortly.' },
+    tournament_end:   { icon: ICON_SVGS.trophy,     name: 'Tournament Complete',      desc: 'Thanks for playing! Final results are on the board.' }
 };
 
 /**
@@ -273,7 +273,7 @@ function renderPhaseBanner() {
     }
 
     const guide = PHASE_GUIDE[phaseName] ||
-        { icon: 'ℹ', name: phaseName.replace(/_/g, ' '), desc: '' };
+        { icon: ICON_SVGS.info, name: phaseName.replace(/_/g, ' '), desc: '' };
     let desc = guide.desc;
     let action = guide.action === true;
 
@@ -733,30 +733,30 @@ function _buildActiveEffect(spellId, def, targetData) {
     const currentRound = gameData?.currentPhase?.roundNumber || 0;
     const casterName = teamData?.name || 'Team ' + currentTeamId;
     let displayText = `${casterName} cast ${def.nameEn || def.name}`;
-    let icon = '\u{1F52E}'; // 🔮
+    let icon = ICON_SVGS.wandSparkles;
 
     if (effectType === 'ban' && targetData?.bannedElement) {
         const tTeam = gameData?.teams?.find(t => String(t.id) === String(targetData.targetTeamId));
         displayText = `${tTeam?.name || 'Team'} cannot use "${targetData.bannedElement}" next match`;
-        icon = '\u{1F6AB}'; // 🚫
+        icon = ICON_SVGS.ban;
     } else if (effectType === 'silence' && targetData?.targetPlayerName) {
         displayText = `${targetData.targetPlayerName} cannot speak or use mic next match`;
-        icon = '\u{1F507}'; // 🔇
+        icon = ICON_SVGS.volumeX;
     } else if (effectType === 'shield') {
         displayText = `${casterName}'s tiles are protected until next round`;
-        icon = '\u{1F6E1}'; // 🛡️
+        icon = ICON_SVGS.shield;
     } else if (effectType === 'multiplier') {
         displayText = `${casterName}: 2x points & tiles if top 2 finish`;
-        icon = '\u2728'; // ✨
+        icon = ICON_SVGS.sparkles;
     } else if (effectType === 'permanent_buff') {
         displayText = `${casterName}: each heart capture = +1 bonus point`;
-        icon = '\u{1F48E}'; // 💎
+        icon = ICON_SVGS.gem;
     } else if (effectType === 'modifier') {
         displayText = `${casterName}: next room hex draw = double cards`;
-        icon = '\u{1F3B2}'; // 🎲
+        icon = ICON_SVGS.dices;
     } else if (effectType === 'counter') {
         displayText = `${casterName} can block an opponent's spell draw`;
-        icon = '\u{1F6E1}'; // 🛡️
+        icon = ICON_SVGS.shield;
     }
 
     const expiresAfterRound = (effectType === 'permanent_buff' || effectType === 'counter' || effectType === 'streak_bonus')
@@ -804,7 +804,7 @@ function renderActiveConditions() {
         return `
             <div style="padding: 8px; margin: 4px 0; border-left: 3px solid ${borderColor};
                         background: rgba(168,85,247,0.05); border-radius: 4px; font-size: 0.85rem;">
-                <span>${eff.icon || '\u{1F52E}'}</span>
+                <span>${eff.icon || ICON_SVGS.wandSparkles}</span>
                 <strong>${name}</strong>: ${text}
                 ${eff.expiresAfterRound != null ? `<span style="color: #9aa1ad;"> (until R${eff.expiresAfterRound})</span>` : ''}
             </div>
@@ -1712,7 +1712,7 @@ function showVotingProgress(match) {
                 ${votes.length} / ${totalPlayers} players voted (${agreementPercentage}% agreement)
             </div>
             ${agreementPercentage >= 90 ?
-                '<div style="color: #4ade80; margin-top: 5px;">✅ Consensus reached! Awaiting admin confirmation.</div>' :
+                '<div style="color: #4ade80; margin-top: 5px;">' + ICON_SVGS.circleCheck + ' Consensus reached! Awaiting admin confirmation.</div>' :
                 '<div style="opacity: 0.7; margin-top: 5px;">Need 90% agreement to auto-submit</div>'
             }
         </div>
@@ -1886,13 +1886,13 @@ function renderMatchPanel(isLobbyPhase) {
     const discordBtn = document.getElementById('readyDiscordBtn');
 
     if (gameLobbyBtn) {
-        gameLobbyBtn.textContent = gameLobbyReady ? '\uD83C\uDFAE Game Lobby \u2713' : '\uD83C\uDFAE Game Lobby';
+        gameLobbyBtn.innerHTML = ICON_SVGS.gamepad2 + ' Game Lobby' + (gameLobbyReady ? ' ' + ICON_SVGS.check : '');
         gameLobbyBtn.classList.toggle('is-ready', gameLobbyReady);
         gameLobbyBtn.disabled = gameLobbyReady;
     }
 
     if (discordBtn) {
-        discordBtn.textContent = discordReady ? '\uD83C\uDFA7 Discord \u2713' : '\uD83C\uDFA7 Discord';
+        discordBtn.innerHTML = ICON_SVGS.headphones + ' Discord' + (discordReady ? ' ' + ICON_SVGS.check : '');
         discordBtn.classList.toggle('is-ready', discordReady);
         discordBtn.disabled = discordReady;
     }
@@ -1986,7 +1986,7 @@ function renderMatchCardsWithDiscord(container) {
         // Discord channel for our side
         const discordChannel = match.discordChannels?.[mySideId];
         const discordHTML = discordChannel
-            ? `<div class="discord-channel-badge">\uD83C\uDFA7 Discord Channel #${discordChannel}</div>`
+            ? `<div class="discord-channel-badge">${ICON_SVGS.headphones} Discord Channel #${discordChannel}</div>`
             : '';
 
         // Lobby creator for our side
@@ -1994,7 +1994,7 @@ function renderMatchCardsWithDiscord(container) {
         const isCreator = lobbyCreator?.uid === currentUser.uid;
         const creatorHTML = lobbyCreator
             ? `<div class="lobby-creator-info">${isCreator
-                ? '<strong>\u2B50 YOU CREATE THE GAME LOBBY</strong>'
+                ? '<strong>' + ICON_SVGS.star + ' YOU CREATE THE GAME LOBBY</strong>'
                 : `Join <strong>${lobbyCreator.name || 'Player'}</strong>'s lobby`
             }</div>`
             : '';
@@ -2046,7 +2046,7 @@ function renderLobbyCreatorRole() {
 
     roleContainer.style.display = isCreator ? '' : 'none';
     if (isCreator) {
-        roleContainer.innerHTML = '<span class="lobby-creator-banner">\u2B50 You are the lobby creator \u2014 create the game and invite your team!</span>';
+        roleContainer.innerHTML = '<span class="lobby-creator-banner">' + ICON_SVGS.star + ' You are the lobby creator \u2014 create the game and invite your team!</span>';
     }
 }
 
@@ -2091,8 +2091,8 @@ function renderReadinessStatus() {
                             const dc = r.discord === true || r.ready === true;
                             const isYou = p.uid === currentUser.uid;
                             return `<span class="ready-player ${gl && dc ? 'is-ready' : 'not-ready'}">
-                                <span class="ready-icon ${gl ? 'on' : ''}">\uD83C\uDFAE</span>
-                                <span class="ready-icon ${dc ? 'on' : ''}">\uD83C\uDFA7</span>
+                                <span class="ready-icon ${gl ? 'on' : ''}">${ICON_SVGS.gamepad2}</span>
+                                <span class="ready-icon ${dc ? 'on' : ''}">${ICON_SVGS.headphones}</span>
                                 ${p.name || 'Player'}${isYou ? ' (you)' : ''}
                             </span>`;
                         }).join('')}

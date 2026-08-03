@@ -1557,7 +1557,7 @@ function renderPlayerDetail(playerId) {
     const initials = (stats.name || 'P').substring(0, 2).toUpperCase();
 
     const winRateClass = stats.winRate >= 60 ? 'positive' : stats.winRate >= 40 ? 'neutral' : 'negative';
-    const streakEmoji = stats.currentStreak.type === 'win' ? '🔥' : stats.currentStreak.type === 'loss' ? '❄️' : '➖';
+    const streakEmoji = stats.currentStreak.type === 'win' ? ICON_SVGS.flame : stats.currentStreak.type === 'loss' ? ICON_SVGS.snowflake : ICON_SVGS.minus;
     const streakColor = stats.currentStreak.type === 'win' ? 'var(--accent-success, #2e9158)' : stats.currentStreak.type === 'loss' ? 'var(--accent-danger, #ef4444)' : 'var(--text-tertiary)';
 
     container.innerHTML = `
@@ -1600,7 +1600,7 @@ function renderPlayerDetail(playerId) {
                 </div>
             </div>
             <div class="player-streak-item">
-                <div class="player-streak-icon">🏆</div>
+                <div class="player-streak-icon">${ICON_SVGS.trophy}</div>
                 <div class="player-streak-info">
                     <div class="player-streak-value">${stats.bestWinStreak}</div>
                     <div class="player-streak-label">Best Win Streak</div>
@@ -1608,7 +1608,7 @@ function renderPlayerDetail(playerId) {
             </div>
             ${stats.avgDuration ? `
             <div class="player-streak-item">
-                <div class="player-streak-icon">⏱️</div>
+                <div class="player-streak-icon">${ICON_SVGS.timer}</div>
                 <div class="player-streak-info">
                     <div class="player-streak-value">${stats.avgDuration}m</div>
                     <div class="player-streak-label">Avg Duration (${stats.durationDataPoints}/${stats.durationTotalPoints})</div>
@@ -1617,7 +1617,7 @@ function renderPlayerDetail(playerId) {
             ` : ''}
             ${stats.challenges.played > 0 ? `
             <div class="player-streak-item">
-                <div class="player-streak-icon">⚔️</div>
+                <div class="player-streak-icon">${ICON_SVGS.swords}</div>
                 <div class="player-streak-info">
                     <div class="player-streak-value">${stats.challenges.won}-${stats.challenges.lost}</div>
                     <div class="player-streak-label">Challenges</div>

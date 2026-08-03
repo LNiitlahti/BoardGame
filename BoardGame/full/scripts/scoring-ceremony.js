@@ -160,7 +160,7 @@ class ScoringCeremony {
 
             steps.push({
                 type: 'match_victory',
-                icon: '\u{1F3C6}',
+                icon: ICON_SVGS.trophy,
                 title: `${winnerName} wins ${gameName}`,
                 teamColor: winnerColor,
                 detail: p.matchId ? `Match #${p.matchNumber || ''}` : null,
@@ -181,7 +181,7 @@ class ScoringCeremony {
 
             steps.push({
                 type: 'plate_placement',
-                icon: '\u{1F537}',
+                icon: ICON_SVGS.diamond,
                 title: `${teamName} places hex`,
                 teamColor: teamColor,
                 detail: p.hexCoord ? `at ${p.hexCoord}` : null,
@@ -206,7 +206,7 @@ class ScoringCeremony {
             if (pointsList) {
                 steps.push({
                     type: 'points_awarded',
-                    icon: '\u{2764}\u{FE0F}',
+                    icon: ICON_SVGS.heart,
                     title: 'Heart Hex Points',
                     teamColor: '#ef4444',
                     detail: pointsList,
@@ -229,7 +229,7 @@ class ScoringCeremony {
 
             steps.push({
                 type: 'spell_effect',
-                icon: '\u{2728}',
+                icon: ICON_SVGS.sparkles,
                 title: `${casterName} casts ${spellName}`,
                 teamColor: casterColor,
                 detail: p.displayText || null,
@@ -250,7 +250,7 @@ class ScoringCeremony {
     _createSummaryStep() {
         return {
             type: 'round_summary',
-            icon: '\u{1F4CA}',
+            icon: ICON_SVGS.chartColumn,
             title: `Round ${this._roundNumber} Complete`,
             teamColor: '#00d4ff',
             detail: null,
