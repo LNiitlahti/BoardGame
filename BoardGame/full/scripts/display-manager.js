@@ -1320,14 +1320,8 @@ class DisplayManager {
         this._ensurePrimaryActive();
 
         switch (slideKey) {
-            case 'next_match_large':
-                this._renderNextMatchLarge(primary, data);
-                break;
             case 'standings_large':
                 this._renderStandingsLarge(primary, data);
-                break;
-            case 'readiness_large':
-                this._renderReadinessLarge(primary, data);
                 break;
             case 'live_matches_large':
                 this._renderLiveMatchesLarge(primary, data);
@@ -1495,41 +1489,6 @@ class DisplayManager {
         container.innerHTML = `<div class="dm-matches-dual">${panelHTML}</div>`;
     }
 
-    _renderNextMatchLarge(container, data) {
-        const queue = data.gameQueue || [];
-        const nextMatch = queue.find(m =>
-            (m.status === 'pending' || m.status === 'waiting') && !m.isBreak
-        );
-
-        if (!nextMatch) {
-            container.innerHTML = '<div class="dm-next-match-large"><div class="dm-label">No Upcoming Matches</div></div>';
-            return;
-        }
-
-        const gameName = this._getGameDisplayName(nextMatch.game);
-        const teams = nextMatch.teams || [];
-
-        let sidesHTML = '';
-        teams.forEach((teamData, i) => {
-            if (i > 0) sidesHTML += '<div class="dm-vs">VS</div>';
-            sidesHTML += '<div class="dm-side">';
-            const players = this._getMatchTeamPlayers(teamData);
-            players.forEach(p => {
-                const color = this._getPlayerCurrentColor(p);
-                sidesHTML += `<div class="dm-player-name" style="border-color: ${color}; color: ${color};">${this._getPlayerCurrentName(p)}</div>`;
-            });
-            sidesHTML += '</div>';
-        });
-
-        container.innerHTML = `
-            <div class="dm-next-match-large">
-                <div class="dm-label">Next Match</div>
-                <div class="dm-game-name">${gameName}</div>
-                <div class="dm-sides">${sidesHTML}</div>
-            </div>
-        `;
-    }
-
     _renderStandingsLarge(container, data) {
         const teams = [...(data.teams || [])].sort((a, b) =>
             this._getTeamTotalPoints(b) - this._getTeamTotalPoints(a)
@@ -1628,94 +1587,6 @@ class DisplayManager {
             primary.classList.add('active');
         }
         this._container.removeAttribute('data-display-mode');
-    }
-
-    _renderReadinessLarge(container, data) {
-        const lobbyReady = data.lobbyReady || {};
-        const teams = data.teams || [];
-        const queue = data.gameQueue || [];
-
-        const activeTeamIds = new Set();
-        // Build Discord channel map per team
-        const teamDiscordChannels = {};
-        queue.forEach(match => {
-            if (match.isBreak || match.status === 'completed') return;
-            (match.teams || []).forEach(team => {
-                const players = this._getMatchTeamPlayers(team);
-                players.forEach(p => {
-                    if (p.originalTeamId != null) activeTeamIds.add(String(p.originalTeamId));
-                });
-            });
-            // Map Discord channels to original team IDs
-            if (match.discordChannels) {
-                (match.teams || []).forEach(side => {
-                    const ch = match.discordChannels[side.id];
-                    if (ch == null) return;
-                    const players = this._getMatchTeamPlayers(side);
-                    players.forEach(p => {
-                        if (p.originalTeamId != null) {
-                            teamDiscordChannels[String(p.originalTeamId)] = ch;
-                        }
-                    });
-                });
-            }
-        });
-
-        // Build lobby creator set
-        const lobbyCreatorUids = new Set();
-        queue.forEach(match => {
-            if (match.isBreak || match.status === 'completed') return;
-            Object.values(match.lobbyCreators || {}).forEach(c => {
-                if (c?.uid) lobbyCreatorUids.add(c.uid);
-            });
-        });
-
-        let rowsHTML = '';
-        teams.filter(t => activeTeamIds.size === 0 || activeTeamIds.has(String(t.id))).forEach(team => {
-            const players = team.players || [];
-            const teamColor = team.color || '#888';
-            const discordCh = teamDiscordChannels[String(team.id)];
-
-            // Per-player readiness matrix
-            let playersHTML = '';
-            players.forEach(p => {
-                const r = lobbyReady[p.uid] || {};
-                const gl = r.gameLobby === true || r.ready === true;
-                const dc = r.discord === true || r.ready === true;
-                const isCreator = lobbyCreatorUids.has(p.uid);
-                const creatorIcon = isCreator ? `<span style="margin-right: 4px;">${ICON_SVGS.star}</span>` : '';
-                const dotSvg = (ready) => `<svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="color:${ready ? '#22c55e' : '#ef4444'}"><circle cx="12" cy="12" r="8"/></svg>`;
-
-                playersHTML += `
-                    <div class="dm-ready-player-row">
-                        <span class="dm-ready-indicator" style="color: ${gl ? '#10b981' : '#ef4444'};">${dotSvg(gl)}${ICON_SVGS.gamepad2}</span>
-                        <span class="dm-ready-indicator" style="color: ${dc ? '#10b981' : '#ef4444'};">${dotSvg(dc)}${ICON_SVGS.headphones}</span>
-                        ${creatorIcon}<span class="dm-ready-player-name">${p.name || 'Player'}</span>
-                    </div>
-                `;
-            });
-
-            const discordLabel = discordCh ? ` \u2014 Discord #${discordCh}` : '';
-
-            rowsHTML += `
-                <div class="dm-team-ready-row" style="border-left-color: ${teamColor};">
-                    <div style="flex: 1;">
-                        <span class="dm-team-name" style="color: ${teamColor}; font-size: 20px; font-weight: 700;">${team.name || 'Team'}${discordLabel}</span>
-                        <div class="dm-ready-players-grid">${playersHTML}</div>
-                    </div>
-                </div>
-            `;
-        });
-
-        container.innerHTML = `
-            <div class="dm-readiness-large">
-                <div class="dm-readiness-title">Ready Check</div>
-                <div class="dm-readiness-legend" style="text-align: center; font-size: 14px; color: #9aa1ad; margin-bottom: 12px;">
-                    ${ICON_SVGS.gamepad2} = Game Lobby &nbsp; ${ICON_SVGS.headphones} = Discord &nbsp; ${ICON_SVGS.star} = Lobby Creator
-                </div>
-                ${rowsHTML}
-            </div>
-        `;
     }
 
     _renderLiveMatchesLarge(container, data) {
