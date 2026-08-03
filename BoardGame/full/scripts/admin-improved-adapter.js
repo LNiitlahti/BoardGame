@@ -727,6 +727,16 @@
         if (!container) return;
         container.style.display = '';
 
+        // Auto-follow (documented at _computeCurrentSlot but never
+        // implemented): if the admin's target slot is no longer in setup,
+        // snap the target to whichever slot still is — new matches then tag
+        // correctly without a manual "Set Target" click every round. An
+        // explicit admin pick still wins while that slot remains in setup.
+        if (_phaseManager.getSlotSubPhase(_targetSlot) !== 'setup') {
+            if (_phaseManager.getSlotSubPhase(1) === 'setup') _targetSlot = 1;
+            else if (_phaseManager.getSlotSubPhase(2) === 'setup') _targetSlot = 2;
+        }
+
         container.innerHTML = [1, 2].map(slot => {
             const sub = _phaseManager.getSlotSubPhase(slot);
             const step = _computeSlotStep(slot);
