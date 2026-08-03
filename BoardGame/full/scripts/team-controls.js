@@ -1142,7 +1142,12 @@ function getMatchSidePlayers(side) {
                 if (slotMatch) teamId = parseInt(slotMatch[1]);
             }
             const teamColor = teamId ? getTeamColorById(teamId) : '#8a8fa0';
-            return { id: playerId, name, color: teamColor, teamId };
+            // playerId here is the PLAYER REGISTRY key (e.g. "p_zcqiaf93"),
+            // never the linked Firebase Auth uid -- lobbyReady and
+            // currentUser.uid comparisons need the real uid, resolved from
+            // the registry entry (null until the slot is linked).
+            const uid = gameData.players?.[playerId]?.uid || null;
+            return { id: playerId, uid, name, color: teamColor, teamId };
         });
     }
 
@@ -1157,7 +1162,7 @@ function getMatchSidePlayers(side) {
 
             const color = p.originalTeamColor ? getHexColor(p.originalTeamColor) :
                           teamId ? getTeamColorById(teamId) : '#8a8fa0';
-            return { id: playerId, name, color, teamId };
+            return { id: playerId, uid: p.uid || null, name, color, teamId };
         });
     }
 
@@ -1939,7 +1944,7 @@ function renderMatchCardsWithDiscord(container) {
         // Narrow "is this specifically the logged-in player" check, for the
         // "YOU" tag -- must NOT reuse isOnMyTeam here, or every teammate on
         // the roster gets tagged "YOU" too.
-        const isCurrentUser = p => !!currentUser?.uid && p.id === currentUser.uid;
+        const isCurrentUser = p => !!currentUser?.uid && p.uid === currentUser.uid;
         const mine = resolvedSides.find(({ players }) => players.some(isOnMyTeam));
         const mySide = mine?.side;
         const mySideId = mySide?.id || 'TEAM_A';

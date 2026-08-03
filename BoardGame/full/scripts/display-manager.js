@@ -287,10 +287,18 @@ class DisplayManager {
         // New format: playerIds array
         if (matchTeam.playerIds && Array.isArray(matchTeam.playerIds)) {
             return matchTeam.playerIds.map(playerId => {
+                // playerId here is the PLAYER REGISTRY key (e.g. "p_zcqiaf93"),
+                // never the linked Firebase Auth uid -- lobbyReady, however,
+                // is keyed by the real uid (set by team.html's
+                // setReadyStatus()). Resolve it from the registry entry
+                // (gameState.players[playerId].uid, null until linked) so
+                // callers can actually look up this player's readiness.
+                const uid = this._gameData?.players?.[playerId]?.uid || null;
                 if (window.PlayerUtils) {
                     const info = window.PlayerUtils.getPlayerDisplayInfo(this._gameData, playerId);
                     return {
                         id: playerId,
+                        uid,
                         name: info.name,
                         originalTeamId: info.teamId,
                         originalTeamColor: info.teamId ? this._getTeamColor(info.teamId) : '#666666'
@@ -300,12 +308,13 @@ class DisplayManager {
                     const p = this._gameData.players[playerId];
                     return {
                         id: playerId,
+                        uid,
                         name: p.name || 'Unknown',
                         originalTeamId: p.teamId,
                         originalTeamColor: p.teamId ? this._getTeamColor(p.teamId) : '#666666'
                     };
                 }
-                return { id: playerId, name: 'Unknown', originalTeamId: null, originalTeamColor: '#666666' };
+                return { id: playerId, uid, name: 'Unknown', originalTeamId: null, originalTeamColor: '#666666' };
             });
         }
 
@@ -313,6 +322,7 @@ class DisplayManager {
         if (matchTeam.players && Array.isArray(matchTeam.players)) {
             return matchTeam.players.map(p => ({
                 id: p.id || null,
+                uid: p.uid || null,
                 name: p.name || 'Unknown',
                 originalTeamId: p.originalTeamId,
                 originalTeamColor: p.originalTeamColor || this._getTeamColor(p.originalTeamId) || '#666666'
@@ -1412,7 +1422,7 @@ class DisplayManager {
             const playersHTML = players.map(p => {
                 const color = this._getPlayerCurrentColor(p);
                 const name = this._getPlayerCurrentName(p);
-                const r = lobbyReady[p.id] || {};
+                const r = lobbyReady[p.uid] || {};
                 const gl = r.gameLobby === true || r.ready === true;
                 const dc = r.discord === true || r.ready === true;
                 return `
