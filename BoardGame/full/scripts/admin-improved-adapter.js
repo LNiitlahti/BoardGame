@@ -1787,6 +1787,27 @@
 
         const phase = _phaseManager.getCurrentPhase();
 
+        // Slot-aware guard: during the matches segment, a match belonging to
+        // NEITHER current slot (future-round import, stale tag) used to start
+        // silently just because some slot was in 'playing'. It can play, but
+        // it won't count toward Match 1 or Match 2 — say so first.
+        if (phase === 'matches_in_progress' && game.isChallenge !== true &&
+            !_belongsToCurrentSlot(game, 1) && !_belongsToCurrentSlot(game, 2)) {
+            const foreignLabel = _matchShortLabel(game);
+            const tagDesc = game.roundNumber !== undefined
+                ? `tagged Round ${game.roundNumber}${game.slot !== undefined ? ' · Match ' + game.slot : ''}`
+                : 'untagged (created in an earlier phase)';
+            _openFlowConfirm({
+                title: 'Not This Round’s Match',
+                bodyHtml: `<p><strong>${_esc(foreignLabel)}</strong> is ${_esc(tagDesc)} — it belongs to neither of this round’s match slots.</p>` +
+                          `<p>It can play, but it will <strong>not</strong> count toward Match 1 or Match 2. To play it as this round’s match, retag it first (Edit Match → Round/Slot).</p>`,
+                confirmLabel: 'Start Anyway',
+                danger: true,
+                onConfirm: () => _origStartMatch(gameId)
+            });
+            return;
+        }
+
         // Playing phases: this is the expected place to start matches
         if (_phaseManager.isPlayingPhase(phase)) {
             return _origStartMatch(gameId);
