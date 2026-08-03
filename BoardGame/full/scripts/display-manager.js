@@ -1471,7 +1471,15 @@ class DisplayManager {
             } else if (pending.length > 0) {
                 const next = pending[0];
                 const gameName = this._getGameDisplayName(next.game || next.gameType);
-                bodyHTML = `<div class="dm-dual-slot-status">Next: ${gameName}</div>`;
+                const teams = next.teams || next.sides || [];
+                const sidesHTML = teams.map((t, i) => {
+                    const players = this._getMatchTeamPlayers(t);
+                    const namesHTML = players.map(p =>
+                        `<span class="dm-dual-player" style="color:${this._getPlayerCurrentColor(p)};">${this._getPlayerCurrentName(p)}</span>`
+                    ).join('');
+                    return (i > 0 ? '<span class="dm-dual-vs">VS</span>' : '') + namesHTML;
+                }).join('');
+                bodyHTML = `<div class="dm-dual-live-match"><div class="dm-dual-slot-status">Next: ${gameName}</div><div class="dm-dual-sides">${sidesHTML}</div></div>`;
             } else {
                 bodyHTML = `<div class="dm-dual-slot-status">No match queued yet</div>`;
             }
