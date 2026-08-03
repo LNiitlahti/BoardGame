@@ -1728,19 +1728,35 @@
             animation: dm-pulse 2s infinite;
         }
         @keyframes dm-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
-        .dm-live-match-large .dm-challenge-badge {
-            display: inline-flex; align-items: center; gap: 8px;
-            background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4);
-            color: #ef4444; padding: 5px 20px; border-radius: 5px;
-            font-family: 'Quantico', sans-serif;
-            font-size: 16px; font-weight: 800; letter-spacing: 2px;
-            text-transform: uppercase; margin-bottom: 16px;
+        /* Challenge matches get their own visual identity entirely --
+           replaces the green LIVE pill with a big red "Challenge Game"
+           banner, and makes the TEAM name (not the player list) the
+           headline, since the whole point is "which teams are disputing
+           this", not "which individuals happen to be playing". */
+        .dm-live-match-large--challenge {
+            padding: 20px; border-radius: 16px;
+            background: rgba(239,68,68,0.06); border: 2px solid rgba(239,68,68,0.35);
+            box-shadow: 0 0 40px rgba(239,68,68,0.12);
         }
-        .dm-live-match-large .dm-challenge-badge svg { width: 18px; height: 18px; }
+        .dm-live-match-large .dm-challenge-title {
+            display: flex; align-items: center; justify-content: center; gap: 12px;
+            font-family: 'Russo One', sans-serif;
+            font-size: 30px; font-weight: 800; color: #ef4444;
+            text-transform: uppercase; letter-spacing: 3px; margin-bottom: 16px;
+            text-shadow: 0 0 20px rgba(239,68,68,0.5);
+            animation: dm-pulse 2s infinite;
+        }
+        .dm-live-match-large .dm-challenge-title svg { width: 30px; height: 30px; }
         .dm-live-match-large .dm-side-team-name {
             font-family: 'Russo One', sans-serif;
-            font-size: 20px; font-weight: 800; text-transform: uppercase;
-            letter-spacing: 1px; margin-bottom: 4px;
+            font-size: 34px; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 1px; margin-bottom: 10px;
+            padding: 6px 22px; border: 3px solid; border-radius: 8px;
+            background: var(--bg-glass);
+            text-shadow: 0 0 12px currentColor;
+        }
+        .dm-live-match-large .dm-player-name--sub {
+            font-size: 22px; padding: 8px 16px; font-weight: 600; opacity: 0.85;
         }
         .dm-live-match-large .dm-game-header {
             display: flex; align-items: center; justify-content: center;
@@ -1771,6 +1787,9 @@
             font-family: 'Russo One', sans-serif;
             font-size: 52px; font-weight: 800; color: var(--gold);
             text-shadow: 0 0 16px var(--gold-glow);
+        }
+        .dm-live-match-large--challenge .dm-vs {
+            font-size: 28px; color: #ef4444; text-shadow: 0 0 16px rgba(239,68,68,0.5);
         }
 
         /* ── Results Large ───────────────────────────── */

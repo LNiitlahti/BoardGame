@@ -91,9 +91,14 @@ function makePlayerRegistry() {
     // teams in the real disposable test tournament this was built against.
     const players = {};
     let n = 1;
+    // Teams 1 and 2 both get 5 players -- needed so the Challenge Game
+    // scenario can do a real 5v5 (a challenge is whole-team vs whole-team,
+    // not a 2v2 sample of it), while 3/4/5 stay smaller/uneven to keep
+    // testing asymmetric-roster edge cases elsewhere.
+    const ROSTER_SIZES = [5, 5, 4, 3, 2];
     TEAM_NAMES.forEach((_, teamIdx) => {
         const teamId = teamIdx + 1;
-        const count = teamIdx === 0 ? 5 : (teamIdx === 3 ? 3 : (teamIdx === 4 ? 2 : 4));
+        const count = ROSTER_SIZES[teamIdx];
         for (let i = 0; i < count; i++) {
             const pid = `p_mock${n}`;
             const isLinked = teamId === 1 && i < 2;
@@ -284,7 +289,10 @@ const SCENARIOS = [
 { group: 'Challenges / Board', items: [
     { label: 'Challenge Game (live_matches_large)', build: () => baseData({
         currentPhase: { name: 'challenge_game', roundNumber: 4 },
-        gameQueue: (p => [ makeMatch(p, { teamsSides: [1, 3], status: 'ongoing', isChallenge: true, matchNumber: 12 }) ])(makePlayerRegistry())
+        // Default to 5v5 -- a challenge is whole-team vs whole-team, not a
+        // 2v2 sample of it, and testing with the full roster is what
+        // actually exercises the team-name-as-headline display.
+        gameQueue: (p => [ makeMatch(p, { teamsSides: [1, 2], playType: '5v5', status: 'ongoing', isChallenge: true, matchNumber: 12 }) ])(makePlayerRegistry())
     }) },
     { label: 'Board Resolved (bare board)', build: () => baseData({ currentPhase: { name: 'board_resolved', roundNumber: 4 } }) },
 ]},

@@ -1838,33 +1838,38 @@ class DisplayManager {
             const gameImage = this._getGameImagePath(match.game);
             const logoHtml = gameImage ? `<img class="dm-game-logo" src="${gameImage}" alt="${gameName}">` : '';
             const teams = match.teams || [];
-            const challengeBadge = match.isChallenge
-                ? `<div class="dm-challenge-badge">${ICON_SVGS.swords} Challenge</div>`
-                : '';
+            const isChallenge = !!match.isChallenge;
+            // A challenge isn't an ordinary "LIVE" match -- it's a
+            // heart-hex dispute duel, so it gets its own big banner instead
+            // of the generic green LIVE pill, and the TEAM names (not just
+            // player names) become the headline, sized to match the game
+            // name rather than a small label easy to miss.
+            const topBanner = isChallenge
+                ? `<div class="dm-challenge-title">${ICON_SVGS.swords} Challenge Game ${ICON_SVGS.swords}</div>`
+                : `<div class="dm-live-badge">\u25CF LIVE</div>`;
 
             let sidesHTML = '';
             teams.forEach((teamData, i) => {
-                if (i > 0) sidesHTML += '<div class="dm-vs">VS</div>';
+                if (i > 0) sidesHTML += `<div class="dm-vs">${isChallenge ? 'CHALLENGES' : 'VS'}</div>`;
                 sidesHTML += '<div class="dm-side">';
                 const players = this._getMatchTeamPlayers(teamData);
-                if (match.isChallenge) {
+                if (isChallenge) {
                     const teamColor = this._getTeamColor(players[0]?.originalTeamId);
                     const teamName = this._getCurrentTeamName(players[0]?.originalTeamId);
                     if (teamName) {
-                        sidesHTML += `<div class="dm-side-team-name" style="color: ${teamColor};">${teamName}</div>`;
+                        sidesHTML += `<div class="dm-side-team-name" style="color: ${teamColor}; border-color: ${teamColor};">${teamName}</div>`;
                     }
                 }
                 players.forEach(p => {
                     const color = this._getPlayerCurrentColor(p);
-                    sidesHTML += `<div class="dm-player-name" style="border-color: ${color}; color: ${color};">${this._getPlayerCurrentName(p)}</div>`;
+                    sidesHTML += `<div class="dm-player-name${isChallenge ? ' dm-player-name--sub' : ''}" style="border-color: ${color}; color: ${color};">${this._getPlayerCurrentName(p)}</div>`;
                 });
                 sidesHTML += '</div>';
             });
 
             matchesHTML += `
-                <div class="dm-live-match-large">
-                    <div class="dm-live-badge">\u25CF LIVE</div>
-                    ${challengeBadge}
+                <div class="dm-live-match-large${isChallenge ? ' dm-live-match-large--challenge' : ''}">
+                    ${topBanner}
                     <div class="dm-game-header">${logoHtml}<span class="dm-game-name">${gameName}</span></div>
                     <div class="dm-sides">${sidesHTML}</div>
                 </div>
