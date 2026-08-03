@@ -3000,20 +3000,27 @@ function closeClearQueueModal() {
 async function confirmClearQueue(triggerBtn) {
     closeClearQueueModal();
 
-    const removedCount = (gameState.gameQueue || []).filter(g => g.status !== 'completed').length;
+    // Spare: completed (history), ongoing (LIVE matches), and matches tagged
+    // for future rounds (the mass-imported schedule). "Clear All" means
+    // "clear this round's pending clutter", not "destroy the tournament".
+    const currentRound = gameState.currentPhase?.roundNumber;
+    const keep = g =>
+        g.status === 'completed' ||
+        g.status === 'ongoing' ||
+        (g.roundNumber !== undefined && currentRound !== undefined && g.roundNumber > currentRound);
 
-    // Keep only completed matches (preserve match history)
-    gameState.gameQueue = (gameState.gameQueue || []).filter(g => g.status === 'completed');
+    const removedCount = (gameState.gameQueue || []).filter(g => !keep(g)).length;
+    gameState.gameQueue = (gameState.gameQueue || []).filter(keep);
 
     await saveGameState(triggerBtn);
 
     // Log the clear event
     logEvent('queue_cleared', {
         matchesRemoved: removedCount,
-        message: `Cleared ${removedCount} matches from queue`
+        message: `Cleared ${removedCount} matches from queue (live + future rounds kept)`
     });
 
-    showStatus(`Cleared ${removedCount} match${removedCount !== 1 ? 'es' : ''} from queue`, 'success');
+    showStatus(`Cleared ${removedCount} match${removedCount !== 1 ? 'es' : ''} — live matches and future rounds kept`, 'success');
 }
 
 // =============================================================================
