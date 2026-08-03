@@ -1904,13 +1904,27 @@
             return _origStartMatch(gameId);
         }
 
-        // "Things done accordingly": hex tiles from earlier results should be
-        // placed before the next match starts (warn + confirm, not a block)
-        const pendingPlacements = (pendingHexWins || []).length;
-        if (pendingPlacements > 0 && !skipPlacementCheck) {
+        // Hex placement is deliberately DEFERRED to next round: hex_placement_1/2
+        // gate the PREVIOUS round's match win, not the current one (see
+        // phase-manager.js's PHASE_ORDER doc comment) -- a win from THIS round's
+        // Match 1 is not due until next round's hex_placement_1, so it is NOT
+        // "not yet placed" in any actionable sense while Match 2 is starting.
+        // Only count wins tagged for a round BEFORE this one: those already had
+        // their placement window (this round's own hex_placement_1/2, already
+        // passed by the time matches_in_progress is running) and are genuinely
+        // overdue -- almost always because an earlier gate got force-advanced
+        // past instead of placed or Waived. (Found live: this warning fired on
+        // the completely routine "start match 2 right after confirming match
+        // 1" sequence when it counted ALL pending wins with no round scoping.)
+        const currentRoundNumber = gameState.currentPhase?.roundNumber;
+        const overduePlacements = (pendingHexWins || []).filter(w =>
+            w.roundNumber === undefined || currentRoundNumber === undefined ||
+            w.roundNumber < currentRoundNumber
+        ).length;
+        if (overduePlacements > 0 && !skipPlacementCheck) {
             _openFlowConfirm({
                 title: 'Hex Tiles Not Placed',
-                bodyHtml: `<p><strong>${pendingPlacements}</strong> hex placement${pendingPlacements !== 1 ? 's are' : ' is'} still pending from earlier results — teams should place their tiles before the next match starts.</p>`,
+                bodyHtml: `<p><strong>${overduePlacements}</strong> hex placement${overduePlacements !== 1 ? 's are' : ' is'} still pending from an earlier round — teams should place ${overduePlacements !== 1 ? 'those' : 'that'} tile${overduePlacements !== 1 ? 's' : ''} before the next match starts.</p>`,
                 confirmLabel: 'Start Anyway ' + ICON_SVGS.play,
                 danger: true,
                 onConfirm: () => window.startMatch(gameId, true)
