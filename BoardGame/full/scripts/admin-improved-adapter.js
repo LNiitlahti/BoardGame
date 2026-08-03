@@ -1179,7 +1179,7 @@
         const queue = gameState.gameQueue || [];
         const votedMatches = queue.filter(m => !m.isBreak && m.votes && m.votes.length > 0 && !m.adminConfirmed);
         votedMatches.forEach(m => {
-            const gameName = (typeof getGameDisplayName === 'function') ? getGameDisplayName(m.gameId) : (m.gameId || 'Match');
+            const gameName = (typeof getGameDisplayName === 'function') ? getGameDisplayName(m.game) : (m.game || 'Match');
             html += `<span class="flow-action-item action-vote" title="Players voted on result for ${gameName}">` +
                     `<span class="flow-action-icon">${ICON_SVGS.vote}</span> Vote: ${_esc(gameName)}</span>`;
         });
