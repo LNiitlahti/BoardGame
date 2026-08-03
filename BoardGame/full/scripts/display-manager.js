@@ -1624,6 +1624,76 @@ class DisplayManager {
         container.innerHTML = '';
         container.classList.remove('active');
         this._container.setAttribute('data-display-mode', 'board_focus');
+        this._renderHexScoringOverlay(data);
+    }
+
+    /**
+     * Live preview of what each team is ABOUT to score from hex territory
+     * control, shown ONLY during the scoring_hex phase (board_focus is also
+     * reused by board_resolved, a different phase where nothing is being
+     * scored). Previously this phase showed nothing but the bare board --
+     * no indication a team was about to gain points, nor by how much.
+     * Mirrors stats-manager.js's awardRoundPoints() exactly (same
+     * mountain-heart=2/side-heart=1 rule, same contested-hex exclusion) but
+     * read-only -- this only PREVIEWS the award that fires when the admin
+     * actually leaves this phase.
+     */
+    _renderHexScoringOverlay(data) {
+        const overlay = document.getElementById('hexScoringOverlay');
+        if (!overlay) return;
+
+        if (data.currentPhase?.name !== 'scoring_hex') {
+            overlay.style.display = 'none';
+            overlay.innerHTML = '';
+            return;
+        }
+
+        const teams = data.teams || [];
+        const heartHexControl = data.heartHexControl || {};
+        const queue = data.gameQueue || [];
+
+        const contestedHexes = new Set();
+        queue.forEach(m => {
+            if (m.isChallenge && m.challengeHexCoord &&
+                (m.status === 'pending' || m.status === 'ongoing')) {
+                contestedHexes.add(m.challengeHexCoord);
+            }
+        });
+
+        const pending = teams.map(team => {
+            let points = 0, mountainCount = 0, sideCount = 0;
+            Object.entries(heartHexControl).forEach(([coord, ownerId]) => {
+                if (contestedHexes.has(coord) || ownerId !== team.id) return;
+                const m = coord.match(/q(-?\d+)r(-?\d+)/);
+                if (!m) return;
+                const hexType = this._boardModule?.getHexType(parseInt(m[1]), parseInt(m[2]));
+                if (hexType === 'mountain-heart') { points += 2; mountainCount++; }
+                else if (hexType === 'side-heart') { points += 1; sideCount++; }
+            });
+            return { team, points, mountainCount, sideCount };
+        }).filter(t => t.points > 0).sort((a, b) => b.points - a.points);
+
+        const rowsHTML = pending.length > 0
+            ? pending.map(({ team, points, mountainCount, sideCount }) => {
+                const color = team.color || '#888';
+                const breakdown = [
+                    mountainCount > 0 ? `${mountainCount} × Mountain Heart` : '',
+                    sideCount > 0 ? `${sideCount} × Side Heart` : ''
+                ].filter(Boolean).join(' + ');
+                return `
+                    <div class="dm-hex-score-row" style="--c:${color};">
+                        <span class="dm-hex-score-team" style="color:${color};">${team.name || 'Team'}</span>
+                        <span class="dm-hex-score-breakdown">${breakdown}</span>
+                        <span class="dm-hex-score-pts">+${points}</span>
+                    </div>`;
+            }).join('')
+            : '<div class="dm-hex-score-empty">No heart hexes controlled this round</div>';
+
+        overlay.innerHTML = `
+            <div class="dm-hex-score-title">${ICON_SVGS.hexagon} Hex Scoring</div>
+            <div class="dm-hex-score-rows">${rowsHTML}</div>
+        `;
+        overlay.style.display = '';
     }
 
     _ensurePrimaryActive() {
@@ -1632,6 +1702,11 @@ class DisplayManager {
             primary.classList.add('active');
         }
         this._container.removeAttribute('data-display-mode');
+        const hexOverlay = document.getElementById('hexScoringOverlay');
+        if (hexOverlay) {
+            hexOverlay.style.display = 'none';
+            hexOverlay.innerHTML = '';
+        }
     }
 
     _renderLiveMatchesLarge(container, data) {

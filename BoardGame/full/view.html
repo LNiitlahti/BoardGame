@@ -1423,6 +1423,45 @@
         body[data-display-mode="board_focus"] .queue-panel { display: none; }
         body[data-display-mode="board_focus"] .board-area { grid-column: 1 / -1; }
 
+        /* ── Hex Scoring overlay (scoring_hex phase only) ────────── */
+        .dm-hex-scoring-overlay {
+            position: absolute; top: 90px; left: 50%; transform: translateX(-50%);
+            z-index: 5; pointer-events: none;
+            background: var(--bg-glass); border: 1px solid var(--border-gold, rgba(200,179,126,0.3));
+            border-radius: 14px; padding: 18px 28px;
+            min-width: 320px; max-width: 90%;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+        }
+        .dm-hex-score-title {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            font-family: 'Russo One', sans-serif; font-size: 22px; font-weight: 800;
+            color: var(--gold-bright); text-transform: uppercase; letter-spacing: 2px;
+            margin-bottom: 12px;
+        }
+        .dm-hex-score-title svg { width: 22px; height: 22px; }
+        .dm-hex-score-rows { display: flex; flex-direction: column; gap: 6px; }
+        .dm-hex-score-row {
+            display: flex; align-items: center; gap: 16px;
+            padding: 6px 12px; border-radius: 8px;
+            background: rgba(255,255,255,0.03); border-left: 3px solid var(--c, var(--gold));
+        }
+        .dm-hex-score-team {
+            font-family: 'Quantico', sans-serif; font-size: 17px; font-weight: 700;
+            min-width: 140px;
+        }
+        .dm-hex-score-breakdown {
+            font-family: 'Quantico', sans-serif; font-size: 13px; color: var(--text-muted);
+            flex: 1;
+        }
+        .dm-hex-score-pts {
+            font-family: 'Russo One', sans-serif; font-size: 20px; font-weight: 800;
+            color: #22c55e;
+        }
+        .dm-hex-score-empty {
+            font-family: 'Quantico', sans-serif; font-size: 15px; color: var(--text-muted);
+            text-align: center; padding: 8px 0;
+        }
+
         /* ── Standings Large ─────────────────────────── */
         .dm-standings-large { width: 100%; max-width: 700px; }
         .dm-standings-large .dm-standings-title {
@@ -1806,6 +1845,11 @@
                 </div>
             </div>
             <div class="board-wrap"><div class="scene-3d" id="cineScene"><div class="rig-3d" id="cineRig"><div id="hexBoard"></div></div></div><div id="cineWash"></div></div>
+            <!-- Hex Scoring info overlay -- populated by
+                 DisplayManager._renderBoardFocusSlide() only during the
+                 scoring_hex phase (hidden/cleared otherwise, incl. the other
+                 board_focus phase, board_resolved). -->
+            <div class="dm-hex-scoring-overlay" id="hexScoringOverlay" style="display:none;"></div>
         </div>
 
         <!-- UPCOMING QUEUE — Right panel -->
