@@ -1284,12 +1284,19 @@
         if (phase === 'challenges' || phase === 'challenge_game' ||
             phase === 'spell_window_2' || phase === 'spell_window_3') {
             target = _excludeLiveConflicts(_pendingChallengeMatches())[0];
-        } else if (phase.startsWith('match_1')) {
-            target = _excludeLiveConflicts(_pendingSlotMatches(1))[0];
-        } else if (phase.startsWith('match_2')) {
-            target = _excludeLiveConflicts(_pendingSlotMatches(2))[0];
+        } else if (phase === 'matches_in_progress') {
+            // Per-slot pick, playing slots first — the panel's NEXT badge and
+            // the slot card's own Next-up must agree. (The old branches keyed
+            // on retired match_1_*/match_2_* phase names — dead since the
+            // slot migration — and fell through to "first pending in the
+            // whole queue", badging future-round imports.)
+            const pick = slot => _excludeLiveConflicts(_pendingSlotMatches(slot))[0];
+            target = (_phaseManager.isSlotPlaying(1) ? pick(1) : null) ||
+                     (_phaseManager.isSlotPlaying(2) ? pick(2) : null) ||
+                     pick(1) || pick(2) || null;
         }
-        if (!target) target = _excludeLiveConflicts(_queuePending())[0];
+        // Outside match/challenge phases nothing is "next to start" — badge
+        // nothing rather than an arbitrary (possibly future-round) entry.
 
         const items = document.querySelectorAll('#matchQueue .queue-item');
         items.forEach(el => {
