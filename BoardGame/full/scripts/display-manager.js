@@ -1390,6 +1390,13 @@ class DisplayManager {
      * during the lobby ready-check. Labeled with the match number (e.g.
      * "#6 Age of Empires IV") matching admin.html's own match cards, so
      * whoever's running admin can find the right card from the big screen.
+     *
+     * A slot's own sub-phase badge (Setup/Lobby/Live/Done) is per-SLOT, not
+     * per-match — a split-format slot (e.g. linked 3v3+2v2) holds two
+     * matches that can each be in a different actual state (one started,
+     * the other still waiting on the admin to hit Start), which the slot
+     * badge alone can't show. Each match card gets its own LIVE/WAITING
+     * tag straight from that queue entry's own `status`.
      */
     _renderMatchGroup(m, data) {
         const lobbyReady = data.lobbyReady || {};
@@ -1397,6 +1404,8 @@ class DisplayManager {
 
         const gameName = this._getGameDisplayName(m.game || m.gameType);
         const gameLabel = m.matchNumber ? `#${m.matchNumber} ${gameName}` : gameName;
+        const isLive = m.status === 'ongoing';
+        const liveTagHTML = `<span class="dm-dual-live-tag dm-dual-live-tag--${isLive ? 'live' : 'waiting'}">${isLive ? 'Live' : 'Waiting'}</span>`;
         const teams = m.teams || m.sides || [];
         const sidesHTML = teams.map((t, i) => {
             const players = this._getMatchTeamPlayers(t);
@@ -1417,7 +1426,7 @@ class DisplayManager {
             return (i > 0 ? '<div class="dm-dual-vs">VS</div>' : '') + side;
         }).join('');
 
-        return `<div class="dm-dual-live-match"><div class="dm-dual-game-name">${gameLabel}</div><div class="dm-dual-ready-sides">${sidesHTML}</div></div>`;
+        return `<div class="dm-dual-live-match"><div class="dm-dual-game-name">${gameLabel} ${liveTagHTML}</div><div class="dm-dual-ready-sides">${sidesHTML}</div></div>`;
     }
 
     /**
