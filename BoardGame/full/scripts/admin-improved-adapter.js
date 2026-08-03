@@ -390,45 +390,6 @@
         return { total, played: total - missing.length, missing };
     }
 
-    /**
-     * Player coverage for a slot: which roster players of the teams involved
-     * in this slot's COMPLETED matches actually played. User's rule: a slot
-     * only truly completes once ALL the involved teams' players have played
-     * (a full 5v5, or both halves of a 3v3+2v2 pair). Counting queue entries
-     * alone can't catch a never-created second half — rosters can.
-     */
-    function _slotPlayerCoverage(slot) {
-        const queue = gameState.gameQueue || [];
-        const completed = queue.filter(m => !m.isBreak && m.isChallenge !== true &&
-            m.status === 'completed' && _belongsToCurrentSlot(m, slot));
-        const playedIds = new Set();
-        const teamIds = new Set();
-        completed.forEach(m => {
-            (m.teams || m.sides || []).forEach(side => {
-                (side.playerIds || []).forEach(pid => playedIds.add(String(pid)));
-                (side.players || []).forEach(p => {
-                    if (p.id !== undefined) playedIds.add(String(p.id));
-                    if (p.teamId !== undefined) teamIds.add(String(p.teamId));
-                });
-            });
-        });
-        const missing = [];
-        let total = 0;
-        (gameState.teams || []).forEach(team => {
-            const roster = team.players || [];
-            const involved = teamIds.has(String(team.id)) ||
-                roster.some(p => p.id !== undefined && playedIds.has(String(p.id)));
-            if (!involved) return;
-            roster.forEach(p => {
-                total++;
-                if (!(p.id !== undefined && playedIds.has(String(p.id)))) {
-                    missing.push(p.name || p.email || String(p.id));
-                }
-            });
-        });
-        return { total, played: total - missing.length, missing };
-    }
-
     // ══════════════════════════════════════════════════════════════
     //  ROUND + SLOT TAGGING
     // ══════════════════════════════════════════════════════════════
