@@ -1453,7 +1453,10 @@ class DisplayManager {
                         <span class="dm-dual-ready-name" style="color:${color};">${name}</span>
                     </div>`;
             }).join('');
-            const label = isWinner ? `<div class="dm-dual-winner-label">${ICON_SVGS.crown} Winner</div>` : '';
+            // Always reserve the label's row on both sides (hidden when not
+            // the winner) so the two columns' player rows stay vertically
+            // aligned instead of the winning side's rows sitting lower.
+            const label = `<div class="dm-dual-winner-label"${isWinner ? '' : ' style="visibility:hidden;"'}>${ICON_SVGS.crown} Winner</div>`;
             const side = `<div class="dm-dual-ready-side${isWinner ? ' dm-dual-winner-side' : ''}">${label}${playersHTML}</div>`;
             return (i > 0 ? '<div class="dm-dual-vs">VS</div>' : '') + side;
         }).join('');
