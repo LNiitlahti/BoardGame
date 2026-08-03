@@ -1758,7 +1758,24 @@
 
     window.forceAdvanceSlot = async (slot) => {
         _initPhaseAdapter();
-        await _phaseManager?.advanceSlot(slot, true);
+        if (!_phaseManager) return;
+
+        // Unlike forceAdvancePhase() (which opens a full confirmation modal
+        // with a consequence note), this used to fire immediately with zero
+        // confirmation -- a single misclick could skip a slot straight to
+        // 'done' with matches still ongoing/unstarted, leaving them orphaned
+        // in the queue while the display treats the slot as finished. Found
+        // live: an accidental click cleared an in-progress Match 2.
+        const reqs = _phaseManager.getSlotRequirements(slot) || [];
+        const unmet = reqs.filter(r => !r.met).map(r => r.label);
+        const lines = [`Force-advance Match ${slot} to its next stage, skipping its requirements?`];
+        if (unmet.length > 0) {
+            lines.push('', 'Currently unmet:', ...unmet.map(l => `• ${l}`));
+        }
+        lines.push('', 'Any ongoing or not-yet-started match in this slot will be left behind in the queue instead of being resolved.');
+        if (!window.confirm(lines.join('\n'))) return;
+
+        await _phaseManager.advanceSlot(slot, true);
     };
 
     window.confirmForceAdvance = async () => {
