@@ -1563,7 +1563,10 @@
             font-family: 'Quantico', sans-serif; font-size: 18px; color: var(--text-muted);
             text-align: center; padding: 20px 0;
         }
-        .dm-dual-ready-list { display: flex; flex-direction: column; gap: 8px; }
+        .dm-dual-ready-sides {
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; align-items: flex-start;
+        }
+        .dm-dual-ready-side { display: flex; flex-direction: column; gap: 8px; min-width: 160px; }
         .dm-dual-ready-row {
             display: flex; align-items: center; gap: 10px;
             padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: 6px;

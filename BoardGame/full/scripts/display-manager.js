@@ -1382,36 +1382,43 @@ class DisplayManager {
     }
 
     /**
-     * Whole rosters of every team with a player on a pending/ongoing match
-     * in this slot, by uid -> {uid, name, teamColor}. Mirrors
-     * phase-manager.js's _getPlayersWhoMustReadyForSlot, but returns
-     * display-ready objects instead of bare uids since this feeds a
-     * ready-check grid, not a gate calculation.
+     * Renders one queue match as "Side A VS Side B" (handles 3+ sides too).
+     * Used for every matches_in_progress sub-phase so who-plays-whom stays
+     * visible the whole time — setup/lobby previews the matchup just like
+     * a live match does, instead of dropping to a bare game-name line.
+     * When `showReady` is set (lobby sub-phase), each player's name grows
+     * a game-lobby/Discord ready-dot pair instead of rendering plain.
      */
-    _getMustReadyForSlotDisplay(data, slot) {
-        const queue = data.gameQueue || [];
-        const teams = data.teams || [];
-        const currentRoundNumber = data.currentPhase?.roundNumber;
+    _renderMatchGroup(m, data, { showReady }) {
+        const lobbyReady = data.lobbyReady || {};
+        const dotSvg = (ready) => `<svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="color:${ready ? '#22c55e' : '#ef4444'}"><circle cx="12" cy="12" r="8"/></svg>`;
 
-        const activeTeamIds = new Set();
-        queue.forEach(match => {
-            if (match.status === 'completed') return;
-            if (!this._matchBelongsToSlot(match, slot, currentRoundNumber)) return;
-            (match.teams || match.sides || []).forEach(side => {
-                this._getMatchTeamPlayers(side).forEach(p => {
-                    if (p.originalTeamId != null) activeTeamIds.add(String(p.originalTeamId));
-                });
-            });
-        });
+        const gameName = this._getGameDisplayName(m.game || m.gameType);
+        const teams = m.teams || m.sides || [];
+        const sidesHTML = teams.map((t, i) => {
+            const players = this._getMatchTeamPlayers(t);
+            const playersHTML = players.map(p => {
+                const color = this._getPlayerCurrentColor(p);
+                const name = this._getPlayerCurrentName(p);
+                if (!showReady) {
+                    return `<span class="dm-dual-player" style="color:${color};">${name}</span>`;
+                }
+                const r = lobbyReady[p.uid] || {};
+                const gl = r.gameLobby === true || r.ready === true;
+                const dc = r.discord === true || r.ready === true;
+                return `
+                    <div class="dm-dual-ready-row">
+                        <span class="dm-dual-ready-name" style="color:${color};">${name}</span>
+                        <span class="dm-dual-ready-indicator">${dotSvg(gl)}${ICON_SVGS.gamepad2}</span>
+                        <span class="dm-dual-ready-indicator">${dotSvg(dc)}${ICON_SVGS.headphones}</span>
+                    </div>`;
+            }).join('');
+            const side = showReady ? `<div class="dm-dual-ready-side">${playersHTML}</div>` : playersHTML;
+            return (i > 0 ? '<span class="dm-dual-vs">VS</span>' : '') + side;
+        }).join('');
 
-        const result = [];
-        teams.forEach(team => {
-            if (!activeTeamIds.has(String(team.id))) return;
-            (team.players || []).forEach(p => {
-                if (p.uid) result.push({ uid: p.uid, name: p.name || 'Player', teamColor: team.color || '#888' });
-            });
-        });
-        return result;
+        const sidesClass = showReady ? 'dm-dual-ready-sides' : 'dm-dual-sides';
+        return `<div class="dm-dual-live-match"><div class="dm-dual-game-name">${gameName}</div><div class="${sidesClass}">${sidesHTML}</div></div>`;
     }
 
     /**
@@ -1421,6 +1428,11 @@ class DisplayManager {
      * sub-phases at once (one live while the other's still lobby-ready),
      * so this is the one phase a single "pick the best existing slide"
      * choice can't represent — it needs both shown together.
+     *
+     * A slot can hold more than one simultaneous match (e.g. a linked
+     * 3v3+2v2 split-format pair counts as one slot but is two queue
+     * entries) — every active match for the slot renders as its own
+     * matchup group, not just the first one.
      */
     _renderMatchesDualSlot(container, data) {
         const currentRoundNumber = data.currentPhase?.roundNumber;
@@ -1434,52 +1446,16 @@ class DisplayManager {
             const slotMatches = m => this._matchBelongsToSlot(m, slot, currentRoundNumber);
             const ongoing = queue.filter(m => m.status === 'ongoing' && slotMatches(m));
             const pending = queue.filter(m => (m.status === 'pending' || m.status === undefined) && slotMatches(m));
+            const active = [...ongoing, ...pending];
 
             let bodyHTML = '';
 
             if (sub === 'done') {
                 bodyHTML = `<div class="dm-dual-slot-status">Complete</div>`;
+            } else if (active.length > 0) {
+                bodyHTML = active.map(m => this._renderMatchGroup(m, data, { showReady: sub === 'lobby' })).join('');
             } else if (sub === 'lobby') {
-                const mustReady = this._getMustReadyForSlotDisplay(data, slot);
-                const lobbyReady = data.lobbyReady || {};
-                const readyRows = mustReady.map(p => {
-                    const r = lobbyReady[p.uid] || {};
-                    const gl = r.gameLobby === true || r.ready === true;
-                    const dc = r.discord === true || r.ready === true;
-                    const dotSvg = (ready) => `<svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="color:${ready ? '#22c55e' : '#ef4444'}"><circle cx="12" cy="12" r="8"/></svg>`;
-                    return `
-                        <div class="dm-dual-ready-row">
-                            <span class="dm-dual-ready-name" style="color:${p.teamColor};">${p.name}</span>
-                            <span class="dm-dual-ready-indicator">${dotSvg(gl)}${ICON_SVGS.gamepad2}</span>
-                            <span class="dm-dual-ready-indicator">${dotSvg(dc)}${ICON_SVGS.headphones}</span>
-                        </div>`;
-                }).join('');
-                bodyHTML = `<div class="dm-dual-ready-list">${readyRows || '<div class="dm-dual-slot-status">Waiting for players...</div>'}</div>`;
-            } else if (sub === 'playing' && ongoing.length > 0) {
-                bodyHTML = ongoing.map(m => {
-                    const gameName = this._getGameDisplayName(m.game || m.gameType);
-                    const teams = m.teams || m.sides || [];
-                    const sidesHTML = teams.map((t, i) => {
-                        const players = this._getMatchTeamPlayers(t);
-                        const namesHTML = players.map(p =>
-                            `<span class="dm-dual-player" style="color:${this._getPlayerCurrentColor(p)};">${this._getPlayerCurrentName(p)}</span>`
-                        ).join('');
-                        return (i > 0 ? '<span class="dm-dual-vs">VS</span>' : '') + namesHTML;
-                    }).join('');
-                    return `<div class="dm-dual-live-match"><div class="dm-dual-game-name">${gameName}</div><div class="dm-dual-sides">${sidesHTML}</div></div>`;
-                }).join('');
-            } else if (pending.length > 0) {
-                const next = pending[0];
-                const gameName = this._getGameDisplayName(next.game || next.gameType);
-                const teams = next.teams || next.sides || [];
-                const sidesHTML = teams.map((t, i) => {
-                    const players = this._getMatchTeamPlayers(t);
-                    const namesHTML = players.map(p =>
-                        `<span class="dm-dual-player" style="color:${this._getPlayerCurrentColor(p)};">${this._getPlayerCurrentName(p)}</span>`
-                    ).join('');
-                    return (i > 0 ? '<span class="dm-dual-vs">VS</span>' : '') + namesHTML;
-                }).join('');
-                bodyHTML = `<div class="dm-dual-live-match"><div class="dm-dual-slot-status">Next: ${gameName}</div><div class="dm-dual-sides">${sidesHTML}</div></div>`;
+                bodyHTML = `<div class="dm-dual-slot-status">Waiting for players...</div>`;
             } else {
                 bodyHTML = `<div class="dm-dual-slot-status">No match queued yet</div>`;
             }
