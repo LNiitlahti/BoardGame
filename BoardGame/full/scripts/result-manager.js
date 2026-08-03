@@ -49,8 +49,41 @@ class ResultManager {
         this._onPhaseChanged = onPhaseRequirementsChanged || (() => {});
 
         this._selectedQueuedGame = null;
-        this._pendingHexWins = [];
         this._asyncBusy = false;
+        // _pendingHexWins is NOT a plain instance field — see the
+        // get/set _pendingHexWins accessor pair below, which backs it with
+        // gameState.pendingHexWins (TODO.md Task 15).
+    }
+
+    // ------------------------------------------------------------------
+    // Pending hex wins — backed by gameState (see accessor rationale)
+    // ------------------------------------------------------------------
+
+    /**
+     * `_pendingHexWins` used to be a plain in-memory instance array — reset
+     * to [] on every page load, with nothing ever restoring it from
+     * Firestore. It's the SOLE gate for advancing past hex_placement_1/2
+     * (phase-manager.js's _getPendingHexCount(), wired at god-app.js:171 to
+     * `this.result._pendingHexWins.length`), so a refresh mid-hex-placement
+     * silently reset the gate to "all clear" regardless of true state.
+     *
+     * Backing this with a get/set accessor pair (instead of a plain field)
+     * means every existing `this._pendingHexWins.push(...)`/`.length`/
+     * `.filter(...)` call site throughout this file keeps working exactly
+     * as written, but now transparently reads/writes through
+     * `this._gameState.pendingHexWins` — persisted the same way every other
+     * gameState array field is (via the `saveCallback`/saveGameState()
+     * pattern), and naturally re-synced on every Firestore snapshot since
+     * `this._gameState` is the same stable object GodApp's onSnapshot
+     * handler does `Object.assign(this.gameState, newData)` into.
+     */
+    get _pendingHexWins() {
+        if (!this._gameState.pendingHexWins) this._gameState.pendingHexWins = [];
+        return this._gameState.pendingHexWins;
+    }
+
+    set _pendingHexWins(value) {
+        this._gameState.pendingHexWins = value;
     }
 
     // ------------------------------------------------------------------
@@ -648,6 +681,13 @@ class ResultManager {
 
             // Show persistent reminder
             this.updatePendingHexNotification();
+
+            // Persist immediately — the `await this._save()` earlier in this
+            // method runs BEFORE this push, so without this second save the
+            // pending win would only ever live in memory (see the
+            // _pendingHexWins accessor doc above for why that's the actual
+            // gate-bypass bug, not just a cosmetic notification gap).
+            await this._save();
         }
 
         this._onPhaseChanged();
@@ -675,10 +715,24 @@ class ResultManager {
             banner.id = 'pendingHexBanner';
             banner.className = 'pending-hex-banner';
 
-            // Insert after the top bar
-            const topBar = document.querySelector('.top-bar');
-            if (topBar) {
-                topBar.after(banner);
+            // Insert after the page's top status/phase bar. admin.html has
+            // `.top-bar` (admin.js's own near-identical copy of this
+            // function uses that selector, correctly, since it only ever
+            // runs on admin.html) — but god.html (this ResultManager class's
+            // only consumer) has no `.top-bar` element at all, so this
+            // selector never matched here and the banner was being created
+            // in memory but never actually appended to the DOM, silently,
+            // on every call. Found while building
+            // e2e-pending-hex-persistence.js (TODO.md Task 15): pending
+            // counts/gate state were correct, but nothing was ever visible.
+            // `#phaseIndicatorBar` is god.html's equivalent top bar; fall
+            // back to prepending to <body> if even that's missing so the
+            // banner is never silently dropped again.
+            const anchor = document.querySelector('.top-bar') || document.getElementById('phaseIndicatorBar');
+            if (anchor) {
+                anchor.after(banner);
+            } else {
+                document.body.prepend(banner);
             }
         }
 
@@ -701,7 +755,6 @@ class ResultManager {
             <span class="pending-hex-icon">\u26A0\uFE0F</span>
             <span class="pending-hex-text">Pending hex placement:</span>
             ${pendingList}
-            <button class="pending-hex-dismiss" onclick="dismissPendingHexBanner()" title="Dismiss">\u2715</button>
         `;
     }
 
@@ -711,7 +764,7 @@ class ResultManager {
      * Only removes ONE notification per hex placed (the oldest one for this team).
      * @param {string|number} teamId
      */
-    clearPendingHexWin(teamId) {
+    async clearPendingHexWin(teamId) {
         let changed = false;
 
         // Find the FIRST (oldest) pending hex win that includes this team
@@ -737,15 +790,10 @@ class ResultManager {
         if (changed || this._pendingHexWins.length !== beforeCount) {
             this.updatePendingHexNotification();
             this._onPhaseChanged();
+            // Persist the clear \u2014 see the persistence note on the
+            // _pendingHexWins accessor above.
+            await this._save();
         }
-    }
-
-    /**
-     * Dismiss all pending hex notifications.
-     */
-    dismissPendingHexBanner() {
-        this._pendingHexWins = [];
-        this.updatePendingHexNotification();
     }
 
     // ------------------------------------------------------------------

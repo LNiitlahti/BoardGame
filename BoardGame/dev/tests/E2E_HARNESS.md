@@ -490,6 +490,70 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   (`task14-vote-toast-{desktop,phone}-{before,after}.png`, not committed).
   Snapshots/restores `gameQueue` (array field, plain reassign+save is
   sufficient) in a `finally` block.
+- `e2e-pending-hex-persistence.js` — regression test for TODO.md Task 15
+  ("during hex_placement_1/2 it's not clear which team has a pending hex
+  placement; the old notification disappears on refresh"). Investigation
+  found this was a real gate-bypass bug, not just cosmetic:
+  `pendingHexWins` (admin.js's bare global) / `ResultManager._pendingHexWins`
+  (god.html) is the SOLE gate for advancing past hex_placement_1/2
+  (phase-manager.js's `_getPendingHexCount()`), and it was a plain in-memory
+  array with zero Firestore persistence — a refresh mid-hex-placement reset
+  it to `[]`, so the gate silently reported "all clear" regardless of true
+  state. Fix: both are now backed by `gameState.pendingHexWins`, persisted
+  via the normal `saveGameState()`/`this._save()` pattern — a `window`
+  accessor pair in admin.js (so every existing bare `pendingHexWins`
+  reference in admin.js AND admin-improved-adapter.js keeps working
+  unchanged) and a `get`/`set _pendingHexWins` accessor pair on
+  `ResultManager` (result-manager.js). The standing `#pendingHexBanner` is
+  now re-rendered on every display update instead of only right after a
+  hex-related action — god.html's `GodApp.updateDisplay()` calls it
+  directly; admin-improved-adapter.js used to unconditionally REMOVE the
+  banner on every Flow Panel render ("Flow Panel handles it now" — it
+  didn't, outside hex_placement_1/2 there was no replacement indication at
+  all), now it calls `updatePendingHexNotification()` instead, which itself
+  only removes the banner once nothing is pending — making it visible across
+  every phase, not just hex_placement_1/2. The data-destroying "dismiss"
+  button/function (`dismissPendingHexBanner()`, which just did
+  `_pendingHexWins = []`, wiping every team's pending record) was removed
+  entirely on both pages — the banner can now only disappear via a real
+  `clearPendingHexWin(teamId)` call, itself only reachable from a genuine
+  `assignTeamToHex()` placement. Also found and fixed, live, while building
+  this test: `ResultManager.updatePendingHexNotification()`'s banner-anchor
+  selector (`.top-bar`) matches admin.html's markup but god.html (this
+  class's only consumer) has no such element — the banner was being created
+  but never appended to the DOM at all on god.html, unconditionally, even
+  before this fix (confirmed by testing, not by reading — pending counts and
+  the phase gate were always correct, nothing was ever visible); now falls
+  back to `#phaseIndicatorBar` (god.html's equivalent top bar) with a final
+  `document.body.prepend()` fallback. Drives BOTH pages: Part 1 (god.html) is
+  thorough — confirms 2 real match results via `ResultManager
+  .quickConfirmResult()` awarding hex wins to Team Alpha and Team Beta
+  simultaneously (asserts the banner shows both), places Team Alpha's hex via
+  `BoardManager.assignTeamToHex()` (asserts Team Alpha clears, Team Beta
+  still shows — multi-team correctness), does a REAL `page.reload()` while
+  Team Beta's hex is still pending (asserts the banner reappears AND
+  `advancePhase()` still returns `false`/`currentPhase` stays
+  `hex_placement_1` — the core regression check), moves `currentPhase` to
+  `spell_window_1` with Team Beta still pending (asserts the banner stays
+  visible outside hex_placement_1/2), places Team Beta's hex there (asserts
+  it clears and the banner disappears), and confirms no dismiss path exists
+  anywhere. Part 2 (admin.html) is lighter — the underlying persistence
+  mechanism is structurally identical to Part 1's, already proven there — and
+  focuses on what's unique to admin.html: the Flow Panel suppression fix
+  (banner stays visible during `spell_window_1`, not just hex_placement_1/2)
+  and refresh persistence through admin.js's own separate `pendingHexWins`
+  accessor (admin.html never loads result-manager.js — confirmed by grep, so
+  this is a genuinely separate implementation, not shared code). Confirmed
+  passing against live `e2e-disposable-1`. Snapshots/restores `gameQueue`,
+  `currentPhase`, `teams`, `gamesPlayed`, `gameHistory`, and `pendingHexWins`
+  on both pages in `finally` blocks — `pendingHexWins` is now a real
+  persisted array field, so (unlike before this fix) leaving it unrestored
+  would leak synthetic pending-hex data into `e2e-disposable-1` permanently,
+  not just for the page session. Test hexes are cleared via the real
+  `assignTeamToHex(coord, null)` "Clear Hex" path (explicit
+  `FieldValue.delete()`), same reasoning as `e2e-hex-placement-gate.js`.
+  That older test's own snapshot/restore was also updated to include
+  `pendingHexWins` now that it's persisted, for the same reason.
 - `.env.e2e` (gitignored, not in git) — real credentials. Copy `.env.e2e.example`
   to create it if missing.
 

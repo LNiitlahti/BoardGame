@@ -55,8 +55,34 @@ let smartMatchGenerator = null;
 // Hex picker state
 let selectedHexCoord = null;
 
-// Pending hex wins - wins that haven't had a hex placed yet
-let pendingHexWins = [];
+// Pending hex wins - wins that haven't had a hex placed yet.
+//
+// Backed by gameState.pendingHexWins (persisted via saveGameState(), same
+// as gameState.gameQueue/teams) instead of a plain in-memory array — TODO.md
+// Task 15: this list is the SOLE gate for advancing past hex_placement_1/2
+// (phase-manager.js's _getPendingHexCount(), wired at
+// admin-improved-adapter.js:136), so a page refresh mid-hex-placement used
+// to silently reset it to [], making the gate report "all clear" regardless
+// of true state.
+//
+// Defined as a `window` accessor (not `let`) so every existing bare
+// `pendingHexWins` read/write throughout this file AND
+// admin-improved-adapter.js (a separate <script>, loaded after this one,
+// sharing the same global scope) transparently goes through gameState with
+// zero call-site changes — unqualified global identifier lookups fall
+// through to accessor properties defined on `window` exactly like they do
+// for `var`/function-declaration globals.
+Object.defineProperty(window, 'pendingHexWins', {
+    configurable: true,
+    get() {
+        if (!gameState) return [];
+        if (!gameState.pendingHexWins) gameState.pendingHexWins = [];
+        return gameState.pendingHexWins;
+    },
+    set(value) {
+        if (gameState) gameState.pendingHexWins = value;
+    }
+});
 
 // Async operation guard — prevents double-clicks on queue actions
 let _asyncBusy = false;
@@ -1733,7 +1759,7 @@ async function assignTeamToHex(coord, teamId) {
     });
 
     // Clear pending hex win notification for this team
-    clearPendingHexWin(teamId);
+    await clearPendingHexWin(teamId);
 
     renderBoard();
 }
@@ -4507,6 +4533,14 @@ async function confirmResult(winnerIndex) {
 
         // Show persistent reminder
         updatePendingHexNotification();
+
+        // Persist immediately — pendingHexWins is the sole gate for advancing
+        // past hex_placement_1/2 (phase-manager.js's _getPendingHexCount), so
+        // it must survive a refresh rather than only live in memory until
+        // some unrelated future save happens to catch it. The earlier
+        // `await saveGameState()` above runs BEFORE this push, so this is a
+        // deliberate second write, not a duplicate.
+        await saveGameState();
     }
 }
 
@@ -5054,7 +5088,6 @@ function updatePendingHexNotification() {
         <span class="pending-hex-icon">⚠️</span>
         <span class="pending-hex-text">Pending hex placement:</span>
         ${pendingList}
-        <button class="pending-hex-dismiss" onclick="dismissPendingHexBanner()" title="Dismiss">✕</button>
     `;
 }
 
@@ -5063,7 +5096,7 @@ function updatePendingHexNotification() {
  * Called from assignTeamToHex when a hex is assigned
  * Only removes ONE notification per hex placed (the oldest one for this team)
  */
-function clearPendingHexWin(teamId) {
+async function clearPendingHexWin(teamId) {
     let changed = false;
 
     // Find the FIRST (oldest) pending hex win that includes this team
@@ -5088,15 +5121,10 @@ function clearPendingHexWin(teamId) {
 
     if (changed || pendingHexWins.length !== beforeCount) {
         updatePendingHexNotification();
+        // Persist the clear — see the persistence note on the pendingHexWins
+        // accessor near the top of this file.
+        await saveGameState();
     }
-}
-
-/**
- * Dismiss all pending hex notifications
- */
-function dismissPendingHexBanner() {
-    pendingHexWins = [];
-    updatePendingHexNotification();
 }
 
 // =============================================================================

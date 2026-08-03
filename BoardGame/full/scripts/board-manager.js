@@ -17,7 +17,7 @@ class BoardManager {
      * @param {Function}      deps.logEventCallback   - (type, data) => void (legacy)
      * @param {Function}      [deps.logActionCallback] - (actionType, category, payload, previousState) => void
      * @param {Function}      deps.deleteLastTileEventCallback - (coord) => void
-     * @param {Function}      [deps.clearPendingHexWinCallback] - (teamId) => void
+     * @param {Function}      [deps.clearPendingHexWinCallback] - (teamId) => Promise<void>
      * @param {Function}      [deps.onDisplayRefresh] - Called after board changes
      * @param {Function}      [deps.onPhaseRequirementsChanged] - Notifies PhaseManager
      */
@@ -249,7 +249,7 @@ class BoardManager {
             }, { heartHexControl: { [coord]: oldOccupier || null } });
         }
 
-        this._clearPendingHexWin(teamId);
+        await this._clearPendingHexWin(teamId);
 
         // Room hex spell draw (SpellEngine integration)
         const isRoomHex = (this._gameState.rooms || []).includes(coord);
