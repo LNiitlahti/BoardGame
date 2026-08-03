@@ -351,6 +351,84 @@
         return all.filter(m => _belongsToCurrentSlot(m, slot));
     }
 
+    /**
+     * Player coverage for a slot: which roster players of the teams involved
+     * in this slot's COMPLETED matches actually played. User's rule: a slot
+     * only truly completes once ALL the involved teams' players have played
+     * (a full 5v5, or both halves of a 3v3+2v2 pair). Counting queue entries
+     * alone can't catch a never-created second half — rosters can.
+     */
+    function _slotPlayerCoverage(slot) {
+        const queue = gameState.gameQueue || [];
+        const completed = queue.filter(m => !m.isBreak && m.isChallenge !== true &&
+            m.status === 'completed' && _belongsToCurrentSlot(m, slot));
+        const playedIds = new Set();
+        const teamIds = new Set();
+        completed.forEach(m => {
+            (m.teams || m.sides || []).forEach(side => {
+                (side.playerIds || []).forEach(pid => playedIds.add(String(pid)));
+                (side.players || []).forEach(p => {
+                    if (p.id !== undefined) playedIds.add(String(p.id));
+                    if (p.teamId !== undefined) teamIds.add(String(p.teamId));
+                });
+            });
+        });
+        const missing = [];
+        let total = 0;
+        (gameState.teams || []).forEach(team => {
+            const roster = team.players || [];
+            const involved = teamIds.has(String(team.id)) ||
+                roster.some(p => p.id !== undefined && playedIds.has(String(p.id)));
+            if (!involved) return;
+            roster.forEach(p => {
+                total++;
+                if (!(p.id !== undefined && playedIds.has(String(p.id)))) {
+                    missing.push(p.name || p.email || String(p.id));
+                }
+            });
+        });
+        return { total, played: total - missing.length, missing };
+    }
+
+    /**
+     * Player coverage for a slot: which roster players of the teams involved
+     * in this slot's COMPLETED matches actually played. User's rule: a slot
+     * only truly completes once ALL the involved teams' players have played
+     * (a full 5v5, or both halves of a 3v3+2v2 pair). Counting queue entries
+     * alone can't catch a never-created second half — rosters can.
+     */
+    function _slotPlayerCoverage(slot) {
+        const queue = gameState.gameQueue || [];
+        const completed = queue.filter(m => !m.isBreak && m.isChallenge !== true &&
+            m.status === 'completed' && _belongsToCurrentSlot(m, slot));
+        const playedIds = new Set();
+        const teamIds = new Set();
+        completed.forEach(m => {
+            (m.teams || m.sides || []).forEach(side => {
+                (side.playerIds || []).forEach(pid => playedIds.add(String(pid)));
+                (side.players || []).forEach(p => {
+                    if (p.id !== undefined) playedIds.add(String(p.id));
+                    if (p.teamId !== undefined) teamIds.add(String(p.teamId));
+                });
+            });
+        });
+        const missing = [];
+        let total = 0;
+        (gameState.teams || []).forEach(team => {
+            const roster = team.players || [];
+            const involved = teamIds.has(String(team.id)) ||
+                roster.some(p => p.id !== undefined && playedIds.has(String(p.id)));
+            if (!involved) return;
+            roster.forEach(p => {
+                total++;
+                if (!(p.id !== undefined && playedIds.has(String(p.id)))) {
+                    missing.push(p.name || p.email || String(p.id));
+                }
+            });
+        });
+        return { total, played: total - missing.length, missing };
+    }
+
     // ══════════════════════════════════════════════════════════════
     //  ROUND + SLOT TAGGING
     // ══════════════════════════════════════════════════════════════
@@ -573,7 +651,21 @@
             };
         }
 
-        // playing
+        // playing — a slot can hold a simultaneous PAIR (3v3+2v2): keep
+        // offering Start for remaining pending matches even while one is
+        // live, so the second game of the pair is never hidden behind
+        // "wait for the result".
+        const available = _excludeLiveConflicts(pendingSlot);
+        if (available.length > 0) {
+            const next = available[0];
+            const label = _matchShortLabel(next);
+            const liveNote = ongoingSlot.length > 0
+                ? `${ongoingSlot.length} live · ` : '';
+            return {
+                text: `${liveNote}Next up: ${_esc(label)}.`,
+                primary: { label: `▶ Start ${label}`, action: () => window.startMatch(next.id) }
+            };
+        }
         if (ongoingSlot.length > 0) {
             return {
                 text: `${ongoingSlot.length} match${ongoingSlot.length !== 1 ? 'es' : ''} live — click its card to record the result.`,
@@ -581,18 +673,6 @@
             };
         }
         if (pendingSlot.length > 0) {
-            // Never propose starting a match whose players are already live
-            // in an ongoing match elsewhere — skip to the next eligible
-            // queued match instead of blindly taking pendingSlot[0].
-            const available = _excludeLiveConflicts(pendingSlot);
-            if (available.length > 0) {
-                const next = available[0];
-                const label = _matchShortLabel(next);
-                return {
-                    text: `Next up: ${_esc(label)}.`,
-                    primary: { label: `▶ Start ${label}`, action: () => window.startMatch(next.id) }
-                };
-            }
             return {
                 text: `${pendingSlot.length} match${pendingSlot.length !== 1 ? 'es' : ''} queued, but all share a player with a live match — resolve that match first.`,
                 primary: null
@@ -600,7 +680,25 @@
         }
         return {
             text: 'All results confirmed.',
-            primary: { label: `Mark Match ${slot} Done ▶`, action: () => window.advanceSlot(slot) }
+            primary: {
+                label: `Mark Match ${slot} Done ▶`,
+                action: () => {
+                    const cov = _slotPlayerCoverage(slot);
+                    if (cov.missing.length > 0) {
+                        _openFlowConfirm({
+                            title: 'Not Everyone Has Played',
+                            bodyHtml: `<p><strong>${cov.played}/${cov.total}</strong> players played in Match ${slot}.</p>` +
+                                      `<p>Didn't play: <strong>${_esc(cov.missing.join(', '))}</strong>.</p>` +
+                                      `<p>A slot normally completes only when all players have played — e.g. BOTH halves of a 3v3+2v2 pair. Missing a second match? Create it instead of marking done.</p>`,
+                            confirmLabel: 'Mark Done Anyway',
+                            danger: true,
+                            onConfirm: () => window.advanceSlot(slot)
+                        });
+                    } else {
+                        window.advanceSlot(slot);
+                    }
+                }
+            }
         };
     }
 
