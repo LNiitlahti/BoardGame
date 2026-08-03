@@ -1687,7 +1687,10 @@ class DisplayManager {
      */
     _renderResultsLarge(container, data) {
         const resultLogCache = this._getResultLogCache();
-        const recent = resultLogCache.slice(0, 5);
+        // 4, not 5 -- the screen is a fixed 1920x1080 with a title above and
+        // the score strip below, no scrolling, and real matches here can run
+        // up to 5-a-side, so the safe budget is tighter than it looks.
+        const recent = resultLogCache.slice(0, 4);
 
         if (recent.length === 0) {
             container.innerHTML = '<div class="dm-results-large"><div class="dm-results-title">No Results Yet</div></div>';

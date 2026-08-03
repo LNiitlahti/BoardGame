@@ -1658,23 +1658,38 @@
         }
 
         /* ── Results Large ───────────────────────────── */
+        /* Screen is a fixed 1920x1080 -- these cards stack under a title and
+           above the score strip with no scrolling, so height per card is a
+           hard budget, not a suggestion. Overrides the shared .dm-dual-*
+           classes (also used by the much-bigger live matches_dual_slot
+           slide) with higher-specificity, results-only rules instead of
+           shrinking those shared base rules. */
         .dm-results-large { width: 100%; max-width: 1600px; }
         .dm-results-large .dm-results-title {
             font-family: 'Russo One', sans-serif;
-            font-size: 44px; font-weight: 800; color: var(--gold-bright);
+            font-size: 32px; font-weight: 800; color: var(--gold-bright);
             text-transform: uppercase; letter-spacing: 2px;
-            text-align: center; margin-bottom: 28px;
+            text-align: center; margin-bottom: 14px;
         }
         .dm-results-large .dm-result-card {
-            padding: 20px 28px; margin-bottom: 16px;
-            background: var(--bg-glass); border-radius: 12px;
-            border-left: 6px solid var(--live);
+            padding: 10px 24px; margin-bottom: 8px;
+            background: var(--bg-glass); border-radius: 10px;
+            border-left: 5px solid var(--live);
         }
         .dm-results-large .dm-result-game {
             font-family: 'Quantico', sans-serif;
-            font-size: 26px; font-weight: 700; color: var(--text-muted);
-            text-align: center; margin-bottom: 14px;
+            font-size: 19px; font-weight: 700; color: var(--text-muted);
+            text-align: center; margin-bottom: 6px;
         }
+        .dm-results-large .dm-dual-ready-sides { gap: 16px; }
+        .dm-results-large .dm-dual-ready-side { gap: 4px; min-width: 140px; }
+        .dm-results-large .dm-dual-ready-row { padding: 3px 10px; }
+        .dm-results-large .dm-dual-ready-name { font-size: 15px; }
+        .dm-results-large .dm-dual-vs { font-size: 17px; padding: 0 8px; }
+        .dm-results-large .dm-dual-winner-label {
+            font-size: 12px; margin-bottom: 2px;
+        }
+        .dm-results-large .dm-dual-winner-label svg { width: 13px; height: 13px; }
     </style>
     <link rel="stylesheet" href="css/styles.css">
 </head>
