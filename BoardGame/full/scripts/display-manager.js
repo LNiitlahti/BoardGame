@@ -1387,13 +1387,16 @@ class DisplayManager {
      * Discord ready-dot pair. Used for every matches_in_progress sub-phase
      * (setup/lobby/playing) so who-plays-whom stays visible the whole
      * time, in the same readable stacked-names look throughout — not just
-     * during the lobby ready-check.
+     * during the lobby ready-check. Labeled with the match number (e.g.
+     * "#6 Age of Empires IV") matching admin.html's own match cards, so
+     * whoever's running admin can find the right card from the big screen.
      */
     _renderMatchGroup(m, data) {
         const lobbyReady = data.lobbyReady || {};
         const dotSvg = (ready) => `<svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="color:${ready ? '#22c55e' : '#ef4444'}"><circle cx="12" cy="12" r="8"/></svg>`;
 
         const gameName = this._getGameDisplayName(m.game || m.gameType);
+        const gameLabel = m.matchNumber ? `#${m.matchNumber} ${gameName}` : gameName;
         const teams = m.teams || m.sides || [];
         const sidesHTML = teams.map((t, i) => {
             const players = this._getMatchTeamPlayers(t);
@@ -1414,7 +1417,7 @@ class DisplayManager {
             return (i > 0 ? '<div class="dm-dual-vs">VS</div>' : '') + side;
         }).join('');
 
-        return `<div class="dm-dual-live-match"><div class="dm-dual-game-name">${gameName}</div><div class="dm-dual-ready-sides">${sidesHTML}</div></div>`;
+        return `<div class="dm-dual-live-match"><div class="dm-dual-game-name">${gameLabel}</div><div class="dm-dual-ready-sides">${sidesHTML}</div></div>`;
     }
 
     /**
