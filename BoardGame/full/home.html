@@ -996,11 +996,14 @@
       // loadPlayerData/loadRecentTournaments, which run concurrently via the
       // same Promise.all as this function's caller) since none of those are
       // guaranteed to have completed yet.
-      let tournamentName = userData.assignedTournamentId;
+      // Falls back to a generic phrase rather than the raw document id if the
+      // tournament doc is missing/unreachable — an internal id (e.g.
+      // "e2e-disposable-1") is meaningless and confusing shown to a player.
+      let tournamentName = null;
       try {
         const tournamentDoc = await db.collection('tournaments').doc(userData.assignedTournamentId).get();
         if (tournamentDoc.exists) {
-          tournamentName = tournamentDoc.data().name || tournamentName;
+          tournamentName = tournamentDoc.data().name || null;
         }
       } catch (e) {
         console.warn('[Home] Could not load tournament name for assignment banner:', e);
@@ -1009,7 +1012,8 @@
       const banner = document.getElementById('newAssignmentBanner');
       const text = document.getElementById('newAssignmentText');
       const btn = document.getElementById('newAssignmentBtn');
-      text.textContent = `You've been added to ${userData.assignedTeamName} in ${tournamentName}! Start onboarding to get set up.`;
+      const tournamentPhrase = tournamentName ? ` in ${tournamentName}` : '';
+      text.textContent = `You've been added to ${userData.assignedTeamName}${tournamentPhrase}! Start onboarding to get set up.`;
 
       const onboardUrl = `onboarding.html?tournamentId=${encodeURIComponent(userData.assignedTournamentId)}&player=${encodeURIComponent(userData.assignedPlayerId)}`;
       btn.onclick = async () => {
