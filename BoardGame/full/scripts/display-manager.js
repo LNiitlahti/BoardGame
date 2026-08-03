@@ -187,6 +187,11 @@ class DisplayManager {
         // 11. Ceremony overlay (takes priority over display modes)
         this._renderCeremonyOverlay(gameData);
 
+        // 11b. Hex-phase overlay (scoring_hex / hex_placement_1/2) -- deliberately
+        // independent of the display-mode/slide system below (see its own
+        // doc comment for why).
+        this._renderHexPhaseOverlay(gameData);
+
         // 12. Display mode engine
         const newMode = this._determineDisplayMode(gameData);
         if (newMode !== this._currentMode) {
@@ -1651,30 +1656,45 @@ class DisplayManager {
         container.innerHTML = '';
         container.classList.remove('active');
         this._container.setAttribute('data-display-mode', 'board_focus');
-        this._renderHexScoringOverlay(data);
     }
 
     /**
-     * Live preview of what each team is ABOUT to score from hex territory
-     * control, shown ONLY during the scoring_hex phase (board_focus is also
-     * reused by board_resolved, a different phase where nothing is being
-     * scored). Previously this phase showed nothing but the bare board --
-     * no indication a team was about to gain points, nor by how much.
-     * Mirrors stats-manager.js's awardRoundPoints() exactly (same
-     * mountain-heart=2/side-heart=1 rule, same contested-hex exclusion) but
-     * read-only -- this only PREVIEWS the award that fires when the admin
-     * actually leaves this phase.
+     * Hex-phase info overlay on top of the board -- covers BOTH scoring_hex
+     * (live preview of what each team is about to score) and
+     * hex_placement_1/2 (the pending placement queue for that match slot).
+     * Called unconditionally every onFirebaseSnapshot tick, independent of
+     * the DISPLAY_MODES slide/rotation system entirely -- board_focus's
+     * slide renderer used to own this, but hex_placement_1/2 have
+     * `slides: null` (no slide at all), so _applyDisplayMode short-circuits
+     * before ever reaching a slide renderer for them. That left the overlay
+     * with no code path to hide itself when scoring_hex handed off to
+     * hex_placement_1: found while adding the placement-queue view below.
      */
-    _renderHexScoringOverlay(data) {
-        const overlay = document.getElementById('hexScoringOverlay');
+    _renderHexPhaseOverlay(data) {
+        const overlay = document.getElementById('hexPhaseOverlay');
         if (!overlay) return;
 
-        if (data.currentPhase?.name !== 'scoring_hex') {
+        const phase = data.currentPhase?.name;
+        if (phase === 'scoring_hex') {
+            overlay.innerHTML = this._buildHexScoringHTML(data);
+        } else if (phase === 'hex_placement_1' || phase === 'hex_placement_2') {
+            overlay.innerHTML = this._buildHexPlacementHTML(data, phase);
+        } else {
             overlay.style.display = 'none';
             overlay.innerHTML = '';
             return;
         }
+        overlay.style.display = '';
+    }
 
+    /**
+     * Live preview of what each team is ABOUT to score from hex territory
+     * control. Mirrors stats-manager.js's awardRoundPoints() exactly (same
+     * mountain-heart=2/side-heart=1 rule, same contested-hex exclusion) but
+     * read-only -- this only PREVIEWS the award that fires when the admin
+     * actually leaves scoring_hex.
+     */
+    _buildHexScoringHTML(data) {
         const teams = data.teams || [];
         const heartHexControl = data.heartHexControl || {};
         const queue = data.gameQueue || [];
@@ -1716,11 +1736,64 @@ class DisplayManager {
             }).join('')
             : '<div class="dm-hex-score-empty">No heart hexes controlled this round</div>';
 
-        overlay.innerHTML = `
+        return `
             <div class="dm-hex-score-title">${ICON_SVGS.hexagon} Hex Scoring</div>
             <div class="dm-hex-score-rows">${rowsHTML}</div>
         `;
-        overlay.style.display = '';
+    }
+
+    /**
+     * Pending hex-placement queue for one match slot, shown throughout
+     * hex_placement_1/2. Mirrors admin-improved-adapter.js's
+     * _relevantPendingWinsForPhase() (untagged .slot counts for either
+     * phase, matching how a match created before slot-tagging existed
+     * still needs to gate SOMETHING rather than silently vanish) and
+     * flattens each win's teamIds into individual queue entries -- a
+     * split-credit win naming two teams is two separate placements owed,
+     * not one. The whole queue stays visible the entire phase (not just
+     * "next"), with the first entry (earliest-pushed = next to place)
+     * highlighted.
+     */
+    _buildHexPlacementHTML(data, phase) {
+        const teams = data.teams || [];
+        const slot = phase === 'hex_placement_1' ? 1 : 2;
+        const slotLabel = slot === 1 ? 'Match 1' : 'Match 2';
+
+        const relevant = (data.pendingHexWins || [])
+            .filter(w => w.teamIds && w.teamIds.length > 0)
+            .filter(w => w.slot === undefined || w.slot === slot);
+
+        const entries = relevant.flatMap(win =>
+            (win.teamIds || []).map((teamId, idx) => ({
+                teamId,
+                teamName: win.teamNames?.[idx] || `Team ${teamId}`,
+                matchNumber: win.matchNumber
+            }))
+        );
+
+        if (entries.length === 0) {
+            return `
+                <div class="dm-hex-score-title">${ICON_SVGS.hexagon} ${slotLabel} Hex Placement</div>
+                <div class="dm-hex-score-empty">No pending hex placements</div>
+            `;
+        }
+
+        const rowsHTML = entries.map((entry, i) => {
+            const team = teams.find(t => String(t.id) === String(entry.teamId));
+            const color = team?.color || '#888';
+            const isNext = i === 0;
+            return `
+                <div class="dm-hex-placement-row${isNext ? ' dm-hex-placement-next' : ''}" style="--c:${color};">
+                    ${isNext ? '<span class="dm-hex-placement-badge">Up Next</span>' : ''}
+                    <span class="dm-hex-placement-team" style="color:${color};">${team?.name || entry.teamName}</span>
+                    <span class="dm-hex-placement-match">#${entry.matchNumber || '?'}</span>
+                </div>`;
+        }).join('');
+
+        return `
+            <div class="dm-hex-score-title">${ICON_SVGS.hexagon} ${slotLabel} Hex Placement</div>
+            <div class="dm-hex-score-rows">${rowsHTML}</div>
+        `;
     }
 
     _ensurePrimaryActive() {
@@ -1729,11 +1802,6 @@ class DisplayManager {
             primary.classList.add('active');
         }
         this._container.removeAttribute('data-display-mode');
-        const hexOverlay = document.getElementById('hexScoringOverlay');
-        if (hexOverlay) {
-            hexOverlay.style.display = 'none';
-            hexOverlay.innerHTML = '';
-        }
     }
 
     _renderLiveMatchesLarge(container, data) {

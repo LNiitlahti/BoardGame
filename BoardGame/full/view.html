@@ -1457,8 +1457,8 @@
         #broadcastTicker .bt-text { opacity: 0; transition: opacity 0.35s ease; }
         #broadcastTicker.bt-text-visible .bt-text { opacity: 1; }
 
-        /* ── Hex Scoring overlay (scoring_hex phase only) ────────── */
-        .dm-hex-scoring-overlay {
+        /* ── Hex Phase overlay (scoring_hex / hex_placement_1/2) ─── */
+        .dm-hex-phase-overlay {
             position: absolute; top: 90px; left: 50%; transform: translateX(-50%);
             z-index: 5; pointer-events: none;
             background: var(--bg-glass); border: 1px solid var(--border-gold, rgba(200,179,126,0.3));
@@ -1494,6 +1494,26 @@
         .dm-hex-score-empty {
             font-family: 'Quantico', sans-serif; font-size: 15px; color: var(--text-muted);
             text-align: center; padding: 8px 0;
+        }
+        .dm-hex-placement-row {
+            display: flex; align-items: center; gap: 14px;
+            padding: 8px 14px; border-radius: 8px;
+            background: rgba(255,255,255,0.03); border-left: 3px solid var(--c, var(--gold));
+        }
+        .dm-hex-placement-next {
+            background: rgba(247,186,50,0.1); border-left-color: #f7ba32;
+            box-shadow: 0 0 16px rgba(247,186,50,0.15);
+        }
+        .dm-hex-placement-badge {
+            font-family: 'Quantico', sans-serif; font-size: 11px; font-weight: 700;
+            padding: 3px 10px; border-radius: 20px; text-transform: uppercase;
+            background: #f7ba32; color: #1a1300; letter-spacing: 0.5px;
+        }
+        .dm-hex-placement-team {
+            font-family: 'Quantico', sans-serif; font-size: 17px; font-weight: 700; flex: 1;
+        }
+        .dm-hex-placement-match {
+            font-family: 'Quantico', sans-serif; font-size: 13px; color: var(--text-muted);
         }
 
         /* ── Standings Large ─────────────────────────── */
@@ -1879,11 +1899,14 @@
                 </div>
             </div>
             <div class="board-wrap"><div class="scene-3d" id="cineScene"><div class="rig-3d" id="cineRig"><div id="hexBoard"></div></div></div><div id="cineWash"></div></div>
-            <!-- Hex Scoring info overlay -- populated by
-                 DisplayManager._renderBoardFocusSlide() only during the
-                 scoring_hex phase (hidden/cleared otherwise, incl. the other
+            <!-- Hex phase info overlay -- populated by
+                 DisplayManager._renderHexPhaseOverlay(), called every
+                 onFirebaseSnapshot tick independent of the slide/rotation
+                 system. Shows the live scoring preview during scoring_hex,
+                 the pending placement queue during hex_placement_1/2, and
+                 is hidden/cleared for every other phase (incl. the other
                  board_focus phase, board_resolved). -->
-            <div class="dm-hex-scoring-overlay" id="hexScoringOverlay" style="display:none;"></div>
+            <div class="dm-hex-phase-overlay" id="hexPhaseOverlay" style="display:none;"></div>
         </div>
 
         <!-- UPCOMING QUEUE — Right panel -->
