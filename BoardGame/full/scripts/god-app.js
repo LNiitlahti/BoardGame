@@ -415,7 +415,7 @@ class GodApp {
         if (tournamentId) {
             this.loadTournament(tournamentId);
             const url = new URL(window.location);
-            url.searchParams.delete('tournament'); // legacy alias (see init())
+            url.searchParams.delete('tournament'); // clean up any stale legacy param name
             url.searchParams.set('tournamentId', tournamentId);
             window.history.pushState({}, '', url);
         }
@@ -1502,12 +1502,14 @@ document.addEventListener('firebase-ready', async function () {
             // Load tournaments
             await godApp.loadTournamentsList();
 
-            // Auto-load from URL (navbar uses 'tournament', other links may use 'tournamentId'),
-            // falling back to the shared storage contract the navbar maintains so a link that
-            // forgot to carry the id (or a stale bookmark) doesn't strand the page tournament-less.
+            // Auto-load from URL (canonical param is 'tournamentId'; a legacy 'tournament'
+            // alias is warned-and-ignored, see resolveTournamentId), falling back to the
+            // shared storage contract the navbar maintains so a link that forgot to carry
+            // the id (or a stale bookmark) doesn't strand the page tournament-less.
             const tournamentId = resolveTournamentId({
                 search: window.location.search,
-                paramNames: ['tournament', 'tournamentId'],
+                paramNames: ['tournamentId'],
+                legacyParamNames: ['tournament'],
                 cached: sessionStorage.getItem('currentTournamentId') || localStorage.getItem('currentTournamentId')
             });
             if (tournamentId) {

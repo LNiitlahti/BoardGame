@@ -37,7 +37,11 @@ let profilePlatformIds = null; // cross-tournament platformIds from users/{uid},
 document.addEventListener('DOMContentLoaded', function() {
     // Parse URL parameters
     const urlParams = new URLSearchParams(window.location.search);
-    tournamentId = urlParams.get('tournamentId') || urlParams.get('tournament');
+    tournamentId = resolveTournamentId({
+        search: window.location.search,
+        paramNames: ['tournamentId'],
+        legacyParamNames: ['tournament']
+    });
     const playerParam = urlParams.get('player');
     const viewParam = urlParams.get('view');
     urlSecret = urlParams.get('secret') || '';

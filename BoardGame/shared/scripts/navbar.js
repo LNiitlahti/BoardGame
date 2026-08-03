@@ -110,14 +110,7 @@
         const params = new URLSearchParams();
 
         if (currentTournamentId) {
-            // Each page expects a different param name
-            if (href === 'god.html') {
-                params.set('tournament', currentTournamentId);
-            } else if (href === 'admin.html') {
-                params.set('tournamentId', currentTournamentId);
-            } else {
-                params.set('tournamentId', currentTournamentId);
-            }
+            params.set('tournamentId', currentTournamentId);
         }
         if (currentTeamId && (href === 'team.html')) {
             params.set('teamId', currentTeamId);
@@ -228,14 +221,6 @@
     const TOURNAMENT_LIST_TTL_MS = 60000;
     let documentSwitcherListenersAttached = false;
 
-    function getUrlTournamentParamName() {
-        const params = new URLSearchParams(window.location.search);
-        if (params.has('tournament')) return 'tournament';
-        if (params.has('gameId')) return 'gameId';
-        if (params.has('game')) return 'game';
-        return 'tournamentId';
-    }
-
     async function fetchTournamentList(forceRefresh) {
         const now = Date.now();
         if (!forceRefresh && tournamentListCache && (now - tournamentListFetchedAt) < TOURNAMENT_LIST_TTL_MS) {
@@ -306,7 +291,10 @@
         sessionStorage.setItem('currentTournamentName', tournamentName);
 
         const url = new URL(window.location.href);
-        url.searchParams.set(getUrlTournamentParamName(), tournamentId);
+        url.searchParams.delete('tournament');
+        url.searchParams.delete('gameId');
+        url.searchParams.delete('game');
+        url.searchParams.set('tournamentId', tournamentId);
         window.location.href = url.toString();
     }
 
@@ -503,10 +491,11 @@
      */
     function getCurrentTournamentId() {
         const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get('tournament') ||
-               urlParams.get('tournamentId') ||
-               urlParams.get('gameId') ||  // backward compat
-               urlParams.get('game') ||   // backward compat
+        const legacyName = ['tournament', 'gameId', 'game'].find(name => urlParams.has(name));
+        if (legacyName) {
+            console.warn(`[navbar] Ignoring legacy query param "${legacyName}" — use "tournamentId" instead.`);
+        }
+        return urlParams.get('tournamentId') ||
                sessionStorage.getItem('currentTournamentId') ||
                localStorage.getItem('currentTournamentId');
     }

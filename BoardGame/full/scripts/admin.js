@@ -233,7 +233,8 @@ document.addEventListener('firebase-ready', async function() {
             // falling back to the shared storage contract it maintains.
             const tournamentId = resolveTournamentId({
                 search: window.location.search,
-                paramNames: ['tournament', 'tournamentId', 'gameId', 'game'],
+                paramNames: ['tournamentId'],
+                legacyParamNames: ['tournament', 'gameId', 'game'],
                 cached: sessionStorage.getItem('currentTournamentId') || localStorage.getItem('currentTournamentId')
             });
 
