@@ -647,7 +647,16 @@
         if (sub === 'lobby') {
             return {
                 text: 'Waiting for players to ready up (auto-advances when done).',
-                primary: { label: 'Force Ready', action: () => window.forceAllReady(slot) }
+                primary: {
+                    label: 'Force Ready',
+                    action: () => _openFlowConfirm({
+                        title: `Force Match ${slot} Ready?`,
+                        bodyHtml: '<p>All players are marked ready <strong>without</strong> confirming Discord or the game lobby, and the match moves straight to playing. There is no un-ready.</p>',
+                        confirmLabel: 'Force Ready',
+                        danger: true,
+                        onConfirm: () => window.forceAllReady(slot)
+                    })
+                }
             };
         }
 
@@ -877,7 +886,12 @@
                     text: 'Mark room hexes on the board and give every team at least 2 players. Then begin the tournament.',
                     primary: {
                         label: 'Begin Tournament ▶',
-                        action: advance,
+                        action: () => _openFlowConfirm({
+                            title: 'Begin Tournament?',
+                            bodyHtml: '<p>This starts <strong>Round 1</strong>. The flow only moves forward — there is no going back to setup.</p>',
+                            confirmLabel: 'Begin ' + ICON_SVGS.play,
+                            onConfirm: advance
+                        }),
                         disabled: !reqs.allMet,
                         title: reqs.allMet ? '' : 'Complete the setup requirements first'
                     },
@@ -991,7 +1005,16 @@
                 }
                 return {
                     text: 'Challenges are optional — create one if a team requests a heart-hex dispute (⚔ button). Otherwise continue and the challenge step is skipped this round.',
-                    primary: { label: 'Continue — No Challenges ▶', action: advance },
+                    primary: {
+                        label: 'Continue — No Challenges ▶',
+                        action: () => _openFlowConfirm({
+                            title: 'Skip Challenges?',
+                            bodyHtml: '<p>No team has requested a heart-hex dispute this round?</p>' +
+                                      '<p>The challenge step is skipped. The only way back this round is the Spell Window loop after Board Check.</p>',
+                            confirmLabel: 'Skip — No Challenges ' + ICON_SVGS.play,
+                            onConfirm: advance
+                        })
+                    },
                     primaryIsAdvance: true
                 };
             }
@@ -1042,7 +1065,15 @@
                     text: bothDone
                         ? 'Both matches complete.'
                         : `${summaries.join(' · ')} — see the match cards below.`,
-                    primary: bothDone ? { label: 'Continue ▶', action: advance } : null,
+                    primary: bothDone ? {
+                        label: 'End Round ▶',
+                        action: () => _openFlowConfirm({
+                            title: `End Round ${round}?`,
+                            bodyHtml: '<p>Both matches are complete. This ends the round and begins the next one — there is no way back.</p>',
+                            confirmLabel: 'End Round ' + ICON_SVGS.play,
+                            onConfirm: advance
+                        })
+                    } : null,
                     primaryIsAdvance: true
                 };
             }
