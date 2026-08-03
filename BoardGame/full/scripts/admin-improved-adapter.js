@@ -1443,7 +1443,7 @@
     //  FLOW CONFIRM MODAL (generic guided-flow prompt)
     // ══════════════════════════════════════════════════════════════
 
-    function _openFlowConfirm({ title, bodyHtml, confirmLabel, danger, onConfirm }) {
+    function _openFlowConfirm({ title, bodyHtml, confirmLabel, danger, onConfirm, secondaryLabel, onSecondary }) {
         const modal = document.getElementById('flowConfirmModal');
         if (!modal) {
             // Fallback: never block the admin if the modal is missing
@@ -1453,6 +1453,7 @@
         const titleEl = document.getElementById('flowConfirmTitle');
         const bodyEl = document.getElementById('flowConfirmBody');
         const btn = document.getElementById('flowConfirmBtn');
+        const secondaryBtn = document.getElementById('flowConfirmSecondaryBtn');
 
         if (titleEl) titleEl.textContent = title || 'Confirm';
         if (bodyEl) bodyEl.innerHTML = bodyHtml || '';
@@ -1464,6 +1465,24 @@
                 window.closeFlowConfirm();
                 if (fn) fn();
             };
+        }
+        // Optional third action, for the rare case a confirm has a genuine
+        // middle-ground choice (neither "do it" nor "cancel") — e.g. waive
+        // + assign in one step instead of forcing the admin through two
+        // separate modals. Hidden/cleared whenever not supplied, so every
+        // other _openFlowConfirm call site is unaffected.
+        if (secondaryBtn) {
+            if (secondaryLabel && onSecondary) {
+                secondaryBtn.style.display = '';
+                secondaryBtn.innerHTML = secondaryLabel;
+                secondaryBtn.onclick = () => {
+                    window.closeFlowConfirm();
+                    onSecondary();
+                };
+            } else {
+                secondaryBtn.style.display = 'none';
+                secondaryBtn.onclick = null;
+            }
         }
         _flowConfirmAction = onConfirm || null;
         modal.style.display = 'flex';
@@ -2207,13 +2226,23 @@
                     e.preventDefault();
                     const team = gameState?.teams?.find(t => String(t.id) === teamIdStr);
                     const teamName = team?.name || `Team ${teamIdStr}`;
+                    // The specific win entry this team's credit lives on, so
+                    // the combined waive+assign action below waives exactly
+                    // that credit (mirrors waivePendingHexWin's own "first
+                    // matching entry" policy).
+                    const myWin = pending.find(w => (w.teamIds || []).some(id => String(id) === teamIdStr));
                     _openFlowConfirm({
                         title: 'Earned Placement, or Spell Claim?',
                         bodyHtml: `<p><strong>${_esc(teamName)}</strong> has an unplaced match-win hex credit. Placing <strong>this</strong> hex will use up that credit — no matter which hex you click here.</p>` +
                                   `<p>Is this hex <strong>their earned placement</strong>? Assign it below.</p>` +
-                                  `<p>Is this hex from a <strong>spell</strong> instead (claiming a different hex)? Cancel here, click <strong>Waive</strong> (${ICON_SVGS.hexagon} pill in the Flow Panel) to clear their credit deliberately, then assign this hex separately.</p>`,
+                                  `<p>Is this hex from a <strong>spell or an admin ruling</strong> instead (claiming a different hex)? Use the button below to waive their earned credit and assign this hex in one step.</p>`,
                         confirmLabel: 'This Is Their Earned Placement — Assign',
-                        onConfirm: () => window.assignTeamToHex(btnCoord, parseInt(teamIdStr, 10))
+                        onConfirm: () => window.assignTeamToHex(btnCoord, parseInt(teamIdStr, 10)),
+                        secondaryLabel: myWin ? `${ICON_SVGS.hexagon} Spell / Admin Claim — Waive & Assign` : undefined,
+                        onSecondary: myWin ? async () => {
+                            await window.waivePendingHexWin(myWin.matchNumber, teamIdStr);
+                            await window.assignTeamToHex(btnCoord, parseInt(teamIdStr, 10));
+                        } : undefined
                     });
                 };
                 return;
