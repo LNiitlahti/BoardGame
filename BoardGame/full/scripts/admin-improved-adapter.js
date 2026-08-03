@@ -1027,9 +1027,35 @@
                 if (pendingCh.length > 0) {
                     const next = pendingCh[0];
                     const label = _matchShortLabel(next);
+                    // Challenges now get the same ready-check step as the
+                    // two planned matches, instead of going straight from
+                    // queued to playing.
+                    if (_phaseManager.isChallengeLobbyActive()) {
+                        return {
+                            text: `Waiting for players to ready up for <strong>${_esc(label)}</strong> (auto-advances when done).`,
+                            primary: {
+                                label: 'Force Ready',
+                                action: () => _openFlowConfirm({
+                                    title: 'Force Challenge Ready?',
+                                    bodyHtml: '<p>All challenge players are marked ready <strong>without</strong> confirming Discord or the game lobby. There is no un-ready.</p>',
+                                    confirmLabel: 'Force Ready',
+                                    danger: true,
+                                    onConfirm: () => window.forceAllChallengeReady()
+                                })
+                            },
+                            primaryIsAdvance: false
+                        };
+                    }
+                    if (_phaseManager.getChallengeLobbyState() === 'ready') {
+                        return {
+                            text: `Next challenge: <strong>${_esc(label)}</strong>. Challenges play one at a time, before other board changes.`,
+                            primary: { label: `▶ Start ${label}`, action: () => window.startMatch(next.id) },
+                            primaryIsAdvance: false
+                        };
+                    }
                     return {
-                        text: `Next challenge: <strong>${_esc(label)}</strong>. Challenges play one at a time, before other board changes.`,
-                        primary: { label: `▶ Start ${label}`, action: () => window.startMatch(next.id) },
+                        text: `Next challenge: <strong>${_esc(label)}</strong>.`,
+                        primary: { label: 'Open Lobby ▶', action: () => window.openChallengeLobby() },
                         primaryIsAdvance: false
                     };
                 }
@@ -1829,6 +1855,17 @@
 
     window.forceAllReady = async (slot) => {
         _phaseManager?.forceAllReadyForSlot(slot);
+        await saveGameState();
+        if (typeof updateDisplay === 'function') updateDisplay();
+    };
+
+    window.openChallengeLobby = async () => {
+        _initPhaseAdapter();
+        await _phaseManager?.openChallengeLobby();
+    };
+
+    window.forceAllChallengeReady = async () => {
+        _phaseManager?.forceAllChallengeReady();
         await saveGameState();
         if (typeof updateDisplay === 'function') updateDisplay();
     };
