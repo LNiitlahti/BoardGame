@@ -116,7 +116,7 @@ const _warnedUntaggedSlotMatchIds = new Set();
 function _warnUntaggedSlotMatch(m) {
     if (_warnedUntaggedSlotMatchIds.has(m.id)) return;
     _warnedUntaggedSlotMatchIds.add(m.id);
-    console.warn(`[PhaseManager] Match ${m.id} has no .slot tag — excluded from slot progression. Run e2e-cleanup-stale-queue.js to retag or purge stale queue entries.`);
+    console.warn(`[PhaseManager] Match ${m.id} has no .slot tag — counted toward BOTH slot 1 and slot 2 (ambiguous, by design — see getSlotRequirements()'s doc comment). Run e2e-cleanup-stale-queue.js to retag or purge stale queue entries.`);
 }
 
 // ── PhaseManager class ───────────────────────────────────────────
@@ -907,28 +907,37 @@ class PhaseManager {
      * in a long-past round that was left pending/ongoing and never resolved
      * would block every future round's slot 2 forever.
      *
-     * Untagged entries (entry.slot undefined — created before slot tagging
-     * existed, or via a path that never tags) NEVER count for either slot.
-     * An earlier version of this method let a recent-enough untagged match
-     * count for BOTH slots at once (there was no way to tell which slot it
-     * belonged to), which meant a single leftover untagged match could
-     * silently satisfy slot 1's AND slot 2's requirements simultaneously —
-     * a round could reach round_advance having only actually had one real
-     * match played. Excluding untagged matches entirely is the safe
-     * failure mode instead: the affected slot just appears stuck ("Create
-     * a match for Match N" / "Start the match first"), which is visible
-     * and TD-correctable via the per-slot Force Advance button, rather
-     * than a silent double-count. See dev/tests/e2e-cleanup-stale-queue.js
-     * for retagging/purging legacy untagged queue entries. A console.warn
-     * (deduped per match id, see _warnUntaggedSlotMatch above) fires the
-     * first time each untagged match is encountered, for dev visibility
-     * into why a slot might be stuck.
+     * Untagged entries (created before slot tagging existed, or via a path
+     * that never tags — e.g. god.html's match creation has no tagging step
+     * at all) count for either slot — safer than silently hiding a real
+     * match — but ONLY if they were created at/after the CURRENT round's
+     * matches phase began (entry.createdAt >= currentPhase.startedAt).
+     * Checking "roundNumber is undefined" alone is NOT a safe stand-in for
+     * "created this round": it's true forever for legacy leftovers with no
+     * roundNumber field at all, so it would let an indefinitely-growing
+     * pool of untagged matches count as pending for every future round
+     * forever — a slot could never reach 'done' (see TODO.md's "match slot
+     * never reaches done" writeup: ~61 leftover queued matches from before
+     * slot-tagging existed kept a round from ever reaching round_advance).
+     * Comparing createdAt against the CURRENT phase's startedAt correctly
+     * lets genuinely-ambiguous matches created THIS round still count for
+     * both slots (preserving the safe-by-default behavior for new
+     * ambiguous cases) while excluding anything older. This deliberately
+     * accepts a narrower risk (a single untagged match created this round
+     * could double-satisfy both slots) in exchange for avoiding the much
+     * more common stuck-forever failure — mirrors
+     * admin-improved-adapter.js's `_belongsToCurrentSlot`, which applies
+     * the identical gate for the identical reason; keep both in sync if
+     * this policy ever changes. A console.warn (deduped per match id, see
+     * _warnUntaggedSlotMatch above) fires the first time each untagged
+     * match is encountered, for dev visibility into the ambiguity.
      */
     getSlotRequirements(slot) {
         const gs = this._gameState;
         const queue = gs.gameQueue || [];
         const sub = this.getSlotSubPhase(slot);
         const currentRoundNumber = gs.currentPhase?.roundNumber;
+        const phaseStartedAt = gs.currentPhase?.startedAt;
 
         const belongsToSlot = m => {
             if (m.isBreak || m.isChallenge === true) return false;
@@ -936,7 +945,11 @@ class PhaseManager {
                 return m.slot === slot &&
                     (m.roundNumber === undefined || m.roundNumber === currentRoundNumber);
             }
-            _warnUntaggedSlotMatch(m);
+            if (!m.createdAt || !phaseStartedAt) return false;
+            if (m.createdAt >= phaseStartedAt) {
+                _warnUntaggedSlotMatch(m);
+                return true;
+            }
             return false;
         };
         const pendingMatches = () => queue.filter(m => belongsToSlot(m) &&

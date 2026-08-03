@@ -1,16 +1,24 @@
 /**
  * Regression coverage for phase-manager.js's getSlotRequirements() /
- * belongsToSlot() — the per-slot ("Match 1"/"Match 2") progression bug
- * where a queue entry with no `.slot` tag used to count as pending/ongoing
- * for BOTH match slots at once (see the doc comment above getSlotRequirements
- * in full/scripts/phase-manager.js for the full writeup).
+ * belongsToSlot() untagged-match handling (see the doc comment above
+ * getSlotRequirements in full/scripts/phase-manager.js for the full
+ * writeup, and admin-improved-adapter.js's `_belongsToCurrentSlot` for the
+ * identical, deliberately-mirrored gate used by admin.html).
  *
- * The bug: belongsToSlot's untagged fallback was `m.createdAt >=
- * phaseStartedAt`, which has no slot discrimination — a single untagged
- * match created this round would satisfy getSlotRequirements(1) AND
- * getSlotRequirements(2) simultaneously. The fix: untagged matches never
- * belong to any slot (hard `return false`), plus a deduped console.warn so
- * a stuck slot is diagnosable in devtools.
+ * Policy under test: an untagged queue entry (no `.slot` field) counts as
+ * belonging to BOTH match slots, but ONLY if it was created at/after the
+ * current matches_in_progress phase began (createdAt >= phaseStartedAt).
+ * This is a deliberate tradeoff, not an oversight: excluding untagged
+ * matches entirely would reintroduce a previously-confirmed production bug
+ * (TODO.md's "match slot never reaches done" — ~61 leftover untagged
+ * matches from before slot-tagging existed kept a round from ever reaching
+ * round_advance, since an ever-growing pool of untagged matches would
+ * never let a slot's pending list empty out). Accepting a narrower risk
+ * (a single untagged match created THIS round could double-satisfy both
+ * slots) in exchange for avoiding that much more common stuck-forever
+ * failure is the chosen policy on both admin.html's and god.html's copies
+ * of this logic. A deduped console.warn still fires so an untagged match
+ * is diagnosable in devtools.
  *
  * phase-manager.js is a plain browser script (`window.PhaseManager = ...`,
  * no module.exports), so it's loaded here the same way the browser would:
@@ -43,9 +51,9 @@ function baseGameState(overrides = {}) {
     };
 }
 
-// ---- core regression: one untagged match must not satisfy BOTH slots ----
+// ---- untagged match created THIS round: counts toward BOTH slots (by design) ----
 
-test('an untagged match created this round satisfies NEITHER slot 1 nor slot 2 (setup sub-phase)', () => {
+test('an untagged match created this round satisfies BOTH slot 1 and slot 2 (setup sub-phase)', () => {
     const gs = baseGameState({
         gameQueue: [
             { id: 'untagged-1', status: 'pending', createdAt: 2_000_000 } // no .slot, created after phaseStartedAt
@@ -56,13 +64,11 @@ test('an untagged match created this round satisfies NEITHER slot 1 nor slot 2 (
     const slot1 = pm.getSlotRequirements(1);
     const slot2 = pm.getSlotRequirements(2);
 
-    assert.strictEqual(slot1.every(r => r.met), false, `slot 1 should NOT be met, got: ${JSON.stringify(slot1)}`);
-    assert.strictEqual(slot2.every(r => r.met), false, `slot 2 should NOT be met, got: ${JSON.stringify(slot2)}`);
-    assert.match(slot1[0].label, /Create a match/);
-    assert.match(slot2[0].label, /Create a match/);
+    assert.strictEqual(slot1.every(r => r.met), true, `slot 1 should be met, got: ${JSON.stringify(slot1)}`);
+    assert.strictEqual(slot2.every(r => r.met), true, `slot 2 should be met, got: ${JSON.stringify(slot2)}`);
 });
 
-test('an untagged ongoing match does not satisfy either slot\'s "playing" requirements', () => {
+test('an untagged ongoing match satisfies BOTH slots\' "playing" requirements', () => {
     const gs = baseGameState({
         currentPhase: {
             name: 'matches_in_progress',
@@ -79,10 +85,25 @@ test('an untagged ongoing match does not satisfy either slot\'s "playing" requir
     const slot1 = pm.getSlotRequirements(1);
     const slot2 = pm.getSlotRequirements(2);
 
-    // Neither slot saw a match "start" for it, since the untagged match
-    // belongs to no slot — both should report "Start the match first".
-    assert.deepStrictEqual(slot1, [{ label: 'Start the match first', met: false }]);
-    assert.deepStrictEqual(slot2, [{ label: 'Start the match first', met: false }]);
+    assert.deepStrictEqual(slot1, [{ label: '1 match still playing', met: false }]);
+    assert.deepStrictEqual(slot2, [{ label: '1 match still playing', met: false }]);
+});
+
+// ---- untagged match from a PRIOR phase attempt: excluded, prevents stuck-forever ----
+
+test('an untagged match created BEFORE the current phase started does not satisfy either slot (stuck-forever prevention)', () => {
+    const gs = baseGameState({
+        gameQueue: [
+            { id: 'stale-untagged', status: 'pending', createdAt: 500 } // no .slot, created before phaseStartedAt (1_000_000)
+        ]
+    });
+    const pm = makePhaseManager(gs);
+
+    const slot1 = pm.getSlotRequirements(1);
+    const slot2 = pm.getSlotRequirements(2);
+
+    assert.strictEqual(slot1.every(r => r.met), false, `slot 1 should NOT be met by a stale untagged match, got: ${JSON.stringify(slot1)}`);
+    assert.strictEqual(slot2.every(r => r.met), false, `slot 2 should NOT be met by a stale untagged match, got: ${JSON.stringify(slot2)}`);
 });
 
 // ---- no regression: correctly tagged matches still work exactly as before ----
@@ -183,4 +204,25 @@ test('console.warn fires again for a DIFFERENT untagged match id (dedup key is p
 
     assert.ok(calls.some(msg => msg.includes('warn-dedup-2a')), 'expected a warning mentioning warn-dedup-2a');
     assert.ok(calls.some(msg => msg.includes('warn-dedup-2b')), 'expected a warning mentioning warn-dedup-2b');
+});
+
+test('console.warn does NOT fire for a stale (pre-phase) untagged match', () => {
+    const gs = baseGameState({
+        gameQueue: [
+            { id: 'no-warn-stale', status: 'pending', createdAt: 500 }
+        ]
+    });
+    const pm = makePhaseManager(gs);
+
+    const originalWarn = console.warn;
+    const calls = [];
+    console.warn = (...args) => calls.push(args.join(' '));
+    try {
+        pm.getSlotRequirements(1);
+    } finally {
+        console.warn = originalWarn;
+    }
+
+    assert.strictEqual(calls.filter(msg => msg.includes('no-warn-stale')).length, 0,
+        'a stale untagged match that never counts toward any slot should not warn');
 });
