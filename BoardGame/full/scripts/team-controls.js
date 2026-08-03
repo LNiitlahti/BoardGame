@@ -1446,6 +1446,25 @@ function _matchInvolvesUs(match) {
     });
 }
 
+/**
+ * Is a queue entry tagged for the round currently in progress? Untagged
+ * matches (roundNumber undefined — legacy/ambiguous) count as belonging,
+ * same permissive-by-default policy used throughout the admin-side slot
+ * tagging (see phase-manager.js's getSlotRequirements doc comment).
+ *
+ * Without this, "my active/next match" queries only filtered on
+ * isBreak/isChallenge/status/_matchInvolvesUs — with a full multi-round
+ * schedule mass-imported ahead of time, EVERY future round's match for
+ * this team passed all of those, so the "Your Next Match" panel rendered
+ * a card for every remaining match in the tournament instead of just this
+ * round's (found during live smoke testing, 2026-08-03).
+ */
+function _belongsToCurrentRound(match) {
+    const currentRound = gameData?.currentPhase?.roundNumber;
+    return match.roundNumber === undefined || currentRound === undefined ||
+        match.roundNumber === currentRound;
+}
+
 // Match ids we've already warned about for missing .slot tags — dedupes the
 // console.warn below so it doesn't spam the console on every re-render.
 const _warnedUntaggedActiveSlotMatchIds = new Set();
@@ -1466,7 +1485,8 @@ const _warnedUntaggedActiveSlotMatchIds = new Set();
  */
 function _getMyActiveSlot() {
     const queue = gameData?.gameQueue || [];
-    const mine = queue.filter(m => !m.isBreak && !m.isChallenge && m.status !== 'completed' && _matchInvolvesUs(m));
+    const mine = queue.filter(m => !m.isBreak && !m.isChallenge && m.status !== 'completed' &&
+        _belongsToCurrentRound(m) && _matchInvolvesUs(m));
     if (mine.length === 0) return null;
     const ongoing = mine.find(m => m.status === 'ongoing');
     const match = ongoing || mine[0];
@@ -1957,7 +1977,8 @@ function renderMatchCardsWithDiscord(container) {
     const queue = gameData.gameQueue || [];
 
     const teamMatches = queue.filter(match =>
-        !match.isBreak && match.status !== 'completed' && _matchInvolvesUs(match)
+        !match.isBreak && match.status !== 'completed' &&
+        _belongsToCurrentRound(match) && _matchInvolvesUs(match)
     );
 
     if (teamMatches.length === 0) {

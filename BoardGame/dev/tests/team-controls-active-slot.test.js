@@ -101,6 +101,49 @@ test('_getMyActiveSlot prefers the ongoing match over a pending one, tagged case
     assert.strictEqual(bridge.getMyActiveSlot(), 2);
 });
 
+// ---- round scoping: a mass-imported future round must not leak in ----
+// (found live 2026-08-03: the "Your Next Match" panel rendered a card for
+// EVERY remaining match in a mass-imported multi-round schedule, because
+// nothing filtered the queue by round — only isBreak/isChallenge/status/
+// _matchInvolvesUs. _getMyActiveSlot shares the same underlying `mine`
+// filter as the match-cards panel, so this exercises the shared fix.)
+
+test('_getMyActiveSlot ignores a match tagged for a future round', () => {
+    const bridge = loadTeamControls();
+    const futureMatch = matchInvolving('u1', { id: 'future-1', slot: 1, roundNumber: 3 });
+    bridge.setState(
+        { gameQueue: [futureMatch], currentPhase: { roundNumber: 2 } },
+        { uid: 'u1' }, team('u1')
+    );
+
+    assert.strictEqual(bridge.getMyActiveSlot(), null,
+        'a future round\'s match must not be treated as the active match');
+});
+
+test('_getMyActiveSlot picks the current round\'s match over a future round\'s, when both exist', () => {
+    const bridge = loadTeamControls();
+    const current = matchInvolving('u1', { id: 'current-1', slot: 1, roundNumber: 2 });
+    const future = matchInvolving('u1', { id: 'future-2', slot: 2, roundNumber: 3 });
+    bridge.setState(
+        { gameQueue: [future, current], currentPhase: { roundNumber: 2 } },
+        { uid: 'u1' }, team('u1')
+    );
+
+    assert.strictEqual(bridge.getMyActiveSlot(), 1);
+});
+
+test('_getMyActiveSlot still resolves an untagged (legacy) match regardless of currentPhase.roundNumber', () => {
+    const bridge = loadTeamControls();
+    const legacyMatch = matchInvolving('u1', { id: 'legacy-no-round-1', slot: 1 });
+    bridge.setState(
+        { gameQueue: [legacyMatch], currentPhase: { roundNumber: 5 } },
+        { uid: 'u1' }, team('u1')
+    );
+
+    assert.strictEqual(bridge.getMyActiveSlot(), 1,
+        'a match with no roundNumber at all must still count (untagged = ambiguous, include it)');
+});
+
 // ---- console.warn: fires once per untagged match id, deduped across calls ----
 
 test('console.warn fires exactly once for an untagged active match across repeated calls', () => {
