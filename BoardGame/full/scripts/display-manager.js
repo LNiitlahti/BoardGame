@@ -1676,6 +1676,15 @@ class DisplayManager {
         container.innerHTML = `<div class="dm-live-matches-wrapper">${matchesHTML}</div>`;
     }
 
+    /**
+     * Latest Results slide. Used to show only the winning side's names and
+     * a static "Winner" badge -- no match number, no opponent, no way to
+     * tell which specific game a result belonged to. Rebuilt to match the
+     * matches_dual_slot look: match number + game name, both sides shown
+     * VS-style with the winning side highlighted (same .dm-dual-* classes
+     * as _renderMatchResult, for visual consistency and the same big
+     * on-screen sizing).
+     */
     _renderResultsLarge(container, data) {
         const resultLogCache = this._getResultLogCache();
         const recent = resultLogCache.slice(0, 5);
@@ -1685,28 +1694,42 @@ class DisplayManager {
             return;
         }
 
-        const formatTimeAgo = window.formatTimeAgo || (() => '');
+        const sideFields = ['sideAPlayers', 'sideBPlayers', 'sideCPlayers'];
+        const sideLetters = ['A', 'B', 'C'];
 
         let rowsHTML = '';
         recent.forEach(event => {
             const gameName = event.gameName || 'Match';
-            const winningSide = event.winningSide?.toUpperCase();
-            const winningPlayers = event.winningPlayers || [];
+            const gameLabel = event.matchNumber ? `#${event.matchNumber} ${gameName}` : gameName;
 
-            let winnerText = 'Completed';
-            if (winningPlayers.length > 0) {
-                const names = winningPlayers.map(p => {
-                    const color = this._getTeamColor(p.originalTeamId) || p.originalTeamColor || '#888';
-                    return `<span style="color: ${color};">${p.name || '?'}</span>`;
-                });
-                winnerText = names.join(', ');
+            // Prefer the full per-side arrays (every game_win event logs
+            // these) so both winner AND loser show; fall back to the
+            // flat winningPlayers/losingPlayers lists for older cached
+            // events logged before sideAPlayers/sideBPlayers existed.
+            let sides = sideFields
+                .map((field, i) => ({ players: event[field] || [], isWinner: sideLetters[i] === event.winningSide }))
+                .filter(s => s.players.length > 0);
+            if (sides.length === 0) {
+                const winners = event.winningPlayers || [];
+                const losers = event.losingPlayers || [];
+                if (winners.length > 0) sides.push({ players: winners, isWinner: true });
+                if (losers.length > 0) sides.push({ players: losers, isWinner: false });
             }
+
+            const sidesHTML = sides.map((side, i) => {
+                const rows = side.players.map(p => {
+                    const color = this._getTeamColor(p.originalTeamId) || p.originalTeamColor || '#888';
+                    return `<div class="dm-dual-ready-row"><span class="dm-dual-ready-name" style="color:${color};">${p.name || '?'}</span></div>`;
+                }).join('');
+                const label = `<div class="dm-dual-winner-label"${side.isWinner ? '' : ' style="visibility:hidden;"'}>${ICON_SVGS.crown} Winner</div>`;
+                const col = `<div class="dm-dual-ready-side${side.isWinner ? ' dm-dual-winner-side' : ''}">${label}${rows}</div>`;
+                return (i > 0 ? '<div class="dm-dual-vs">VS</div>' : '') + col;
+            }).join('');
 
             rowsHTML += `
                 <div class="dm-result-card">
-                    <span class="dm-result-game">${gameName}</span>
-                    <span class="dm-result-winner">${winnerText}</span>
-                    <span class="dm-result-badge">Winner</span>
+                    <div class="dm-result-game">${gameLabel}</div>
+                    <div class="dm-dual-ready-sides">${sidesHTML}</div>
                 </div>
             `;
         });
