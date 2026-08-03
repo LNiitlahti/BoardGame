@@ -1132,39 +1132,57 @@ class DisplayManager {
     // Broadcast message
     // ==================================================================
 
+    /**
+     * Broadcast banner: sizing/z-index/colors all live in view.html's
+     * #broadcastTicker CSS now (needed transitions, which don't work well
+     * built purely from an inline cssText string). This just choreographs
+     * the open/close sequence via class toggling:
+     *   open:  draw a line (collapsed scaleY) -> expand to the full band
+     *          -> fade the text in once the expand transition finishes
+     *   close: fade the text out -> collapse back to a line
+     * `_broadcastTimer` debounces against onFirebaseSnapshot firing again
+     * mid-animation (e.g. an unrelated field changing) so the sequence
+     * doesn't restart or race itself.
+     */
     renderBroadcastMessage(data) {
         let ticker = document.getElementById('broadcastTicker');
+        let textEl;
         if (!ticker) {
             ticker = document.createElement('div');
             ticker.id = 'broadcastTicker';
-            // Deliberately huge and impossible to miss: covers the middle
-            // two-thirds of the viewport height with large centered text.
-            // z-index/position:fixed beat every other overlay on the page
-            // (ceremony overlay ~200, the cinematic board zoom's
-            // body-reparented .board-wrap at 10000, etc.) -- an admin
-            // broadcast is meant to always be visible, no exceptions, so it
-            // must outrank anything that could ever be layered on top of it,
-            // present or future.
-            ticker.style.cssText = [
-                'position:fixed', 'left:0', 'right:0', 'top:16.67%', 'height:66.66%',
-                'z-index:999999', 'display:none', 'align-items:center', 'justify-content:center',
-                'text-align:center', 'padding:40px 80px', 'box-sizing:border-box',
-                'overflow-y:auto', 'word-break:break-word',
-                'font-family:"Russo One",sans-serif', 'font-size:64px', 'font-weight:800',
-                'line-height:1.3', 'color:#00d4ff', 'text-shadow:0 0 30px rgba(0,212,255,0.6)',
-                'background:rgba(4,10,18,0.96)',
-                'border-top:4px solid #00d4ff', 'border-bottom:4px solid #00d4ff',
-                'letter-spacing:1px'
-            ].join(';');
+            textEl = document.createElement('div');
+            textEl.className = 'bt-text';
+            ticker.appendChild(textEl);
             document.body.appendChild(ticker);
+        } else {
+            textEl = ticker.querySelector('.bt-text');
         }
 
         const msg = data.broadcastMessage;
-        if (msg && msg.text) {
-            ticker.textContent = msg.text;
-            ticker.style.display = 'flex';
-        } else {
-            ticker.style.display = 'none';
+        const newText = (msg && msg.text) || null;
+        const isOpen = ticker.classList.contains('bt-open');
+
+        clearTimeout(this._broadcastTimer);
+
+        if (newText && !isOpen) {
+            // Opening: line -> expand -> fade text in (500ms matches the
+            // CSS transform transition's duration).
+            textEl.textContent = newText;
+            ticker.classList.remove('bt-text-visible');
+            ticker.classList.add('bt-open');
+            this._broadcastTimer = setTimeout(() => ticker.classList.add('bt-text-visible'), 500);
+        } else if (newText && isOpen && textEl.textContent !== newText) {
+            // Already open, message text changed -- quick cross-fade
+            // instead of replaying the whole line/expand entrance.
+            ticker.classList.remove('bt-text-visible');
+            this._broadcastTimer = setTimeout(() => {
+                textEl.textContent = newText;
+                ticker.classList.add('bt-text-visible');
+            }, 350);
+        } else if (!newText && isOpen) {
+            // Closing: fade text out -> collapse back to a line.
+            ticker.classList.remove('bt-text-visible');
+            this._broadcastTimer = setTimeout(() => ticker.classList.remove('bt-open'), 350);
         }
     }
 

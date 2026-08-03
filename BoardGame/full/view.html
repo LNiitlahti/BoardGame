@@ -1423,6 +1423,31 @@
         body[data-display-mode="board_focus"] .queue-panel { display: none; }
         body[data-display-mode="board_focus"] .board-area { grid-column: 1 / -1; }
 
+        /* ── Broadcast Message ────────────────────────── */
+        /* Collapsed state (scaleY near-0, transform-origin center) reads as
+           a thin line across the vertical middle of the screen; opening
+           expands that line outward to the full band, then the text fades
+           in once the expansion finishes (see renderBroadcastMessage's
+           setTimeout choreography, timed to this transition's duration).
+           Closing reverses: text fades out, then the band collapses back
+           to a line. */
+        #broadcastTicker {
+            position: fixed; left: 0; right: 0; top: 16.67%; height: 66.66%;
+            z-index: 999999; display: flex; align-items: center; justify-content: center;
+            text-align: center; padding: 40px 80px; box-sizing: border-box;
+            overflow-y: auto; word-break: break-word;
+            font-family: 'Russo One', sans-serif; font-size: 64px; font-weight: 800; line-height: 1.3;
+            color: #00d4ff; text-shadow: 0 0 30px rgba(0,212,255,0.6);
+            background: rgba(4,10,18,0.96);
+            border-top: 4px solid #00d4ff; border-bottom: 4px solid #00d4ff;
+            letter-spacing: 1px; pointer-events: none;
+            transform: scaleY(0.001); transform-origin: center;
+            transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        #broadcastTicker.bt-open { transform: scaleY(1); }
+        #broadcastTicker .bt-text { opacity: 0; transition: opacity 0.35s ease; }
+        #broadcastTicker.bt-text-visible .bt-text { opacity: 1; }
+
         /* ── Hex Scoring overlay (scoring_hex phase only) ────────── */
         .dm-hex-scoring-overlay {
             position: absolute; top: 90px; left: 50%; transform: translateX(-50%);
