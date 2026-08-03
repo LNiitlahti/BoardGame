@@ -2142,6 +2142,30 @@
                 badge.className = 'pending-badge';
                 badge.innerHTML = ICON_SVGS.hourglass + ' owed';
                 btn.appendChild(badge);
+
+                // This click always consumes the team's oldest pending hex
+                // credit (assignTeamToHex -> clearPendingHexWin), regardless
+                // of WHICH hex is clicked — there's no way to detect "this is
+                // a spell-claimed hex, not their earned placement" from the
+                // coordinate alone (earned placements have no fixed target
+                // hex). Make the designed flow explicit at the one moment it
+                // matters: is this the team's real earned placement, or a
+                // spell claiming an unrelated hex (which should be Waived
+                // first, then assigned separately, so the credit and the
+                // spell-hex don't collapse into one silent click)?
+                btn.onclick = (e) => {
+                    e.preventDefault();
+                    const team = gameState?.teams?.find(t => String(t.id) === teamIdStr);
+                    const teamName = team?.name || `Team ${teamIdStr}`;
+                    _openFlowConfirm({
+                        title: 'Earned Placement, or Spell Claim?',
+                        bodyHtml: `<p><strong>${_esc(teamName)}</strong> has an unplaced match-win hex credit. Placing <strong>this</strong> hex will use up that credit — no matter which hex you click here.</p>` +
+                                  `<p>Is this hex <strong>their earned placement</strong>? Assign it below.</p>` +
+                                  `<p>Is this hex from a <strong>spell</strong> instead (claiming a different hex)? Cancel here, click <strong>Waive</strong> (${ICON_SVGS.hexagon} pill in the Flow Panel) to clear their credit deliberately, then assign this hex separately.</p>`,
+                        confirmLabel: 'This Is Their Earned Placement — Assign',
+                        onConfirm: () => window.assignTeamToHex(btnCoord, parseInt(teamIdStr, 10))
+                    });
+                };
                 return;
             }
 
