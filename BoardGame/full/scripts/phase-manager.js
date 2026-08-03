@@ -1296,12 +1296,27 @@ class PhaseManager {
         return playerUids;
     }
 
-    /** Clear lobbyReady entries for exactly this slot's players (leaves the other slot's entries untouched) */
+    /**
+     * Reset lobbyReady for exactly this slot's players (leaves the other
+     * slot's entries untouched). Writes explicit `false` TOMBSTONES instead
+     * of deleting keys: every client persists gameState via
+     * set({merge:true}), and Firestore's merge never removes absent map
+     * keys — a plain `delete` stays local-only, the next snapshot
+     * resurrects last round's `true` flags, and the slot's lobby
+     * auto-advance fires instantly (lobby check silently skipped from
+     * round 2 onward). `ready: false` also kills the legacy single-flag
+     * field, which every reader still ORs in.
+     */
     _resetLobbyReadyForSlot(slot) {
         const gs = this._gameState;
-        if (!gs.lobbyReady) return;
+        if (!gs.lobbyReady) gs.lobbyReady = {};
         this._getPlayersWhoMustReadyForSlot(slot).forEach(uid => {
-            delete gs.lobbyReady[uid];
+            gs.lobbyReady[uid] = {
+                gameLobby: false,
+                discord: false,
+                ready: false,
+                resetAt: new Date().toISOString()
+            };
         });
     }
 
