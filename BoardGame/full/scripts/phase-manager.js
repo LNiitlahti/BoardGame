@@ -108,6 +108,17 @@ const LOOP_TARGETS = {
 /** Maximum challenge games per round */
 const MAX_CHALLENGE_GAMES = 7;
 
+// Match ids we've already warned about for missing .slot tags. getSlotRequirements()
+// is called from render loops (potentially on every state update/poll), so this
+// dedupes the console.warn per match id instead of spamming it on every re-render.
+const _warnedUntaggedSlotMatchIds = new Set();
+
+function _warnUntaggedSlotMatch(m) {
+    if (_warnedUntaggedSlotMatchIds.has(m.id)) return;
+    _warnedUntaggedSlotMatchIds.add(m.id);
+    console.warn(`[PhaseManager] Match ${m.id} has no .slot tag — counted toward BOTH slot 1 and slot 2 (ambiguous, by design — see getSlotRequirements()'s doc comment). Run e2e-cleanup-stale-queue.js to retag or purge stale queue entries.`);
+}
+
 // ── PhaseManager class ───────────────────────────────────────────
 
 class PhaseManager {
@@ -911,7 +922,15 @@ class PhaseManager {
      * Comparing createdAt against the CURRENT phase's startedAt correctly
      * lets genuinely-ambiguous matches created THIS round still count for
      * both slots (preserving the safe-by-default behavior for new
-     * ambiguous cases) while excluding anything older.
+     * ambiguous cases) while excluding anything older. This deliberately
+     * accepts a narrower risk (a single untagged match created this round
+     * could double-satisfy both slots) in exchange for avoiding the much
+     * more common stuck-forever failure — mirrors
+     * admin-improved-adapter.js's `_belongsToCurrentSlot`, which applies
+     * the identical gate for the identical reason; keep both in sync if
+     * this policy ever changes. A console.warn (deduped per match id, see
+     * _warnUntaggedSlotMatch above) fires the first time each untagged
+     * match is encountered, for dev visibility into the ambiguity.
      */
     getSlotRequirements(slot) {
         const gs = this._gameState;
@@ -927,7 +946,11 @@ class PhaseManager {
                     (m.roundNumber === undefined || m.roundNumber === currentRoundNumber);
             }
             if (!m.createdAt || !phaseStartedAt) return false;
-            return m.createdAt >= phaseStartedAt;
+            if (m.createdAt >= phaseStartedAt) {
+                _warnUntaggedSlotMatch(m);
+                return true;
+            }
+            return false;
         };
         const pendingMatches = () => queue.filter(m => belongsToSlot(m) &&
             (m.status === 'pending' || m.status === undefined || m.status === 'queued'));

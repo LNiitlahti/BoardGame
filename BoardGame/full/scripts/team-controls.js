@@ -1446,18 +1446,35 @@ function _matchInvolvesUs(match) {
     });
 }
 
+// Match ids we've already warned about for missing .slot tags — dedupes the
+// console.warn below so it doesn't spam the console on every re-render.
+const _warnedUntaggedActiveSlotMatchIds = new Set();
+
 /**
  * Which match slot (1 or 2) our team's active match belongs to this round,
  * or null if we have no active match right now. Match 1 and Match 2 run
  * independently, so this — not the tournament-wide phase — decides what
  * the player should see (lobby check, live match, etc).
+ *
+ * Returns undefined (falsy, same as "no active match") when the match has
+ * no .slot tag, instead of defaulting to slot 1. Defaulting to 1 used to
+ * mean a player whose match was genuinely untagged legacy data always got
+ * shown slot 1's ready-check/live-match UI even though which match they
+ * were actually in was unknown. All current callers already treat a falsy
+ * return as "unknown/no slot" (mySlot ? ... : null), so leaving it
+ * unresolved here is safe and avoids showing the wrong slot's panel.
  */
 function _getMyActiveSlot() {
     const queue = gameData?.gameQueue || [];
     const mine = queue.filter(m => !m.isBreak && !m.isChallenge && m.status !== 'completed' && _matchInvolvesUs(m));
     if (mine.length === 0) return null;
     const ongoing = mine.find(m => m.status === 'ongoing');
-    return (ongoing || mine[0]).slot || 1;
+    const match = ongoing || mine[0];
+    if (match.slot === undefined && !_warnedUntaggedActiveSlotMatchIds.has(match.id)) {
+        _warnedUntaggedActiveSlotMatchIds.add(match.id);
+        console.warn(`[Team Controls] Match ${match.id} has no .slot tag — cannot determine which match slot's UI to show. Run e2e-cleanup-stale-queue.js to retag or purge stale queue entries.`);
+    }
+    return match.slot;
 }
 
 /**
