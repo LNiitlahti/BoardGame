@@ -1213,6 +1213,20 @@
             breakBtn.style.display = (phase === 'break' || phase === 'tournament_end' || phase === 'pre_game_setup') ? 'none' : '';
         }
 
+        // God-only Set Phase corrector button
+        let setPhaseBtn = document.getElementById('setPhaseBtn');
+        const isGod = typeof currentUserRole !== 'undefined' && currentUserRole === 'god';
+        if (isGod && !setPhaseBtn && breakBtn && breakBtn.parentElement) {
+            setPhaseBtn = document.createElement('button');
+            setPhaseBtn.id = 'setPhaseBtn';
+            setPhaseBtn.className = 'btn-small secondary';
+            setPhaseBtn.title = 'Set phase directly (god-only recovery tool)';
+            setPhaseBtn.innerHTML = ICON_SVGS.settings + ' Set Phase';
+            setPhaseBtn.onclick = () => window.openSetPhaseModal();
+            breakBtn.parentElement.appendChild(setPhaseBtn);
+        }
+        if (setPhaseBtn) setPhaseBtn.style.display = isGod ? '' : 'none';
+
         // Phase-specific extra controls (Create Challenge shortcut)
         if (extraControls) {
             if (phase === 'challenges') {
@@ -1716,6 +1730,46 @@
     window.endTournamentViaPhase = async () => {
         _initPhaseAdapter();
         await _phaseManager?.endTournament();
+    };
+
+    const SET_PHASE_CHOICES = [
+        'pre_game_setup', 'scoring_vp', 'scoring_hex', 'hex_placement_1',
+        'spell_window_1', 'hex_placement_2', 'challenges', 'spell_window_2',
+        'challenge_game', 'spell_window_3', 'board_resolved', 'spell_window_4',
+        'matches_in_progress', 'tournament_end'
+    ];
+
+    window.openSetPhaseModal = () => {
+        const modal = document.getElementById('setPhaseModal');
+        if (!modal || !_phaseManager) return;
+        const sel = document.getElementById('setPhaseSelect');
+        if (sel && sel.options.length === 0) {
+            SET_PHASE_CHOICES.forEach(p => sel.add(new Option(PHASE_LABELS[p] || p, p)));
+        }
+        if (sel) sel.value = _phaseManager.getCurrentPhase() || 'scoring_vp';
+        const r = document.getElementById('setPhaseRound');
+        if (r) r.value = gameState.currentPhase?.roundNumber || 1;
+        const s1 = document.getElementById('setPhaseSlot1');
+        const s2 = document.getElementById('setPhaseSlot2');
+        if (s1) s1.value = _phaseManager.getSlotSubPhase(1);
+        if (s2) s2.value = _phaseManager.getSlotSubPhase(2);
+        modal.style.display = 'flex';
+    };
+
+    window.closeSetPhaseModal = () => {
+        const modal = document.getElementById('setPhaseModal');
+        if (modal) modal.style.display = 'none';
+    };
+
+    window.confirmSetPhase = async () => {
+        const name = document.getElementById('setPhaseSelect')?.value;
+        const roundNumber = document.getElementById('setPhaseRound')?.value;
+        const slots = {
+            1: document.getElementById('setPhaseSlot1')?.value || 'setup',
+            2: document.getElementById('setPhaseSlot2')?.value || 'setup'
+        };
+        await _phaseManager?.setPhaseDirect({ name, roundNumber, slots });
+        window.closeSetPhaseModal();
     };
 
     window.openBreakSettings = () => {

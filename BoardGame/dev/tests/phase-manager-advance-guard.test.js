@@ -99,3 +99,26 @@ test('a real (>2 min) break resets the auto-break counter', async () => {
     await pm.endBreak();
     assert.strictEqual(gs.breakSettings.roundsSinceLastBreak, 0);
 });
+
+test('setPhaseDirect sets phase, round, slots and keeps status consistent', async () => {
+    const gs = {
+        status: 'playing',
+        currentPhase: { name: 'board_resolved', roundNumber: 3, startedAt: '2026-08-05T10:00:00.000Z' },
+        teams: [], gameQueue: [], spellPhase: { isActive: true }
+    };
+    const pm = makePM(gs);
+    const ok = await pm.setPhaseDirect({ name: 'matches_in_progress', roundNumber: 2, slots: { 1: 'playing', 2: 'setup' } });
+    assert.strictEqual(ok, true);
+    assert.strictEqual(gs.currentPhase.name, 'matches_in_progress');
+    assert.strictEqual(gs.currentPhase.roundNumber, 2);
+    assert.deepStrictEqual(gs.currentPhase.slots, { 1: 'playing', 2: 'setup' });
+    assert.strictEqual(gs.spellPhase.isActive, false, 'spell state must not leak across a manual jump');
+});
+
+test('setPhaseDirect rejects unknown phases', async () => {
+    const gs = { status: 'playing', currentPhase: { name: 'scoring_vp', roundNumber: 1 }, teams: [], gameQueue: [] };
+    const pm = makePM(gs);
+    const ok = await pm.setPhaseDirect({ name: 'no_such_phase', roundNumber: 1 });
+    assert.strictEqual(ok, false);
+    assert.strictEqual(gs.currentPhase.name, 'scoring_vp');
+});

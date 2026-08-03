@@ -875,6 +875,49 @@ class PhaseManager {
         this.renderPhaseIndicator();
     }
 
+    /**
+     * God-mode corrector: set the phase directly (any phase, any round).
+     * The flow deliberately has no back button — this is the logged escape
+     * hatch for recovering from misclicks and desyncs.
+     */
+    async setPhaseDirect({ name, roundNumber, slots }) {
+        const gs = this._gameState;
+        if (!PHASE_ORDER.includes(name)) {
+            this._ui.showStatus(`Unknown phase: ${name}`, 'error');
+            return false;
+        }
+        const previousPhase = { ...gs.currentPhase };
+        gs.currentPhase = {
+            name,
+            roundNumber: Math.max(0, parseInt(roundNumber, 10) || 0),
+            startedAt: new Date().toISOString(),
+            challengeGamesPlayed: 0
+        };
+        if (name === 'matches_in_progress') {
+            gs.currentPhase.slots = slots || { 1: 'setup', 2: 'setup' };
+        }
+        if (name === 'tournament_end') gs.status = 'finished';
+        else if (name !== 'pre_game_setup' && gs.status !== 'playing') gs.status = 'playing';
+
+        // Spell/casting state must not leak into a phase that didn't start it
+        this._clearSpellPhaseState();
+
+        await this._save();
+        this._logAction('phase_set_manual', 'admin', {
+            fromPhase: previousPhase.name || null,
+            toPhase: name,
+            roundNumber: gs.currentPhase.roundNumber
+        }, { currentPhase: previousPhase });
+
+        this._ui.showStatus(
+            `Phase set to ${PHASE_DISPLAY[name]?.name || name} (Round ${gs.currentPhase.roundNumber})`,
+            'warning'
+        );
+        this.recheckRequirements();
+        this.renderPhaseIndicator();
+        return true;
+    }
+
     // ── Requirements ─────────────────────────────────────────────
 
     recheckRequirements() {

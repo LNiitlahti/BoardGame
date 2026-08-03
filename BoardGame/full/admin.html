@@ -630,6 +630,35 @@
         </div>
     </div>
 
+    <!-- Set Phase Modal (god-only corrector) -->
+    <div id="setPhaseModal" class="phase-modal" style="display: none;">
+        <div class="phase-modal-content" style="max-width: 420px;">
+            <div class="phase-modal-header">
+                <h2>Set Phase (God)</h2>
+                <button onclick="closeSetPhaseModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div class="phase-modal-body">
+                <p class="modal-warning-line">&#x26A0; Direct phase override — the recovery tool for misclicks and desyncs. Logged to the action log.</p>
+                <div style="display:flex; flex-direction:column; gap:10px; margin-top:10px;">
+                    <label>Phase <select id="setPhaseSelect" style="width:100%"></select></label>
+                    <label>Round <input type="number" id="setPhaseRound" min="0" style="width:90px"></label>
+                    <div id="setPhaseSlots" style="display:flex; gap:14px;">
+                        <label>Match 1
+                            <select id="setPhaseSlot1"><option>setup</option><option>lobby</option><option>playing</option><option>done</option></select>
+                        </label>
+                        <label>Match 2
+                            <select id="setPhaseSlot2"><option>setup</option><option>lobby</option><option>playing</option><option>done</option></select>
+                        </label>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+                    <button class="btn secondary" onclick="closeSetPhaseModal()">Cancel</button>
+                    <button class="btn danger" onclick="confirmSetPhase()">Set Phase</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Break Settings Modal -->
     <div id="breakSettingsModal" class="phase-modal" style="display: none;">
         <div class="phase-modal-content" style="max-width: 400px;">
