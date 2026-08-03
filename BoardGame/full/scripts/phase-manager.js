@@ -699,8 +699,11 @@ class PhaseManager {
         const challengeGamesPlayed = gs.currentPhase.challengeGamesPlayed || 0;
         const previousPhase = { ...gs.currentPhase };
 
-        // Reset break interval counter
-        if (gs.breakSettings) {
+        // Reset break interval counter — but only for a real break. A
+        // misclicked Insert Break + immediate End Break must not silently
+        // cancel the next scheduled auto-break.
+        const breakLastedMs = Date.now() - (Date.parse(gs.currentPhase.startedAt) || 0);
+        if (gs.breakSettings && breakLastedMs >= 2 * 60 * 1000) {
             gs.breakSettings.roundsSinceLastBreak = 0;
             gs.breakSettings.lastBreakAt = new Date().toISOString();
         }

@@ -66,3 +66,36 @@ test('round_advance auto-advance still chains through to scoring_vp', async () =
     assert.strictEqual(gs.currentPhase.name, 'scoring_vp');
     assert.strictEqual(gs.currentPhase.roundNumber, 3);
 });
+
+test('a sub-2-minute break does not reset the auto-break counter', async () => {
+    const gs = {
+        status: 'playing',
+        currentPhase: {
+            name: 'break', roundNumber: 2,
+            startedAt: new Date().toISOString(), // just started
+            returnToPhase: 'scoring_vp'
+        },
+        breakSettings: { intervalRounds: 2, roundsSinceLastBreak: 2, lastBreakAt: null },
+        teams: [], gameQueue: []
+    };
+    const pm = makePM(gs);
+    await pm.endBreak();
+    assert.strictEqual(gs.currentPhase.name, 'scoring_vp');
+    assert.strictEqual(gs.breakSettings.roundsSinceLastBreak, 2, 'accidental break must not cancel the scheduled one');
+});
+
+test('a real (>2 min) break resets the auto-break counter', async () => {
+    const gs = {
+        status: 'playing',
+        currentPhase: {
+            name: 'break', roundNumber: 2,
+            startedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+            returnToPhase: 'scoring_vp'
+        },
+        breakSettings: { intervalRounds: 2, roundsSinceLastBreak: 2, lastBreakAt: null },
+        teams: [], gameQueue: []
+    };
+    const pm = makePM(gs);
+    await pm.endBreak();
+    assert.strictEqual(gs.breakSettings.roundsSinceLastBreak, 0);
+});
