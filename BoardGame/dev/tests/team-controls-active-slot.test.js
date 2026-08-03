@@ -44,7 +44,10 @@ function loadTeamControls() {
         window: windowStub,
         document: { addEventListener: () => {}, getElementById: () => null },
         URLSearchParams,
-        CustomEvent: function CustomEvent() {}
+        CustomEvent: function CustomEvent() {},
+        // The icon refactor made the script reference bare ICON_SVGS at load
+        // time; any icon name resolves to '' — tests don't render markup.
+        ICON_SVGS: new Proxy({}, { get: () => '' })
     };
     sandbox.window.window = sandbox.window;
     sandbox.globalThis = sandbox;

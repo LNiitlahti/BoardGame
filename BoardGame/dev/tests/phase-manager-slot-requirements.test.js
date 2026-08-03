@@ -31,6 +31,9 @@ const test = require('node:test');
 const assert = require('node:assert');
 
 global.window = global.window || {};
+// The icon refactor made the script reference bare ICON_SVGS at load time;
+// any icon name resolves to '' — tests don't render markup.
+global.ICON_SVGS = global.ICON_SVGS || new Proxy({}, { get: () => '' });
 require('../../full/scripts/phase-manager.js');
 const PhaseManager = global.window.PhaseManager;
 
