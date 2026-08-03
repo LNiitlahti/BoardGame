@@ -1250,36 +1250,46 @@ class PhaseManager {
     // ── Lobby Ready ─────────────────────────────────────────────
 
     /**
-     * Players who must ready up for one slot's match(es), by uid. Mirrors
-     * _getPlayersWhoMustReady(), narrowed to matches tagged for this slot
-     * (untagged matches count for either slot).
+     * Players who must ready up for one slot's match(es), by uid.
+     * Shape-tolerant: modern queue entries store teams[].playerIds; legacy
+     * entries store sides[].players[].teamId — both are supported, resolving
+     * the WHOLE roster of every team with a player on the match (existing
+     * semantics). Matches tagged for a different slot, or for a round other
+     * than the one in progress, are excluded (a mass-imported future round
+     * must not inflate this round's ready list). Untagged matches count for
+     * either slot, matching getSlotRequirements' policy.
      * @returns {string[]}
      */
     _getPlayersWhoMustReadyForSlot(slot) {
         const gs = this._gameState;
         const queue = gs.gameQueue || [];
         const teams = gs.teams || [];
+        const currentRoundNumber = gs.currentPhase?.roundNumber;
 
         const activeTeamIds = new Set();
+        const activePlayerIds = new Set();
         queue.forEach(match => {
             if (match.isBreak || match.status === 'completed' || match.isChallenge) return;
             if (match.slot !== undefined && match.slot !== slot) return;
-            (match.sides || []).forEach(side => {
+            if (match.roundNumber !== undefined && currentRoundNumber !== undefined &&
+                match.roundNumber !== currentRoundNumber) return;
+            (match.teams || match.sides || []).forEach(side => {
+                (side.playerIds || []).forEach(pid => activePlayerIds.add(String(pid)));
                 (side.players || []).forEach(player => {
-                    if (player.teamId !== undefined) {
-                        activeTeamIds.add(String(player.teamId));
-                    }
+                    if (player.teamId !== undefined) activeTeamIds.add(String(player.teamId));
+                    if (player.id !== undefined) activePlayerIds.add(String(player.id));
                 });
             });
         });
 
         const playerUids = [];
         teams.forEach(team => {
-            if (!activeTeamIds.has(String(team.id))) return;
-            (team.players || []).forEach(player => {
-                if (player.uid) {
-                    playerUids.push(player.uid);
-                }
+            const roster = team.players || [];
+            const involved = activeTeamIds.has(String(team.id)) ||
+                roster.some(p => p.id !== undefined && activePlayerIds.has(String(p.id)));
+            if (!involved) return;
+            roster.forEach(player => {
+                if (player.uid) playerUids.push(player.uid);
             });
         });
 
