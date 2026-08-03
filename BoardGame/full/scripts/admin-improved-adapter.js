@@ -1256,7 +1256,19 @@
         // case for the Continue guidance).
 
         const loopInfo = _phaseManager.getLoopInfo();
-        if (loopInfo.canLoop) {
+        // spell_window_4 -> challenges has no "anything pending?" gate in
+        // phase-manager.js (unlike spell_window_3's max-games check) — it's
+        // unconditionally offered as a "let a team add a late challenge"
+        // escape hatch. But you can't actually CREATE a challenge from the
+        // spell window itself (the ⚔ button only exists on the challenges
+        // phase screen), so showing an always-on "Loop" button here when
+        // nothing is pending reads as something needing attention when it
+        // isn't. Hide it in that case on admin.html specifically — the
+        // capability isn't lost, a god user can still reach `challenges`
+        // via Set Phase if a team decides late.
+        const hasChallengeToLoopTo = phase !== 'spell_window_4' ||
+            _pendingChallengeMatches().length > 0 || _ongoingChallengeMatches().length > 0;
+        if (loopInfo.canLoop && hasChallengeToLoopTo) {
             html += `<button class="btn-small secondary" onclick="loopBack()" title="${_esc(loopInfo.label)}">${_esc(loopInfo.label)}</button>`;
         } else if (loopInfo.target && !loopInfo.canLoop) {
             html += `<span style="font-size: 0.75rem; color: var(--text-tertiary);">${_esc(loopInfo.label)}</span>`;
