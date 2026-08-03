@@ -1,6 +1,6 @@
 /**
  * resolveTournamentId — shared URL-param-then-cache lookup for the active
- * tournament, used by every page's init bootstrap (god/admin/view).
+ * tournament, used by every page's init bootstrap.
  *
  * Centralized because a page landing without a URL param (stale bookmark,
  * a nav link that forgot to carry the id, browser autocomplete) should

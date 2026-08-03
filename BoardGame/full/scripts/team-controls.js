@@ -52,7 +52,7 @@ document.addEventListener('firebase-ready', function() {
         console.log('[Team Controls] Tournament ID:', currentTournamentId, 'Team ID:', currentTeamId);
 
         if (!currentTournamentId || isNaN(currentTeamId)) {
-            console.warn('[Team Controls] Missing gameId or teamId in URL');
+            console.warn('[Team Controls] Missing tournamentId or teamId in URL');
 
             // Try to get from user document
             try {
