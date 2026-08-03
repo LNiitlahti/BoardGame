@@ -104,6 +104,14 @@
  * so the match-panel copy was a straight duplicate. STEP 2's assertions
  * were updated to check the Teammates-sidebar buttons instead.
  *
+ * UPDATED AGAIN (later, feature not adopted yet): the lobby-creator UI
+ * (`#lobbyCreatorRole` banner, the match-card "YOU CREATE THE GAME
+ * LOBBY"/"Join X's lobby" line, and the Teammates "LOBBY CREATOR" badge)
+ * was removed from every page — the team isn't using that workflow yet and
+ * may reintroduce it later. `lobbyCreators` is still seeded on the
+ * synthetic queue entry below (harmless, matches real `assignDiscordAndLobby()`
+ * output) but no longer asserted against, since nothing renders it now.
+ *
  * Run: cd BoardGame && node dev/tests/e2e-team-match-panel-merge.js
  */
 require('dotenv').config({ path: __dirname + '/.env.e2e' });
@@ -283,9 +291,7 @@ async function main() {
         subtitleText: document.getElementById('matchPanelSubtitle')?.textContent.trim(),
         ownReadyBtnDisabledCount: document.querySelectorAll('.teammate-item.you .teammate-ready-btn[disabled]').length,
         teammatesHtml: document.getElementById('teammatesList')?.innerHTML || '',
-        readyStatusHtml: document.getElementById('readyStatus')?.innerHTML || '',
-        lobbyCreatorRoleDisplay: getComputedStyle(document.getElementById('lobbyCreatorRole')).display,
-        lobbyCreatorRoleText: document.getElementById('lobbyCreatorRole')?.textContent.trim()
+        readyStatusHtml: document.getElementById('readyStatus')?.innerHTML || ''
       }));
       console.log('--- STEP 2: lobby-phase panel state ---', JSON.stringify(lobbyState, null, 2).slice(0, 2500));
 
@@ -324,8 +330,11 @@ async function main() {
           'never side.playerIds -- same bug family as the renderMatchCardsWithDiscord() fix in this commit, ' +
           'but in a function Task 13 did not otherwise touch. readyStatusHtml: ' + lobbyState.readyStatusHtml.slice(0, 200));
       }
-      assert(lobbyState.lobbyCreatorRoleDisplay !== 'none' && /lobby creator/i.test(lobbyState.lobbyCreatorRoleText || ''),
-        `STEP 2: lobby-creator banner should be visible for E2ePlayer14 (the designated TEAM_A creator), got display="${lobbyState.lobbyCreatorRoleDisplay}" text="${lobbyState.lobbyCreatorRoleText}"`);
+      // Lobby-creator UI (#lobbyCreatorRole banner, match-card creator line,
+      // Teammates "LOBBY CREATOR" badge) was intentionally removed from
+      // every page -- feature not adopted yet, may return later. No longer
+      // asserted here; `lobbyCreators` is still seeded/kept in the queue
+      // entry above since it's harmless plumbing, just not rendered.
 
       await playerPage.screenshot({ path: path.resolve(__dirname, 'task13-panel-lobby-open.png') });
       console.log('Screenshot saved: dev/tests/task13-panel-lobby-open.png');

@@ -401,13 +401,9 @@ function renderTeammates() {
             }
         }
 
-        // Check if this player is the lobby creator
-        const isCreator = matchInfo.lobbyCreatorUid === player.uid;
-
         return `
             <div class="teammate-item ${isYou ? 'you' : ''}">
                 ${isYou ? '<span class="you-label">YOU</span>' : ''}
-                ${isCreator ? '<span class="you-label" style="background: rgba(168,85,247,0.2); color: #a855f7; border-color: rgba(168,85,247,0.3);">LOBBY CREATOR</span>' : ''}
                 <div class="teammate-info-row">
                     <div class="teammate-name">${playerName}</div>
                     ${readyHTML}
@@ -432,10 +428,10 @@ function renderTeammates() {
 }
 
 /**
- * Find the current team's match assignment info (Discord channel, side label, lobby creator).
+ * Find the current team's match assignment info (Discord channel, side label).
  */
 function _getTeamMatchInfo() {
-    const result = { hasMatch: false, discordChannel: null, sideLabel: null, lobbyCreatorUid: null };
+    const result = { hasMatch: false, discordChannel: null, sideLabel: null };
     const queue = gameData?.gameQueue || [];
 
     for (const match of queue) {
@@ -464,11 +460,6 @@ function _getTeamMatchInfo() {
         result.sideLabel = sideLetter.length === 1
             ? `Side ${sideLetter}`
             : `Side ${String.fromCharCode(65 + sideIndex)}`;
-
-        // Lobby creator
-        if (match.lobbyCreators?.[mySideId]?.uid) {
-            result.lobbyCreatorUid = match.lobbyCreators[mySideId].uid;
-        }
 
         break; // Use first active match
     }
@@ -1901,14 +1892,13 @@ function renderMatchPanel(isLobbyPhase) {
     // sidebar (renderTeammates()), not here -- this panel only shows what
     // Teammates doesn't: the lobby-creator call-to-action and the
     // both-teams aggregate readiness.
-    renderLobbyCreatorRole();
     renderReadinessStatus();
 }
 
 /**
- * Render match cards enriched with Discord channel and lobby creator info.
- * Now also the persistent match-info area shown as soon as a match is
- * assigned (see renderMatchPanel) -- not just the lobby-phase view.
+ * Render match cards enriched with Discord channel info. Now also the
+ * persistent match-info area shown as soon as a match is assigned (see
+ * renderMatchPanel) -- not just the lobby-phase view.
  *
  * Uses the same "which side is mine" resolution as `_matchInvolvesUs()`
  * (checking both the real `teams[].playerIds` shape and the legacy/synthetic
@@ -1955,16 +1945,6 @@ function renderMatchCardsWithDiscord(container) {
             ? `<div class="discord-channel-badge">${ICON_SVGS.headphones} Discord Channel #${discordChannel}</div>`
             : '';
 
-        // Lobby creator for our side
-        const lobbyCreator = match.lobbyCreators?.[mySideId];
-        const isCreator = lobbyCreator?.uid === currentUser.uid;
-        const creatorHTML = lobbyCreator
-            ? `<div class="lobby-creator-info">${isCreator
-                ? '<strong>' + ICON_SVGS.star + ' YOU CREATE THE GAME LOBBY</strong>'
-                : `Join <strong>${lobbyCreator.name || 'Player'}</strong>'s lobby`
-            }</div>`
-            : '';
-
         // Opponent info
         const opponentEntry = resolvedSides.find(r => r.side !== mySide);
         const opponentNames = opponentEntry?.players?.length
@@ -1986,34 +1966,9 @@ function renderMatchCardsWithDiscord(container) {
                 </div>
                 <div class="opponent-players">${opponentNames}</div>
                 ${discordHTML}
-                ${creatorHTML}
             </div>
         `;
     }).join('');
-}
-
-/**
- * Show lobby creator role prominently if current user is the designated creator.
- */
-function renderLobbyCreatorRole() {
-    const roleContainer = document.getElementById('lobbyCreatorRole');
-    if (!roleContainer) return;
-
-    const queue = gameData.gameQueue || [];
-    let isCreator = false;
-
-    queue.forEach(match => {
-        if (match.isBreak || match.status === 'completed') return;
-        const lobbyCreators = match.lobbyCreators || {};
-        Object.values(lobbyCreators).forEach(creator => {
-            if (creator?.uid === currentUser.uid) isCreator = true;
-        });
-    });
-
-    roleContainer.style.display = isCreator ? '' : 'none';
-    if (isCreator) {
-        roleContainer.innerHTML = '<span class="lobby-creator-banner">' + ICON_SVGS.star + ' You are the lobby creator \u2014 create the game and invite your team!</span>';
-    }
 }
 
 /**

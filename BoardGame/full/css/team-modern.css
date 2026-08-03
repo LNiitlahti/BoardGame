@@ -1387,27 +1387,6 @@
   border: 1px solid rgba(88, 101, 242, 0.2);
 }
 
-.lobby-creator-info {
-  margin-top: 6px;
-  font-size: 0.85rem;
-  color: #c8b37e;
-}
-
-.lobby-creator-banner {
-  display: block;
-  text-align: center;
-  padding: 10px 16px;
-  margin-bottom: 12px;
-  background: rgba(200, 179, 126, 0.08);
-  border: 1px solid rgba(200, 179, 126, 0.3);
-  border-radius: 10px;
-  color: #c8b37e;
-  font-weight: 700;
-  font-size: 0.95rem;
-  font-family: 'Russo One', sans-serif;
-  letter-spacing: 0.04em;
-}
-
 /* Ready status icons (two-status per player) */
 
 .ready-icon {

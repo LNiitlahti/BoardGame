@@ -433,7 +433,13 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   the Teammates sidebar (own row under `.teammate-item.you`, teammate rows
   under `.teammate-item:not(.you)`), so the match-panel copy was a straight
   duplicate. Both this test and `e2e-ready-check.js` now click the
-  Teammates-sidebar buttons directly instead.
+  Teammates-sidebar buttons directly instead. **Updated again (later,
+  feature not adopted yet)**: the lobby-creator UI (`#lobbyCreatorRole`
+  banner, the match-card creator line, the Teammates "LOBBY CREATOR" badge)
+  was removed from every page — not part of the team's workflow yet, may
+  come back later. `lobbyCreators` is still seeded on this test's synthetic
+  queue entry (harmless, matches real assignment output) but no longer
+  asserted against, since nothing renders it now.
 - `e2e-vote-toast-position.js` — regression test for TODO.md Task 14
   ("team.html: the vote-submitted notification/toast overlaps the team
   scores section"). Root cause: team.html's vote-submitted message is NOT

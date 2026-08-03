@@ -325,7 +325,7 @@ async function main() {
       console.log('--- PART 2: matchAssignmentCards innerHTML ---', cardHtml.slice(0, 200));
       const cardShowsEmptyState = /No matches assigned/.test(cardHtml);
       assert(cardShowsEmptyState === false,
-        `PART 2 REGRESSION: match-info card should show real match content (game/opponent/Discord/creator), not the empty state. Got: ${cardHtml.slice(0, 200)}`);
+        `PART 2 REGRESSION: match-info card should show real match content (game/opponent/Discord), not the empty state. Got: ${cardHtml.slice(0, 200)}`);
 
       // Click own Discord + Game Lobby confirm buttons. These live in the
       // Teammates sidebar now (renderTeammates()'s own-row buttons under
