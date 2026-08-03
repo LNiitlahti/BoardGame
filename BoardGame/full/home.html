@@ -962,7 +962,7 @@
             loadRoleData(firestoreRole);
           }
 
-          checkNewAssignment(userData);
+          await checkNewAssignment(userData);
         }
       } catch (error) {
         console.error('[Home] Error loading profile:', error);
@@ -974,8 +974,14 @@
     // appointedAt is stamped every time a god links/assigns this account to a
     // team (see full/scripts/user-management.js); onboardingPromptSeenAt
     // tracks whether the player has already been shown the banner for that
-    // specific appointment.
-    function checkNewAssignment(userData) {
+    // specific appointment. Dismissing (via the × button or by clicking
+    // through to onboarding) persists onboardingPromptSeenAt to Firestore
+    // via markAssignmentSeen() below, so the check above is naturally scoped
+    // per-appointment: it only re-shows if appointedAt moves forward again
+    // (a genuinely NEW assignment), never for the same appointment the user
+    // already dismissed, and never bleeds into a future assignment to a
+    // DIFFERENT team/tournament (that stamps a fresh, later appointedAt too).
+    async function checkNewAssignment(userData) {
       if (!userData.assignedTeamId || !userData.assignedTournamentId || !userData.assignedPlayerId || !userData.appointedAt) {
         return;
       }
@@ -983,10 +989,31 @@
       const isNew = !seenAt || new Date(seenAt) < new Date(userData.appointedAt);
       if (!isNew) return;
 
+      // Resolve the tournament's display name so the banner can say WHICH
+      // tournament the assignment is for (a player can be linked into more
+      // than one at once — team name alone is ambiguous). Fetched
+      // independently rather than read off any other in-flight load (e.g.
+      // loadPlayerData/loadRecentTournaments, which run concurrently via the
+      // same Promise.all as this function's caller) since none of those are
+      // guaranteed to have completed yet.
+      // Falls back to a generic phrase rather than the raw document id if the
+      // tournament doc is missing/unreachable — an internal id (e.g.
+      // "e2e-disposable-1") is meaningless and confusing shown to a player.
+      let tournamentName = null;
+      try {
+        const tournamentDoc = await db.collection('tournaments').doc(userData.assignedTournamentId).get();
+        if (tournamentDoc.exists) {
+          tournamentName = tournamentDoc.data().name || null;
+        }
+      } catch (e) {
+        console.warn('[Home] Could not load tournament name for assignment banner:', e);
+      }
+
       const banner = document.getElementById('newAssignmentBanner');
       const text = document.getElementById('newAssignmentText');
       const btn = document.getElementById('newAssignmentBtn');
-      text.textContent = `You've been added to ${userData.assignedTeamName}! Start onboarding to get set up.`;
+      const tournamentPhrase = tournamentName ? ` in ${tournamentName}` : '';
+      text.textContent = `You've been added to ${userData.assignedTeamName}${tournamentPhrase}! Start onboarding to get set up.`;
 
       const onboardUrl = `onboarding.html?tournamentId=${encodeURIComponent(userData.assignedTournamentId)}&player=${encodeURIComponent(userData.assignedPlayerId)}`;
       btn.onclick = async () => {
