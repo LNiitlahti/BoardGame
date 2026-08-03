@@ -1382,14 +1382,14 @@ class DisplayManager {
     }
 
     /**
-     * Renders one queue match as "Side A VS Side B" (handles 3+ sides too).
-     * Used for every matches_in_progress sub-phase so who-plays-whom stays
-     * visible the whole time — setup/lobby previews the matchup just like
-     * a live match does, instead of dropping to a bare game-name line.
-     * When `showReady` is set (lobby sub-phase), each player's name grows
-     * a game-lobby/Discord ready-dot pair instead of rendering plain.
+     * Renders one queue match as two (or more) stacked player columns
+     * separated by a VS divider, each player shown with the game-lobby/
+     * Discord ready-dot pair. Used for every matches_in_progress sub-phase
+     * (setup/lobby/playing) so who-plays-whom stays visible the whole
+     * time, in the same readable stacked-names look throughout — not just
+     * during the lobby ready-check.
      */
-    _renderMatchGroup(m, data, { showReady }) {
+    _renderMatchGroup(m, data) {
         const lobbyReady = data.lobbyReady || {};
         const dotSvg = (ready) => `<svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="color:${ready ? '#22c55e' : '#ef4444'}"><circle cx="12" cy="12" r="8"/></svg>`;
 
@@ -1400,9 +1400,6 @@ class DisplayManager {
             const playersHTML = players.map(p => {
                 const color = this._getPlayerCurrentColor(p);
                 const name = this._getPlayerCurrentName(p);
-                if (!showReady) {
-                    return `<span class="dm-dual-player" style="color:${color};">${name}</span>`;
-                }
                 const r = lobbyReady[p.uid] || {};
                 const gl = r.gameLobby === true || r.ready === true;
                 const dc = r.discord === true || r.ready === true;
@@ -1413,12 +1410,11 @@ class DisplayManager {
                         <span class="dm-dual-ready-indicator">${dotSvg(dc)}${ICON_SVGS.headphones}</span>
                     </div>`;
             }).join('');
-            const side = showReady ? `<div class="dm-dual-ready-side">${playersHTML}</div>` : playersHTML;
-            return (i > 0 ? '<span class="dm-dual-vs">VS</span>' : '') + side;
+            const side = `<div class="dm-dual-ready-side">${playersHTML}</div>`;
+            return (i > 0 ? '<div class="dm-dual-vs">VS</div>' : '') + side;
         }).join('');
 
-        const sidesClass = showReady ? 'dm-dual-ready-sides' : 'dm-dual-sides';
-        return `<div class="dm-dual-live-match"><div class="dm-dual-game-name">${gameName}</div><div class="${sidesClass}">${sidesHTML}</div></div>`;
+        return `<div class="dm-dual-live-match"><div class="dm-dual-game-name">${gameName}</div><div class="dm-dual-ready-sides">${sidesHTML}</div></div>`;
     }
 
     /**
@@ -1453,7 +1449,7 @@ class DisplayManager {
             if (sub === 'done') {
                 bodyHTML = `<div class="dm-dual-slot-status">Complete</div>`;
             } else if (active.length > 0) {
-                bodyHTML = active.map(m => this._renderMatchGroup(m, data, { showReady: sub === 'lobby' })).join('');
+                bodyHTML = active.map(m => this._renderMatchGroup(m, data)).join('');
             } else if (sub === 'lobby') {
                 bodyHTML = `<div class="dm-dual-slot-status">Waiting for players...</div>`;
             } else {
