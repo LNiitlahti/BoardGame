@@ -4788,6 +4788,15 @@ function advanceRound() {
         return;
     }
 
+    // Phase-managed tournaments must never touch the legacy round system:
+    // it awards points under a round key the phase flow's double-award
+    // guard doesn't check, and bumps currentRound out from under the
+    // adapter's round sync. The hidden button is not a guard — this is.
+    if (gameState?.currentPhase) {
+        showStatus('Phase flow is active — use the Flow Panel to advance.', 'warning');
+        return;
+    }
+
     // Preview points that will be awarded
     const previewContainer = document.getElementById('nextRoundPreview');
     let previewHtml = '<h5>Points to be awarded:</h5>';
@@ -4851,6 +4860,13 @@ function closeNextRoundModal() {
  * Confirm and advance to next round, awarding points
  */
 async function confirmAdvanceRound(triggerBtn) {
+    // Same guard as advanceRound(): the legacy round system must be inert
+    // while the phase flow owns advancement (double-award + round desync).
+    if (gameState?.currentPhase) {
+        showStatus('Phase flow is active — use the Flow Panel to advance.', 'warning');
+        closeNextRoundModal();
+        return;
+    }
     closeNextRoundModal();
 
     // Award points BEFORE advancing round
