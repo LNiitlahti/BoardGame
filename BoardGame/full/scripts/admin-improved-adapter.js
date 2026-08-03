@@ -988,8 +988,8 @@
                     };
                 }
                 return {
-                    text: 'Optional spell window — begin spells, or skip ahead.' + extra,
-                    primary: { label: 'Skip Spells ▶', action: advance },
+                    text: 'Spell window — give teams time to cast at the table, then continue. (Digital spell casting is driven from the GOD view.)' + extra,
+                    primary: { label: 'Continue ▶', action: advance },
                     primaryIsAdvance: true
                 };
             }
@@ -1264,10 +1264,13 @@
         container.style.display = '';
         let html = '';
 
-        const sp = gameState.spellPhase;
-        if (!sp?.isActive) {
-            html += '<button class="btn-small primary" onclick="beginSpells()" title="Start spell casting phase">' + ICON_SVGS.sparkles + ' Begin Spells</button> ';
-        }
+        // "Begin Spells" is deliberately absent here: on admin.html the
+        // _onSpellPhaseEntered hook is never wired (only god-app.js wires
+        // digital spell casting), so the button used to be a silent no-op —
+        // it looked like it started something and did nothing. Spells are
+        // played physically at the table by default; this window is a
+        // manual timing checkpoint (see _computeNextStep's spell_window
+        // case for the Continue guidance).
 
         const loopInfo = _phaseManager.getLoopInfo();
         if (loopInfo.canLoop) {
