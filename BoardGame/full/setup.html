@@ -741,8 +741,11 @@
                 </p>
 
                 <div class="room-board-toolbar">
-                    <button class="btn" onclick="loadDefaultRoomsSetup()" title="Lataa viimeksi tallennettu huonepohja">
+                    <button class="btn" onclick="loadDefaultRoomsSetup()" title="Lataa viimeksi tallennettu huonepohja (Firestore, jaettu kaikkien turnausten kesken)">
                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg> Lataa Oletushuoneet
+                    </button>
+                    <button class="btn btn-secondary" onclick="loadLocalDefaultRoomsSetup()" title="Lataa koodiin tallennettu huonepohja (ei riipu jaetusta Firestore-oletuksesta)">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg> Lataa Paikallinen Oletus
                     </button>
                     <button class="btn btn-secondary" onclick="saveDefaultRoomsSetup()" title="Tallenna nykyinen huonepohja oletukseksi tuleville turnauksille">
                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg> Tallenna Oletukseksi
@@ -1175,6 +1178,21 @@
             }
         }
 
+        /**
+         * Load the LOCAL fallback layout (shared/scripts/default-rooms.js's
+         * LOCAL_DEFAULT_ROOMS) instead of the Firestore-shared default — no
+         * network round-trip, and immune to another tournament's "Save as
+         * Default" click overwriting it (see that file's doc comment).
+         */
+        function loadLocalDefaultRoomsSetup() {
+            if (!Array.isArray(LOCAL_DEFAULT_ROOMS) || LOCAL_DEFAULT_ROOMS.length === 0) {
+                alert('Paikallista oletushuonepohjaa ei ole vielä määritetty (shared/scripts/default-rooms.js).');
+                return;
+            }
+            rooms = [...LOCAL_DEFAULT_ROOMS];
+            renderRoomBoard();
+        }
+
         async function saveDefaultRoomsSetup() {
             try {
                 await saveDefaultRoomsDoc(db, rooms);
@@ -1416,7 +1434,7 @@
                 await batch.commit();
 
                 alert('Turnaus luotu onnistuneesti!');
-                window.location.href = `view.html?tournamentId=${tournamentId}`;
+                window.location.href = `admin.html?tournamentId=${tournamentId}`;
             } catch (error) {
                 alert('Virhe turnauksen luomisessa: ' + error.message);
                 console.error(error);
