@@ -1871,10 +1871,11 @@ function renderPhaseOverlays() {
 /**
  * Render the single "Your Next Match" panel. The match-assignment cards
  * (game, opponent, Discord channel, lobby creator) are always shown as soon
- * as a match is assigned; the ready-check controls (Game Lobby / Discord
- * buttons, teammate-confirm list, per-team readiness) are revealed in place
- * -- same panel, no overlay swap -- once the TD opens the lobby for this
- * match (isLobbyPhase === true).
+ * as a match is assigned; the ready-check info (lobby-creator banner,
+ * per-team readiness) is revealed in place -- same panel, no overlay swap
+ * -- once the TD opens the lobby for this match (isLobbyPhase === true).
+ * The actual Discord/Game Lobby toggle buttons live in the Teammates
+ * sidebar (renderTeammates()), not here.
  */
 function renderMatchPanel(isLobbyPhase) {
     const cardsContainer = document.getElementById('matchAssignmentCards');
@@ -1896,68 +1897,12 @@ function renderMatchPanel(isLobbyPhase) {
 
     if (!isLobbyPhase) return;
 
-    // Update two-button ready state
-    const lobbyReady = gameData.lobbyReady || {};
-    const myStatus = lobbyReady[currentUser.uid] || {};
-    const gameLobbyReady = myStatus.gameLobby === true || myStatus.ready === true;
-    const discordReady = myStatus.discord === true || myStatus.ready === true;
-
-    const gameLobbyBtn = document.getElementById('readyGameLobbyBtn');
-    const discordBtn = document.getElementById('readyDiscordBtn');
-
-    if (gameLobbyBtn) {
-        gameLobbyBtn.innerHTML = ICON_SVGS.gamepad2 + ' Game Lobby' + (gameLobbyReady ? ' ' + ICON_SVGS.check : '');
-        gameLobbyBtn.classList.toggle('is-ready', gameLobbyReady);
-        gameLobbyBtn.disabled = gameLobbyReady;
-    }
-
-    if (discordBtn) {
-        discordBtn.innerHTML = ICON_SVGS.headphones + ' Discord' + (discordReady ? ' ' + ICON_SVGS.check : '');
-        discordBtn.classList.toggle('is-ready', discordReady);
-        discordBtn.disabled = discordReady;
-    }
-
-    renderTeammateConfirmRow();
+    // The self/teammate Discord+Lobby toggle buttons live in the Teammates
+    // sidebar (renderTeammates()), not here -- this panel only shows what
+    // Teammates doesn't: the lobby-creator call-to-action and the
+    // both-teams aggregate readiness.
     renderLobbyCreatorRole();
     renderReadinessStatus();
-}
-
-/**
- * Render per-teammate confirm buttons in the match panel so team members
- * can confirm Discord/lobby status on each other's behalf.
- */
-function renderTeammateConfirmRow() {
-    const container = document.getElementById('teammateConfirmList');
-    if (!container) return;
-
-    const lobbyReady = gameData.lobbyReady || {};
-    const teammates = (teamData?.players || []).filter(p => p.uid && p.uid !== currentUser.uid);
-
-    if (teammates.length === 0) {
-        container.innerHTML = '';
-        return;
-    }
-
-    container.innerHTML = teammates.map(p => {
-        const name = _escapeHtmlSafe(_resolvePlayerName(p));
-        const r = lobbyReady[p.uid] || {};
-        const gl = r.gameLobby === true || r.ready === true;
-        const dc = r.discord === true || r.ready === true;
-
-        return `
-            <div class="teammate-confirm-row">
-                <span class="teammate-confirm-name">Confirm for <strong>${name}</strong>:</span>
-                <button class="teammate-ready-btn ${dc ? 'is-ready' : ''}" ${dc ? 'disabled' : ''}
-                        onclick="setReadyStatus('discord', '${p.uid}')">
-                    &#x1F3A7; ${dc ? 'Discord &#x2713;' : 'Discord'}
-                </button>
-                <button class="teammate-ready-btn ${gl ? 'is-ready' : ''}" ${gl ? 'disabled' : ''}
-                        onclick="setReadyStatus('gameLobby', '${p.uid}')">
-                    &#x1F3AE; ${gl ? 'Lobby &#x2713;' : 'Lobby'}
-                </button>
-            </div>
-        `;
-    }).join('');
 }
 
 /**

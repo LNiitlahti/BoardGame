@@ -85,6 +85,15 @@
  * script's assertions were updated accordingly: 'flex' checks became
  * "not 'none'" checks, and the id was renamed.
  *
+ * UPDATED AGAIN (later, dedup): `#readyGameLobbyBtn`/`#readyDiscordBtn` and
+ * `#teammateConfirmList` were removed from the match panel entirely —
+ * `renderTeammates()` already renders the identical Discord/Game Lobby
+ * toggle buttons per player in the Teammates sidebar (clickable for
+ * yourself under `.teammate-item.you`, and for teammates under
+ * `.teammate-item:not(.you)` with a "confirm on behalf of" tooltip), so the
+ * match-panel copy was a straight duplicate. Part 2 below now clicks the
+ * Teammates-sidebar buttons directly instead.
+ *
  * Snapshots/restores gameQueue, currentPhase, lobbyReady in a `finally`
  * block so no synthetic data is left behind in e2e-disposable-1.
  *
@@ -318,22 +327,29 @@ async function main() {
       assert(cardShowsEmptyState === false,
         `PART 2 REGRESSION: match-info card should show real match content (game/opponent/Discord/creator), not the empty state. Got: ${cardHtml.slice(0, 200)}`);
 
-      // Click own Discord + Game Lobby confirm buttons.
-      await playerPage.waitForSelector('#readyDiscordBtn:not([disabled])', { timeout: 10000 });
-      await playerPage.click('#readyDiscordBtn');
-      await playerPage.waitForFunction(() => document.getElementById('readyDiscordBtn')?.disabled === true, { timeout: 10000 });
+      // Click own Discord + Game Lobby confirm buttons. These live in the
+      // Teammates sidebar now (renderTeammates()'s own-row buttons under
+      // `.teammate-item.you`), not a separate standalone control -- the old
+      // #readyDiscordBtn/#readyGameLobbyBtn duplicated that exact UI and
+      // were removed. Re-query fresh each time: clicking triggers a
+      // Firestore write that round-trips through onSnapshot and re-renders
+      // #teammatesList's innerHTML, detaching any previously-queried handle.
+      for (let i = 0; i < 2; i++) {
+        await playerPage.waitForSelector('.teammate-item.you .teammate-ready-btn:not([disabled])', { timeout: 10000 });
+        const btn = await playerPage.$('.teammate-item.you .teammate-ready-btn:not([disabled])');
+        await btn.click();
+        await new Promise(r => setTimeout(r, 500));
+      }
+      await playerPage.waitForFunction(
+        () => document.querySelectorAll('.teammate-item.you .teammate-ready-btn:not([disabled])').length === 0,
+        { timeout: 10000 }
+      );
 
-      await playerPage.waitForSelector('#readyGameLobbyBtn:not([disabled])', { timeout: 10000 });
-      await playerPage.click('#readyGameLobbyBtn');
-      await playerPage.waitForFunction(() => document.getElementById('readyGameLobbyBtn')?.disabled === true, { timeout: 10000 });
-
-      const uiAfterOwnConfirm = await playerPage.evaluate(() => ({
-        discordText: document.getElementById('readyDiscordBtn')?.textContent.trim(),
-        lobbyText: document.getElementById('readyGameLobbyBtn')?.textContent.trim()
-      }));
-      console.log('--- PART 2: button UI after own confirm ---', JSON.stringify(uiAfterOwnConfirm));
-      assert(/✓/.test(uiAfterOwnConfirm.discordText), 'PART 2: Discord button should show a checkmark after confirming');
-      assert(/✓/.test(uiAfterOwnConfirm.lobbyText), 'PART 2: Game Lobby button should show a checkmark after confirming');
+      const uiAfterOwnConfirm = await playerPage.evaluate(() =>
+        document.querySelector('.teammate-item.you')?.innerHTML || ''
+      );
+      console.log('--- PART 2: own teammate-item HTML after own confirm ---', uiAfterOwnConfirm.slice(0, 300));
+      assert(/✓/.test(uiAfterOwnConfirm), 'PART 2: own Discord+Lobby buttons should show a checkmark after confirming');
 
       // Verify Firestore actually got the write (read back via TD's live godApp.gameState).
       await tdPage.waitForFunction(
@@ -347,17 +363,20 @@ async function main() {
         'PART 2: Firestore lobbyReady should show this player as discord+gameLobby ready');
 
       // Now confirm on behalf of the teammate ("TD (E2E)") using the
-      // teammate-confirm buttons, completing mustReady entirely.
-      await playerPage.waitForSelector('#teammateConfirmList .teammate-ready-btn', { timeout: 10000 });
-      const teammateBtnCount = await playerPage.evaluate(() => document.querySelectorAll('#teammateConfirmList .teammate-ready-btn').length);
+      // Teammates sidebar's own "confirm on behalf of" buttons (the
+      // standalone #teammateConfirmList that used to duplicate this was
+      // removed -- renderTeammates() already offered the identical
+      // confirm-for-teammate buttons on the non-"you" row).
+      await playerPage.waitForSelector('.teammate-item:not(.you) .teammate-ready-btn', { timeout: 10000 });
+      const teammateBtnCount = await playerPage.evaluate(() => document.querySelectorAll('.teammate-item:not(.you) .teammate-ready-btn').length);
       assert(teammateBtnCount === 2, `PART 2: expected 2 teammate-confirm buttons (Discord + Lobby) for "TD (E2E)", got ${teammateBtnCount}`);
       // Click both teammate buttons (discord first, then lobby) as rendered.
       // Re-query fresh each time: clicking triggers a Firestore write, which
-      // round-trips through onSnapshot and re-renders #teammateConfirmList's
+      // round-trips through onSnapshot and re-renders #teammatesList's
       // innerHTML, detaching any previously-queried element handle.
       for (let i = 0; i < 2; i++) {
-        await playerPage.waitForSelector('#teammateConfirmList .teammate-ready-btn:not([disabled])', { timeout: 10000 });
-        const btn = await playerPage.$('#teammateConfirmList .teammate-ready-btn:not([disabled])');
+        await playerPage.waitForSelector('.teammate-item:not(.you) .teammate-ready-btn:not([disabled])', { timeout: 10000 });
+        const btn = await playerPage.$('.teammate-item:not(.you) .teammate-ready-btn:not([disabled])');
         await btn.click();
         await new Promise(r => setTimeout(r, 500));
       }

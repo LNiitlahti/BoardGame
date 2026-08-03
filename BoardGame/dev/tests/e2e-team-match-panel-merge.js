@@ -96,6 +96,14 @@
  * references and the "exactly 2 .lobby-overlay elements" assertions were
  * updated accordingly (now 1).
  *
+ * UPDATED AGAIN (later, dedup): `#readyGameLobbyBtn`/`#readyDiscordBtn` and
+ * `#teammateConfirmList` were removed from the match panel entirely —
+ * `renderTeammates()` already renders the identical Discord/Game Lobby
+ * toggle buttons per player in the Teammates sidebar (own row under
+ * `.teammate-item.you`, teammate rows under `.teammate-item:not(.you)`),
+ * so the match-panel copy was a straight duplicate. STEP 2's assertions
+ * were updated to check the Teammates-sidebar buttons instead.
+ *
  * Run: cd BoardGame && node dev/tests/e2e-team-match-panel-merge.js
  */
 require('dotenv').config({ path: __dirname + '/.env.e2e' });
@@ -273,9 +281,8 @@ async function main() {
         footerDisplay: getComputedStyle(document.getElementById('matchPanelWaitingFooter')).display,
         controlsDisplay: getComputedStyle(document.getElementById('lobbyReadyControls')).display,
         subtitleText: document.getElementById('matchPanelSubtitle')?.textContent.trim(),
-        gameLobbyBtnDisabled: document.getElementById('readyGameLobbyBtn')?.disabled,
-        discordBtnDisabled: document.getElementById('readyDiscordBtn')?.disabled,
-        teammateConfirmHtml: document.getElementById('teammateConfirmList')?.innerHTML || '',
+        ownReadyBtnDisabledCount: document.querySelectorAll('.teammate-item.you .teammate-ready-btn[disabled]').length,
+        teammatesHtml: document.getElementById('teammatesList')?.innerHTML || '',
         readyStatusHtml: document.getElementById('readyStatus')?.innerHTML || '',
         lobbyCreatorRoleDisplay: getComputedStyle(document.getElementById('lobbyCreatorRole')).display,
         lobbyCreatorRoleText: document.getElementById('lobbyCreatorRole')?.textContent.trim()
@@ -291,10 +298,13 @@ async function main() {
       assert(lobbyState.footerDisplay === 'none', 'STEP 2: "waiting for admin" footer should now be hidden');
       assert(lobbyState.controlsDisplay !== 'none', 'STEP 2: ready-check controls should now be visible');
       assert(/lobby/i.test(lobbyState.subtitleText || ''), `STEP 2: subtitle should now mention the lobby step, got: "${lobbyState.subtitleText}"`);
-      assert(lobbyState.gameLobbyBtnDisabled === false, 'STEP 2: Game Lobby ready button should be enabled (not yet confirmed)');
-      assert(lobbyState.discordBtnDisabled === false, 'STEP 2: Discord ready button should be enabled (not yet confirmed)');
-      assert(/Confirm for/.test(lobbyState.teammateConfirmHtml) && /TD \(E2E\)/.test(lobbyState.teammateConfirmHtml),
-        `STEP 2: teammate-confirm list should offer to confirm for teammate "TD (E2E)", got: ${lobbyState.teammateConfirmHtml.slice(0, 300)}`);
+      // Discord/Game Lobby toggle buttons live in the Teammates sidebar
+      // (renderTeammates()), not a standalone control inside the match
+      // panel -- the old #readyGameLobbyBtn/#readyDiscordBtn/
+      // #teammateConfirmList duplicated that exact UI and were removed.
+      assert(lobbyState.ownReadyBtnDisabledCount === 0, 'STEP 2: own Discord + Game Lobby ready buttons (Teammates sidebar) should both be enabled (not yet confirmed)');
+      assert(/teammate-ready-btn/.test(lobbyState.teammatesHtml) && /TD \(E2E\)/.test(lobbyState.teammatesHtml),
+        `STEP 2: Teammates sidebar should offer confirm-for-teammate buttons for "TD (E2E)", got: ${lobbyState.teammatesHtml.slice(0, 300)}`);
       // NOT asserted (documenting, not fixing -- out of scope for Task 13):
       // renderReadinessStatus() has the SAME field-shape bug family as the
       // renderMatchCardsWithDiscord() bug fixed above, in a function this

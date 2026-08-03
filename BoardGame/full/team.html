@@ -95,20 +95,16 @@
                     <div class="lobby-overlay-footer" id="matchPanelWaitingFooter">
                         Waiting for admin to open the lobby...
                     </div>
+                    <!-- Self/teammate Discord+Lobby toggle buttons are NOT duplicated
+                         here -- the Teammates section above already has them (see
+                         renderTeammates(), clickable for yourself and, via a
+                         "confirm on behalf of" title, for teammates too). This panel
+                         only adds what Teammates doesn't show: the lobby-creator call-
+                         to-action and the aggregate per-team readiness for BOTH sides
+                         of the match (not just your own team's roster). -->
                     <div class="lobby-ready-controls" id="lobbyReadyControls" style="display: none;">
                         <div id="lobbyCreatorRole" style="display: none;">
                             <!-- Shows lobby creator banner if applicable -->
-                        </div>
-                        <div class="lobby-ready-buttons">
-                            <button class="btn primary lobby-ready-btn" id="readyGameLobbyBtn" onclick="setReadyStatus('gameLobby')">
-                                &#x1F3AE; Game Lobby
-                            </button>
-                            <button class="btn primary lobby-ready-btn" id="readyDiscordBtn" onclick="setReadyStatus('discord')">
-                                &#x1F3A7; Discord
-                            </button>
-                        </div>
-                        <div id="teammateConfirmList" class="teammate-confirm-list">
-                            <!-- Dynamically populated: confirm on behalf of teammates -->
                         </div>
                         <div id="readyStatus" class="ready-status">
                             <!-- Dynamically populated: per-team two-status readiness -->

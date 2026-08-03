@@ -426,7 +426,14 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   aren't blocked from the rest of team.html while readying up —
   `#spellPhaseOverlay` is now the only `.lobby-overlay` element left on the
   page, and this test's assertions were updated to match (1 overlay, not 2;
-  "not 'none'" instead of "'flex'").
+  "not 'none'" instead of "'flex'"). **Updated again (later, dedup)**:
+  `#readyGameLobbyBtn`/`#readyDiscordBtn`/`#teammateConfirmList` were
+  removed from the match panel entirely — `renderTeammates()` already
+  rendered the identical Discord/Game Lobby toggle buttons per player in
+  the Teammates sidebar (own row under `.teammate-item.you`, teammate rows
+  under `.teammate-item:not(.you)`), so the match-panel copy was a straight
+  duplicate. Both this test and `e2e-ready-check.js` now click the
+  Teammates-sidebar buttons directly instead.
 - `e2e-vote-toast-position.js` — regression test for TODO.md Task 14
   ("team.html: the vote-submitted notification/toast overlaps the team
   scores section"). Root cause: team.html's vote-submitted message is NOT

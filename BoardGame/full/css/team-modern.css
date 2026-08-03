@@ -1374,69 +1374,6 @@
   border-top: 1px solid rgba(200, 179, 126, 0.15);
 }
 
-.lobby-ready-buttons {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  margin-bottom: 24px;
-}
-
-.lobby-ready-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  max-width: 240px;
-  padding: 16px 24px;
-  font-size: 1.1rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  border-radius: 10px;
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-.lobby-ready-btn.is-ready {
-  background: linear-gradient(180deg, #155839, #0a3320) !important;
-  border-color: rgba(16, 185, 129, 0.5) !important;
-  color: #6ee7b7 !important;
-  cursor: default;
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
-}
-
-.lobby-ready-btn.is-ready:hover {
-  transform: none;
-}
-
-/* Confirm on behalf of teammates */
-
-.teammate-confirm-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.teammate-confirm-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  background: rgba(11, 13, 16, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 9999px;
-}
-
-.teammate-confirm-name {
-  font-size: 0.8rem;
-  color: #9aa1ad;
-}
-
-.teammate-confirm-name strong {
-  color: #d6d9df;
-}
-
 /* Discord + Lobby Creator info on match cards */
 
 .discord-channel-badge {
