@@ -2162,6 +2162,15 @@
         const numEl = document.getElementById('editMatchNumber');
         if (numEl) numEl.textContent = (game.matchNumber ? `#${game.matchNumber}` : '') + ' — LIVE';
 
+        // Round/slot retag fields (hidden for challenges — mirrors the
+        // stock openEditMatchModal population in admin.js)
+        const tagRow = document.getElementById('editMatchTagRow');
+        if (tagRow) tagRow.style.display = game.isChallenge ? 'none' : 'flex';
+        const roundInput = document.getElementById('editMatchRoundInput');
+        if (roundInput) roundInput.value = game.roundNumber !== undefined ? game.roundNumber : '';
+        const slotSelect = document.getElementById('editMatchSlotSelect');
+        if (slotSelect && (game.slot === 1 || game.slot === 2)) slotSelect.value = String(game.slot);
+
         populateEditGameTypeDropdown();
         renderEditMatchModal();
         document.getElementById('editMatchModal').classList.add('active');

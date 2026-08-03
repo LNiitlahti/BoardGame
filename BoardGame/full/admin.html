@@ -473,6 +473,18 @@
                     <select id="editGameType"></select>
                 </div>
 
+                <!-- Round/Slot Retag (hidden for challenges) -->
+                <div class="edit-match-tag-row" id="editMatchTagRow" style="display:flex; gap:14px; align-items:center; margin-bottom:10px;">
+                    <label>Round <input type="number" id="editMatchRoundInput" min="1" style="width:70px"></label>
+                    <label>Slot
+                        <select id="editMatchSlotSelect">
+                            <option value="1">Match 1</option>
+                            <option value="2">Match 2</option>
+                        </select>
+                    </label>
+                    <span style="font-size:0.72rem; color: var(--text-tertiary);">Controls which round & match slot this entry gates</span>
+                </div>
+
                 <!-- Sides Editor -->
                 <div class="edit-sides-container" id="editSidesContainer">
                     <!-- Dynamically rendered sides -->

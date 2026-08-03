@@ -3094,6 +3094,15 @@ function openEditMatchModal(gameId) {
     const matchNumber = game.matchNumber ? `#${game.matchNumber}` : '';
     document.getElementById('editMatchNumber').textContent = matchNumber;
 
+    // Round/slot retag fields (hidden for challenges — challenge<->regular
+    // conversion is not supported here)
+    const tagRow = document.getElementById('editMatchTagRow');
+    if (tagRow) tagRow.style.display = game.isChallenge ? 'none' : 'flex';
+    const roundInput = document.getElementById('editMatchRoundInput');
+    if (roundInput) roundInput.value = game.roundNumber !== undefined ? game.roundNumber : '';
+    const slotSelect = document.getElementById('editMatchSlotSelect');
+    if (slotSelect && (game.slot === 1 || game.slot === 2)) slotSelect.value = String(game.slot);
+
     // Populate game type dropdown
     populateEditGameTypeDropdown();
 
@@ -3348,6 +3357,19 @@ async function saveMatchEdits(triggerBtn) {
     delete match.sides;
     delete match.teamA;
     delete match.teamB;
+
+    // Round/slot retag — only ever SETS values; Firestore merge:true cannot
+    // persist a deletion, so there is deliberately no "untag" option.
+    if (match.isChallenge !== true) {
+        const roundInput = document.getElementById('editMatchRoundInput');
+        const slotSelect = document.getElementById('editMatchSlotSelect');
+        if (roundInput && roundInput.value.trim() !== '') {
+            match.roundNumber = parseInt(roundInput.value, 10);
+        }
+        if (slotSelect && (slotSelect.value === '1' || slotSelect.value === '2')) {
+            match.slot = parseInt(slotSelect.value, 10);
+        }
+    }
 
     await saveGameState(triggerBtn);
     closeEditMatchModal();
