@@ -1734,19 +1734,45 @@
            headline, since the whole point is "which teams are disputing
            this", not "which individuals happen to be playing". */
         .dm-live-match-large--challenge {
-            padding: 20px; border-radius: 16px;
+            padding: 20px 30px; border-radius: 16px;
             background: rgba(239,68,68,0.06); border: 2px solid rgba(239,68,68,0.35);
             box-shadow: 0 0 40px rgba(239,68,68,0.12);
-            /* A challenge is whole-team (up to 5 players/side), which
-               overflowed the fixed 1920x1080 height stacked in one column
-               with tons of horizontal space sitting unused beside it.
-               Widen the card and let each side wrap into rows instead. */
-            max-width: 1700px; flex: none;
+            /* A challenge is whole-team (up to 5 players/side). Widen the
+               card and keep the two teams side by side -- horizontally,
+               reading as a sentence: "<challenger> CHALLENGES <owner>". */
+            max-width: 1780px; width: 100%; flex: none;
+        }
+        /* The sides must NEVER stack vertically here -- a wrapped layout
+           made "CHALLENGES" float in dead space with Team 2 dropped below
+           the fold, unreadable as a matchup. nowrap + flex:1 sides shrink
+           to fit instead. */
+        .dm-live-match-large--challenge .dm-sides {
+            flex-wrap: nowrap; align-items: flex-start; gap: 24px;
+        }
+        .dm-live-match-large--challenge .dm-side {
+            flex: 1 1 0; min-width: 0;
+        }
+        .dm-live-match-large--challenge .dm-vs {
+            align-self: center; flex: none; white-space: nowrap;
         }
         .dm-live-match-large--challenge .dm-side-players {
             display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center;
-            max-width: 760px; gap: 10px;
+            gap: 10px;
         }
+        .dm-live-match-large .dm-side-role {
+            font-family: 'Quantico', sans-serif;
+            font-size: 15px; font-weight: 700; letter-spacing: 3px;
+            text-transform: uppercase; margin-bottom: 6px;
+        }
+        .dm-side-role--challenger { color: #ef4444; }
+        .dm-side-role--defender { color: var(--text-muted); }
+        .dm-live-match-large .dm-challenge-stakes {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            font-family: 'Quantico', sans-serif;
+            font-size: 20px; font-weight: 700; color: var(--gold-bright);
+            margin: -12px 0 20px;
+        }
+        .dm-live-match-large .dm-challenge-stakes svg { width: 20px; height: 20px; }
         .dm-live-match-large .dm-challenge-title {
             display: flex; align-items: center; justify-content: center; gap: 12px;
             font-family: 'Russo One', sans-serif;

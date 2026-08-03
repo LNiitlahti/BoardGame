@@ -145,7 +145,12 @@ function makeMatch(players, { teamsSides, game = 'aoe4', playType = '2v2', statu
     };
     if (slot !== undefined) entry.slot = slot;
     if (roundNumber !== undefined) entry.roundNumber = roundNumber;
-    if (isChallenge) entry.isChallenge = true;
+    if (isChallenge) {
+        entry.isChallenge = true;
+        // Real team-raised disputes always tag the contested hex -- default
+        // to a side heart so the "Disputing: ..." stakes line renders.
+        entry.challengeHexCoord = 'q2r2';
+    }
     if (status === 'completed') {
         entry.winnerIndex = winnerIndex ?? 0;
         entry.winningSide = ['A', 'B', 'C'][winnerIndex ?? 0];
