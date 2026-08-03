@@ -1137,29 +1137,32 @@ class DisplayManager {
         if (!ticker) {
             ticker = document.createElement('div');
             ticker.id = 'broadcastTicker';
-            // z-index/position:fixed deliberately beat every other overlay on
-            // the page (ceremony overlay ~200, the cinematic board zoom's
+            // Deliberately huge and impossible to miss: covers the middle
+            // two-thirds of the viewport height with large centered text.
+            // z-index/position:fixed beat every other overlay on the page
+            // (ceremony overlay ~200, the cinematic board zoom's
             // body-reparented .board-wrap at 10000, etc.) -- an admin
             // broadcast is meant to always be visible, no exceptions, so it
             // must outrank anything that could ever be layered on top of it,
             // present or future.
-            ticker.style.cssText = 'position:fixed; left:0; right:0; z-index:999999; text-align:center; padding:10px 20px; font-family:"Quantico",sans-serif; font-size:18px; font-weight:600; background:rgba(0,212,255,0.12); color:#00d4ff; display:none; border-bottom:1px solid rgba(0,212,255,0.3); letter-spacing:0.5px;';
-            // Position below header (or phaseBanner if present)
-            const phaseBanner = document.getElementById('phaseBanner');
-            const ref = phaseBanner || document.querySelector('.header');
-            if (ref) {
-                const refBottom = (ref.offsetTop || 0) + (ref.offsetHeight || 56);
-                ticker.style.top = refBottom + 'px';
-            } else {
-                ticker.style.top = '56px';
-            }
+            ticker.style.cssText = [
+                'position:fixed', 'left:0', 'right:0', 'top:16.67%', 'height:66.66%',
+                'z-index:999999', 'display:none', 'align-items:center', 'justify-content:center',
+                'text-align:center', 'padding:40px 80px', 'box-sizing:border-box',
+                'overflow-y:auto', 'word-break:break-word',
+                'font-family:"Russo One",sans-serif', 'font-size:64px', 'font-weight:800',
+                'line-height:1.3', 'color:#00d4ff', 'text-shadow:0 0 30px rgba(0,212,255,0.6)',
+                'background:rgba(4,10,18,0.96)',
+                'border-top:4px solid #00d4ff', 'border-bottom:4px solid #00d4ff',
+                'letter-spacing:1px'
+            ].join(';');
             document.body.appendChild(ticker);
         }
 
         const msg = data.broadcastMessage;
         if (msg && msg.text) {
             ticker.textContent = msg.text;
-            ticker.style.display = 'block';
+            ticker.style.display = 'flex';
         } else {
             ticker.style.display = 'none';
         }
