@@ -129,6 +129,15 @@
                     <div class="team-section-header">Active Conditions</div>
                     <div id="activeConditionsList"></div>
                 </div>
+
+                <!-- Challenge Panel: self-service heart-hex dispute, shown only
+                     during the "challenges" phase. See renderChallengePanel(). -->
+                <div class="team-section" id="challengeSection" style="display: none;">
+                    <div class="team-section-header">&#x2694; Challenge</div>
+                    <div id="challengePanelBody">
+                        <p class="empty-state-inline">Loading...</p>
+                    </div>
+                </div>
             </div>
 
             <!-- Center: Game Board -->
@@ -210,6 +219,27 @@
                 <div class="modal-actions">
                     <button class="btn secondary" onclick="closeEditTeamNameModal()">Cancel</button>
                     <button class="btn primary" onclick="saveTeamName()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Challenge Confirm Modal: team self-service heart-hex dispute -->
+    <div id="challengeModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>&#x2694; Confirm Challenge</h2>
+                <button onclick="closeChallengeModal()" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group" id="challengeHexPickerWrap" style="display: none;">
+                    <label class="form-label">Which hex do you want to dispute?</label>
+                    <select id="challengeHexPicker" class="form-input"></select>
+                </div>
+                <p id="challengeConfirmText"></p>
+                <div class="modal-actions">
+                    <button class="btn secondary" onclick="closeChallengeModal()">Cancel</button>
+                    <button class="btn primary" id="submitChallengeBtn" onclick="submitChallenge()">Submit Challenge</button>
                 </div>
             </div>
         </div>

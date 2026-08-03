@@ -657,6 +657,83 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   `saveGameState()` is safe for all three here (unlike `board`/`players`)
   since the test only ever writes back the exact same key set each field
   already had, never adds a new key.
+- `e2e-team-challenge-button.js` — verification test for TODO.md Task 19
+  ("team.html: add a team-facing CHALLENGE button so teams can request a
+  heart-hex dispute themselves during the 'challenges' phase, instead of
+  only the TD being able to create one from admin.html's ⚔ button"). The
+  TD-side ⚔ button (`admin.js`'s `addChallengeToQueue`/
+  `updateChallengeHexPicker`/`confirmChallengeSetup`, ~admin.js:2182-2403) is
+  a full manual match-setup modal — up to 2 teams per side, a hex picker,
+  player-by-player roster assembly via `manualGameSetup.sides` — and is
+  completely untouched by this task. Investigation while scoping this task
+  also found `full/scripts/match-creation-manager.js` has its own
+  `addChallengeToQueue`/`confirmChallengeSetup` (used by god.html via
+  `god-app.js`'s `MatchCreationManager`), but god.html has **no**
+  `challengeSetupModal` markup or "Challenge" button at all — that code path
+  is currently unreachable from any real UI (admin.html is the only page
+  with a working ⚔ button), also untouched. The new team-facing flow lives
+  entirely in `full/team.html` (`#challengeSection` sidebar panel,
+  `#challengeModal` confirm dialog) and `full/scripts/team-controls.js`
+  (`renderChallengePanel`, `_getEligibleChallengeHexes`, `openChallengeModal`,
+  `submitChallenge`, `_assignChallengeDiscordAndLobby` — the "CHALLENGE
+  (self-service heart-hex dispute)" section near the bottom of the file),
+  deliberately NOT a port of the TD's multi-team/multi-player picker: a team
+  can only ever raise a dispute as itself against whichever other team
+  currently controls a contested heart hex, with each side's FULL roster
+  auto-included via `PlayerUtils.getTeamPlayerIds()` (same helper used for
+  normal roster resolution elsewhere) instead of manual player picking.
+  **Flagged assumption** (no written dispute-eligibility rule found anywhere
+  in `docs/` or the hex-control code): a team may dispute ANY heart hex it
+  doesn't currently control, no adjacency/standing requirement — this
+  mirrors `updateChallengeHexPicker()`'s own lack of an adjacency check, but
+  should be confirmed with the tournament rules owner. Also flagged: the
+  created entry's `game` field defaults to `GAMES_CONFIG.getActiveGames()[0].id`
+  (currently `'predecessor'`) since there's no "any"/"unspecified" game
+  convention anywhere in `games-config.js` and a team has no game-type
+  picker of its own — the TD can change it later via admin.html's Edit
+  Match. `renderChallengePanel()` is gated on
+  `gameData?.currentPhase?.name === 'challenges'`, the same pattern as every
+  other phase-gated UI block in this file (`renderPhaseBanner`,
+  `renderTeammates`, `renderPhaseOverlays`). With 0 eligible hexes the panel
+  shows a disabled button + explanation; with exactly 1, `openChallengeModal()`
+  skips the `<select>` picker and shows a direct confirm summary; with 2+, the
+  picker appears. `submitChallenge()` runs as a Firestore transaction (same
+  pattern as this file's pre-existing `submitVote()`) that re-reads
+  `heartHexControl`/`currentPhase` fresh before writing, so a hex that gets
+  resolved/placed (or a phase that moves on) between opening the modal and
+  clicking Submit fails gracefully instead of creating a stale/invalid
+  dispute; it also replicates `confirmChallengeSetup()`'s exact insertion
+  position (after ongoing games + the first pending match) and its own
+  team.html-local equivalent of `assignDiscordAndLobby()` (channel
+  assignment + lobby-creator designation), since team.html doesn't load
+  admin.js. This test drives the real UI end-to-end (real DOM clicks, not
+  direct function calls) against `e2e-disposable-1`'s Team Alpha (id 1,
+  real-linked "E2ePlayer14") vs Team Beta (id 2), using synthetic
+  `heartHexControl` keys (`"e2e_test_hex_a"`/`"e2e_test_hex_b"`, not real
+  `qXrY` board coordinates) so it can never collide with real board state.
+  Part 1 seeds zero eligible hexes and asserts the button is disabled with
+  an explanation. Part 2 seeds exactly one (owned by Team Beta), asserts the
+  panel/modal skip the picker, clicks through to submit, and asserts the
+  resulting `gameQueue` entry matches the TD-created shape field-for-field
+  (`isChallenge: true`, `disputingSideA: [1]`, `disputingSideB: [2]`,
+  `disputingTeamIds: [1,2]`, `teams: [{id:'TEAM_A', playerIds: <Team Alpha's
+  full roster>}, {id:'TEAM_B', playerIds: <Team Beta's full roster>}]`,
+  `challengeHexCoord`, `playType` derived from both roster sizes, real
+  `discordChannels`) — roster ids are cross-checked against
+  `PlayerUtils.getTeamPlayerIds()` computed independently on the TD side, not
+  hardcoded. Part 3 seeds two eligible hexes (both owned by Team Beta),
+  asserts the picker renders both options, explicitly selects the SECOND
+  one, and asserts the created entry's `challengeHexCoord` is the selected
+  hex (not just the first option) — proving the picker's selection actually
+  drives submission. Confirmed passing against live `e2e-disposable-1`
+  (verified via a one-off inline Firestore read after the test's own restore
+  step: `heartHexControl: {}`, `currentPhase: null`, `gameQueue: []`,
+  matching the tournament's known baseline). Snapshots/restores
+  `heartHexControl`, `currentPhase`, `gameQueue` in a `finally` block —
+  `heartHexControl` is a Firestore MAP field (same gotcha category as
+  `board`/`players`: `merge:true` doesn't delete omitted map keys), so the
+  restore explicitly `FieldValue.delete()`s the two synthetic hex keys in
+  addition to the normal reassign-and-save.
 - `.env.e2e` (gitignored, not in git) — real credentials. Copy `.env.e2e.example`
   to create it if missing.
 

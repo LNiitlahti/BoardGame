@@ -20,6 +20,7 @@ let selectedVote = null;
 let _prevRenderSignature = null;
 let _prevBoardSignature = null;
 let _hexImagesBuilt = false;
+let _selectedChallengeHex = null; // { coord, ownerId, teamName, typeLabel } chosen in the challenge modal
 
 /**
  * Initialize team controls when Firebase is ready
@@ -153,6 +154,7 @@ async function loadTournamentData() {
                 renderRecentEvents();
                 checkForVoting();
                 renderPhaseOverlays();
+                renderChallengePanel();
             }
         }, (error) => {
             console.error('[Team Controls] Error loading tournament:', error);
@@ -2172,6 +2174,327 @@ function resolveGameImage(gameId) {
         }
     }
     return null;
+}
+
+// ==================== CHALLENGE (self-service heart-hex dispute) ====================
+//
+// Team-facing equivalent of admin.html's TD-only "⚔ Challenge" button
+// (addChallengeToQueue/updateChallengeHexPicker/confirmChallengeSetup in
+// full/scripts/admin.js ~2182-2403). Deliberately NOT a port of that full
+// multi-team/multi-player picker -- a team can only ever raise a dispute as
+// itself (single side) against whichever other team currently controls a
+// contested heart hex, with each side's FULL roster auto-included (no
+// player-by-player picking). Framing assumption (flagged in the commit/
+// report): a team may only dispute a heart hex it does NOT currently
+// control -- there's no adjacency/standing requirement found in the hex
+// rules elsewhere in the codebase, so eligibility is simply "any hex in
+// gameState.heartHexControl owned by another team". This mirrors how
+// updateChallengeHexPicker() itself has no adjacency check, just an
+// "owned by one of the currently-selected teams" filter.
+
+/**
+ * All heart hexes NOT controlled by our own team -- i.e. every hex our team
+ * could raise a dispute against right now. Mirrors admin.js's
+ * updateChallengeHexPicker() hex-gathering logic (same coord regex, same
+ * hex-type labeling via boardModule.getHexType), scoped to "controlled by
+ * someone other than us" instead of "controlled by any selected team".
+ */
+function _getEligibleChallengeHexes() {
+    const control = gameData?.heartHexControl || {};
+    const result = [];
+
+    Object.entries(control).forEach(([coord, ownerId]) => {
+        if (ownerId == null || String(ownerId) === String(currentTeamId)) return;
+
+        const team = gameData.teams?.find(t => String(t.id) === String(ownerId));
+        const teamName = team?.name || `Team ${ownerId}`;
+
+        let typeLabel = 'Heart';
+        try {
+            const m = coord.match(/q(-?\d+)r(-?\d+)/);
+            if (m && boardModule?.getHexType) {
+                const hexType = boardModule.getHexType(parseInt(m[1]), parseInt(m[2]));
+                typeLabel = hexType === 'mountain-heart' ? 'Mountain Heart'
+                    : hexType === 'side-heart' ? 'Side Heart'
+                    : 'Heart';
+            }
+        } catch (e) { /* board not ready yet -- fall back to generic label */ }
+
+        result.push({ coord, ownerId, teamName, typeLabel });
+    });
+
+    return result;
+}
+
+/**
+ * Render the CHALLENGE panel (left sidebar). Only visible during the
+ * "challenges" phase -- same gameData?.currentPhase?.name pattern used by
+ * renderPhaseBanner()/renderTeammates()/renderPhaseOverlays() elsewhere in
+ * this file. Shows a disabled/explained state when there's nothing this
+ * team could dispute right now.
+ */
+function renderChallengePanel() {
+    const section = document.getElementById('challengeSection');
+    const body = document.getElementById('challengePanelBody');
+    if (!section || !body) return;
+
+    if (gameData?.currentPhase?.name !== 'challenges') {
+        section.style.display = 'none';
+        return;
+    }
+    section.style.display = '';
+
+    const eligible = _getEligibleChallengeHexes();
+
+    if (eligible.length === 0) {
+        body.innerHTML = `
+            <p class="empty-state-inline">No contested hexes to challenge right now -- every heart hex is either unclaimed or already yours.</p>
+            <button class="btn primary" disabled title="No eligible hex to dispute">&#x2694; CHALLENGE</button>
+        `;
+        return;
+    }
+
+    const summary = eligible.length === 1
+        ? `1 contested hex available to challenge (held by ${_escapeHtmlSafe(eligible[0].teamName)}).`
+        : `${eligible.length} contested hexes available to challenge.`;
+
+    body.innerHTML = `
+        <p class="empty-state-inline">${summary}</p>
+        <button class="btn primary" onclick="openChallengeModal()">&#x2694; CHALLENGE</button>
+    `;
+}
+
+/**
+ * Open the confirm modal. With exactly one eligible hex, skip the picker
+ * and go straight to a confirm summary (per spec). With 2+, show a select
+ * so the requesting team picks which hex/opposing team to dispute.
+ */
+function openChallengeModal() {
+    const eligible = _getEligibleChallengeHexes();
+    if (eligible.length === 0) {
+        showStatus('No eligible hex to challenge right now.', 'warning');
+        return;
+    }
+
+    const modal = document.getElementById('challengeModal');
+    const pickerWrap = document.getElementById('challengeHexPickerWrap');
+    const select = document.getElementById('challengeHexPicker');
+    if (!modal || !pickerWrap || !select) return;
+
+    // Defensive reset: a prior successful submit leaves the button disabled
+    // (see submitChallenge()'s comment) until the modal is opened again.
+    const submitBtn = document.getElementById('submitChallengeBtn');
+    if (submitBtn) submitBtn.disabled = false;
+
+    if (eligible.length === 1) {
+        pickerWrap.style.display = 'none';
+        _selectedChallengeHex = eligible[0];
+    } else {
+        pickerWrap.style.display = '';
+        select.innerHTML = eligible.map(h =>
+            `<option value="${h.coord}">${h.typeLabel} (${h.coord}) — ${_escapeHtmlSafe(h.teamName)}</option>`
+        ).join('');
+        select.value = eligible[0].coord;
+        select.onchange = () => {
+            _selectedChallengeHex = eligible.find(h => h.coord === select.value) || eligible[0];
+            _updateChallengePreview();
+        };
+        _selectedChallengeHex = eligible[0];
+    }
+
+    _updateChallengePreview();
+    modal.style.display = 'flex';
+}
+
+function _updateChallengePreview() {
+    const preview = document.getElementById('challengeConfirmText');
+    if (!preview) return;
+    const hex = _selectedChallengeHex;
+    if (!hex) {
+        preview.textContent = '';
+        return;
+    }
+    preview.innerHTML = `You are challenging <strong>${_escapeHtmlSafe(hex.teamName)}</strong>'s control of the ` +
+        `<strong>${hex.typeLabel}</strong> hex (${hex.coord}). This queues a dispute match between your full roster ` +
+        `and theirs for the tournament director to run.`;
+}
+
+function closeChallengeModal() {
+    const modal = document.getElementById('challengeModal');
+    if (modal) modal.style.display = 'none';
+    _selectedChallengeHex = null;
+}
+
+/**
+ * Assign Discord channels + designate a lobby creator for a freshly-created
+ * challenge queue entry. Team.html-local equivalent of admin.js's
+ * assignDiscordAndLobby() (~admin.js:2414) -- reimplemented here rather than
+ * imported since team.html doesn't load admin.js. Trimmed to what a
+ * self-service challenge entry actually needs: our `teams` array only ever
+ * has the normalized `{id, playerIds}` shape (no legacy `team.players`
+ * sub-array), so only the playerIds->registry lookup branch applies.
+ * Mutates `entry` in place; `queue`/`playerRegistry` should be the FRESH
+ * (transaction-read) gameQueue/players, not a possibly-stale gameData copy.
+ */
+function _assignChallengeDiscordAndLobby(entry, queue, playerRegistry) {
+    const usedChannels = new Set();
+    (queue || []).forEach(m => {
+        if (m.isBreak || m.status === 'completed') return;
+        if (m.discordChannels) {
+            Object.values(m.discordChannels).forEach(ch => usedChannels.add(ch));
+        }
+    });
+    const available = [1, 2, 3, 4, 5].filter(ch => !usedChannels.has(ch));
+
+    const discordChannels = {};
+    let channelIdx = 0;
+    (entry.teams || []).forEach(team => {
+        if (channelIdx < available.length) {
+            discordChannels[team.id] = available[channelIdx++];
+        }
+    });
+    entry.discordChannels = discordChannels;
+
+    const lobbyCreators = {};
+    (entry.teams || []).forEach(team => {
+        const pid = (team.playerIds || [])[0];
+        if (!pid) return;
+        const reg = playerRegistry?.[pid];
+        if (reg) {
+            lobbyCreators[team.id] = { name: reg.name || reg.email || 'Player', uid: reg.uid || null, teamId: reg.teamId };
+        }
+    });
+    entry.lobbyCreators = lobbyCreators;
+}
+
+/**
+ * Submit the challenge: builds a queue entry with the SAME shape and
+ * insertion-position logic as admin.js's confirmChallengeSetup()
+ * (~admin.js:2303-2403), with disputingSideA/disputingSideB reduced to our
+ * single team vs the controlling team, and `teams[].playerIds` built from
+ * each side's FULL roster (PlayerUtils.getTeamPlayerIds -- same helper
+ * normal/legacy team-roster resolution uses elsewhere in the codebase)
+ * rather than a manual player-by-player pick. Runs as a Firestore
+ * transaction (same pattern as submitVote() above) so a concurrent TD queue
+ * edit, or the hex being resolved/placed between render and click, can't
+ * silently corrupt the queue or create a stale/invalid dispute.
+ *
+ * Unlike submitVote() (which self-dedupes by uid -- a double-click is a
+ * harmless no-op), the transaction's only guard here checks
+ * `heartHexControl`, which QUEUING a challenge never mutates (only later
+ * RESOLVING one does) -- so nothing in the transaction itself would stop a
+ * rapid double-click from creating two real duplicate dispute matches. The
+ * submit button is disabled for the duration of the call as a client-side
+ * guard against that; re-enabled on any non-success outcome (stale hex,
+ * wrong phase, or a thrown error) so the player can retry, left disabled on
+ * success since closeChallengeModal()/the next openChallengeModal() call
+ * resets it.
+ */
+async function submitChallenge() {
+    const hex = _selectedChallengeHex;
+    if (!hex) {
+        showStatus('Select a hex to challenge', 'warning');
+        return;
+    }
+
+    const submitBtn = document.getElementById('submitChallengeBtn');
+    if (submitBtn?.disabled) return; // already submitting -- ignore a rapid double-click
+    if (submitBtn) submitBtn.disabled = true;
+
+    const myTeamId = currentTeamId;
+    const controllingTeamId = hex.ownerId;
+
+    try {
+        const db = firebase.firestore();
+        const tournamentRef = db.collection('tournaments').doc(currentTournamentId);
+
+        const result = await db.runTransaction(async (tx) => {
+            const snap = await tx.get(tournamentRef);
+            if (!snap.exists) throw new Error('Tournament not found');
+            const data = snap.data();
+
+            // Re-verify against fresh data -- the hex may have been placed/
+            // resolved, or the phase may have moved on, since this modal
+            // was opened.
+            const control = data.heartHexControl || {};
+            if (String(control[hex.coord]) !== String(controllingTeamId)) {
+                return { stale: true };
+            }
+            if (data.currentPhase?.name !== 'challenges') {
+                return { wrongPhase: true };
+            }
+
+            const teamsList = data.teams || [];
+            const otherTeam = teamsList.find(t => String(t.id) === String(controllingTeamId));
+
+            const myPlayerIds = window.PlayerUtils.getTeamPlayerIds(data, myTeamId);
+            const otherPlayerIds = window.PlayerUtils.getTeamPlayerIds(data, controllingTeamId);
+
+            const teams = [
+                { id: 'TEAM_A', playerIds: myPlayerIds },
+                { id: 'TEAM_B', playerIds: otherPlayerIds }
+            ];
+            const playType = teams.map(t => t.playerIds.length).join('v');
+            // No natural "any"/"unspecified" game convention exists in
+            // GAMES_CONFIG (see games-config.js) -- default to the first
+            // active game, same as the TD flow effectively requires one of
+            // the configured game types. TD can change it later via Edit
+            // Match on admin.html if the dispute is actually for a
+            // different game.
+            const defaultGame = (window.GAMES_CONFIG?.getActiveGames?.()[0]?.id) || 'predecessor';
+
+            const queue = (data.gameQueue || []).map(m => ({ ...m }));
+            const matchNumber = queue.length === 0
+                ? 1
+                : Math.max(...queue.map(m => m.matchNumber || 0)) + 1;
+
+            const queueEntry = {
+                id: Date.now(),
+                matchNumber,
+                game: defaultGame,
+                playType,
+                teams,
+                status: 'pending',
+                isChallenge: true,
+                challengeHexCoord: hex.coord,
+                disputingSideA: [myTeamId],
+                disputingSideB: [controllingTeamId],
+                disputingTeamIds: [myTeamId, controllingTeamId],
+                createdAt: new Date().toISOString()
+            };
+
+            _assignChallengeDiscordAndLobby(queueEntry, queue, data.players);
+
+            // Same insertion-position logic as confirmChallengeSetup():
+            // after ongoing games + first pending match.
+            const ongoingCount = queue.filter(g => g.status === 'ongoing').length;
+            const firstPendingIndex = queue.findIndex(g =>
+                g.status === 'pending' || g.status === undefined || g.status === 'queued'
+            );
+            const insertIndex = firstPendingIndex === -1 ? ongoingCount : firstPendingIndex + 1;
+            queue.splice(insertIndex, 0, queueEntry);
+
+            tx.update(tournamentRef, { gameQueue: queue });
+            return { matchNumber, otherTeamName: otherTeam?.name || `Team ${controllingTeamId}` };
+        });
+
+        if (result.stale) {
+            showStatus('That hex is no longer available to challenge -- it may already have been resolved.', 'warning');
+            if (submitBtn) submitBtn.disabled = false;
+        } else if (result.wrongPhase) {
+            showStatus('Challenges can only be submitted during the Challenges phase.', 'warning');
+            if (submitBtn) submitBtn.disabled = false;
+        } else {
+            showStatus(`⚔️ Challenge #${result.matchNumber} submitted against ${result.otherTeamName}!`, 'success');
+            // Left disabled -- the modal is about to close; re-enabled the
+            // next time openChallengeModal() runs.
+        }
+        closeChallengeModal();
+    } catch (error) {
+        console.error('[Team Controls] Error submitting challenge:', error);
+        showStatus('Error submitting challenge: ' + error.message, 'error');
+        if (submitBtn) submitBtn.disabled = false;
+    }
 }
 
 // ==================== STATUS ====================
