@@ -196,20 +196,14 @@ class BoardModule {
         return validPlacements;
     }
 
-    /**
-     * Calculate total points for a team
-     */
-    calculateTeamPoints(teamPlates) {
-        let points = 0;
-        teamPlates.forEach(coord => {
-            const matches = coord.match(/-?\d+/g);
-            if (matches) {
-                const [q, r] = matches.map(Number);
-                points += this.getHexValue(q, r);
-            }
-        });
-        return points;
-    }
+    // calculateTeamPoints() was DELETED 2026-08-04. It summed getHexValue()
+    // (heart income: mountain 2, side 1, normal 0) over every hex a team
+    // owned — a board-derived scoring model that was never adopted. Its only
+    // caller, BoardManager.calculatePoints(), was itself dead and has also
+    // been removed. Real scoring lives in admin.js's confirmResult() /
+    // awardRoundPoints(); see docs/architecture/scoring.md.
+    // getHexValue() is KEPT: still used by getValidPlacements() above and by
+    // tools/spell-generator.html.
 
     /**
      * Set room hexes (admin-defined during setup)

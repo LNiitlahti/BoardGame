@@ -1,0 +1,177 @@
+# Scoring — how `team.points` is calculated
+
+> **Written 2026-08-04 by reading the code, not from design docs.**
+>
+> Three earlier scoring specs existed in `.plan/` and **all three were wrong**
+> (a cluster-`n²` formula, and twice "+1 victory point per tile placed").
+> They have been deleted. This file is the only scoring documentation, and it
+> describes what the code actually does. If you change any function named
+> below, update this file in the same commit.
+
+---
+
+## The formula
+
+A team's score is the single field **`team.points`**. It accumulates from
+exactly **two** sources:
+
+| Source | Amount | When |
+|---|---|---|
+| **Match win** | **+1** | The moment the TD confirms a match result |
+| **Heart hex income** | **+1** per side heart, **+2** for the mountain heart | Once per round, on leaving the `scoring_hex` phase |
+
+**Win condition:** first team to reach `gameState.winCondition` points.
+Default **50**, set in the setup wizard (`setup.html` `#winCondition`) and
+editable live from admin.html's "Win At" badge.
+
+`points` is the **single source of truth for standings everywhere**. Nothing
+that displays a ranking may add anything on top of it.
+
+---
+
+## 1. Match win: +1
+
+**Where:** `confirmResult()` in `full/scripts/admin.js`, and the mirrored
+`ResultManager.confirmResult()` / result-correction path in
+`full/scripts/result-manager.js` (god.html).
+
+```js
+teamsWithFullCredit.forEach(teamId => {
+    team.gamesWon    = (team.gamesWon || 0) + 1;
+    team.gamesPlayed = (team.gamesPlayed || 0) + 1;
+    team.points      = (team.points || 0) + 1;   // the victory point
+});
+```
+
+Three conditions gate it:
+
+- **Challenge matches award nothing.** `if (!isChallenge)` wraps the whole
+  block — a heart-hex dispute changes who controls the hex, not the score, and
+  does not touch `gamesWon`/`gamesLost` either.
+- **A team needs 2+ players on the winning side** to get credit
+  (`teamsWithFullCredit` = teams with `count >= 2`). This is the split-team
+  rule: if a team is split across both sides, it earns neither the win nor the
+  point. The same threshold applies to losses (`teamsWithFullLoss`).
+- Losing teams get `gamesLost`/`gamesPlayed` only — no point change.
+
+> **History note:** until 2026-08-04 admin.html incremented `gamesWon` **without**
+> awarding the point, while god.html awarded both. The same match win was worth
+> a different amount depending on which page confirmed it. Both now award +1.
+
+---
+
+## 2. Heart hex income: +1 / +2 per round
+
+**Where:** `awardRoundPoints()` in `full/scripts/admin.js`, invoked via
+`_awardPointsForRound()` in `admin-improved-adapter.js`, which is wired to
+PhaseManager's `_onAwardPoints` hook.
+
+```js
+if (hexType === 'mountain-heart')  roundPoints += 2;
+else if (hexType === 'side-heart') roundPoints += 1;
+...
+team.points = (team.points || 0) + roundPoints;   // ADDs, never replaces
+```
+
+Timing and edge cases that are easy to get wrong:
+
+- **Fires on leaving `scoring_hex`**, once per round — `phase-manager.js`:
+  `if (current === 'scoring_hex' && this._onAwardPoints && newRound > 1)`.
+- **Round 1 awards no heart income.** The `newRound > 1` guard is deliberate:
+  income is paid for a *completed* round, and at the start of round 1 no round
+  has been played.
+- **Contested hearts are frozen.** Any heart hex that is the subject of a
+  `pending` or `ongoing` challenge match is skipped for that round — its income
+  is withheld until the dispute resolves, rather than paid to the current
+  holder.
+- **Double-award guard.** `_awardPointsForRound()` records each payout in
+  `gameState.pointsHistory` keyed by round number and returns early if that
+  round is already present, so re-entering the phase cannot pay twice.
+
+---
+
+## What does NOT award points
+
+- **Placing a hex/tile.** Placement is the *reward* for winning (and can draw a
+  spell card in a room hex), but carries no points of its own. Two deleted
+  design docs claimed "+1 per tile placed" — that was never implemented and is
+  not the rule.
+- **Cluster adjacency.** The `n²` connected-cluster formula in the deleted
+  `phase-4-point-calculation.md` was never implemented anywhere.
+- **Winning a challenge match.** Transfers heart-hex control (and therefore
+  future income), but awards no points directly.
+- **Being split across both sides of a match.** See the 2+ player rule above.
+
+---
+
+## Display rules
+
+Every ranking surface must sort by **`points` alone**. `gamesWon` may be used
+as a **tiebreaker**, never added into the total — doing so double-counts every
+win, because the win's point is already inside `points`.
+
+| File | Function |
+|---|---|
+| `full/scripts/display-manager.js` | `_getTeamTotalPoints()` — returns `team.points` |
+| `full/scripts/statistics.js` | standings sort, trend chart datasets |
+| `full/scripts/stats-manager.js` | standings sort, chart datasets |
+| `shared/scripts/pdf-generator.js` | standings table |
+
+> This was a live bug: every one of these summed `points + gamesWon` while
+> admin.html's own Teams column showed raw `points`, so the spectator screen
+> disagreed with the TD's screen. Fixed 2026-08-04.
+
+**Regression guards** in `dev/tests/e2e-full-flow.js`:
+1. every team must satisfy `points >= gamesWon` (proves each win awarded its +1);
+2. the number rendered in `.dm-winner-points` on view.html is compared directly
+   against admin's `gameState`.
+
+---
+
+## Manual adjustment and undo
+
+- `adjustTeamPoints(teamId, delta)` — the ± buttons on admin.html's team cards.
+  Runs inside a Firestore **transaction** so two admins adjusting the same team
+  concurrently accumulate instead of clobbering each other. Clamped at 0.
+- `setTeamPoints(teamId, value)` — absolute set; inherently last-write-wins.
+- Both log to the action log, so **Undo Last Action** on admin.html can revert
+  them, as it can a confirmed match result (which restores the full pre-match
+  `teamStats` snapshot including `points`).
+
+## Recalculation — deliberately absent
+
+There is **no** "recalculate all points" function. `calculateAllPoints()`
+existed in both `admin.js` and `stats-manager.js` and was **deleted 2026-08-04**:
+it rebuilt `points` from heart-hex control alone, which silently erased every
+match-win point. It had no callers and no button.
+
+If a rebuild tool is ever needed, it must replay **both** sources — match wins
+from `gameState.gameHistory` **and** heart income for each completed round —
+not just the board state.
+
+### Board-derived scoring: deleted 2026-08-04
+
+An alternative, board-derived scoring path used to exist alongside the real one
+and has been removed:
+
+| Deleted | File |
+|---|---|
+| `BoardManager.placePlate()` | `full/scripts/board-manager.js` |
+| `BoardManager.calculatePoints()` | `full/scripts/board-manager.js` |
+| `BoardManager.checkWinCondition()` | `full/scripts/board-manager.js` |
+| `BoardModule.calculateTeamPoints()` | `shared/scripts/board-module.js` |
+
+All four were verified unreachable before removal — no callers, not exposed on
+`window`, no button on god.html or admin.html. They were also wrong twice over:
+`calculatePoints()` **replaced** `team.points` with a board-derived total (which
+would have erased every match-win point), and it counted heart hexes twice —
+once via `calculateTeamPoints()` summing `getHexValue()` over owned hexes, then
+again from `heartHexControl`.
+
+Kept deliberately: `BoardManager.canPlaceAt()` and `highlightValidPlacements()`
+(the latter is wired to god.html's "Valid Placements" button), and
+`BoardModule.getHexValue()` (used by `getValidPlacements()` and
+`tools/spell-generator.html`).
+
+If board-driven scoring is ever genuinely wanted, write it against this document
+rather than resurrecting the old functions from git history.

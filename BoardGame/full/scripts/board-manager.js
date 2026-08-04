@@ -335,82 +335,16 @@ class BoardManager {
         return this._boardModule.canPlaceAt(q, r, teamPlates, occupiedHexes);
     }
 
-    async placePlate(q, r, teamId) {
-        const coord = `q${q}r${r}`;
-
-        this._gameState.board[coord] = teamId;
-
-        // Heart hex capture
-        const hexType = this._boardModule.getHexType(q, r);
-        const isHeartHex = hexType === 'high-value' || hexType === 'center';
-        if (isHeartHex) {
-            this._gameState.heartHexControl = this._gameState.heartHexControl || {};
-            this._gameState.heartHexControl[coord] = teamId;
-            this._ui.addLog(`${ICON_SVGS.heart} Team ${teamId} captured heart hex ${coord}!`, 'success');
-        }
-
-        this.calculatePoints();
-
-        // End the turn
-        if (this._gameState.currentTurn) {
-            this._gameState.currentTurn.needsPlacement = false;
-            this._gameState.currentTurn = null;
-        }
-
-        this.checkWinCondition();
-        await this._save();
-
-        this._logAction('plate_placed', 'board', {
-            teamId, hexCoord: coord, isHeart: isHeartHex
-        }, { board: { [coord]: null } });
-        if (isHeartHex) {
-            this._logAction('heart_hex_captured', 'board', {
-                hexCoord: coord, newOwnerTeamId: teamId
-            }, { heartHexControl: { [coord]: null } });
-        }
-
-        this._ui.addLog(`${ICON_SVGS.circleCheck} Team ${teamId} placed plate at ${coord}`, 'success');
-        this._onDisplayRefresh();
-    }
-
-    calculatePoints() {
-        if (!this._gameState?.teams || !this._boardModule) return;
-
-        this._gameState.teams.forEach(team => {
-            const teamPlates = Object.entries(this._gameState.board || {})
-                .filter(([, occupier]) => occupier === team.id)
-                .map(([coord]) => coord);
-
-            team.points = this._boardModule.calculateTeamPoints(teamPlates);
-
-            Object.entries(this._gameState.heartHexControl || {}).forEach(([heartHex, controllingTeam]) => {
-                if (controllingTeam === team.id) {
-                    const nums = heartHex.match(/-?\d+/g);
-                    if (nums) {
-                        const [hq, hr] = nums.map(Number);
-                        team.points += this._boardModule.getHexType(hq, hr) === 'center' ? 2 : 1;
-                    }
-                }
-            });
-        });
-    }
-
-    checkWinCondition() {
-        if (!this._gameState?.teams) return;
-
-        const winner = this._gameState.teams.find(t => t.points >= this._gameState.winCondition);
-        if (winner) {
-            const oldPhase = this._gameState.gamePhase;
-            this._gameState.gamePhase = 'finished';
-            this._gameState.finishedAt = new Date().toISOString();
-            this._logAction('phase_advanced', 'phase', {
-                fromPhase: oldPhase || 'playing', toPhase: 'finished',
-                winnerTeamId: winner.id, winnerTeamName: winner.name, winnerPoints: winner.points
-            }, { gamePhase: oldPhase });
-            this._ui.addLog(`${ICON_SVGS.trophy} GAME OVER! ${winner.name} wins with ${winner.points} points!`, 'success');
-            this._ui.showStatus(`${winner.name} wins the game!`, 'success');
-        }
-    }
+    // placePlate() / calculatePoints() / checkWinCondition() were DELETED
+    // 2026-08-04. All three were unreachable (no callers, not exposed on
+    // window, no button on god.html or admin.html) AND actively dangerous:
+    // calculatePoints() REPLACED team.points with a board-derived total
+    // (sum of hex heart-values over owned hexes, then heart hexes added a
+    // second time from heartHexControl — so it also double-counted hearts),
+    // which would have erased every match-win point. Live hex placement goes
+    // through assignTeamToHex() above; the live win-condition banner is
+    // _checkWinCondition() in admin-improved-adapter.js.
+    // See docs/architecture/scoring.md.
 
     highlightValidPlacements() {
         if (!this._gameState?.currentTurn) {

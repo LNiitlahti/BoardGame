@@ -140,6 +140,7 @@ graph TB
 | [firestore-rules.md](firestore-rules.md) | `firestore.rules` | 6 | Role hierarchy, per-collection permissions, permission matrix, billing costs |
 | [god-modules.md](god-modules.md) | `full/scripts/*.js` (19 modules) | 10 | OOP module architecture, DI graph, data flow, window globals, script loading order, action logger, phase manager (16-phase flow with loops and concurrent match slots), spell engine, backup/undo, voting, scoring ceremony, display manager, season manager, VP + hex territory points |
 | [replay-analytics.md](replay-analytics.md) | `full/scripts/replay-engine.js`, `summary-generator.js`, `action-export.js` | 9 | Replay engine architecture, state reconstruction, playback, summary generator, action export, god.html integration |
+| [scoring.md](scoring.md) | `full/scripts/admin.js`, `result-manager.js`, `display-manager.js` | — | **How `team.points` is calculated** — the only scoring spec. +1 per match win, heart-hex income per round, win condition, split-team rule, display rules |
 | [cross-system.md](cross-system.md) | All files | 1 | End-to-end data flow sequence diagram |
 
 ## How to Update
