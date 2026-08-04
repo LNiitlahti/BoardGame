@@ -1418,6 +1418,53 @@ class PhaseManager {
     }
 
     /**
+     * Admin-display details of one slot's active (non-completed) matches:
+     * game name, match number, and each side's team name + Discord
+     * channel. Same slot/round/challenge tagging rules as
+     * _getPlayersWhoMustReadyForSlot (untagged matches count for either
+     * slot). Accepts the pseudo-slot 'challenge'.
+     * @returns {Array<{id, matchNumber, status, gameName,
+     *   sides: Array<{teamId, teamName, discordChannel}>}>}
+     */
+    getSlotMatchDetails(slot) {
+        const gs = this._gameState;
+        const queue = gs.gameQueue || [];
+        const currentRoundNumber = gs.currentPhase?.roundNumber;
+        const teamById = new Map((gs.teams || []).map(t => [String(t.id), t]));
+
+        const resolveGameName = (id) => {
+            if (!id) return 'Match';
+            if (gs.gameDefinitions?.[id]?.name) return gs.gameDefinitions[id].name;
+            if (typeof getGameDisplayName === 'function') return getGameDisplayName(id);
+            return id;
+        };
+
+        return queue.filter(m => {
+            if (m.isBreak || m.status === 'completed') return false;
+            if (slot === 'challenge' ? m.isChallenge !== true : m.isChallenge === true) return false;
+            if (m.slot !== undefined && m.slot !== slot) return false;
+            if (m.roundNumber !== undefined && currentRoundNumber !== undefined &&
+                m.roundNumber !== currentRoundNumber) return false;
+            return true;
+        }).map(m => ({
+            id: m.id,
+            matchNumber: m.matchNumber,
+            status: m.status || 'pending',
+            gameName: resolveGameName(m.game || m.gameType),
+            sides: (m.teams || m.sides || []).map(side => {
+                const teamId = side.id ?? side.teamId ?? side.players?.[0]?.teamId;
+                const team = teamById.get(String(teamId));
+                return {
+                    teamId,
+                    teamName: team?.name || side.name ||
+                        (teamId !== undefined ? `Team ${teamId}` : 'TBD'),
+                    discordChannel: m.discordChannels?.[teamId] ?? null
+                };
+            })
+        }));
+    }
+
+    /**
      * Reset lobbyReady for exactly this slot's players (leaves the other
      * slot's entries untouched). Writes explicit `false` TOMBSTONES instead
      * of deleting keys: every client persists gameState via
