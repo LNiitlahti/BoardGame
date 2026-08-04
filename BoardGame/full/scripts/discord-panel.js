@@ -18,6 +18,8 @@ const DiscordPanel = {
     _channels: [],
     _links: {},
     _activityUnsub: null,
+    _toggling: false,
+    _movingSlots: new Set(),
 
     // ── Shared helpers ──────────────────────────────────────────
 
@@ -64,10 +66,20 @@ const DiscordPanel = {
     /** Re-read everything from Firestore and re-render all sections. */
     async reload() {
         await this._loadData();
-        this.renderKillSwitch();
-        this.renderSetup();
-        this.renderLinks();
-        this.watchActivity();
+        this._safeRender('renderKillSwitch');
+        this._safeRender('renderSetup');
+        this._safeRender('renderLinks');
+        this._safeRender('watchActivity');
+    },
+
+    /** Run one render step in isolation so a failure in one section can't silently prevent the others from running (most importantly, can't silently kill the live Activity listener). */
+    _safeRender(methodName) {
+        try {
+            this[methodName]();
+        } catch (err) {
+            console.error(`[Discord Panel] ${methodName} failed:`, err);
+            this._toast(`Discord panel: ${methodName} failed — ${err.message}`, 'error');
+        }
     },
 
     async _loadData() {
@@ -437,6 +449,188 @@ const DiscordPanel = {
         } catch (err) {
             console.error('[Discord Panel] Batch link failed:', err);
             this._toast(`Could not confirm links: ${err.message}`, 'error');
+        }
+    },
+
+    // ── Kill switch ─────────────────────────────────────────────
+
+    renderKillSwitch() {
+        const host = document.getElementById('discordKillSwitch');
+        if (!host) return;
+
+        const enabled = this._config?.enabled === true;
+        const configured = !!this._config?.guildId;
+
+        host.innerHTML = `
+            <div style="display:flex; align-items:center; gap:14px; padding:14px;
+                        border-radius:10px; border:1px solid ${enabled ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)'};
+                        background:${enabled ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)'};">
+                <div style="flex:1;">
+                    <div style="font-weight:600; color:${enabled ? '#22c55e' : '#ef4444'};">
+                        Automatic moves are ${enabled ? 'ENABLED' : 'DISABLED'}
+                    </div>
+                    <div style="font-size:0.8rem; color:var(--text-tertiary);">
+                        ${enabled
+                            ? 'Players are moved when a lobby opens and returned when a result is confirmed.'
+                            : 'The bot will not move anyone. Nothing else is affected.'}
+                    </div>
+                </div>
+                <button class="btn ${enabled ? 'secondary' : 'primary'}"
+                        onclick="DiscordPanel.toggleEnabled()"
+                        ${configured ? '' : 'disabled title="Save the setup first"'}>
+                    ${enabled ? 'Disable' : 'Enable'}
+                </button>
+            </div>
+        `;
+    },
+
+    /**
+     * Disabling is instant — the safe direction should never have friction.
+     * Enabling asks first, so nobody reactivates moves mid-break by
+     * mis-clicking.
+     */
+    async toggleEnabled() {
+        if (this._toggling) return;
+        this._toggling = true;
+        try {
+            const ref = this._ref();
+            if (!ref) return;
+
+            const enabling = this._config?.enabled !== true;
+            if (enabling) {
+                const ok = await this._confirmEnable();
+                if (!ok) return;
+            }
+
+            await ref.collection('discordConfig').doc('state')
+                .set({ enabled: enabling }, { merge: true });
+            this._toast(enabling ? 'Automatic moves enabled.' : 'Automatic moves disabled.', 'success');
+            await this.reload();
+        } catch (err) {
+            console.error('[Discord Panel] Toggle failed:', err);
+            this._toast(`Could not change the kill switch: ${err.message}`, 'error');
+        } finally {
+            this._toggling = false;
+        }
+    },
+
+    /** Modal confirm, matching the pattern used by team-controls.js. */
+    _confirmEnable() {
+        return new Promise(resolve => {
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:10000;';
+            modal.innerHTML = `
+                <div style="background: var(--bg-panel, rgba(20, 22, 30, 0.95)); padding:25px; border-radius:12px; max-width:430px; width:90%; color:white; border:2px solid rgba(34,197,94,0.4);">
+                    <h3 style="color:#22c55e; margin-top:0;">Enable automatic moves?</h3>
+                    <p style="line-height:1.6; color:#cbd5e1;">
+                        Players will start being moved between voice channels automatically
+                        when lobbies open and results are confirmed.
+                    </p>
+                    <div style="display:flex; gap:10px; margin-top:20px;">
+                        <button id="discordEnableYes" class="btn primary" style="flex:1;">Enable</button>
+                        <button id="discordEnableNo" class="btn secondary" style="flex:1;">Cancel</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+            modal.querySelector('#discordEnableYes').onclick = () => { modal.remove(); resolve(true); };
+            modal.querySelector('#discordEnableNo').onclick = () => { modal.remove(); resolve(false); };
+            modal.addEventListener('click', e => { if (e.target === modal) { modal.remove(); resolve(false); } });
+        });
+    },
+
+    // ── Activity ────────────────────────────────────────────────
+
+    /**
+     * Live view of recent commands. Subscribed rather than fetched so a move
+     * fired from admin.html shows up here without a manual refresh.
+     */
+    watchActivity() {
+        const ref = this._ref();
+        const host = document.getElementById('discordActivity');
+        if (!ref || !host) return;
+
+        if (this._activityUnsub) {
+            this._activityUnsub();
+            this._activityUnsub = null;
+        }
+
+        this._activityUnsub = ref.collection('discordCommands')
+            .orderBy('requestedAt', 'desc')
+            .limit(30)
+            .onSnapshot(
+                snap => {
+                    const commands = [];
+                    snap.forEach(doc => commands.push({ id: doc.id, ...doc.data() }));
+                    this.renderActivity(commands);
+                },
+                err => {
+                    console.error('[Discord Panel] Activity watch failed:', err);
+                    host.innerHTML = `<h4>Activity</h4>
+                        <p style="color:#ef4444; font-size:0.85rem;">Could not load activity: ${this._escape(err.message)}</p>`;
+                }
+            );
+    },
+
+    renderActivity(commands) {
+        const host = document.getElementById('discordActivity');
+        if (!host) return;
+
+        const statusColour = status =>
+            status === 'done' ? '#22c55e' : (status === 'pending' ? '#eab308' : '#ef4444');
+
+        const rows = commands.map(command => {
+            const results = (command.results || [])
+                .map(r => `${this._escape(r.uid || r.playerId || '?')}: ${this._escape(r.outcome)}`)
+                .join(', ');
+
+            return `
+                <tr>
+                    <td style="color:var(--text-tertiary); white-space:nowrap;">
+                        ${this._escape((command.requestedAt || '').replace('T', ' ').slice(0, 19))}
+                    </td>
+                    <td>${this._escape(command.type)}${command.slot ? ` (slot ${this._escape(command.slot)})` : ''}</td>
+                    <td style="color:${statusColour(command.status)};">
+                        ${this._escape(command.status || 'pending')}${command.reason ? ` — ${this._escape(command.reason)}` : ''}
+                    </td>
+                    <td style="color:var(--text-tertiary); font-size:0.8rem;">${results || '—'}</td>
+                </tr>`;
+        }).join('');
+
+        host.innerHTML = `
+            <h4 style="margin-bottom:10px;">Activity</h4>
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <button class="btn secondary" onclick="DiscordPanel.moveNow('1')">Move now — match 1</button>
+                <button class="btn secondary" onclick="DiscordPanel.moveNow('2')">Move now — match 2</button>
+                <button class="btn secondary" onclick="DiscordPanel.moveNow('challenge')">Move now — challenge</button>
+            </div>
+            <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+                <thead>
+                    <tr style="text-align:left; color:var(--text-tertiary); font-size:0.8rem;">
+                        <th>When</th><th>Command</th><th>Status</th><th>Results</th>
+                    </tr>
+                </thead>
+                <tbody>${rows || '<tr><td colspan="4" style="color:var(--text-tertiary); padding:12px;">No commands yet.</td></tr>'}</tbody>
+            </table>
+        `;
+    },
+
+    /**
+     * Manual re-fire for stragglers. force:true skips the staleness check —
+     * its whole purpose is the case that check would reject, someone
+     * arriving after the lobby phase moved on.
+     */
+    async moveNow(slot) {
+        if (this._movingSlots.has(slot)) return;
+        this._movingSlots.add(slot);
+        try {
+            const id = await window.DiscordCommands?.request('pull', { slot, force: true });
+            if (!id) {
+                this._toast('Could not queue the move.', 'error');
+                return;
+            }
+            this._toast(`Move queued for slot ${slot}.`, 'info');
+        } finally {
+            setTimeout(() => this._movingSlots.delete(slot), 3000);
         }
     }
 };
