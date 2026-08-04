@@ -1435,6 +1435,8 @@ class PhaseManager {
         const resolveGameName = (id) => {
             if (!id) return 'Match';
             if (gs.gameDefinitions?.[id]?.name) return gs.gameDefinitions[id].name;
+            // getGameDisplayName is admin.js's global (admin.html only) — on
+            // god.html it's undefined and this falls through to the raw id.
             if (typeof getGameDisplayName === 'function') return getGameDisplayName(id);
             return id;
         };
