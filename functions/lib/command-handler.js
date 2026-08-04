@@ -32,7 +32,7 @@ async function handleCommand({ db, rest, sleep, tournamentId, command }) {
     const tournament = db.tournament(tournamentId);
 
     const config = await tournament.getConfig();
-    if (!config || config.enabled !== true) {
+    if (!config) {
         return { status: 'skipped', reason: 'disabled', results: [] };
     }
 
@@ -60,6 +60,14 @@ async function handleCommand({ db, rest, sleep, tournamentId, command }) {
             refreshedAt: new Date().toISOString()
         });
         return { status: 'done', results: [] };
+    }
+
+    // The kill switch only gates moves (pull/return). refresh-* commands
+    // never move anyone, so they run even while disabled — otherwise a
+    // brand-new config (which defaults to disabled) could never populate
+    // its channel/member caches without first enabling automatic moves.
+    if (config.enabled !== true) {
+        return { status: 'skipped', reason: 'disabled', results: [] };
     }
 
     if (command.type !== 'pull' && command.type !== 'return') {

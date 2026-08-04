@@ -375,8 +375,32 @@ test('a failed channel list is reported, not silently cached', async () => {
     assert.strictEqual(db.channelWrites.length, 0);
 });
 
-test('refresh-channels respects the kill switch', async () => {
+test('refresh-channels runs even when the kill switch is disabled', async () => {
     const db = fakeDb({ config: { ...CONFIG, enabled: false } });
+    const rest = fakeRest([]);
+    const result = await handleCommand({
+        db, rest, sleep: noSleep,
+        tournamentId: 't1',
+        command: { type: 'refresh-channels' }
+    });
+    assert.strictEqual(result.status, 'done');
+    assert.strictEqual(db.channelWrites.length, 1);
+});
+
+test('refresh-members runs even when the kill switch is disabled', async () => {
+    const db = fakeDb({ config: { ...CONFIG, enabled: false } });
+    const rest = fakeRest([]);
+    const result = await handleCommand({
+        db, rest, sleep: noSleep,
+        tournamentId: 't1',
+        command: { type: 'refresh-members' }
+    });
+    assert.strictEqual(result.status, 'done');
+    assert.strictEqual(db.configWrites.length, 1);
+});
+
+test('refresh-channels is blocked when no config exists at all', async () => {
+    const db = fakeDb({ config: null });
     const rest = fakeRest([]);
     const result = await handleCommand({
         db, rest, sleep: noSleep,
@@ -386,4 +410,19 @@ test('refresh-channels respects the kill switch', async () => {
     assert.strictEqual(result.status, 'skipped');
     assert.strictEqual(result.reason, 'disabled');
     assert.strictEqual(db.channelWrites.length, 0);
+    assert.strictEqual(rest.calls.length, 0);
+});
+
+test('refresh-members is blocked when no config exists at all', async () => {
+    const db = fakeDb({ config: null });
+    const rest = fakeRest([]);
+    const result = await handleCommand({
+        db, rest, sleep: noSleep,
+        tournamentId: 't1',
+        command: { type: 'refresh-members' }
+    });
+    assert.strictEqual(result.status, 'skipped');
+    assert.strictEqual(result.reason, 'disabled');
+    assert.strictEqual(db.configWrites.length, 0);
+    assert.strictEqual(rest.calls.length, 0);
 });

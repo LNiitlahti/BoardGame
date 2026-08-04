@@ -20,6 +20,8 @@ const DiscordPanel = {
     _activityUnsub: null,
     _toggling: false,
     _movingSlots: new Set(),
+    _refreshingChannels: false,
+    _refreshingMembers: false,
 
     // ── Shared helpers ──────────────────────────────────────────
 
@@ -197,13 +199,23 @@ const DiscordPanel = {
     },
 
     async refreshChannels() {
-        const id = await window.DiscordCommands?.request('refresh-channels');
-        if (!id) {
-            this._toast('Could not queue the channel refresh.', 'error');
-            return;
+        if (this._refreshingChannels) return;
+        this._refreshingChannels = true;
+        try {
+            const id = await window.DiscordCommands?.request('refresh-channels');
+            if (!id) {
+                this._toast('Could not queue the channel refresh.', 'error');
+                return;
+            }
+            this._toast('Fetching channels from Discord…', 'info');
+            this._awaitCommand(id, 'Channels refreshed.');
+        } finally {
+            // _awaitCommand's own listener resolves asynchronously (up to
+            // its 30s timeout), so this flag can't wait for that — it only
+            // needs to survive long enough to absorb an accidental
+            // rapid double-click on the button itself.
+            setTimeout(() => { this._refreshingChannels = false; }, 3000);
         }
-        this._toast('Fetching channels from Discord…', 'info');
-        this._awaitCommand(id, 'Channels refreshed.');
     },
 
     /**
@@ -368,13 +380,19 @@ const DiscordPanel = {
     },
 
     async refreshMembers() {
-        const id = await window.DiscordCommands?.request('refresh-members');
-        if (!id) {
-            this._toast('Could not queue the member refresh.', 'error');
-            return;
+        if (this._refreshingMembers) return;
+        this._refreshingMembers = true;
+        try {
+            const id = await window.DiscordCommands?.request('refresh-members');
+            if (!id) {
+                this._toast('Could not queue the member refresh.', 'error');
+                return;
+            }
+            this._toast('Fetching members from Discord…', 'info');
+            this._awaitCommand(id, 'Members refreshed.');
+        } finally {
+            setTimeout(() => { this._refreshingMembers = false; }, 3000);
         }
-        this._toast('Fetching members from Discord…', 'info');
-        this._awaitCommand(id, 'Members refreshed.');
     },
 
     async saveLink(uid, index) {
