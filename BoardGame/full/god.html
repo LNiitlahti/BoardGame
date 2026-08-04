@@ -47,6 +47,9 @@
             <button class="god-nav-tab" data-tab="users" data-role="god" onclick="switchGodTab('users')">
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Users
             </button>
+            <button class="god-nav-tab" data-tab="discord" data-role="god" onclick="switchGodTab('discord')">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg> Discord
+            </button>
             <button class="god-nav-tab" data-tab="spells" data-role="god" onclick="switchGodTab('spells')">
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg> Spells
             </button>
@@ -507,6 +510,24 @@
         </div>
     </div>
 
+    <!-- Tab 9: Discord Panel -->
+    <div id="discordPanel" class="god-tab-panel">
+        <div class="panel">
+            <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg> Discord Voice Moves</h3>
+
+            <div id="discordNoTournament" style="padding: 20px; color: var(--text-tertiary);">
+                Select a tournament on the Tournaments tab first.
+            </div>
+
+            <div id="discordPanelBody" style="display: none;">
+                <div id="discordKillSwitch" style="margin-bottom: 20px;"></div>
+                <div id="discordSetup" style="margin-bottom: 25px;"></div>
+                <div id="discordLinksSection" style="margin-bottom: 25px;"></div>
+                <div id="discordActivity"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Tab: Seasons Panel (GOD only) -->
     <div id="seasonsPanel" class="god-tab-panel">
         <div class="panel">
@@ -788,6 +809,7 @@
     <script defer src="../shared/scripts/icon-svgs.js"></script>
     <script defer src="../shared/scripts/render-signature.js"></script>
     <script defer src="../shared/scripts/resolve-tournament-id.js"></script>
+    <script defer src="../shared/scripts/discord-link-matcher.js"></script>
     <script defer src="../shared/scripts/user-assignment.js"></script>
     <script defer src="../shared/scripts/firebase-loader.js"></script>
     <script defer src="../shared/scripts/hex-image-preloader.js"></script>
@@ -812,6 +834,7 @@
     <script defer src="scripts/ui-manager.js"></script>
     <script defer src="scripts/team-manager.js"></script>
     <script defer src="scripts/discord-commands.js"></script>
+    <script defer src="scripts/discord-panel.js"></script>
     <script defer src="scripts/phase-manager.js"></script>
     <script defer src="scripts/board-manager.js"></script>
     <script defer src="scripts/match-queue-manager.js"></script>
@@ -952,6 +975,11 @@
             // If switching to Seasons tab, load seasons
             if (tabName === 'seasons') {
                 window.godApp?.seasons?.loadSeasons();
+            }
+
+            // If switching to Discord tab, load its config/links/activity
+            if (tabName === 'discord') {
+                window.DiscordPanel?.load();
             }
 
             // Save to sessionStorage
