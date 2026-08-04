@@ -1413,18 +1413,27 @@ class DisplayManager {
     /**
      * Does this queue entry belong to the given match slot (1 or 2), for
      * display purposes? Mirrors phase-manager.js's getSlotRequirements
-     * belongsToSlot helper. This is read-only display code, not a phase
-     * gate, so unlike that version it does NOT need the createdAt/
-     * phaseStartedAt fallback dance for untagged matches — untagged
-     * matches just count for either slot, no console.warn needed.
+     * belongsToSlot helper, including its createdAt >= phaseStartedAt gate
+     * for untagged matches (entries created via a path that bypasses slot
+     * tagging, e.g. the queue's own ▶ start buttons instead of the flow
+     * manager). Without that gate, any stale untagged entry left in the
+     * queue counts for BOTH slots forever — harmless while both slots are
+     * still open, but once one slot reaches 'done' its panel stops
+     * rendering pending/ongoing entries while the other slot's panel keeps
+     * pulling in the whole untagged backlog, which is exactly what
+     * happened here: Match 1 (done) looked fine while Match 2 (still live)
+     * accumulated every stray untagged queue entry. Keep in sync with
+     * admin-improved-adapter.js's `_belongsToCurrentSlot` and
+     * phase-manager.js's `getSlotRequirements`.
      */
-    _matchBelongsToSlot(match, slot, currentRoundNumber) {
+    _matchBelongsToSlot(match, slot, currentRoundNumber, phaseStartedAt) {
         if (match.isBreak || match.isChallenge === true) return false;
         if (match.slot !== undefined) {
             return match.slot === slot &&
                 (match.roundNumber === undefined || match.roundNumber === currentRoundNumber);
         }
-        return true;
+        if (!match.createdAt || !phaseStartedAt) return false;
+        return match.createdAt >= phaseStartedAt;
     }
 
     /**
@@ -1525,6 +1534,7 @@ class DisplayManager {
      */
     _renderMatchesDualSlot(container, data) {
         const currentRoundNumber = data.currentPhase?.roundNumber;
+        const phaseStartedAt = data.currentPhase?.startedAt;
         const slots = data.currentPhase?.slots || {};
         const queue = data.gameQueue || [];
 
@@ -1532,7 +1542,7 @@ class DisplayManager {
             const sub = slots[slot] || 'setup';
             const subLabel = { setup: 'Setup', lobby: 'Lobby', playing: 'Live', done: 'Done' }[sub] || sub;
 
-            const slotMatches = m => this._matchBelongsToSlot(m, slot, currentRoundNumber);
+            const slotMatches = m => this._matchBelongsToSlot(m, slot, currentRoundNumber, phaseStartedAt);
             const ongoing = queue.filter(m => m.status === 'ongoing' && slotMatches(m));
             const pending = queue.filter(m => (m.status === 'pending' || m.status === undefined) && slotMatches(m));
             const active = [...ongoing, ...pending];
