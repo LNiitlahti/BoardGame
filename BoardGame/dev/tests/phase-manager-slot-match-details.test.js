@@ -112,3 +112,44 @@ test('unknown team id falls back to side.name then "Team <id>"', () => {
     assert.strictEqual(details[0].sides[0].teamName, 'Team 99');
     assert.strictEqual(details[0].sides[1].teamName, 'Red Dragons');
 });
+
+// ---- getLobbyPlayerStatuses ----
+
+test('getLobbyPlayerStatuses resolves names from rosters and readiness from lobbyReady', () => {
+    const gs = makeGs({
+        gameQueue: [{ id: 'm1', status: 'pending', slot: 1, roundNumber: 3,
+                      teams: [{ id: 1, playerIds: [101] }, { id: 2, playerIds: [102] }] }],
+        lobbyReady: {
+            u1: { gameLobby: true, discord: false },
+            u2: { ready: true } // legacy flag implies both
+        }
+    });
+    const pm = new PhaseManager(gs, {});
+    const statuses = pm.getLobbyPlayerStatuses(1);
+
+    assert.deepStrictEqual(statuses, [
+        { uid: 'u1', name: 'Alice', teamName: 'Red Dragons', gameLobby: true,  discord: false },
+        { uid: 'u2', name: 'Bob',   teamName: 'Blue Owls',   gameLobby: true,  discord: true }
+    ]);
+});
+
+test('getLobbyPlayerStatuses falls back to lobbyReady.name, then shortened uid', () => {
+    const gs = makeGs({
+        teams: [{ id: 1, name: 'Red Dragons', players: [
+            { uid: 'u1', name: 'Alice', id: 101 },
+            { uid: 'mystery-user-uid', id: 103 } // roster entry with no name
+        ] }],
+        gameQueue: [{ id: 'm1', status: 'pending', slot: 1, roundNumber: 3,
+                      teams: [{ id: 1, playerIds: [101] }] }],
+        lobbyReady: { 'mystery-user-uid': { name: 'RecordedName', gameLobby: false, discord: false } }
+    });
+    const pm = new PhaseManager(gs, {});
+    const statuses = pm.getLobbyPlayerStatuses(1);
+    const mystery = statuses.find(s => s.uid === 'mystery-user-uid');
+    assert.strictEqual(mystery.name, 'RecordedName');
+});
+
+test('getLobbyPlayerStatuses returns [] when no players must ready', () => {
+    const pm = new PhaseManager(makeGs(), {});
+    assert.deepStrictEqual(pm.getLobbyPlayerStatuses(1), []);
+});

@@ -1465,6 +1465,36 @@ class PhaseManager {
     }
 
     /**
+     * Per-player readiness for one slot's lobby (admin display). Names
+     * resolve from team rosters, then the name recorded on the
+     * lobbyReady write, then a shortened uid. `ready: true` is the
+     * legacy both-at-once flag every reader ORs in.
+     * @param {number|'challenge'} slot
+     * @returns {Array<{uid, name, teamName, gameLobby, discord}>}
+     */
+    getLobbyPlayerStatuses(slot) {
+        const gs = this._gameState;
+        const lobbyReady = gs.lobbyReady || {};
+        const rosterByUid = new Map();
+        (gs.teams || []).forEach(team => {
+            (team.players || []).forEach(p => {
+                if (p.uid) rosterByUid.set(p.uid, { name: p.name, teamName: team.name });
+            });
+        });
+        return this._getPlayersWhoMustReadyForSlot(slot).map(uid => {
+            const r = lobbyReady[uid] || {};
+            const roster = rosterByUid.get(uid);
+            return {
+                uid,
+                name: roster?.name || r.name || String(uid).slice(0, 8),
+                teamName: roster?.teamName || null,
+                gameLobby: r.gameLobby === true || r.ready === true,
+                discord: r.discord === true || r.ready === true
+            };
+        });
+    }
+
+    /**
      * Reset lobbyReady for exactly this slot's players (leaves the other
      * slot's entries untouched). Writes explicit `false` TOMBSTONES instead
      * of deleting keys: every client persists gameState via
