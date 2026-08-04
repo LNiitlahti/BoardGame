@@ -23,9 +23,11 @@ Resolves the slot's active (non-completed, non-break) matches from
 `_getPlayersWhoMustReadyForSlot` (untagged matches count for either slot;
 matches for other rounds are excluded). Accepts pseudo-slot `'challenge'`.
 
-Returns per match: game display name, match number, sides (team id + name +
-player uids/names resolved from `gameState.teams` rosters), and each side's
-Discord channel (`match.discordChannels[sideId]`).
+Returns per match: game display name, match number, sides (team id + team
+name resolved from `gameState.teams` rosters), and each side's Discord
+channel (`match.discordChannels[sideId]`). Per-player names/readiness are
+resolved separately by the sibling `getLobbyPlayerStatuses(slot)` helper,
+not embedded in each side.
 
 ### Rendering (`_renderSlotPanels`)
 

@@ -1418,6 +1418,85 @@ class PhaseManager {
     }
 
     /**
+     * Admin-display details of one slot's active (non-completed) matches:
+     * game name, match number, and each side's team name + Discord
+     * channel. Same slot/round/challenge tagging rules as
+     * _getPlayersWhoMustReadyForSlot (untagged matches count for either
+     * slot). Accepts the pseudo-slot 'challenge'.
+     * @returns {Array<{id, matchNumber, status, gameName,
+     *   sides: Array<{teamId, teamName, discordChannel}>}>}
+     */
+    getSlotMatchDetails(slot) {
+        const gs = this._gameState;
+        const queue = gs.gameQueue || [];
+        const currentRoundNumber = gs.currentPhase?.roundNumber;
+        const teamById = new Map((gs.teams || []).map(t => [String(t.id), t]));
+
+        const resolveGameName = (id) => {
+            if (!id) return 'Match';
+            if (gs.gameDefinitions?.[id]?.name) return gs.gameDefinitions[id].name;
+            // getGameDisplayName is admin.js's global (admin.html only) — on
+            // god.html it's undefined and this falls through to the raw id.
+            if (typeof getGameDisplayName === 'function') return getGameDisplayName(id);
+            return id;
+        };
+
+        return queue.filter(m => {
+            if (m.isBreak || m.status === 'completed') return false;
+            if (slot === 'challenge' ? m.isChallenge !== true : m.isChallenge === true) return false;
+            if (m.slot !== undefined && m.slot !== slot) return false;
+            if (m.roundNumber !== undefined && currentRoundNumber !== undefined &&
+                m.roundNumber !== currentRoundNumber) return false;
+            return true;
+        }).map(m => ({
+            id: m.id,
+            matchNumber: m.matchNumber,
+            status: m.status || 'pending',
+            gameName: resolveGameName(m.game || m.gameType),
+            sides: (m.teams || m.sides || []).map(side => {
+                const teamId = side.id ?? side.teamId ?? side.players?.[0]?.teamId;
+                const team = teamById.get(String(teamId));
+                return {
+                    teamId,
+                    teamName: team?.name || side.name ||
+                        (teamId !== undefined ? `Team ${teamId}` : 'TBD'),
+                    discordChannel: m.discordChannels?.[teamId] ?? null
+                };
+            })
+        }));
+    }
+
+    /**
+     * Per-player readiness for one slot's lobby (admin display). Names
+     * resolve from team rosters, then the name recorded on the
+     * lobbyReady write, then a shortened uid. `ready: true` is the
+     * legacy both-at-once flag every reader ORs in.
+     * @param {number|'challenge'} slot
+     * @returns {Array<{uid, name, teamName, gameLobby, discord}>}
+     */
+    getLobbyPlayerStatuses(slot) {
+        const gs = this._gameState;
+        const lobbyReady = gs.lobbyReady || {};
+        const rosterByUid = new Map();
+        (gs.teams || []).forEach(team => {
+            (team.players || []).forEach(p => {
+                if (p.uid) rosterByUid.set(p.uid, { name: p.name, teamName: team.name });
+            });
+        });
+        return this._getPlayersWhoMustReadyForSlot(slot).map(uid => {
+            const r = lobbyReady[uid] || {};
+            const roster = rosterByUid.get(uid);
+            return {
+                uid,
+                name: roster?.name || r.name || String(uid).slice(0, 8),
+                teamName: roster?.teamName || null,
+                gameLobby: r.gameLobby === true || r.ready === true,
+                discord: r.discord === true || r.ready === true
+            };
+        });
+    }
+
+    /**
      * Reset lobbyReady for exactly this slot's players (leaves the other
      * slot's entries untouched). Writes explicit `false` TOMBSTONES instead
      * of deleting keys: every client persists gameState via
@@ -1670,6 +1749,24 @@ class PhaseManager {
             }
         }
 
+        // Challenge lobby: show the queued challenge + per-player readiness
+        // under the requirement counters (same shared builder the match
+        // slots use).
+        let challengeDetails = document.getElementById('challengeLobbyDetails');
+        if (this.isChallengeLobbyActive()) {
+            if (!challengeDetails) {
+                challengeDetails = document.createElement('div');
+                challengeDetails.id = 'challengeLobbyDetails';
+                challengeDetails.className = 'challenge-lobby-details';
+                bar.appendChild(challengeDetails);
+            }
+            challengeDetails.style.display = '';
+            challengeDetails.innerHTML = this.renderSlotDetailsHtml('challenge', { players: true });
+        } else if (challengeDetails) {
+            challengeDetails.style.display = 'none';
+            challengeDetails.innerHTML = '';
+        }
+
         // Buttons
         const advBtn = document.getElementById('advancePhaseBtn');
         const forceBtn = document.getElementById('forceAdvanceBtn');
@@ -1761,6 +1858,44 @@ class PhaseManager {
      * button (which only gates leaving 'matches_in_progress' once both
      * slots are done).
      */
+    /**
+     * Shared admin HTML for a slot's match details, optionally with the
+     * per-player lobby readiness list. Used by god.html's slot panels
+     * (below) AND admin.html's flow cards (admin-improved-adapter.js) —
+     * change both call sites if the signature changes.
+     * @param {number|'challenge'} slot
+     * @param {{players?: boolean}} [opts]
+     */
+    renderSlotDetailsHtml(slot, { players = false } = {}) {
+        const matchesHtml = this.getSlotMatchDetails(slot).map(m => {
+            const sides = m.sides.map(s =>
+                `<span class="slot-detail-team">${this._escHtml(s.teamName)}` +
+                (s.discordChannel
+                    ? ` <span class="slot-detail-channel">${ICON_SVGS.headphones} #${this._escHtml(String(s.discordChannel))}</span>`
+                    : '') +
+                `</span>`
+            ).join('<span class="slot-detail-vs">vs</span>');
+            return `<div class="slot-match-detail">` +
+                `<span class="slot-detail-game">${m.matchNumber ? '#' + m.matchNumber + ' ' : ''}${this._escHtml(m.gameName)}</span>` +
+                sides + `</div>`;
+        }).join('');
+
+        let playersHtml = '';
+        if (players) {
+            const statuses = this.getLobbyPlayerStatuses(slot);
+            if (statuses.length > 0) {
+                playersHtml = `<div class="slot-lobby-players">` + statuses.map(p =>
+                    `<span class="slot-lobby-player ${p.gameLobby && p.discord ? 'is-ready' : 'not-ready'}"` +
+                    ` title="${this._escHtml(p.teamName || '')}">` +
+                    `<span class="slot-ready-icon ${p.gameLobby ? 'on' : ''}" title="Game lobby (player-confirmed)">${ICON_SVGS.gamepad2}</span>` +
+                    `<span class="slot-ready-icon ${p.discord ? 'on' : ''}" title="Discord (moved automatically)">${ICON_SVGS.headphones}</span>` +
+                    this._escHtml(p.name) + `</span>`
+                ).join('') + `</div>`;
+            }
+        }
+        return matchesHtml + playersHtml;
+    }
+
     _renderSlotPanels(phase) {
         const bar = document.getElementById('phaseIndicatorBar');
         if (!bar) return;
@@ -1789,12 +1924,18 @@ class PhaseManager {
                 `<span class="phase-req-check">${r.met ? ICON_SVGS.check : ICON_SVGS.x}</span> ${this._escHtml(r.label)}</span>`
             ).join('');
 
+            const sub = info.subPhase;
+            const detailsHtml = (sub === 'setup' || sub === 'lobby' || sub === 'playing')
+                ? this.renderSlotDetailsHtml(slot, { players: sub === 'lobby' })
+                : '';
+
             return `
                 <div class="match-slot-panel${isDone ? ' slot-done' : ''}">
                     <div class="match-slot-header">
                         <span class="match-slot-icon">${info.icon}</span>
                         <span class="match-slot-name">${this._escHtml(info.name)}</span>
                     </div>
+                    ${detailsHtml}
                     <div class="match-slot-reqs">${reqsHtml}</div>
                     ${isDone ? '' : `<button class="btn-small primary" ${allMet ? '' : 'disabled'} onclick="advanceSlot(${slot})">Advance Match ${slot} ${ICON_SVGS.play}</button>`}
                     <button class="btn-small secondary" onclick="forceAdvanceSlot(${slot})" title="Force advance (skip requirements)" ${isDone ? 'style="display:none"' : ''}>${ICON_SVGS.triangleAlert} Force Advance</button>

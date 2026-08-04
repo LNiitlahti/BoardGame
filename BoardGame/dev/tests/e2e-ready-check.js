@@ -42,14 +42,17 @@
  *   workaround for the confirmed bug above, NOT how any real match looks.
  *   Log in as the real player (E2ePlayer14) in an isolated browser context,
  *   open team.html, confirm the ready-check overlay is visible with the
- *   right match card, click both the Discord and Game Lobby buttons, assert
- *   the UI updates (buttons disabled + checkmarked) and Firestore's
- *   `lobbyReady.{uid}` is correctly written. Then have that player confirm
- *   on behalf of their teammate too (the "confirm for teammate" buttons),
- *   completing mustReady, and confirm the slot THEN legitimately
- *   auto-advances to 'playing' — proving the auto-advance gate and the
- *   button/Firestore plumbing are correct; only the mustReady population
- *   source (Part 1) is broken.
+ *   right match card, click the Game Lobby button (the only player-settable
+ *   one — Discord is bot-automated, see Task 7 note below, and is instead
+ *   simulated here with a direct Firestore write standing in for the bot),
+ *   assert the UI updates (button disabled + checkmarked) and Firestore's
+ *   `lobbyReady.{uid}` ends up with both `discord` and `gameLobby` true.
+ *   Then have that player confirm Lobby on behalf of their teammate too (the
+ *   "confirm for teammate" button) plus simulate the bot's Discord write for
+ *   the teammate, completing mustReady, and confirm the slot THEN
+ *   legitimately auto-advances to 'playing' — proving the auto-advance gate
+ *   and the button/Firestore plumbing are correct; only the mustReady
+ *   population source (Part 1) is broken.
  *
  *   PART 3 — the "retroactive confirm in playing" gap (also flagged in
  *   TODO.md as unverified). With the slot now in 'playing', wipe
@@ -93,6 +96,16 @@
  * `.teammate-item:not(.you)` with a "confirm on behalf of" tooltip), so the
  * match-panel copy was a straight duplicate. Part 2 below now clicks the
  * Teammates-sidebar buttons directly instead.
+ *
+ * UPDATED AGAIN (Task 7): the player-facing Discord confirm button was
+ * removed entirely (both `.teammate-item.you` and `.teammate-item:not(.you)`
+ * rows now render Discord as a read-only `.teammate-ready-icon` span) —
+ * Discord readiness is written by a Discord bot's automated voice-move
+ * (production only) instead of a manual click, and `setReadyStatus()` in
+ * team-controls.js now rejects any `statusType` other than `'gameLobby'`.
+ * This bot-less e2e harness can't trigger a real bot write, so Part 2 below
+ * clicks the single remaining Lobby button and simulates the bot's Discord
+ * write with a direct `firebase.firestore()...update()` call from `tdPage`.
  *
  * Snapshots/restores gameQueue, currentPhase, lobbyReady in a `finally`
  * block so no synthetic data is left behind in e2e-disposable-1.
@@ -327,19 +340,19 @@ async function main() {
       assert(cardShowsEmptyState === false,
         `PART 2 REGRESSION: match-info card should show real match content (game/opponent/Discord), not the empty state. Got: ${cardHtml.slice(0, 200)}`);
 
-      // Click own Discord + Game Lobby confirm buttons. These live in the
-      // Teammates sidebar now (renderTeammates()'s own-row buttons under
-      // `.teammate-item.you`), not a separate standalone control -- the old
-      // #readyDiscordBtn/#readyGameLobbyBtn duplicated that exact UI and
-      // were removed. Re-query fresh each time: clicking triggers a
-      // Firestore write that round-trips through onSnapshot and re-renders
-      // #teammatesList's innerHTML, detaching any previously-queried handle.
-      for (let i = 0; i < 2; i++) {
-        await playerPage.waitForSelector('.teammate-item.you .teammate-ready-btn:not([disabled])', { timeout: 10000 });
-        const btn = await playerPage.$('.teammate-item.you .teammate-ready-btn:not([disabled])');
-        await btn.click();
-        await new Promise(r => setTimeout(r, 500));
-      }
+      // Click the single Game Lobby confirm button. Discord is no longer
+      // player-settable -- team-controls.js's setReadyStatus() rejects any
+      // statusType other than 'gameLobby', and the Discord control in the
+      // Teammates sidebar is now a read-only `.teammate-ready-icon` span
+      // (renderTeammates()) that the bot's automated voice move flips via a
+      // direct Firestore write we can't trigger for real here, so we
+      // simulate that bot write below instead. Re-query fresh: clicking
+      // triggers a Firestore write that round-trips through onSnapshot and
+      // re-renders #teammatesList's innerHTML, detaching any previously-
+      // queried handle.
+      await playerPage.waitForSelector('.teammate-item.you .teammate-ready-btn:not([disabled])', { timeout: 10000 });
+      const ownBtn = await playerPage.$('.teammate-item.you .teammate-ready-btn:not([disabled])');
+      await ownBtn.click();
       await playerPage.waitForFunction(
         () => document.querySelectorAll('.teammate-item.you .teammate-ready-btn:not([disabled])').length === 0,
         { timeout: 10000 }
@@ -349,9 +362,16 @@ async function main() {
         document.querySelector('.teammate-item.you')?.innerHTML || ''
       );
       console.log('--- PART 2: own teammate-item HTML after own confirm ---', uiAfterOwnConfirm.slice(0, 300));
-      assert(/✓/.test(uiAfterOwnConfirm), 'PART 2: own Discord+Lobby buttons should show a checkmark after confirming');
+      assert(/✓/.test(uiAfterOwnConfirm), 'PART 2: own Lobby button should show a checkmark after confirming');
 
-      // Verify Firestore actually got the write (read back via TD's live godApp.gameState).
+      // Simulate the Discord bot's automated write for this player (no real
+      // bot runs in this e2e harness) with a direct Firestore update, the
+      // same shape team-controls.js's old player-driven write used to make.
+      await tdPage.evaluate((uid, tid) => firebase.firestore()
+        .collection('tournaments').doc(tid)
+        .update({ [`lobbyReady.${uid}.discord`]: true }), player14.uid, tournamentId);
+
+      // Verify Firestore actually got both writes (read back via TD's live godApp.gameState).
       await tdPage.waitForFunction(
         (uid) => window.godApp.gameState.lobbyReady?.[uid]?.discord === true && window.godApp.gameState.lobbyReady?.[uid]?.gameLobby === true,
         { timeout: 15000 },
@@ -360,7 +380,7 @@ async function main() {
       const firestoreLobbyReadyForPlayer = await tdPage.evaluate((uid) => window.godApp.gameState.lobbyReady[uid], player14.uid);
       console.log('--- PART 2: Firestore lobbyReady for E2ePlayer14 ---', JSON.stringify(firestoreLobbyReadyForPlayer));
       assert(firestoreLobbyReadyForPlayer.discord === true && firestoreLobbyReadyForPlayer.gameLobby === true,
-        'PART 2: Firestore lobbyReady should show this player as discord+gameLobby ready');
+        'PART 2: Firestore lobbyReady should show this player as discord (simulated bot write) + gameLobby (button) ready');
 
       // Now confirm on behalf of the teammate ("TD (E2E)") using the
       // Teammates sidebar's own "confirm on behalf of" buttons (the
@@ -369,17 +389,19 @@ async function main() {
       // confirm-for-teammate buttons on the non-"you" row).
       await playerPage.waitForSelector('.teammate-item:not(.you) .teammate-ready-btn', { timeout: 10000 });
       const teammateBtnCount = await playerPage.evaluate(() => document.querySelectorAll('.teammate-item:not(.you) .teammate-ready-btn').length);
-      assert(teammateBtnCount === 2, `PART 2: expected 2 teammate-confirm buttons (Discord + Lobby) for "TD (E2E)", got ${teammateBtnCount}`);
-      // Click both teammate buttons (discord first, then lobby) as rendered.
-      // Re-query fresh each time: clicking triggers a Firestore write, which
-      // round-trips through onSnapshot and re-renders #teammatesList's
-      // innerHTML, detaching any previously-queried element handle.
-      for (let i = 0; i < 2; i++) {
-        await playerPage.waitForSelector('.teammate-item:not(.you) .teammate-ready-btn:not([disabled])', { timeout: 10000 });
-        const btn = await playerPage.$('.teammate-item:not(.you) .teammate-ready-btn:not([disabled])');
-        await btn.click();
-        await new Promise(r => setTimeout(r, 500));
-      }
+      assert(teammateBtnCount === 1, `PART 2: expected 1 teammate-confirm button (Lobby) for "TD (E2E)", got ${teammateBtnCount}`);
+      // Click the single teammate Lobby button. Discord for the teammate is
+      // simulated below with a direct Firestore write, same as for the
+      // player themself above -- there's no button for it anymore.
+      await playerPage.waitForSelector('.teammate-item:not(.you) .teammate-ready-btn:not([disabled])', { timeout: 10000 });
+      const teammateBtn = await playerPage.$('.teammate-item:not(.you) .teammate-ready-btn:not([disabled])');
+      await teammateBtn.click();
+      await new Promise(r => setTimeout(r, 500));
+
+      // Simulate the bot's automated Discord write for the teammate too.
+      await tdPage.evaluate((uid, tid) => firebase.firestore()
+        .collection('tournaments').doc(tid)
+        .update({ [`lobbyReady.${uid}.discord`]: true }), tdE2E.uid, tournamentId);
 
       await tdPage.waitForFunction(
         (uid) => window.godApp.gameState.lobbyReady?.[uid]?.discord === true && window.godApp.gameState.lobbyReady?.[uid]?.gameLobby === true,
@@ -389,9 +411,9 @@ async function main() {
       const firestoreLobbyReadyForTeammate = await tdPage.evaluate((uid) => window.godApp.gameState.lobbyReady[uid], tdE2E.uid);
       console.log('--- PART 2: Firestore lobbyReady for TD (E2E), confirmed-by-teammate ---', JSON.stringify(firestoreLobbyReadyForTeammate));
       assert(firestoreLobbyReadyForTeammate.discord === true && firestoreLobbyReadyForTeammate.gameLobby === true,
-        'PART 2: Firestore lobbyReady should show the teammate as discord+gameLobby ready (confirmed on their behalf)');
-      assert(firestoreLobbyReadyForTeammate.discordBy === player14.uid || firestoreLobbyReadyForTeammate.gameLobbyBy === player14.uid,
-        `PART 2: expected teammate's ready record to note it was confirmed by E2ePlayer14, got: ${JSON.stringify(firestoreLobbyReadyForTeammate)}`);
+        'PART 2: Firestore lobbyReady should show the teammate as discord (simulated bot write) + gameLobby (button) ready');
+      assert(firestoreLobbyReadyForTeammate.gameLobbyBy === player14.uid,
+        `PART 2: expected teammate's lobby confirm to note it was done by E2ePlayer14, got: ${JSON.stringify(firestoreLobbyReadyForTeammate)}`);
 
       // With mustReady now genuinely fully met, the slot should legitimately
       // auto-advance to 'playing' (proving the auto-advance MECHANISM is
@@ -399,9 +421,9 @@ async function main() {
       await tdPage.waitForFunction(() => window.godApp.phase.getSlotSubPhase(1) === 'playing', { timeout: 10000 });
       console.log('--- PART 2: slot 1 legitimately auto-advanced to playing once mustReady was fully confirmed ---');
 
-      findings.push('PART 2 CONFIRMED: the confirm-button UI, Firestore writes (lobbyReady.{uid}.discord/gameLobby), ' +
-        'the "confirm for teammate" flow, and the auto-advance gate all work correctly once mustReady is populated — ' +
-        'the ONLY defect is the population source demonstrated in Part 1.');
+      findings.push('PART 2 CONFIRMED: the Lobby confirm-button UI, Firestore writes (lobbyReady.{uid}.gameLobby, plus ' +
+        'the bot-simulated lobbyReady.{uid}.discord write), the "confirm for teammate" flow, and the auto-advance gate ' +
+        'all work correctly once mustReady is populated — the ONLY defect is the population source demonstrated in Part 1.');
       findings.push('PART 2 (Task 13 update): the match-info card (renderMatchCardsWithDiscord in team-controls.js — ' +
         'game name, opponent, Discord channel, lobby creator) now correctly renders for a real match, confirmed via ' +
         'cardShowsEmptyState === false above. Previously never rendered (same field-shape bug family as Part 1); ' +
@@ -446,8 +468,9 @@ async function main() {
       assert(part3.hasReadOnlyIndicatorsOnly === true, 'PART 3: Teammates sidebar should fall back to read-only status dots while the slot is in \'playing\'');
 
       findings.push('PART 3 CONFIRMED (gap is real, still present): once a slot reaches \'playing\', there is genuinely ' +
-        'no UI path to retroactively confirm Discord/Game Lobby readiness — team-controls.js gates both the lobby overlay ' +
-        '(renderPhaseOverlays, sub === \'lobby\' only) and the Teammates sidebar\'s clickable buttons (renderTeammates, ' +
+        'no UI path to retroactively confirm Game Lobby readiness (Discord readiness was never player-driven UI to begin ' +
+        'with as of Task 7 — it\'s a bot-automated write) — team-controls.js gates both the lobby overlay ' +
+        '(renderPhaseOverlays, sub === \'lobby\' only) and the Teammates sidebar\'s clickable Lobby button (renderTeammates, ' +
         'canClick = isLobbyPhase) strictly on the slot\'s sub-phase being \'lobby\'.');
 
       await playerContext.close();

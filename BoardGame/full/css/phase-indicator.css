@@ -520,6 +520,75 @@
   flex-shrink: 0;
 }
 
+/* Match details + per-player lobby readiness inside slot cards
+   (rendered by PhaseManager.renderSlotDetailsHtml on both god.html's
+   slot panels and admin.html's flow cards) */
+.slot-match-detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.8rem;
+}
+.slot-detail-game {
+  font-weight: 700;
+  color: var(--text-primary, #f7f0e3);
+}
+.slot-detail-vs {
+  opacity: 0.5;
+  font-size: 0.7rem;
+}
+.slot-detail-team {
+  color: var(--text-secondary, rgba(247, 240, 227, 0.8));
+}
+.slot-detail-channel {
+  font-size: 0.7rem;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+.slot-lobby-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.slot-lobby-player {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.slot-lobby-player.not-ready {
+  border-color: rgba(255, 120, 80, 0.45);
+  color: var(--warning, #ffb37a);
+}
+.slot-lobby-player.is-ready {
+  border-color: rgba(120, 220, 140, 0.35);
+  color: var(--success, #9fdca8);
+}
+.slot-ready-icon {
+  display: inline-flex;
+  opacity: 0.3;
+}
+.slot-ready-icon.on {
+  opacity: 1;
+}
+.slot-ready-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.challenge-lobby-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
 /* ==================== ANIMATION ==================== */
 
 @keyframes fadeIn {

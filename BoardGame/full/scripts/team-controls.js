@@ -306,12 +306,15 @@ function renderPhaseBanner() {
 
         if (sub === 'lobby') {
             const r = (gameData.lobbyReady || {})[currentUser?.uid] || {};
-            const confirmed = (r.gameLobby === true || r.ready === true) && (r.discord === true || r.ready === true);
+            // Discord readiness is written automatically when the bot moves
+            // the player into voice — the only manual confirm is the game
+            // lobby.
+            const confirmed = r.gameLobby === true || r.ready === true;
             if (confirmed) {
                 desc = 'You are confirmed. Waiting for the remaining players...';
                 action = false;
             } else {
-                desc = `Match ${mySlot} — join Discord and the game lobby, then confirm both.`;
+                desc = `Match ${mySlot} — you'll be moved into Discord automatically. Confirm once you're in the game lobby.`;
                 action = true;
             }
         } else if (sub === 'playing') {
@@ -382,10 +385,7 @@ function renderTeammates() {
                 const confirmTitle = isYou ? '' : `title="Confirm on behalf of ${playerName.replace(/"/g, '&quot;')}"`;
                 readyHTML = `
                     <div class="teammate-ready-buttons">
-                        <button class="teammate-ready-btn ${dc ? 'is-ready' : ''}" ${dc ? 'disabled' : ''} ${confirmTitle}
-                                onclick="event.stopPropagation(); setReadyStatus('discord'${uidArg})">
-                            &#x1F3A7; ${dc ? '&#x2713;' : 'Discord'}
-                        </button>
+                        <span class="teammate-ready-icon ${dc ? 'on' : ''}" title="Discord — moved automatically by the bot">&#x1F3A7;${dc ? '&#x2713;' : ''}</span>
                         <button class="teammate-ready-btn ${gl ? 'is-ready' : ''}" ${gl ? 'disabled' : ''} ${confirmTitle}
                                 onclick="event.stopPropagation(); setReadyStatus('gameLobby'${uidArg})">
                             &#x1F3AE; ${gl ? '&#x2713;' : 'Lobby'}
@@ -2042,12 +2042,18 @@ function renderReadinessStatus() {
 }
 
 /**
- * Set a specific readiness status for the current player, or on behalf of a
- * teammate (team members vouch for each other being in Discord / the lobby).
- * @param {'gameLobby'|'discord'} statusType
+ * Confirm game-lobby readiness for the current player, or on behalf of a
+ * teammate (team members vouch for each other being in the lobby).
+ * Discord readiness is no longer player-settable — the bot's automated
+ * voice move writes lobbyReady.{uid}.discord itself.
+ * @param {'gameLobby'} statusType
  * @param {string} [targetUid]  Teammate's uid; defaults to the current player
  */
 async function setReadyStatus(statusType, targetUid = null) {
+    if (statusType !== 'gameLobby') {
+        console.warn(`[Team Controls] setReadyStatus('${statusType}') ignored — only gameLobby is player-settable`);
+        return;
+    }
     if (!currentUser || !currentTournamentId) return;
 
     const uid = targetUid || currentUser.uid;
@@ -2092,12 +2098,6 @@ async function setReadyStatus(statusType, targetUid = null) {
         console.error(`[Team Controls] Error setting ${statusType} ready:`, error);
         showStatus(`Error confirming ${statusType}: ` + error.message, 'error');
     }
-}
-
-/** Legacy: mark both statuses ready at once */
-async function toggleReady() {
-    await setReadyStatus('gameLobby');
-    await setReadyStatus('discord');
 }
 
 /**
