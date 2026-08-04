@@ -1295,6 +1295,8 @@ git commit -m "feat: Firestore adapter and onDiscordCommand trigger"
 
 ## Task 6: Firestore security rules
 
+**Correction (found during implementation):** `BoardGame/firestore.rules` is deliberately gitignored — it's a local staging copy hand-mirrored to the Firebase console, never committed. `firestore.rules.temp` is NOT a substitute; it's an unrelated flat "allow everything to authenticated users" migration fallback with no `isAdmin()`/`isGod()` helpers or `tournaments/{tournamentId}` structure. So: edit the real, untracked `firestore.rules` file in place, and do **not** `git add`/`git commit` it — that stays true to how this file has always been handled. Skip the "Commit" step below; everything else applies as written.
+
 **Files:**
 - Modify: `BoardGame/firestore.rules` — insert after the `chatTeams` block, before the closing brace of `match /tournaments/{tournamentId}` (currently line 215)
 
