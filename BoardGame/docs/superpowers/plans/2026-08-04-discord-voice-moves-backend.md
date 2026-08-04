@@ -474,8 +474,11 @@ function restWith(responses) {
     return { rest: createDiscordRest({ token: 'tok', fetchImpl }), calls };
 }
 
-test('204 is a successful move', async () => {
-    const { rest, calls } = restWith([{ status: 204, body: null }]);
+test('200 is a successful move', async () => {
+    const { rest, calls } = restWith([{
+        status: 200,
+        body: { user: { id: 'u' }, channel_id: 'c' }
+    }]);
     const result = await rest.moveMember({ guildId: 'g', discordUserId: 'u', channelId: 'c' });
     assert.deepStrictEqual(result, { outcome: 'moved' });
     assert.strictEqual(calls[0].url, 'https://discord.com/api/v10/guilds/g/members/u');
@@ -618,7 +621,10 @@ function createDiscordRest({ token, fetchImpl = fetch }) {
             return { outcome: 'error', error: String(err && err.message ? err.message : err) };
         }
 
-        if (res.status === 204) return { outcome: 'moved' };
+        // Discord's Modify Guild Member endpoint returns 200 with the
+        // member object on success, not 204 — confirmed against
+        // docs.discord.com/developers/resources/guild.
+        if (res.status === 200) return { outcome: 'moved' };
 
         const body = await readJson(res);
 

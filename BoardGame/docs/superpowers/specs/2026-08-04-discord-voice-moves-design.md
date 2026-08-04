@@ -207,7 +207,7 @@ per month.
 
 | Outcome | Cause | Terminal |
 |---|---|---|
-| `moved` | Success (Discord returns 204) | yes |
+| `moved` | Success (Discord returns 200 with the member object) | yes |
 | `unlinked` | No confirmed link, or roster player has no account | yes |
 | `no_channel` | `slotChannels` has no channel for this slot/side — config error | yes |
 | `not_in_voice` | Player isn't connected to any voice channel | retried |
