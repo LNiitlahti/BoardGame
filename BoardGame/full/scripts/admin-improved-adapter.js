@@ -799,6 +799,13 @@
                 }).join('')
                 : '';
 
+            // Match + player detail (game, teams, Discord channels; in
+            // lobby also each player's ready state) — playing keeps its
+            // richer live-match-card instead.
+            const detailsHtml = (sub === 'setup' || sub === 'lobby')
+                ? _phaseManager.renderSlotDetailsHtml(slot, { players: sub === 'lobby' })
+                : '';
+
             return `
                 <div class="match-slot-panel${isDone ? ' slot-done' : ''}${isTarget ? ' slot-target' : ''}">
                     <div class="match-slot-header">
@@ -807,6 +814,7 @@
                         ${sub === 'setup' ? `<button class="btn-small secondary" onclick="setTargetMatchSlot(${slot})" title="New matches go to this slot">${isTarget ? ICON_SVGS.check + ' Target' : 'Set Target'}</button>` : ''}
                     </div>
                     <div class="match-slot-guidance">${_esc(step.text)}</div>
+                    ${detailsHtml}
                     ${liveMatchesHtml}
                     ${btnHtml}
                     <button class="btn-small secondary" onclick="forceAdvanceSlot(${slot})" title="Force advance (skip requirements)" ${isDone ? 'style="display:none"' : ''}>${ICON_SVGS.triangleAlert} Force Advance</button>
@@ -1083,7 +1091,8 @@
                     // queued to playing.
                     if (_phaseManager.isChallengeLobbyActive()) {
                         return {
-                            text: `Waiting for players to ready up for <strong>${_esc(label)}</strong> (auto-advances when done).`,
+                            text: `Waiting for players to ready up for <strong>${_esc(label)}</strong> (auto-advances when done).` +
+                                _phaseManager.renderSlotDetailsHtml('challenge', { players: true }),
                             primary: {
                                 label: 'Force Ready',
                                 action: () => _openFlowConfirm({
