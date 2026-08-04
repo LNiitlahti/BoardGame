@@ -10,7 +10,48 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   `BoardGame/` directory so pages can be loaded via `http://localhost:8080/...`.
 - `e2e-harness.js` — `login(page, baseUrl, email, password)`,
   `newLoggedInPage(browser, baseUrl, email, password)`,
-  `gotoTournamentPage(page, baseUrl, pageName, tournamentId, extraParams)`.
+  `gotoTournamentPage(page, baseUrl, pageName, tournamentId, extraParams)`,
+  plus shared utilities added 2026-08-04 so scripts stop re-declaring them:
+  `assert(cond, msg)`, `sleep(ms)`, `screenshot(page, name, subdir='full-flow')`
+  (writes to `dev/tests/screenshots/<subdir>/`, auto-creates the dir, logs the
+  path), `screenshotDir(subdir)`, `createDisposablePlayer(browser, baseUrl,
+  name)` (was copy-pasted verbatim into two scripts), and `VIEWPORT`
+  (1920×1080 — `newLoggedInPage` now applies it automatically; see gotcha
+  about the navbar mobile breakpoint).
+- **`e2e-full-flow.js` — the only END-TO-END script.** Everything else here is
+  a narrow single-feature test that seeds synthetic state and restores it;
+  this one drives a whole tournament through the real UI: creates a fresh
+  `e2e-fullflow-<timestamp>` tournament via the setup.html wizard, links real
+  accounts on god.html's Teams tab, captures the player view, plays N rounds
+  on admin.html (phase walk + both match slots + the round-2 earned-hex gate),
+  verifies "Undo Last Action", finishes the tournament, and asserts
+  view.html's winner celebration against the standings. Captures ~99 numbered
+  screenshots across setup/god/team/admin/view/statistics into
+  `dev/tests/screenshots/full-flow/` — these are the source assets for
+  manuals and tutorials, which is why filenames are zero-padded and ordered.
+  ```bash
+  cd BoardGame
+  node dev/tests/e2e-full-flow.js --rounds=2 --teams=5
+  ```
+  Flags: `--rounds=N` (default 2 — the minimum that reaches round-2 hex
+  gating), `--teams=N` (default 5; see below), `--fresh-accounts`,
+  `--headed`, `--keep-open`, `--skip-undo`.
+  - **`--teams=5` is effectively mandatory.** `SmartMatchGenerator` hard-requires
+    exactly 5 teams (`smart-match-generator.js:302`), so Auto-Generate fails on
+    any other count and the run stops at the first match slot. The script warns
+    up front if you pass anything else.
+  - It **reuses the standing `PLAYER1-14` accounts** rather than minting new
+    ones. The "burned uid" rule is scoped to a single tournament's registry,
+    and this script creates a brand-new tournament every run, so the standing
+    accounts are always eligible. `--fresh-accounts` exists but is slow
+    (Firebase Auth rate-limits rapid creation) and burns real auth users.
+  - The tournament is **left behind on purpose** — no teardown. Deleting a
+    tournament currently orphans its season references, and keeping the
+    artifact is what makes a failed run debuggable.
+  - It detects Firestore **quota exhaustion** (HTTP 429 `resource-exhausted`)
+    and prints an explicit banner, because quota makes writes fail silently
+    and looks exactly like a product bug. Repeated full runs WILL hit the
+    daily quota on this project.
 - `e2e-smoke.js` — minimal script proving login works end-to-end; run it any time
   to sanity-check the harness still works (e.g. after a login.html change).
 - `e2e-create-players.js` — creates N disposable player accounts (auth user +
@@ -815,8 +856,10 @@ present in a fresh worktree/clone:
    from an existing checkout; without it the app never leaves the
    "Authenticating..." screen.
 2. `BoardGame/dev/tests/.env.e2e` — credentials, see below.
-3. `npm install` inside `BoardGame/dev/` (installs `puppeteer` + `dotenv` into
-   `BoardGame/dev/node_modules/`, also gitignored).
+3. `npm install` inside **`BoardGame/`** (installs `puppeteer` + `dotenv` into
+   `BoardGame/node_modules/`, also gitignored). NOTE: this used to say
+   `BoardGame/dev/` — that is wrong and there is no `BoardGame/dev/package.json`;
+   the manifest and `node_modules/` both live at `BoardGame/`.
 
 ## Running
 
@@ -832,10 +875,20 @@ stale process before rerunning.
 ## Credentials
 
 `.env.e2e` currently holds one TD/god-admin account (see the repo owner for the
-address — not written here since this file is committed to git). Player test
-accounts (`PLAYER1_*`/`PLAYER2_*`) are intentionally blank — per-task scripts
-create disposable player accounts programmatically rather than relying on
-pre-existing ones.
+address — not written here since this file is committed to git), plus **14
+standing player accounts, `PLAYER1_*` through `PLAYER14_*`, all populated**
+(corrected 2026-08-04 — this section previously claimed PLAYER1/2 were
+"intentionally blank", which has not been true for some time).
+
+Two valid strategies, pick per script:
+- **Reuse the standing accounts** when your script creates its own fresh
+  tournament (as `e2e-full-flow.js` does). The "already assigned in this
+  tournament" rule is scoped to one tournament's player registry, so a brand-new
+  tournament can always link them.
+- **Mint disposable accounts** (`createDisposablePlayer` from `e2e-harness.js`,
+  or the `e2e-create-players.js` CLI) when your script mutates a LONG-LIVED
+  tournament like `e2e-disposable-1`, where every uid ever linked is burned for
+  good. Use timestamped names in that case.
 
 ## Test tournament
 
@@ -1011,3 +1064,45 @@ and is safe for later tasks to keep reusing/mutating.
   `await page.setViewport({ width: 1280, height: 900 })` (or similar) right
   after creating the page. Found while building
   `e2e-navbar-primary-switch.js`.
+- **Firestore quota exhaustion makes writes fail SILENTLY, and looks exactly
+  like a product bug.** When the project hits its daily quota, Firestore
+  returns HTTP 429 / `resource-exhausted`; app code like
+  `adjustTeamPoints()` catches the rejected transaction and only calls
+  `showStatus()`, so the symptom is "the + button does nothing" or "points
+  won't save" with no thrown error and nothing in `pageerror`. Repeatedly
+  running a heavy script (5 full `e2e-full-flow.js` passes inside ~30 min did
+  it) will hit this. **Before concluding you have found a bug, check the
+  browser console for 429 / `resource-exhausted`.** `e2e-full-flow.js` has a
+  `trackQuotaErrors()` helper that watches console output and prints an
+  explicit banner — copy that pattern into any long write-heavy script.
+- **`gameState` on admin.html is a top-level `let`, NOT `window.gameState`.**
+  A top-level `let`/`const` creates a global *lexical* binding, which is
+  reachable by bare name inside `page.evaluate` but is **not** a property of
+  `window` — so `window.gameState` is `undefined` and
+  `window.gameState.teams` throws. Use the defensive form:
+  `const gs = window.gameState || (typeof gameState !== 'undefined' ? gameState : null);`
+  (`window.pendingHexWins` *is* a real window property — it's installed via
+  `Object.defineProperty` in `admin.js` — so that one works directly.)
+  Contrast with god.html, which exposes everything under `window.godApp`.
+- **The hex-placement gate is phase-scoped, and picking the wrong team wastes
+  a hex without clearing anything.** `_relevantPendingWinsForPhase()`
+  (`admin-improved-adapter.js:590`) narrows pending hex credits to slot 1
+  during `hex_placement_1` and slot 2 during `hex_placement_2`. In the team
+  picker, only an in-scope owed team gets the "Earned Placement, or Spell
+  Claim?" prompt whose confirm calls `clearPendingHexWin()`. An owed team
+  from the *other* slot instead gets the "Wrong Team?" prompt, whose confirm
+  assigns the hex but deliberately leaves the credit intact — so a test that
+  iterates over all of `pendingHexWins` in one phase will assign hexes, never
+  clear the gate, and appear to hang. Also note one pending ENTRY can owe
+  SEVERAL teams (a full-team win credits every team on the winning side) and
+  `clearPendingHexWin()` retires exactly one team per call — so measure
+  progress in owed *teams*, not entries. Both traps hit while building
+  `e2e-full-flow.js`.
+- **`#flowPrimaryBtn` does not exist until the phase system is initialized.**
+  Before that, `admin-improved-adapter.js` replaces the flow panel with an
+  init prompt whose only control is
+  `button[onclick="initializePhaseSystem()"]`. Click that first, then wait
+  for `#flowPrimaryBtn`. Related: the primary's real behaviour is a JS
+  closure (`_primaryAction`), not inspectable from the DOM — the only way to
+  know where the flow is is to read `#flowPhaseName`, and most primaries then
+  route through `#flowConfirmModal` → `#flowConfirmBtn`.
