@@ -1747,6 +1747,24 @@ class PhaseManager {
             }
         }
 
+        // Challenge lobby: show the queued challenge + per-player readiness
+        // under the requirement counters (same shared builder the match
+        // slots use).
+        let challengeDetails = document.getElementById('challengeLobbyDetails');
+        if (this.isChallengeLobbyActive()) {
+            if (!challengeDetails) {
+                challengeDetails = document.createElement('div');
+                challengeDetails.id = 'challengeLobbyDetails';
+                challengeDetails.className = 'challenge-lobby-details';
+                bar.appendChild(challengeDetails);
+            }
+            challengeDetails.style.display = '';
+            challengeDetails.innerHTML = this.renderSlotDetailsHtml('challenge', { players: true });
+        } else if (challengeDetails) {
+            challengeDetails.style.display = 'none';
+            challengeDetails.innerHTML = '';
+        }
+
         // Buttons
         const advBtn = document.getElementById('advancePhaseBtn');
         const forceBtn = document.getElementById('forceAdvanceBtn');
