@@ -224,6 +224,220 @@ const DiscordPanel = {
             clearTimeout(timeout);
             console.error('[Discord Panel] Command watch failed:', err);
         });
+    },
+
+    // ── Player links ────────────────────────────────────────────
+
+    /**
+     * Flatten the tournament roster into link-table rows.
+     *
+     * Roster entries in `teams[].players[]` carry only `{id, name, uid}` —
+     * the Discord username a player typed at onboarding lives in the
+     * tournament document's top-level `players` map, keyed by the same
+     * player id (that is where onboarding.js writes platformIds). So the
+     * two have to be joined here.
+     *
+     * Players with no `uid` are included but cannot be linked: links are
+     * keyed by Firebase uid, and an account-less onboarding player has none.
+     * They are shown greyed out rather than hidden, so it is obvious why
+     * they will never be auto-moved.
+     */
+    _rosterRows() {
+        const gameState = window.godApp?.gameState || {};
+        const teams = gameState.teams || [];
+        const playersById = gameState.players || {};
+        const rows = [];
+
+        teams.forEach(team => {
+            (team.players || []).forEach(player => {
+                const onboarding = playersById[player.id] || {};
+                rows.push({
+                    uid: player.uid || null,
+                    name: player.name || player.id || '(unnamed)',
+                    teamName: team.name || `Team ${team.id}`,
+                    typed: onboarding.platformIds?.discord || '',
+                    linked: player.uid ? this._links[player.uid] : null
+                });
+            });
+        });
+        return rows;
+    },
+
+    /** <option> list of guild members for one row's dropdown. */
+    _memberOptions(selectedId, suggestedId) {
+        const blank = `<option value="">— not linked —</option>`;
+        const options = this._members.map(member => {
+            const chosen = String(member.discordUserId) === String(selectedId) ? ' selected' : '';
+            const isSuggested = String(member.discordUserId) === String(suggestedId);
+            const label = isSuggested
+                ? `${member.displayName} (suggested)`
+                : `${member.displayName} — ${member.username}`;
+            return `<option value="${this._escape(member.discordUserId)}"${chosen}>${this._escape(label)}</option>`;
+        }).join('');
+        return blank + options;
+    },
+
+    renderLinks() {
+        const host = document.getElementById('discordLinksSection');
+        if (!host) return;
+
+        const rows = this._rosterRows();
+        const matcher = window.DiscordLinkMatcher;
+
+        if (this._members.length === 0) {
+            host.innerHTML = `
+                <h4 style="margin-bottom:10px;">Player Links</h4>
+                <p style="color: var(--text-tertiary); font-size:0.85rem;">
+                    No guild members cached yet. Save the setup above, then click "Refresh members".
+                </p>
+                <button class="btn secondary" onclick="DiscordPanel.refreshMembers()">Refresh members</button>
+            `;
+            return;
+        }
+
+        let suggestionCount = 0;
+
+        const body = rows.map((row, index) => {
+            const suggested = (row.uid && !row.linked && matcher)
+                ? matcher.suggestMember(row.typed, this._members)
+                : null;
+            if (suggested) suggestionCount++;
+
+            const selectedId = row.linked?.discordUserId || suggested?.discordUserId || '';
+            const unlinked = !row.linked && !suggested;
+            const rowStyle = row.uid
+                ? (unlinked ? 'background: rgba(239,68,68,0.08);' : '')
+                : 'opacity: 0.45;';
+
+            const control = row.uid
+                ? `<select id="discordLinkSelect-${index}" style="width:100%; padding:6px; background:rgba(11,13,16,0.6); border:1px solid rgba(255,255,255,0.08); border-radius:6px; color:white;">
+                       ${this._memberOptions(selectedId, suggested?.discordUserId)}
+                   </select>`
+                : `<span style="font-size:0.8rem; color:var(--text-tertiary);">no account</span>`;
+
+            const action = row.uid
+                ? `<button class="btn-small primary" onclick="DiscordPanel.saveLink('${this._escape(row.uid)}', ${index})">Save</button>`
+                : '';
+
+            const status = row.linked
+                ? '<span style="color:#22c55e;">linked</span>'
+                : (suggested ? '<span style="color:#eab308;">suggested</span>' : '<span style="color:#ef4444;">unlinked</span>');
+
+            return `
+                <tr style="${rowStyle}">
+                    <td>${this._escape(row.name)}</td>
+                    <td style="color:var(--text-tertiary);">${this._escape(row.teamName)}</td>
+                    <td style="color:var(--text-tertiary);">${this._escape(row.typed || '—')}</td>
+                    <td>${control}</td>
+                    <td>${status}</td>
+                    <td>${action}</td>
+                </tr>`;
+        }).join('');
+
+        host.innerHTML = `
+            <h4 style="margin-bottom:10px;">Player Links</h4>
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <button class="btn primary" onclick="DiscordPanel.confirmAllSuggestions()"
+                        ${suggestionCount === 0 ? 'disabled' : ''}>
+                    Confirm all suggestions (${suggestionCount})
+                </button>
+                <button class="btn secondary" onclick="DiscordPanel.refreshMembers()">Refresh members</button>
+            </div>
+            <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+                <thead>
+                    <tr style="text-align:left; color:var(--text-tertiary); font-size:0.8rem;">
+                        <th>Player</th><th>Team</th><th>Typed at onboarding</th>
+                        <th>Discord account</th><th>Status</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>${body}</tbody>
+            </table>
+        `;
+    },
+
+    async refreshMembers() {
+        const id = await window.DiscordCommands?.request('refresh-members');
+        if (!id) {
+            this._toast('Could not queue the member refresh.', 'error');
+            return;
+        }
+        this._toast('Fetching members from Discord…', 'info');
+        this._awaitCommand(id, 'Members refreshed.');
+    },
+
+    async saveLink(uid, index) {
+        const ref = this._ref();
+        if (!ref) return;
+
+        const discordUserId = document.getElementById(`discordLinkSelect-${index}`)?.value || '';
+
+        try {
+            if (!discordUserId) {
+                await ref.collection('discordLinks').doc(uid).delete();
+                this._toast('Link removed.', 'success');
+            } else {
+                const member = this._members.find(m => String(m.discordUserId) === String(discordUserId));
+                await ref.collection('discordLinks').doc(uid).set({
+                    discordUserId,
+                    discordUsername: member?.username || '',
+                    displayName: member?.displayName || '',
+                    confirmedBy: window.firebase?.auth?.().currentUser?.uid || null,
+                    confirmedAt: new Date().toISOString(),
+                    source: 'manual'
+                });
+                this._toast('Link saved.', 'success');
+            }
+            await this.reload();
+        } catch (err) {
+            console.error('[Discord Panel] Link save failed:', err);
+            this._toast(`Could not save link: ${err.message}`, 'error');
+        }
+    },
+
+    /**
+     * Write a link for every row that has a suggestion and is not already
+     * linked, in one batch. This is the whole point of the panel: a roster
+     * of thirty is one click, not thirty console documents.
+     */
+    async confirmAllSuggestions() {
+        const ref = this._ref();
+        const matcher = window.DiscordLinkMatcher;
+        if (!ref || !matcher) return;
+
+        const batch = window.firebaseDB.batch();
+        const now = new Date().toISOString();
+        const confirmedBy = window.firebase?.auth?.().currentUser?.uid || null;
+        let count = 0;
+
+        this._rosterRows().forEach(row => {
+            if (!row.uid || row.linked) return;
+            const suggested = matcher.suggestMember(row.typed, this._members);
+            if (!suggested) return;
+
+            batch.set(ref.collection('discordLinks').doc(row.uid), {
+                discordUserId: suggested.discordUserId,
+                discordUsername: suggested.username || '',
+                displayName: suggested.displayName || '',
+                confirmedBy,
+                confirmedAt: now,
+                source: 'auto-suggested'
+            });
+            count++;
+        });
+
+        if (count === 0) {
+            this._toast('No suggestions to confirm.', 'info');
+            return;
+        }
+
+        try {
+            await batch.commit();
+            this._toast(`Linked ${count} player(s).`, 'success');
+            await this.reload();
+        } catch (err) {
+            console.error('[Discord Panel] Batch link failed:', err);
+            this._toast(`Could not confirm links: ${err.message}`, 'error');
+        }
     }
 };
 
