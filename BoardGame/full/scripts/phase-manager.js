@@ -1838,6 +1838,44 @@ class PhaseManager {
      * button (which only gates leaving 'matches_in_progress' once both
      * slots are done).
      */
+    /**
+     * Shared admin HTML for a slot's match details, optionally with the
+     * per-player lobby readiness list. Used by god.html's slot panels
+     * (below) AND admin.html's flow cards (admin-improved-adapter.js) —
+     * change both call sites if the signature changes.
+     * @param {number|'challenge'} slot
+     * @param {{players?: boolean}} [opts]
+     */
+    renderSlotDetailsHtml(slot, { players = false } = {}) {
+        const matchesHtml = this.getSlotMatchDetails(slot).map(m => {
+            const sides = m.sides.map(s =>
+                `<span class="slot-detail-team">${this._escHtml(s.teamName)}` +
+                (s.discordChannel
+                    ? ` <span class="slot-detail-channel">${ICON_SVGS.headphones} #${this._escHtml(String(s.discordChannel))}</span>`
+                    : '') +
+                `</span>`
+            ).join('<span class="slot-detail-vs">vs</span>');
+            return `<div class="slot-match-detail">` +
+                `<span class="slot-detail-game">${m.matchNumber ? '#' + m.matchNumber + ' ' : ''}${this._escHtml(m.gameName)}</span>` +
+                sides + `</div>`;
+        }).join('');
+
+        let playersHtml = '';
+        if (players) {
+            const statuses = this.getLobbyPlayerStatuses(slot);
+            if (statuses.length > 0) {
+                playersHtml = `<div class="slot-lobby-players">` + statuses.map(p =>
+                    `<span class="slot-lobby-player ${p.gameLobby && p.discord ? 'is-ready' : 'not-ready'}"` +
+                    ` title="${this._escHtml(p.teamName || '')}">` +
+                    `<span class="slot-ready-icon ${p.gameLobby ? 'on' : ''}" title="Game lobby (player-confirmed)">${ICON_SVGS.gamepad2}</span>` +
+                    `<span class="slot-ready-icon ${p.discord ? 'on' : ''}" title="Discord (moved automatically)">${ICON_SVGS.headphones}</span>` +
+                    this._escHtml(p.name) + `</span>`
+                ).join('') + `</div>`;
+            }
+        }
+        return matchesHtml + playersHtml;
+    }
+
     _renderSlotPanels(phase) {
         const bar = document.getElementById('phaseIndicatorBar');
         if (!bar) return;
@@ -1866,12 +1904,18 @@ class PhaseManager {
                 `<span class="phase-req-check">${r.met ? ICON_SVGS.check : ICON_SVGS.x}</span> ${this._escHtml(r.label)}</span>`
             ).join('');
 
+            const sub = info.subPhase;
+            const detailsHtml = (sub === 'setup' || sub === 'lobby' || sub === 'playing')
+                ? this.renderSlotDetailsHtml(slot, { players: sub === 'lobby' })
+                : '';
+
             return `
                 <div class="match-slot-panel${isDone ? ' slot-done' : ''}">
                     <div class="match-slot-header">
                         <span class="match-slot-icon">${info.icon}</span>
                         <span class="match-slot-name">${this._escHtml(info.name)}</span>
                     </div>
+                    ${detailsHtml}
                     <div class="match-slot-reqs">${reqsHtml}</div>
                     ${isDone ? '' : `<button class="btn-small primary" ${allMet ? '' : 'disabled'} onclick="advanceSlot(${slot})">Advance Match ${slot} ${ICON_SVGS.play}</button>`}
                     <button class="btn-small secondary" onclick="forceAdvanceSlot(${slot})" title="Force advance (skip requirements)" ${isDone ? 'style="display:none"' : ''}>${ICON_SVGS.triangleAlert} Force Advance</button>
