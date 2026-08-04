@@ -111,11 +111,15 @@ function createDiscordRest({ token, fetchImpl = fetch }) {
 
         return {
             outcome: 'ok',
-            members: body.map(member => ({
-                discordUserId: member.user.id,
-                username: member.user.username,
-                displayName: member.nick || member.user.global_name || member.user.username
-            }))
+            // Bot accounts (including this bot itself) are never valid link
+            // targets — a player can never legitimately be "the bot".
+            members: body
+                .filter(member => member.user.bot !== true)
+                .map(member => ({
+                    discordUserId: member.user.id,
+                    username: member.user.username,
+                    displayName: member.nick || member.user.global_name || member.user.username
+                }))
         };
     }
 

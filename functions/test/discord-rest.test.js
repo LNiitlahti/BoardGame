@@ -95,6 +95,22 @@ test('listGuildMembers normalises the member shape', async () => {
     assert.match(calls[0].url, /\/guilds\/g\/members\?limit=1000$/);
 });
 
+test('listGuildMembers excludes bot accounts, including itself', async () => {
+    const { rest } = restWith([{
+        status: 200,
+        body: [
+            { user: { id: '1', username: 'alpha', global_name: 'Alpha' }, nick: null },
+            { user: { id: '2', username: 'tobias-thorn', global_name: 'Tobias Thorn', bot: true }, nick: null },
+            { user: { id: '3', username: 'other-bot', global_name: null, bot: true }, nick: null }
+        ]
+    }]);
+    const result = await rest.listGuildMembers({ guildId: 'g' });
+    assert.deepStrictEqual(result, {
+        outcome: 'ok',
+        members: [{ discordUserId: '1', username: 'alpha', displayName: 'Alpha' }]
+    });
+});
+
 test('listGuildMembers surfaces a failure instead of pretending the guild is empty', async () => {
     const { rest } = restWith([{ status: 403, body: { message: 'Missing Access' } }]);
     const result = await rest.listGuildMembers({ guildId: 'g' });
