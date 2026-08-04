@@ -338,7 +338,11 @@ class DisplayManager {
     }
 
     _getTeamTotalPoints(team) {
-        return (team.points || 0) + (team.gamesWon || 0);
+        // `points` already includes the +1 awarded per match win (see
+        // confirmResult() in admin.js and result-manager.js) plus heart-hex
+        // income. Adding gamesWon here counted every win TWICE and made the
+        // spectator screen disagree with admin.html's own Teams column.
+        return (team.points || 0);
     }
 
     _getPlayerWinCounts() {

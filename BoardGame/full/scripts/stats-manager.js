@@ -239,44 +239,12 @@ class StatsManager {
         return pointsAwarded;
     }
 
-    /**
-     * Recalculate all points from scratch based on current hex control.
-     * This REPLACES points — use for manual correction only.
-     */
-    calculateAllPoints() {
-        const gs = this._gameState;
-
-        if (!gs?.teams || !this._boardModule) {
-            this._ui.showStatus('No game state to calculate', 'warning');
-            return;
-        }
-
-        gs.teams.forEach(team => {
-            let points = 0;
-
-            // Count points from controlled heart hexes
-            Object.entries(gs.heartHexControl || {}).forEach(([coord, ownerId]) => {
-                if (ownerId === team.id) {
-                    const matches = coord.match(/q(-?\d+)r(-?\d+)/);
-                    if (matches) {
-                        const [, q, r] = matches;
-                        const hexType = this._boardModule.getHexType(parseInt(q), parseInt(r));
-
-                        if (hexType === 'mountain-heart') {
-                            points += 2;
-                        } else if (hexType === 'side-heart') {
-                            points += 1;
-                        }
-                    }
-                }
-            });
-
-            team.points = points;
-        });
-
-        this._teams.renderTeamsList();
-        this._ui.showStatus('Points recalculated from heart hexes', 'success');
-    }
+    // calculateAllPoints() was DELETED 2026-08-04 (god.html's copy of the same
+    // dead admin.js function). It rebuilt team.points from heart-hex control
+    // alone, which silently erased every match-win point once `points` started
+    // carrying +1 per win. It had no callers and no button anywhere. A future
+    // rebuild tool must replay BOTH match wins (gameState.gameHistory) and
+    // heart income per completed round. See docs/architecture/scoring.md.
 
     /**
      * Open the Next Round confirmation modal with a preview of points
@@ -622,9 +590,11 @@ class StatsManager {
             return;
         }
 
+        // `points` already includes the +1 per match win; gamesWon is a
+        // tiebreaker only, never part of the total (would double-count).
         const sortedTeams = [...gs.teams].sort((a, b) => {
-            const totalA = (a.points || 0) + (a.gamesWon || 0);
-            const totalB = (b.points || 0) + (b.gamesWon || 0);
+            const totalA = (a.points || 0);
+            const totalB = (b.points || 0);
             if (totalB !== totalA) return totalB - totalA;
             return (b.gamesWon || 0) - (a.gamesWon || 0);
         });
@@ -773,7 +743,7 @@ class StatsManager {
 
         labels.push('Now');
         gs.teams.forEach((team, ti) => {
-            datasets[ti].data.push((team.points || 0) + (team.gamesWon || 0));
+            datasets[ti].data.push(team.points || 0);
         });
 
         this._pointsChart = new Chart(ctx, {

@@ -373,10 +373,12 @@ function renderStandings() {
         return;
     }
 
-    // Sort teams by total points (hex pts + victory pts), then by wins as tiebreaker
+    // Sort by `points`, then by wins as tiebreaker. `points` already includes
+    // the +1 per match win as well as heart-hex income — do NOT add gamesWon
+    // into the total or every win counts twice (it stays a tiebreaker only).
     const sortedTeams = [...gameState.teams].sort((a, b) => {
-        const totalA = (a.points || 0) + (a.gamesWon || 0);
-        const totalB = (b.points || 0) + (b.gamesWon || 0);
+        const totalA = (a.points || 0);
+        const totalB = (b.points || 0);
         if (totalB !== totalA) return totalB - totalA;
         return (b.gamesWon || 0) - (a.gamesWon || 0);
     });
@@ -591,7 +593,7 @@ function renderPointsChart() {
             gameState.teams.forEach((team, teamIndex) => {
                 const snapshot = match.teamStatsSnapshot[team.id];
                 if (snapshot) {
-                    datasets[teamIndex].data.push((snapshot.points || 0) + (snapshot.gamesWon || 0));
+                    datasets[teamIndex].data.push(snapshot.points || 0);
                 } else {
                     // Use last known value
                     const lastValue = datasets[teamIndex].data[datasets[teamIndex].data.length - 1] || 0;
@@ -610,7 +612,7 @@ function renderPointsChart() {
     // Add current state as final point
     labels.push('Current');
     gameState.teams.forEach((team, teamIndex) => {
-        datasets[teamIndex].data.push((team.points || 0) + (team.gamesWon || 0));
+        datasets[teamIndex].data.push(team.points || 0);
     });
 
     pointsChart = new Chart(ctx, {
@@ -1863,7 +1865,7 @@ function exportStatistics() {
             color: team.color,
             points: team.points,
             gamesWon: team.gamesWon,
-            totalPoints: (team.points || 0) + (team.gamesWon || 0),
+            totalPoints: (team.points || 0),
             gamesLost: team.gamesLost,
             gamesPlayed: team.gamesPlayed,
             playerIds: team.playerIds || team.players?.map(p => p.id).filter(Boolean) || []

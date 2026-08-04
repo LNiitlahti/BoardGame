@@ -767,13 +767,15 @@ async function adjustTeamPoints(teamId, delta, e) {
     // correctly accumulate instead of racing.
     const tournamentRef = window.firebaseDB.collection('tournaments').doc(currentTournamentId);
     let updatedTeams = null;
+    let oldPoints = null;
     try {
         await window.firebaseDB.runTransaction(async (transaction) => {
             const doc = await transaction.get(tournamentRef);
             const teams = (doc.data() || {}).teams || [];
             const idx = teams.findIndex(t => t.id === teamId);
             if (idx === -1) return;
-            teams[idx] = { ...teams[idx], points: Math.max(0, (teams[idx].points || 0) + delta) };
+            oldPoints = teams[idx].points || 0;
+            teams[idx] = { ...teams[idx], points: Math.max(0, oldPoints + delta) };
             transaction.update(tournamentRef, { teams });
             updatedTeams = teams;
         });
@@ -786,6 +788,10 @@ async function adjustTeamPoints(teamId, delta, e) {
     if (updatedTeams) {
         gameState.teams = updatedTeams;
         renderTeamsList();
+        const team = updatedTeams.find(t => t.id === teamId);
+        window.logAction?.('points_awarded', 'points', {
+            teamId, teamName: team?.name || `Team ${teamId}`, amount: delta, reason: 'manual adjustment'
+        }, oldPoints !== null ? { points: oldPoints } : null);
     }
 }
 
@@ -794,8 +800,12 @@ async function setTeamPoints(teamId, value) {
 
     const team = gameState.teams.find(t => t.id === teamId);
     if (team) {
+        const oldPoints = team.points || 0;
         team.points = Math.max(0, parseInt(value) || 0);
         await saveGameState();
+        window.logAction?.('points_corrected', 'points', {
+            teamId, teamName: team.name || `Team ${teamId}`, oldPoints, newPoints: team.points
+        }, { points: oldPoints });
     }
 }
 
@@ -1719,6 +1729,7 @@ async function assignTeamToHex(coord, teamId) {
 
     if (teamId === null) {
         // Remove from local state
+        const oldTeamId = gameState.board[coord];
         delete gameState.board[coord];
 
         // Also remove from heart hex control if applicable
@@ -1743,6 +1754,10 @@ async function assignTeamToHex(coord, teamId) {
             // Delete the most recent tile_capture event for this hex (likely a mistake)
             deleteLastTileCaptureEvent(coord);
 
+            window.logAction?.('plate_removed', 'board', {
+                hexCoord: coord, teamId: oldTeamId
+            }, { board: { [coord]: oldTeamId } });
+
             showStatus(`Cleared hex ${coord}`, 'success');
         } catch (error) {
             console.error('Error clearing hex:', error);
@@ -1753,6 +1768,7 @@ async function assignTeamToHex(coord, teamId) {
     }
 
     // Assign team to hex
+    const oldOccupier = gameState.board[coord] || null;
     gameState.board[coord] = teamId;
 
     // Check if this is a heart hex
@@ -1781,6 +1797,9 @@ async function assignTeamToHex(coord, teamId) {
         hexCoord: coord,
         isHeart: isHeartHex
     });
+    window.logAction?.('plate_placed', 'board', {
+        teamId, teamName: team?.name || `Team ${teamId}`, hexCoord: coord, isHeart: isHeartHex
+    }, oldOccupier ? { board: { [coord]: oldOccupier } } : null);
 
     // Deliberately does NOT auto-clear a pending hex win here anymore.
     // Assigning a hex is a general board action (spells, admin rulings,
@@ -4348,6 +4367,19 @@ async function confirmResult(winnerIndex) {
         return;
     }
 
+    // Snapshot team stats BEFORE any mutations (for undo — see UndoManager's
+    // _undoMatchResult, which expects exactly this shape)
+    const _prevTeamStats = {};
+    gameState.teams.forEach(t => {
+        _prevTeamStats[t.id] = {
+            gamesWon: t.gamesWon || 0, gamesLost: t.gamesLost || 0,
+            gamesPlayed: t.gamesPlayed || 0, splitCount: t.splitCount || 0,
+            challengeSplitCount: t.challengeSplitCount || 0, points: t.points || 0
+        };
+    });
+    const _prevGamesPlayed = gameState.gamesPlayed || 0;
+    const _prevHistoryLength = gameState.gameHistory?.length || 0;
+
     const winningTeam = teams[winnerIndex];
     const losingTeams = teams.filter((_, idx) => idx !== winnerIndex);
 
@@ -4401,6 +4433,14 @@ async function confirmResult(winnerIndex) {
             if (team) {
                 team.gamesWon = (team.gamesWon || 0) + 1;
                 team.gamesPlayed = (team.gamesPlayed || 0) + 1;
+                // Award victory point immediately on match win. Mirrors
+                // god.html's ResultManager.confirmResult() (result-manager.js)
+                // — admin.html previously incremented only gamesWon, so the
+                // same match win was worth a different amount depending on
+                // which page confirmed it. `points` is now the single source
+                // of truth for standings everywhere; display code must NOT
+                // add gamesWon on top of it or the win counts twice.
+                team.points = (team.points || 0) + 1;
             }
         });
 
@@ -4617,6 +4657,23 @@ async function confirmResult(winnerIndex) {
         sideAPlayers: sideAPlayers,
         sideBPlayers: sideBPlayers,
         sideCPlayers: sideCPlayers.length > 0 ? sideCPlayers : undefined
+    });
+
+    window.logAction?.('match_result_confirmed', 'match', {
+        matchId: queueEntry?.id, matchNumber: confirmedMatchNumber,
+        game: logGameName, gameName: logGameName,
+        winningSide: SIDE_LABELS[winnerIndex],
+        winningTeamIds, losingTeamIds, teamsWithFullCredit, teamsWithFullLoss,
+        teamId: teamsWithFullCredit[0] || winningTeamIds[0],
+        teamName: displayTeamName,
+        isChallenge: logIsChallenge,
+        playType: queueEntry?.playType || '',
+        historyEntryId: historyEntry.id
+    }, {
+        queueEntry: { id: queueEntry?.id, status: 'ongoing', winnerIndex: undefined },
+        teamStats: _prevTeamStats,
+        gamesPlayed: _prevGamesPlayed,
+        gameHistoryLength: _prevHistoryLength
     });
 
     const matchNumMsg = confirmedMatchNumber ? ` (Match #${confirmedMatchNumber})` : '';
@@ -4849,42 +4906,12 @@ function awardRoundPoints() {
     return pointsAwarded;
 }
 
-/**
- * Recalculate all points from scratch based on current hex control
- * This REPLACES points - use for manual correction only
- */
-function calculateAllPoints() {
-    if (!gameState?.teams || !boardModule) {
-        showStatus('No game state to calculate', 'warning');
-        return;
-    }
-
-    gameState.teams.forEach(team => {
-        let points = 0;
-
-        // Count points from controlled heart hexes
-        Object.entries(gameState.heartHexControl || {}).forEach(([coord, ownerId]) => {
-            if (ownerId === team.id) {
-                const matches = coord.match(/q(-?\d+)r(-?\d+)/);
-                if (matches) {
-                    const [, q, r] = matches;
-                    const hexType = boardModule.getHexType(parseInt(q), parseInt(r));
-
-                    if (hexType === 'mountain-heart') {
-                        points += 2;
-                    } else if (hexType === 'side-heart') {
-                        points += 1;
-                    }
-                }
-            }
-        });
-
-        team.points = points;
-    });
-
-    renderTeamsList();
-    showStatus('Points recalculated from heart hexes', 'success');
-}
+// calculateAllPoints() was DELETED 2026-08-04. It rebuilt team.points from
+// heart-hex control alone, which silently erased every match-win point once
+// `points` started carrying +1 per win (see confirmResult()). It had no
+// callers and no button on any page. If a points-rebuild tool is ever needed
+// again it must replay BOTH sources: match wins from gameState.gameHistory
+// and heart income per completed round. See docs/architecture/scoring.md.
 
 /**
  * Open the Next Round confirmation modal

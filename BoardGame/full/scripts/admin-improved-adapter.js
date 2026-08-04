@@ -29,6 +29,7 @@
 
     let _actionLogger = null;
     let _phaseManager = null;
+    let _undoManager = null;
     let _initialized = false;
     let _primaryAction = null;
     let _broadcastOpen = false;
@@ -102,6 +103,30 @@
 
     const _teamShim = {};
 
+    // ── Undo Last Action ──
+
+    /**
+     * Find the most recent undoable action log entry and open the confirm
+     * modal for it. One button, always undoes the single most recent
+     * undoable thing — mirrors god.html's per-entry undo but collapsed to
+     * "last action" since admin.html has no activity-log list UI to pick
+     * a specific older entry from.
+     */
+    async function undoLastAction() {
+        if (!_actionLogger || !_undoManager) {
+            if (typeof showStatus === 'function') showStatus('Nothing to undo yet', 'info');
+            return;
+        }
+        const { entries } = await _actionLogger.getActions({ limit: 15 });
+        const target = (entries || []).find(e => _undoManager.canUndo(e).canUndo);
+        if (!target) {
+            if (typeof showStatus === 'function') showStatus('No recent action can be undone', 'info');
+            return;
+        }
+        _undoManager.openUndoConfirmModal(target);
+    }
+    window.undoLastAction = undoLastAction;
+
     // ── Lazy initialization ──
 
     function _initPhaseAdapter() {
@@ -120,6 +145,32 @@
 
         const logAction = (actionType, category, payload, previousState) =>
             _actionLogger?.logAction(actionType, category, payload, previousState);
+
+        // Exposed so admin.js's flat mutation functions (confirmResult,
+        // adjustTeamPoints, assignTeamToHex, ...) can log an undo snapshot
+        // without needing a reference into this IIFE's closure.
+        window.logAction = logAction;
+
+        // UndoManager — same generic engine god.html already uses (reads
+        // previousState off the action log and reverses it); admin.html
+        // just never wired a button to it. One "Undo Last Action" button
+        // instead of god.html's per-entry activity-log list, since that's
+        // the level of control asked for here.
+        if (typeof UndoManager !== 'undefined') {
+            _undoManager = new UndoManager(gameState, {
+                actionLogger: _actionLogger,
+                uiManager: _uiShim,
+                teamManager: _teamShim,
+                saveCallback: (btn) => saveGameState(btn),
+                logActionCallback: logAction,
+                refreshCallback: () => {
+                    if (typeof updateDisplay === 'function') updateDisplay();
+                }
+            });
+            window.openUndoConfirmModal = (entry) => _undoManager?.openUndoConfirmModal(entry);
+            window.closeUndoConfirmModal = () => _undoManager?.closeUndoConfirmModal();
+            window.confirmUndoAction = () => _undoManager?.confirmUndoAction();
+        }
 
         // PhaseManager
         _phaseManager = new PhaseManager(gameState, {

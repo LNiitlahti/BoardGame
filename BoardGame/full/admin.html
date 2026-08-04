@@ -119,6 +119,7 @@
                     <span id="lobbyAdminControls" style="display: none;"></span>
                     <span id="spellWindowControls" style="display: none;"></span>
                     <button class="btn-small secondary" id="forceAdvanceBtn" onclick="forceAdvancePhase()" title="Force advance (skip requirements)">&#x26A0; Force Advance</button>
+                    <button class="btn-small danger" id="undoLastActionBtn" onclick="undoLastAction()" title="Undo the most recent undoable action (result, points, or hex placement)">&#x21B6; Undo Last Action</button>
                     <button class="btn-small secondary" id="insertBreakBtn" onclick="insertBreak()" title="Insert break">&#x23F8; Break</button>
                     <button class="btn-small secondary" id="broadcastToggleBtn" onclick="toggleBroadcastBar()" title="Broadcast a message to view screens">&#x1F4E2;</button>
                     <span id="breakIntervalBadge" class="break-interval-badge" onclick="openBreakSettings()" title="Break interval settings" style="display: none;"></span>
@@ -630,6 +631,26 @@
         </div>
     </div>
 
+    <!-- Undo Confirmation Modal (undo-manager.js reads/writes these element ids directly) -->
+    <div id="undoConfirmModal" class="phase-modal" style="display: none;">
+        <div class="phase-modal-content" style="max-width: 480px;">
+            <div class="phase-modal-header">
+                <h2 style="color: var(--accent-danger, #ef4444);">&#x21B6; Undo Action</h2>
+                <button onclick="closeUndoConfirmModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div class="phase-modal-body">
+                <p style="color: var(--text-secondary); margin-bottom: 8px; font-size: 0.85rem;">This action will be reversed:</p>
+                <div id="undoActionDesc" style="font-weight: 600; color: var(--text-primary); margin-bottom: 16px; font-size: 0.9rem;"></div>
+                <div id="undoChangesPreview" style="margin-bottom: 12px;"></div>
+                <div id="undoWarnings" style="display: none; margin-bottom: 12px;"></div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn secondary" onclick="closeUndoConfirmModal()">Cancel</button>
+                    <button class="btn danger" onclick="confirmUndoAction()">Undo</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Set Phase Modal (god-only corrector) -->
     <div id="setPhaseModal" class="phase-modal" style="display: none;">
         <div class="phase-modal-content" style="max-width: 420px;">
@@ -788,6 +809,7 @@
     <script defer src="scripts/admin.js"></script>
     <!-- Phase system (OOP modules + improved guided adapter) -->
     <script defer src="scripts/phase-manager.js"></script>
+    <script defer src="scripts/undo-manager.js"></script>
     <script defer src="scripts/admin-improved-adapter.js"></script>
 </body>
 </html>

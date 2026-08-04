@@ -603,9 +603,11 @@
             y = sectionTitle(y, 'Team Standings');
 
             if (teams.length > 0) {
+                // `points` already includes the +1 per match win; gamesWon is
+                // a tiebreaker only, never part of the total (double-count).
                 const sortedTeams = [...teams].sort((a, b) => {
-                    const totalA = (a.points || 0) + (a.gamesWon || 0);
-                    const totalB = (b.points || 0) + (b.gamesWon || 0);
+                    const totalA = (a.points || 0);
+                    const totalB = (b.points || 0);
                     if (totalB !== totalA) return totalB - totalA;
                     return (b.gamesWon || 0) - (a.gamesWon || 0);
                 });

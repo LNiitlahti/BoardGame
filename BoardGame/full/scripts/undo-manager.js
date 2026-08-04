@@ -248,6 +248,10 @@ class UndoManager {
                 delete queueEntry.completedAt;
                 delete queueEntry.winningSide;
                 delete queueEntry.winnerIndex;
+                // admin.html's confirmResult() (unlike god.html's) also stamps
+                // these two — harmless no-op delete when they were never set.
+                delete queueEntry.adminConfirmed;
+                delete queueEntry.adminConfirmedAt;
             }
         }
     }
