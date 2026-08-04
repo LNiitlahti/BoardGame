@@ -101,3 +101,39 @@ test('listGuildMembers surfaces a failure instead of pretending the guild is emp
     assert.strictEqual(result.outcome, 'error');
     assert.strictEqual(result.members, undefined);
 });
+
+test('listGuildChannels returns only voice channels, normalised', async () => {
+    const { rest, calls } = restWith([{
+        status: 200,
+        body: [
+            { id: '1', name: 'general', type: 0 },
+            { id: '2', name: 'Waiting Room', type: 2 },
+            { id: '3', name: 'Alpha', type: 2 },
+            { id: '4', name: 'Voice Channels', type: 4 }
+        ]
+    }]);
+    const result = await rest.listGuildChannels({ guildId: 'g' });
+    assert.deepStrictEqual(result, {
+        outcome: 'ok',
+        channels: [
+            { channelId: '2', name: 'Waiting Room' },
+            { channelId: '3', name: 'Alpha' }
+        ]
+    });
+    assert.match(calls[0].url, /\/guilds\/g\/channels$/);
+    assert.strictEqual(calls[0].options.method, 'GET');
+});
+
+test('listGuildChannels surfaces a failure instead of an empty list', async () => {
+    const { rest } = restWith([{ status: 403, body: { message: 'Missing Access' } }]);
+    const result = await rest.listGuildChannels({ guildId: 'g' });
+    assert.strictEqual(result.outcome, 'error');
+    assert.strictEqual(result.channels, undefined);
+});
+
+test('listGuildChannels handles a thrown network error', async () => {
+    const { rest } = restWith([new Error('ECONNRESET')]);
+    const result = await rest.listGuildChannels({ guildId: 'g' });
+    assert.strictEqual(result.outcome, 'error');
+    assert.match(result.error, /ECONNRESET/);
+});

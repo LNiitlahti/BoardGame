@@ -14,6 +14,9 @@ const API_BASE = 'https://discord.com/api/v10';
 /** Discord's error code for "Target user is not connected to voice." */
 const ERR_NOT_IN_VOICE = 40032;
 
+/** Discord channel type for a voice channel (GUILD_VOICE). */
+const CHANNEL_TYPE_VOICE = 2;
+
 function createDiscordRest({ token, fetchImpl = fetch }) {
 
     async function request(method, path, body) {
@@ -116,7 +119,43 @@ function createDiscordRest({ token, fetchImpl = fetch }) {
         };
     }
 
-    return { moveMember, listGuildMembers };
+    /**
+     * List the guild's voice channels for the setup dropdowns.
+     *
+     * Filtered to voice channels only: a member can only be moved into one,
+     * so listing text channels or categories would just let an operator
+     * pick something that fails at move time instead of at setup time.
+     *
+     * Like listGuildMembers, a failure is reported as an error rather than
+     * an empty list — "no channels" and "the call failed" must not look
+     * identical to the panel.
+     */
+    async function listGuildChannels({ guildId }) {
+        let res;
+        try {
+            res = await request('GET', `/guilds/${guildId}/channels`);
+        } catch (err) {
+            return { outcome: 'error', error: String(err && err.message ? err.message : err) };
+        }
+
+        const body = await readJson(res);
+
+        if (res.status !== 200 || !Array.isArray(body)) {
+            return {
+                outcome: 'error',
+                error: `HTTP ${res.status}: ${(body && body.message) || 'unexpected response'}`
+            };
+        }
+
+        return {
+            outcome: 'ok',
+            channels: body
+                .filter(channel => channel.type === CHANNEL_TYPE_VOICE)
+                .map(channel => ({ channelId: channel.id, name: channel.name }))
+        };
+    }
+
+    return { moveMember, listGuildMembers, listGuildChannels };
 }
 
 module.exports = { createDiscordRest };
