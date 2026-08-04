@@ -49,6 +49,19 @@ async function handleCommand({ db, rest, sleep, tournamentId, command }) {
         return { status: 'done', results: [] };
     }
 
+    if (command.type === 'refresh-channels') {
+        const listed = await rest.listGuildChannels({ guildId: config.guildId });
+        if (listed.outcome !== 'ok') {
+            return { status: 'skipped', reason: 'channel-list-failed', error: listed.error, results: [] };
+        }
+        await tournament.writeChannelCache({
+            channels: listed.channels,
+            count: listed.channels.length,
+            refreshedAt: new Date().toISOString()
+        });
+        return { status: 'done', results: [] };
+    }
+
     if (command.type !== 'pull' && command.type !== 'return') {
         return { status: 'skipped', reason: 'unknown-type', results: [] };
     }

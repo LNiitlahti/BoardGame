@@ -67,6 +67,10 @@ function createFirestoreDb(firestore) {
 
                 async writeMemberCache(data) {
                     await ref.collection('discordConfig').doc('memberCache').set(data);
+                },
+
+                async writeChannelCache(data) {
+                    await ref.collection('discordConfig').doc('channelCache').set(data);
                 }
             };
         }

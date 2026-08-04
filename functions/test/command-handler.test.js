@@ -21,12 +21,14 @@ const MATCH = { id: 'm1', sides: [{ playerIds: ['1a'] }, { playerIds: ['2a'] }] 
  * Minimal in-memory stand-in for the Firestore surface handleCommand uses.
  * Records tournament updates so tests can assert on lobbyReady writes.
  */
-function fakeDb({ config = CONFIG, gameState = GAME_STATE, links = {}, match = MATCH, listMembersResult } = {}) {
+function fakeDb({ config = CONFIG, gameState = GAME_STATE, links = {}, match = MATCH } = {}) {
     const updates = [];
     const configWrites = [];
+    const channelWrites = [];
     return {
         updates,
         configWrites,
+        channelWrites,
         tournament(tid) {
             return {
                 async getGameState() { return gameState; },
@@ -34,7 +36,8 @@ function fakeDb({ config = CONFIG, gameState = GAME_STATE, links = {}, match = M
                 async getLinks() { return links; },
                 async getMatch() { return match; },
                 async updateGameState(patch) { updates.push(patch); },
-                async writeMemberCache(data) { configWrites.push(data); }
+                async writeMemberCache(data) { configWrites.push(data); },
+                async writeChannelCache(data) { channelWrites.push(data); }
             };
         }
     };
@@ -51,7 +54,10 @@ function fakeRest(moveResults, { listGuildMembersResult } = {}) {
         },
         async listGuildMembers() {
             return listGuildMembersResult || { outcome: 'ok', members: [{ discordUserId: 'd1', username: 'u', displayName: 'U' }] };
-        }
+        },
+        async listGuildChannels() {
+            return { outcome: 'ok', channels: [{ channelId: 'c1', name: 'Waiting Room' }] };
+        },
     };
 }
 
@@ -338,4 +344,46 @@ test('member-list-failed is skipped without writing the member cache', async () 
     assert.strictEqual(result.status, 'skipped');
     assert.strictEqual(result.reason, 'member-list-failed');
     assert.strictEqual(db.configWrites.length, 0);
+});
+
+test('refresh-channels writes the channel cache', async () => {
+    const db = fakeDb();
+    const rest = fakeRest([]);
+    const result = await handleCommand({
+        db, rest, sleep: noSleep,
+        tournamentId: 't1',
+        command: { type: 'refresh-channels' }
+    });
+    assert.strictEqual(result.status, 'done');
+    assert.strictEqual(db.channelWrites.length, 1);
+    assert.strictEqual(db.channelWrites[0].count, 1);
+    assert.strictEqual(db.channelWrites[0].channels[0].channelId, 'c1');
+    assert.ok(db.channelWrites[0].refreshedAt);
+});
+
+test('a failed channel list is reported, not silently cached', async () => {
+    const db = fakeDb();
+    const rest = fakeRest([]);
+    rest.listGuildChannels = async () => ({ outcome: 'error', error: 'Missing Access' });
+    const result = await handleCommand({
+        db, rest, sleep: noSleep,
+        tournamentId: 't1',
+        command: { type: 'refresh-channels' }
+    });
+    assert.strictEqual(result.status, 'skipped');
+    assert.strictEqual(result.reason, 'channel-list-failed');
+    assert.strictEqual(db.channelWrites.length, 0);
+});
+
+test('refresh-channels respects the kill switch', async () => {
+    const db = fakeDb({ config: { ...CONFIG, enabled: false } });
+    const rest = fakeRest([]);
+    const result = await handleCommand({
+        db, rest, sleep: noSleep,
+        tournamentId: 't1',
+        command: { type: 'refresh-channels' }
+    });
+    assert.strictEqual(result.status, 'skipped');
+    assert.strictEqual(result.reason, 'disabled');
+    assert.strictEqual(db.channelWrites.length, 0);
 });
