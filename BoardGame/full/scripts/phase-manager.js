@@ -1162,6 +1162,12 @@ class PhaseManager {
                 roundNumber: gs.currentPhase.roundNumber,
                 matchSlot: slot
             }, { lobbyReady: prevLobbyReady });
+
+            // Pull this slot's players into their voice channels. Queued
+            // after the readiness reset so the function's `discord: true`
+            // writes land on the fresh tombstones, not the old ones.
+            // Not awaited — a Discord failure must never stall the phase.
+            window.DiscordCommands?.request('pull', { slot });
         }
 
         await this._save();
@@ -1543,6 +1549,10 @@ class PhaseManager {
             roundNumber: gs.currentPhase.roundNumber,
             matchSlot: 'challenge'
         }, { lobbyReady: prevLobbyReady });
+
+        // Pull challenge participants into their voice channels. Not
+        // awaited — a Discord failure must never stall the challenge lobby.
+        window.DiscordCommands?.request('pull', { slot: 'challenge' });
 
         await this._save();
         this._ui.showStatus('Challenge lobby opened — waiting for players to ready up.', 'success');

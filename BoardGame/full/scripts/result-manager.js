@@ -512,6 +512,13 @@ class ResultManager {
             queueEntry.completedAt = new Date().toISOString();
             queueEntry.winningSide = winningSideLabel;
             queueEntry.winnerIndex = winnerIndex;
+
+            // Send this match's players back to the waiting room. Not
+            // awaited — a Discord failure must never block result saving.
+            window.DiscordCommands?.request('return', {
+                slot: queueEntry.isChallenge ? 'challenge' : queueEntry.slot,
+                matchId: queueEntry.id
+            });
         }
 
         // Update games played

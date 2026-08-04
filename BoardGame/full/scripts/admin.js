@@ -4529,6 +4529,13 @@ async function confirmResult(winnerIndex) {
         queueEntry.winnerIndex = winnerIndex;
         queueEntry.adminConfirmed = true;
         queueEntry.adminConfirmedAt = new Date().toISOString();
+
+        // Send this match's players back to the waiting room. Not
+        // awaited — a Discord failure must never block result saving.
+        window.DiscordCommands?.request('return', {
+            slot: queueEntry.isChallenge ? 'challenge' : queueEntry.slot,
+            matchId: queueEntry.id
+        });
     }
 
     // Update games played
