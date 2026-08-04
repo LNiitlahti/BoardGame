@@ -90,10 +90,20 @@ players. Depends on nothing. Fully unit-testable.
 list guild members. Injectable, so tests substitute a fake. Owns auth headers, 429 handling,
 and error classification.
 
-**Cloud Functions** — the glue.
-- `onDiscordCommand` — Firestore `onCreate` on `discordCommands`. The only mover.
-- `listGuildMembers` — callable, admin-gated. Populates the link dropdown. Required because
-  the browser cannot call Discord directly: the bot token must never reach client JS.
+**Cloud Function** — the glue. One function, `onDiscordCommand`, a Firestore `onCreate`
+trigger on `discordCommands`. The only thing that moves anyone.
+
+It handles three command types: `pull`, `return`, and `refresh-members`. The last one fetches
+the guild member list and writes it to `discordConfig/memberCache` for the link dropdown to
+read.
+
+Routing the member list through a command rather than a callable function keeps this to a
+single function, avoids adding the `firebase-functions-compat` SDK to the page loader (which
+today loads only app, firestore, and auth), and persists the member list so the dropdown
+still works when the function is cold. It also gives the operator an explicit refresh button,
+which matters because guild membership changes during an event — anyone who joins after the
+last refresh would otherwise be missing from the dropdown exactly when someone needs to link
+them.
 
 ## Data model
 
@@ -109,8 +119,11 @@ discordLinks/{playerUid}
   { discordUserId, discordUsername, displayName,
     confirmedBy, confirmedAt, source: 'auto-suggested' | 'manual' }
 
+discordConfig/memberCache
+  { members: [{ discordUserId, username, displayName }], refreshedAt, count }
+
 discordCommands/{cmdId}
-  { type: 'pull' | 'return', slot, matchId,
+  { type: 'pull' | 'return' | 'refresh-members', slot, matchId,
     requestedBy, requestedAt, force: false,
     status: 'pending' | 'done' | 'skipped', reason,
     results: [{ uid, outcome, discordUserId, channelId, error }] }
@@ -195,7 +208,8 @@ per month.
 | Outcome | Cause | Terminal |
 |---|---|---|
 | `moved` | Success (Discord returns 204) | yes |
-| `unlinked` | No confirmed link — skipped by design | yes |
+| `unlinked` | No confirmed link, or roster player has no account | yes |
+| `no_channel` | `slotChannels` has no channel for this slot/side — config error | yes |
 | `not_in_voice` | Player isn't connected to any voice channel | retried |
 | `not_in_guild` | Left the server, or wrong ID | yes |
 | `forbidden` | Bot lacks MOVE_MEMBERS, or can't see the channel | yes |
@@ -226,8 +240,9 @@ New `god.html` tab, `data-role="god"`, scoped to the tournament already selected
 
 1. **Setup** — guild ID, Waiting Room channel, six slot channel IDs. Entered once.
 2. **Player links** — roster rows: player name, the username they typed at onboarding, the
-   bot's suggestion, a guild-member dropdown. "Confirm all suggestions" for the common case,
-   per-row correction otherwise. Unlinked players visually obvious.
+   bot's suggestion, a guild-member dropdown fed from `discordConfig/memberCache`. "Confirm
+   all suggestions" for the common case, per-row correction otherwise. Unlinked players
+   visually obvious. A "refresh members" button queues a `refresh-members` command.
 3. **Kill switch** — toggle bound to `discordConfig/state.enabled`. Disabling is instant;
    re-enabling takes a confirmation click, so nobody accidentally moves people mid-break.
 4. **Activity** — recent commands with per-player outcomes, plus a "move now" retry per slot.
@@ -256,9 +271,14 @@ never in client JS.
 `node:test` + `node:assert` style. Covers side→channel mapping, unlinked exclusion,
 mixed-roster sides, the challenge pseudo-slot, and both staleness checks.
 
-**Function integration** — Firestore emulator plus a fake `discord-rest` client. Asserts each
-failure mode: disabled kill switch, the `not_in_voice` retry schedule, terminal errors not
-retried, 429 backoff, and double delivery being harmless.
+**Handler integration** — the command handler takes `db`, `rest`, and `sleep` as injected
+dependencies, so its whole flow is tested against plain in-memory fakes: disabled kill
+switch, staleness and `force`, the `not_in_voice` retry schedule, terminal errors not being
+retried, and 429 backoff. A fake `sleep` runs the two-minute retry window in microseconds.
+
+No Firestore emulator. The only untested code is `firestore-adapter.js`, whose methods are
+one-liners over the Admin SDK — an emulator would add a heavyweight dependency to cover
+almost nothing, and the manual smoke test exercises the real thing anyway.
 
 **Manual smoke** — a throwaway test guild with two alt accounts, before it touches a real
 event.
