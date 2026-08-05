@@ -7,9 +7,10 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(() => Promise.all([
             loadScript('https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js'),
             loadScript('https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js'),
+            loadScript('https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js'),
             fetch((window.BOARDGAME_BASE || '.') + '/shared/scripts/firebase.js').then(r => r.text())
         ]))
-        .then(([_fs, _auth, content]) => {
+        .then(([_fs, _auth, _fn, content]) => {
             console.log('Firebase SDK loaded successfully');
 
             // Extract the firebaseConfig object from the file content
@@ -119,6 +120,12 @@ document.addEventListener('DOMContentLoaded', function() {
             window.firebaseWhere = function(field, operator, value) {
                 return (query) => query.where(field, operator, value);
             };
+
+            // Callable Cloud Functions, used by the god-mode user management
+            // panel. The region is mandatory: the functions are deployed to
+            // europe-north1 (see setGlobalOptions in functions/index.js) and
+            // the default us-central1 endpoint would 404.
+            window.firebaseFunctions = firebase.app().functions('europe-north1');
 
             console.log("Firebase initialized successfully");
 
