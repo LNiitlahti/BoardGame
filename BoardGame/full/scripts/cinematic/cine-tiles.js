@@ -69,13 +69,6 @@ class CineTiles {
         fx.classList.add('active', 'flash');
     }
 
-    // Effect 2 (music sync): feeds the existing (already-shipped) material
-    // glow layers via a CSS custom property they reference on top of their
-    // own idle-loop animation — additive, not a replacement.
-    applyBeatIntensity(amp) {
-        this.boardEl.style.setProperty('--beat-intensity', String(amp));
-    }
-
     // Effect 3 (music sync): one-shot re-triggerable glow on a single hex,
     // fired per beat for whichever ring is "on" this beat (see
     // cinematic-controller.js's buildTimeline). Distinct from
@@ -156,7 +149,6 @@ class CineTiles {
                 }
             }
         }
-        this.boardEl.style.removeProperty('--beat-intensity');
         this.showHearts();
     }
 }

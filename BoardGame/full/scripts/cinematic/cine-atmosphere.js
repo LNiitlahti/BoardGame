@@ -78,9 +78,7 @@ class CineAtmosphere {
         this.el.appendChild(this.glowEl);
     }
 
-    // Sets --atmo-intensity, read by CSS to nudge brightness/opacity — same
-    // pattern as the existing --beat-intensity custom property
-    // (cine-tiles.js's applyBeatIntensity).
+    // Sets --atmo-intensity, read by CSS to nudge brightness/opacity.
     applyIntensity(amp) {
         this.el.style.setProperty('--atmo-intensity', String(amp));
     }

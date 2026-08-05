@@ -289,14 +289,6 @@
             100% { opacity: 0; transform: scale(1); }
         }
 
-        /* --- Music envelope feed (effect 2): brightens the existing
-           ambient glow layers on top of their own opacity/transform
-           keyframes above (filter is untouched by cineLavaPulse /
-           cineWaterBreathe / cineMagicPulse, so this is purely additive). */
-        .material-fx.active::before {
-            filter: brightness(calc(1 + var(--beat-intensity, 0) * 0.8));
-        }
-
         /* --- Screen-wide color wash (effect 4), scoped to the board area.
            A plain absolutely-positioned sibling of .scene-3d, deliberately
            NOT nested inside the 3D preserve-3d hierarchy: a positioned

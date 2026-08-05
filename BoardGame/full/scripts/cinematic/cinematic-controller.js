@@ -36,7 +36,8 @@
         boardWrapEl: null,
         boardWrapParent: null,
         boardWrapNextSibling: null,
-        dimOverlayEl: null
+        dimOverlayEl: null,
+        pulseEl: null
     };
 
     window.CINEMATIC = {
@@ -50,6 +51,20 @@
         el.style.cssText =
             'position:fixed;inset:0;background:#000;z-index:9999;pointer-events:none;';
         document.body.appendChild(el);
+        return el;
+    }
+
+    // Board brightness pulse (effect 1) — see cine-camera.js's
+    // applyBoardPulse for why this is an opacity overlay rather than a
+    // filter on the scene root. Lives inside .board-wrap so it brightens the
+    // board without touching the rest of the page.
+    function makePulse() {
+        const el = document.createElement('div');
+        el.id = 'cinePulse';
+        el.style.cssText =
+            'position:absolute;inset:0;pointer-events:none;opacity:0;' +
+            'background:#fff;will-change:opacity;';
+        document.querySelector('.board-wrap').appendChild(el);
         return el;
     }
 
@@ -114,6 +129,7 @@
         document.body.classList.remove('cine-active');
         document.documentElement.classList.remove('cine-pending');
         if (state.coverEl) { state.coverEl.remove(); state.coverEl = null; }
+        if (state.pulseEl) { state.pulseEl.remove(); state.pulseEl = null; }
         try { restoreBoardWrap(); } catch (e) { console.error('[Cinematic] restoreBoardWrap failed:', e); }
         document.removeEventListener('keydown', onKeydown);
         window.removeEventListener('error', bail);
@@ -381,7 +397,6 @@
                 onUpdate: p => {
                     const amp = music.envelopeAt(p * envelopeDuration);
                     state.camera.applyBoardPulse(amp);
-                    state.tiles.applyBeatIntensity(amp);
                     state.camera.setShake('music', window.CineCamera.randomOffset(cfg.shake.music, amp));
                     state.atmosphere.applyIntensity(amp);
                 }
@@ -514,7 +529,8 @@
 
         const scene = document.getElementById('cineScene');
         const rig = document.getElementById('cineRig');
-        state.camera = new window.CineCamera(scene, rig);
+        state.pulseEl = makePulse();
+        state.camera = new window.CineCamera(scene, rig, state.pulseEl);
         state.camera.applyPose(state.config.camera.dramatic);
 
         state.tiles = new window.CineTiles(
