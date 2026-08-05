@@ -36,6 +36,59 @@
         ]
     };
 
+    /**
+     * Player status options for the navbar status menu.
+     *
+     * Keys and write shape must stay in sync with STATUS_EMOJIS in
+     * full/scripts/onboarding.js and the grid in full/onboarding-status.html —
+     * all three write the same `players.<id>.statuses.<key>` map, and
+     * view-onboarding-layout.html renders the first truthy key in this order.
+     *
+     * Icons are Lucide (ISC, https://lucide.dev), inlined rather than pulled
+     * from icon-svgs.js so the navbar stays self-contained — not every page
+     * that loads the navbar loads the icon set.
+     */
+    const STATUS_ICON_PATHS = {
+        idle: '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" />',
+        eating: '<path d="m12 14-1 1" /><path d="m13.75 18.25-1.25 1.42" /><path d="M17.775 5.654a15.68 15.68 0 0 0-12.121 12.12" /><path d="M18.8 9.3a1 1 0 0 0 2.1 7.7" /><path d="M21.964 20.732a1 1 0 0 1-1.232 1.232l-18-5a1 1 0 0 1-.695-1.232A19.68 19.68 0 0 1 15.732 2.037a1 1 0 0 1 1.232.695z" />',
+        smoking: '<path d="M17 12H3a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h14" /><path d="M18 8c0-2.5-2-2.5-2-5" /><path d="M21 16a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M22 8c0-2.5-2-2.5-2-5" /><path d="M7 12v4" />',
+        wc: '<path d="M7 12h13a1 1 0 0 1 1 1 5 5 0 0 1-5 5h-.598a.5.5 0 0 0-.424.765l1.544 2.47a.5.5 0 0 1-.424.765H5.402a.5.5 0 0 1-.424-.765L7 18" /><path d="M8 18a5 5 0 0 1-5-5V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8" />',
+        sleeping: '<path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" />',
+        alert: '<circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" />',
+        question: '<circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" />'
+    };
+
+    /*
+     * `hsl`/`hslDark` are the same colours as `color`, as bare HSL components
+     * so the dial can build both solid fills and translucent glows from one
+     * value — hsl(var(--code)) and hsl(var(--code) / 0.5).
+     */
+    const STATUS_OPTIONS = [
+        { key: 'eating',   label: 'Eating',         color: '#f97316', hsl: '25 95% 53%',  hslDark: '25 95% 43%' },
+        { key: 'smoking',  label: 'Smoke break',    color: '#fef9c3', hsl: '55 92% 88%',  hslDark: '55 80% 76%' },
+        { key: 'wc',       label: 'Bathroom',       color: '#9ca3af', hsl: '218 11% 65%', hslDark: '218 11% 54%' },
+        { key: 'sleeping', label: 'Sleeping',       color: '#818cf8', hsl: '239 84% 74%', hslDark: '239 70% 63%' },
+        { key: 'alert',    label: 'Need attention', color: '#ef4444', hsl: '0 84% 60%',   hslDark: '0 74% 50%' },
+        { key: 'question', label: 'Question',       color: '#f59e0b', hsl: '38 92% 50%',  hslDark: '38 92% 41%' }
+    ];
+
+    function statusIconSvg(name) {
+        return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${STATUS_ICON_PATHS[name] || ''}</svg>`;
+    }
+
+    /**
+     * Same icon as a data: URI — the dial paints its icons as background-image
+     * (they need to sit under the ring's stacking order), which can't reach
+     * currentColor, so the stroke is baked in.
+     */
+    function statusIconDataUri(name, color) {
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${STATUS_ICON_PATHS[name] || ''}</svg>`;
+        // Single-quoted url(): this lands inside a double-quoted style="…"
+        // attribute, and encodeURIComponent turns the SVG's own double quotes
+        // into %22 while leaving no apostrophes behind to close it early.
+        return `url('data:image/svg+xml,${encodeURIComponent(svg)}')`;
+    }
+
     // Role hierarchy for permission checking
     const ROLE_HIERARCHY = {
         'god': 4,
@@ -158,9 +211,38 @@
         const labelText = hasTournament ? tournamentName : 'No tournament';
         const labelTitle = hasTournament ? tournamentName : 'No tournament selected';
 
-        // "My Status" popup — only for players with a confirmed tournament assignment
+        // Status menu — only for players with a confirmed tournament assignment.
+        // Each <li> is one spoke of the dial; CSS rotates them into a ring and
+        // the radio inputs are the (invisible, full-spoke) hit targets.
+        const dialItemsHTML = STATUS_OPTIONS.map(opt => `
+            <li style="--dial-item-icon:${statusIconDataUri(opt.key, opt.color)}">
+                <input type="radio" name="navStatusChoice" data-status-key="${opt.key}" aria-label="${opt.label}" title="${opt.label}">
+            </li>
+        `).join('');
+
+        // Per-position accent colours the dial's :has() rules select between
+        const dialAccentVars = STATUS_OPTIONS
+            .map((opt, i) => `--dial-accent-${i + 1}:${opt.hsl};--dial-accent-${i + 1}-dark:${opt.hslDark};`)
+            .join('');
+
         const statusBtnHTML = (assignedTournamentId && assignedPlayerId)
-            ? `<button class="navbar-status-btn" id="navStatusBtn" title="My Status" data-tournament-id="${escapeHtml(assignedTournamentId)}" data-player-id="${escapeHtml(assignedPlayerId)}">🎭</button>`
+            ? `<div class="navbar-status" id="navStatus" data-tournament-id="${escapeHtml(assignedTournamentId)}" data-player-id="${escapeHtml(assignedPlayerId)}">
+                    <button type="button" class="navbar-status-btn" id="navStatusBtn" title="Change my status" aria-haspopup="true" aria-expanded="false">
+                        <span class="navbar-status-icon" id="navStatusIcon">${statusIconSvg('idle')}</span>
+                        <span class="navbar-status-label" id="navStatusLabel">Change status</span>
+                        <span class="navbar-status-chevron">&#9662;</span>
+                    </button>
+                    <div class="navbar-status-dial-wrap" id="navStatusDropdown" hidden>
+                        <div class="navbar-status-dial-stage">
+                            <div class="navbar-status-dial" id="navStatusDial" style="${dialAccentVars}" role="radiogroup" aria-label="My status">
+                                <div class="navbar-status-knob" id="navStatusKnob" title="Close" aria-hidden="true"></div>
+                                <ul>${dialItemsHTML}</ul>
+                            </div>
+                        </div>
+                        <div class="navbar-status-caption" id="navStatusCaption">No status</div>
+                        <button type="button" class="navbar-status-clear" id="navStatusClear" hidden>Clear status</button>
+                    </div>
+               </div>`
             : '';
 
         const tournamentCtxHTML = canSwitch
@@ -393,23 +475,204 @@
         document.body.style.paddingTop = '60px';
         wireTournamentSwitcher();
         wireTournamentClear();
-        wireStatusButton();
+        wireStatusMenu();
     }
 
     /**
-     * Open the small "my status" popup window (same popup onboarding.js uses),
-     * scoped to the viewer's own tournament assignment rather than whatever
+     * Status menu state.
+     *
+     * Scoped to the viewer's own tournament assignment rather than whatever
      * tournament happens to be in context — so it works from any page.
      */
-    function wireStatusButton() {
+    let statusUnsubscribe = null;
+    let currentStatusKey = null;
+    let documentStatusListenersAttached = false;
+
+    let statusCloseTimer = null;
+
+    function openStatusDropdown() {
+        const dropdown = document.getElementById('navStatusDropdown');
+        const dial = document.getElementById('navStatusDial');
         const btn = document.getElementById('navStatusBtn');
-        if (!btn) return;
-        btn.addEventListener('click', () => {
-            const { tournamentId, playerId } = btn.dataset;
-            const popupUrl = `${getFullBasePath()}/onboarding-status.html?tournamentId=${encodeURIComponent(tournamentId)}&player=${encodeURIComponent(playerId)}`;
-            window.open(popupUrl, 'statusPopup',
-                'width=240,height=200,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no');
+        if (!dropdown) return;
+
+        clearTimeout(statusCloseTimer);
+        dropdown.hidden = false;
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+        // Next frame, so the browser has a collapsed state to animate from
+        requestAnimationFrame(() => {
+            if (!dropdown.hidden && dial) dial.classList.add('active');
         });
+    }
+
+    function closeStatusDropdown() {
+        const dropdown = document.getElementById('navStatusDropdown');
+        const dial = document.getElementById('navStatusDial');
+        const btn = document.getElementById('navStatusBtn');
+        if (!dropdown || dropdown.hidden) return;
+
+        if (dial) dial.classList.remove('active');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+        // Let the ring collapse before removing it from the layout
+        clearTimeout(statusCloseTimer);
+        statusCloseTimer = setTimeout(() => { dropdown.hidden = true; }, 400);
+    }
+
+    function isStatusDropdownOpen() {
+        const dropdown = document.getElementById('navStatusDropdown');
+        return !!dropdown && !dropdown.hidden;
+    }
+
+    /**
+     * Reflect the active status on the trigger button and the menu items.
+     * `key` is null when no status is set.
+     */
+    function renderStatusState(key) {
+        currentStatusKey = key;
+
+        const option = STATUS_OPTIONS.find(o => o.key === key) || null;
+        const root = document.getElementById('navStatus');
+        const iconEl = document.getElementById('navStatusIcon');
+        const labelEl = document.getElementById('navStatusLabel');
+
+        if (iconEl) {
+            iconEl.innerHTML = statusIconSvg(option ? option.key : 'idle');
+            iconEl.style.color = option ? option.color : '';
+        }
+        if (labelEl) labelEl.textContent = option ? option.label : 'Change status';
+        if (root) root.classList.toggle('has-status', !!option);
+
+        // The dial reads its angle and accent straight off :checked
+        document.querySelectorAll('#navStatusDial input[type="radio"]').forEach(radio => {
+            radio.checked = radio.dataset.statusKey === key;
+        });
+
+        const captionEl = document.getElementById('navStatusCaption');
+        if (captionEl) captionEl.textContent = option ? option.label : 'No status';
+
+        const clearBtn = document.getElementById('navStatusClear');
+        if (clearBtn) clearBtn.hidden = !option;
+    }
+
+    /**
+     * Live-follow the viewer's own status so the navbar stays correct when it
+     * is changed elsewhere (onboarding page, the standalone popup, an admin).
+     */
+    function subscribeToStatus(tournamentId, playerId) {
+        if (statusUnsubscribe) {
+            statusUnsubscribe();
+            statusUnsubscribe = null;
+        }
+
+        if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) {
+            // Cache render can beat Firebase; retry once it announces itself.
+            document.addEventListener('firebase-ready', () => subscribeToStatus(tournamentId, playerId), { once: true });
+            return;
+        }
+
+        statusUnsubscribe = firebase.firestore()
+            .collection('tournaments').doc(tournamentId)
+            .collection('onboarding').doc('state')
+            .onSnapshot(snap => {
+                const statuses = (snap.exists && snap.data()?.players?.[playerId]?.statuses) || {};
+                // First truthy key wins, matching view-onboarding-layout.html
+                const active = STATUS_OPTIONS.find(o => statuses[o.key]);
+                renderStatusState(active ? active.key : null);
+            }, error => {
+                console.error('[navbar] Status listener failed:', error);
+            });
+    }
+
+    /**
+     * Write the status exclusively — clear every key, then set the chosen one.
+     * Mirrors togglePlayerStatus() in onboarding.js.
+     */
+    async function setPlayerStatus(tournamentId, playerId, key) {
+        const previousKey = currentStatusKey;
+        renderStatusState(key); // optimistic; the snapshot confirms it
+
+        const updates = {};
+        for (const opt of STATUS_OPTIONS) {
+            updates[`players.${playerId}.statuses.${opt.key}`] = false;
+        }
+        if (key) {
+            updates[`players.${playerId}.statuses.${key}`] = true;
+        }
+        updates[`players.${playerId}.lastUpdated`] = new Date().toISOString();
+
+        try {
+            await firebase.firestore()
+                .collection('tournaments').doc(tournamentId)
+                .collection('onboarding').doc('state')
+                .update(updates);
+        } catch (error) {
+            console.error('[navbar] Failed to save status:', error);
+            renderStatusState(previousKey); // roll the optimistic update back
+        }
+    }
+
+    function wireStatusMenu() {
+        const root = document.getElementById('navStatus');
+        if (!root) return;
+
+        const btn = document.getElementById('navStatusBtn');
+        const dropdown = document.getElementById('navStatusDropdown');
+        const knob = document.getElementById('navStatusKnob');
+        const clearBtn = document.getElementById('navStatusClear');
+        const { tournamentId, playerId } = root.dataset;
+
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (isStatusDropdownOpen()) closeStatusDropdown();
+            else openStatusDropdown();
+        });
+
+        knob.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeStatusDropdown();
+        });
+
+        clearBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setPlayerStatus(tournamentId, playerId, null);
+        });
+
+        // Picking is non-dismissing — the dial stays open so the choice can be
+        // changed or undone without reopening. It closes on the trigger, the
+        // knob, an outside click, or Escape.
+        //
+        // Uses change, not click, so keyboard arrow-key selection within the
+        // radio group works too.
+        dropdown.addEventListener('change', (e) => {
+            const input = e.target.closest('input[type="radio"]');
+            if (!input || input.dataset.statusKey === currentStatusKey) return;
+            setPlayerStatus(tournamentId, playerId, input.dataset.statusKey);
+        });
+
+        // Re-picking the already-selected status clears it — a radio fires no
+        // change event when it is already checked, so that gesture only shows
+        // up as a click. Deferred to the next tick so the write lands after
+        // the input's own activation behaviour, which would otherwise re-check
+        // it right after we cleared it.
+        dropdown.addEventListener('click', (e) => {
+            const input = e.target.closest('input[type="radio"]');
+            if (!input || input.dataset.statusKey !== currentStatusKey) return;
+            setTimeout(() => setPlayerStatus(tournamentId, playerId, null), 0);
+        });
+
+        if (!documentStatusListenersAttached) {
+            documentStatusListenersAttached = true;
+            document.addEventListener('click', (e) => {
+                const el = document.getElementById('navStatus');
+                if (el && !el.contains(e.target)) closeStatusDropdown();
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeStatusDropdown();
+            });
+        }
+
+        renderStatusState(currentStatusKey);
+        subscribeToStatus(tournamentId, playerId);
     }
 
     /**
@@ -563,6 +826,12 @@
      */
     window.navbarLogout = async function() {
         try {
+            // Detach first — a live listener outlives sign-out and throws
+            // permission-denied into the console on the way down.
+            if (statusUnsubscribe) {
+                statusUnsubscribe();
+                statusUnsubscribe = null;
+            }
             await firebase.auth().signOut();
             // Clear both session and local storage for tournament data
             sessionStorage.clear();

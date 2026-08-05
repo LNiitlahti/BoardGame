@@ -119,6 +119,16 @@ This project is in **active development**. The lightweight version ran its first
 | Full | **The only version** — the OOP module stack with a guided admin dashboard (next-step prompts, phase gating, safety-rail confirmations) is what runs live events |
 | Lightweight | Retired and removed from the repo 2026-07-31 (see git history if needed) |
 
+## Credits
+
+| What | Source | License |
+|------|--------|---------|
+| Radial status dial (navbar) | Adapted from the **Radial Dial Control Menu** by [LukyVJ](https://codepen.io/LukyVJ), itself inspired by [Josh Guo's concept](https://twitter.com/JoshGuoSpace/status/1648259938110836738) | MIT |
+| Icons | [Lucide](https://lucide.dev) | ISC |
+| Fonts | Russo One, Quantico (via Google Fonts) | SIL OFL 1.1 |
+
+The status dial uses CSS `@property` and `:has()`, so it needs Chrome/Edge 115+, Safari 16.4+, or Firefox 128+. Nothing else in the app has that requirement.
+
 ## License
 
 Free to use for non-profit purposes. For commercial use, contact the maintainer.

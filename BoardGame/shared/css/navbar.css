@@ -160,6 +160,7 @@
 }
 
 .navbar-link {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -182,6 +183,20 @@
 .navbar-link.active {
     color: var(--nav-gold-bright);
     background: var(--nav-bg-active);
+    box-shadow: inset 0 0 0 1px var(--nav-gold-dim), 0 0 14px -6px var(--nav-gold-glow);
+}
+
+/* Gold underline marking the current page */
+.navbar-link.active::after {
+    content: '';
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: -2px;
+    height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, transparent, var(--nav-gold-bright), transparent);
+    box-shadow: 0 0 8px var(--nav-gold-glow);
 }
 
 .navbar-link-icon {
@@ -200,24 +215,431 @@
     flex-shrink: 0;
 }
 
-/* "My Status" popup toggle */
+/* ==================== STATUS MENU ==================== */
+.navbar-status {
+    position: relative;
+}
+
 .navbar-status-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     background: transparent;
     border: 1px solid var(--nav-border);
     border-radius: 6px;
-    padding: 4px 8px;
+    padding: 6px 10px;
     cursor: pointer;
-    font-size: 1rem;
+    color: var(--nav-gold);
+    font-family: 'Quantico', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
     line-height: 1;
+    white-space: nowrap;
     transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .navbar-status-btn:hover {
     background: var(--nav-gold-dim);
     border-color: var(--nav-gold);
+    color: var(--nav-gold-bright);
+}
+
+/* Icon colour is set inline per status; the label stays theme-gold so the
+   control still reads as part of the navbar rather than as a coloured chip. */
+.navbar-status-icon {
+    display: flex;
+    flex-shrink: 0;
+}
+
+.navbar-status-icon svg {
+    width: 16px;
+    height: 16px;
+    display: block;
+}
+
+/*
+ * Pinned width. The label changes with the selected status, and the button is
+ * in a right-anchored flex group, so any width change pushes leftward into the
+ * centred nav links — picking a status would slide Home/My Team sideways.
+ * Widest label ("Need attention") measures ~97px; ellipsis covers the rest.
+ */
+.navbar-status-label {
+    flex: 0 0 100px;
+    width: 100px;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.navbar-status-chevron {
+    font-size: 0.6rem;
+    opacity: 0.7;
+    flex-shrink: 0;
+}
+
+/* An active status brightens the control so it's visible at a glance */
+.navbar-status.has-status .navbar-status-btn {
+    background: var(--nav-gold-dim);
+    border-color: var(--nav-gold);
+    color: var(--nav-gold-bright);
+}
+
+/* ==================== STATUS DIAL ==================== */
+/*
+ * Rotary status selector: a knob that swings to point at the chosen status,
+ * with the six options fanning out around it.
+ *
+ * Adapted (and de-SCSS'd) from the Radial Dial Control Menu by LukyVJ
+ * (https://codepen.io/LukyVJ, MIT) — see the Credits table in README.md.
+ * Deviations from the original: accent colour is driven by the selected
+ * status rather than by hue-of-angle, icons counter-rotate to stay upright,
+ * and the @property syntax declarations are corrected.
+ *
+ * These custom properties MUST be registered — an unregistered custom property
+ * is not interpolatable, so the ring would snap open instead of animating.
+ * `--dial-is-active` / `--dial-is-selected` are 0|1 flags multiplied into
+ * lengths and opacities to fade glows in and out.
+ */
+@property --dial-selector-width { syntax: "<number>"; initial-value: 90;  inherits: true; }
+@property --dial-border-width   { syntax: "<number>"; initial-value: 0;   inherits: true; }
+@property --dial-icon-offset    { syntax: "<number>"; initial-value: 100; inherits: true; }
+@property --dial-item-opacity   { syntax: "<number>"; initial-value: 0;   inherits: true; }
+@property --dial-is-selected    { syntax: "<number>"; initial-value: 0;   inherits: true; }
+@property --dial-is-active      { syntax: "<number>"; initial-value: 0;   inherits: true; }
+
+/*
+ * The expanded ring is ~2.75x the dial radius and deliberately overflows its
+ * own box, so the wrapper is a transparent stage sized to the full footprint —
+ * the ring itself is the panel chrome.
+ */
+.navbar-status-dial-wrap {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 250px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 1100;
+}
+
+/*
+ * The `hidden` attribute is only `display: none` at UA-stylesheet strength, so
+ * the `display: flex` above wins and the dial stays on screen. Restate it.
+ */
+.navbar-status-dial-wrap[hidden] {
+    display: none;
+}
+
+/* Sized to the expanded ring (~2.6x the dial radius) plus its outer spread */
+.navbar-status-dial-stage {
+    width: 250px;
+    height: 250px;
+    display: grid;
+    place-items: center;
+}
+
+.navbar-status-caption {
+    margin-top: 6px;
+    font-family: 'Quantico', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--nav-text-muted);
+}
+
+.navbar-status-clear {
+    margin-top: 6px;
+    padding: 4px 10px;
+    background: none;
+    border: none;
+    color: var(--nav-text-muted);
+    font-family: 'Quantico', sans-serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.navbar-status-clear:hover {
+    color: var(--nav-gold-bright);
+}
+
+.navbar-status-dial {
+    --dial-radius: 88px;
+    --dial-angle: -90deg;
+    --dial-angle-offset: 90deg;
+    --dial-cubic: cubic-bezier(0.44, -0.9, 0.31, 1.55);
+
+    /* Resting accent is the navbar gold; a selected status overrides it below */
+    --dial-accent-code: 43 40% 64%;
+    --dial-accent-dark-code: 43 34% 52%;
+    --dial-accent: hsl(var(--dial-accent-code));
+    --dial-accent-dark: hsl(var(--dial-accent-dark-code));
+    --dial-off: hsl(43 10% 34%);
+    --dial-off-dark: hsl(43 10% 24%);
+
+    --dial-inner: hsl(220 16% 11%);
+    --dial-outer: hsl(220 20% 6%);
+    --dial-ring: hsl(220 12% 9%);
+    --dial-body: hsl(220 12% 10%);
+    --dial-cap: hsl(220 12% 15%);
+    --dial-icon-opacity: 0.4;
+    --dial-is-active: 0;
+
+    --dial-shadow:
+        rgba(0, 0, 0, 0.35) 0 0 2px -0.5px,
+        rgba(0, 0, 0, 0.35) 0 1px 5px -1px,
+        rgba(0, 0, 0, 0.35) 0 4px 12px -1.5px,
+        rgba(0, 0, 0, 0.35) 0 9px 28px -2px,
+        rgba(0, 0, 0, 0.35) 0 24px 72px -2.5px;
+
+    position: relative;
+    width: var(--dial-radius);
+    aspect-ratio: 1 / 1;
+    border-radius: 1e5px;
+    background: var(--dial-body);
+    box-shadow:
+        inset rgba(0, 0, 0, 0.5) 0 0 2px -1px,
+        inset rgba(0, 0, 0, 0.5) 0 2px 8px -2px,
+        inset rgba(0, 0, 0, 0.5) 0 8px 34px -2px;
+}
+
+.navbar-status-dial.active {
+    --dial-is-active: 1;
+}
+
+/* ---- knob ---- */
+.navbar-status-knob {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border-radius: 1e5px;
+    cursor: pointer;
+    transform: rotate(calc(var(--dial-angle) + var(--dial-angle-offset)));
+    transition: transform 0.4s var(--dial-cubic);
+}
+
+/* the pointer nub */
+.navbar-status-knob::after {
+    content: '';
+    display: block;
+    position: absolute;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    top: 13%;
+    width: 5%;
+    height: 15%;
+    border-radius: 1e5px;
+    background: linear-gradient(to bottom, var(--dial-off), var(--dial-off-dark));
+    box-shadow:
+        0 0 1px rgb(0 0 0 / 40%),
+        0 0 2px 1px rgb(0 0 0 / 20%),
+        0 0 calc(var(--dial-is-active) * 4px) var(--dial-accent),
+        0 0 calc(var(--dial-is-active) * 16px) hsl(var(--dial-accent-code) / 0.5);
+    transition: background 0.3s ease, box-shadow 0.3s ease, transform 0.15s ease;
+}
+
+.navbar-status-knob:hover::after,
+.navbar-status-dial:has(input:checked) .navbar-status-knob::after {
+    background: linear-gradient(to top, var(--dial-accent), var(--dial-accent-dark));
+}
+
+.navbar-status-knob:active::after {
+    transform: scale(0.95);
+}
+
+/* ---- knob cap: the raised disc the pointer rides on ---- */
+.navbar-status-dial::after {
+    content: '';
+    display: block;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 1e5px;
+    background-image: linear-gradient(to bottom, var(--dial-cap), var(--dial-body));
+    box-shadow: 0 0 calc(var(--dial-radius) / 30) rgb(0 0 0 / 0.5);
+    transition: transform 0.15s ease;
+}
+
+.navbar-status-dial:has(.navbar-status-knob:active)::after {
+    transform: scale(0.95);
+}
+
+/* ---- the ring that fans open ---- */
+.navbar-status-dial ul {
+    --dial-selector-width: 90;
+    --dial-border-width: 0;
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+        --dial-selector-width 0.3s ease,
+        --dial-icon-offset 0.5s ease,
+        --dial-item-opacity 0.5s ease 0.2s;
+}
+
+.navbar-status-dial ul::before,
+.navbar-status-dial ul::after {
+    content: '';
+    display: block;
+    position: absolute;
+    border-radius: 1e5px;
+}
+
+/* expanding backdrop the icons sit on */
+.navbar-status-dial ul::before {
+    width: calc(var(--dial-selector-width) * 1%);
+    height: calc(var(--dial-selector-width) * 1%);
+    background: var(--dial-inner);
+    /* Faint gold hairline so the disc reads as a panel edge on dark pages */
+    box-shadow:
+        var(--dial-shadow),
+        inset 0 0 10px rgb(0 0 0 / 0.35),
+        0 0 0 1px var(--nav-border-faint),
+        0 0 0 calc(var(--dial-is-active) * 1px) var(--nav-gold-dim);
+}
+
+/* bezel around the knob, painted over the icons */
+.navbar-status-dial ul::after {
+    width: calc(100% + var(--dial-radius) / 9 + var(--dial-border-width) * 2px);
+    height: calc(100% + var(--dial-radius) / 9 + var(--dial-border-width) * 2px);
+    background: var(--dial-ring);
+    box-shadow:
+        0 0 calc(var(--dial-is-active) * 2px) hsl(var(--dial-accent-dark-code) / 0.6),
+        0 0 calc(var(--dial-is-active) * 6px) hsl(var(--dial-accent-code) / 0.6),
+        0 0 0 calc(var(--dial-is-active) * var(--dial-radius) / 13) var(--dial-outer),
+        var(--dial-shadow);
+    transition:
+        --dial-border-width 0.35s var(--dial-cubic) 0.2s,
+        box-shadow 0.35s var(--dial-cubic) 0.2s;
+}
+
+/* ---- spokes ---- */
+.navbar-status-dial li {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -70%;
+    margin: auto;
+    width: 25%;
+    height: 120%;
+    transform-origin: bottom center;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    opacity: var(--dial-item-opacity);
+}
+
+.navbar-status-dial:not(.active) li {
+    pointer-events: none;
+}
+
+.navbar-status-dial li::before,
+.navbar-status-dial li::after {
+    content: '';
+    display: block;
+    position: absolute;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+}
+
+/* bloom behind the selected icon */
+.navbar-status-dial li::before {
+    background: var(--dial-accent);
+    box-shadow: 0 0 6px var(--dial-accent-dark);
+    transform: translateY(175%) scaleX(1.5);
+    filter: blur(12px) opacity(var(--dial-is-selected)) saturate(2);
+    transition: --dial-is-selected 0.2s ease 0.2s;
+}
+
+.navbar-status-dial li::after {
+    pointer-events: none;
+    opacity: var(--dial-icon-opacity);
+    background: var(--dial-item-icon) no-repeat center top 15% / contain;
+    transition: opacity 0.2s ease;
+}
+
+/* transform is spoken for by the ring layout, so the icons ride on `top` */
+.navbar-status-dial li::after,
+.navbar-status-dial li input[type="radio"] {
+    top: calc(var(--dial-icon-offset) * 1%);
+}
+
+.navbar-status-dial li input[type="radio"] {
+    all: unset;
+    position: absolute;
+    left: 0;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    cursor: pointer;
+}
+
+/*
+ * Spoke angles: six positions, 60° apart. The knob's --dial-angle is the same
+ * rotation less the 90° offset, so pointer and icon always agree.
+ * Icons counter-rotate by the same amount to stay upright — the original
+ * design let them tilt with the ring, but these need to stay legible.
+ */
+.navbar-status-dial.active li:nth-child(1) { transform: rotate(0deg);   transition: transform 0.5s ease 0.05s; }
+.navbar-status-dial.active li:nth-child(2) { transform: rotate(60deg);  transition: transform 0.5s ease 0.10s; }
+.navbar-status-dial.active li:nth-child(3) { transform: rotate(120deg); transition: transform 0.5s ease 0.15s; }
+.navbar-status-dial.active li:nth-child(4) { transform: rotate(180deg); transition: transform 0.5s ease 0.20s; }
+.navbar-status-dial.active li:nth-child(5) { transform: rotate(240deg); transition: transform 0.5s ease 0.25s; }
+.navbar-status-dial.active li:nth-child(6) { transform: rotate(300deg); transition: transform 0.5s ease 0.30s; }
+
+.navbar-status-dial li:nth-child(2)::after { transform: rotate(-60deg); }
+.navbar-status-dial li:nth-child(3)::after { transform: rotate(-120deg); }
+.navbar-status-dial li:nth-child(4)::after { transform: rotate(-180deg); }
+.navbar-status-dial li:nth-child(5)::after { transform: rotate(-240deg); }
+.navbar-status-dial li:nth-child(6)::after { transform: rotate(-300deg); }
+
+.navbar-status-dial.active ul {
+    --dial-selector-width: 260;
+    --dial-border-width: 13;
+    --dial-icon-offset: 7;
+    --dial-item-opacity: 1;
+}
+
+/*
+ * Selection state. The accent codes are per-position custom properties set
+ * inline by navbar.js from STATUS_OPTIONS, so the dial's glow takes on the
+ * colour of the chosen status rather than a hue derived from the angle.
+ */
+.navbar-status-dial:has(li:nth-child(1) input:checked) { --dial-angle: -90deg; --dial-accent-code: var(--dial-accent-1); --dial-accent-dark-code: var(--dial-accent-1-dark); }
+.navbar-status-dial:has(li:nth-child(2) input:checked) { --dial-angle: -30deg; --dial-accent-code: var(--dial-accent-2); --dial-accent-dark-code: var(--dial-accent-2-dark); }
+.navbar-status-dial:has(li:nth-child(3) input:checked) { --dial-angle: 30deg;  --dial-accent-code: var(--dial-accent-3); --dial-accent-dark-code: var(--dial-accent-3-dark); }
+.navbar-status-dial:has(li:nth-child(4) input:checked) { --dial-angle: 90deg;  --dial-accent-code: var(--dial-accent-4); --dial-accent-dark-code: var(--dial-accent-4-dark); }
+.navbar-status-dial:has(li:nth-child(5) input:checked) { --dial-angle: 150deg; --dial-accent-code: var(--dial-accent-5); --dial-accent-dark-code: var(--dial-accent-5-dark); }
+.navbar-status-dial:has(li:nth-child(6) input:checked) { --dial-angle: 210deg; --dial-accent-code: var(--dial-accent-6); --dial-accent-dark-code: var(--dial-accent-6-dark); }
+
+.navbar-status-dial:has(li:nth-child(1) input:checked) li:nth-child(1),
+.navbar-status-dial:has(li:nth-child(2) input:checked) li:nth-child(2),
+.navbar-status-dial:has(li:nth-child(3) input:checked) li:nth-child(3),
+.navbar-status-dial:has(li:nth-child(4) input:checked) li:nth-child(4),
+.navbar-status-dial:has(li:nth-child(5) input:checked) li:nth-child(5),
+.navbar-status-dial:has(li:nth-child(6) input:checked) li:nth-child(6) {
+    --dial-icon-opacity: 1;
+    --dial-is-selected: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .navbar-status-knob,
+    .navbar-status-dial ul,
+    .navbar-status-dial ul::after,
+    .navbar-status-dial.active li {
+        transition: none;
+    }
 }
 
 /* Connection Status Indicator */
@@ -254,6 +676,12 @@
     object-fit: cover;
     border: 1.5px solid var(--nav-gold, #c8b37e);
     flex-shrink: 0;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.navbar-user:hover .navbar-avatar {
+    border-color: var(--nav-gold-bright);
+    box-shadow: 0 0 10px var(--nav-gold-glow);
 }
 
 /* Role Badges */
@@ -322,7 +750,11 @@
     padding: 6px 10px;
     cursor: pointer;
     color: var(--nav-text-muted);
-    font-size: 0.9rem;
+    font-family: 'Quantico', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    line-height: 1;
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
@@ -335,6 +767,25 @@
     color: white;
 }
 
+/* ==================== FOCUS STATES ==================== */
+/*
+ * Keyboard-only focus ring. Uses :focus-visible so mouse clicks don't leave a
+ * lingering outline, and outline (not box-shadow) so it never shifts layout.
+ */
+.unified-navbar a:focus-visible,
+.unified-navbar button:focus-visible,
+.unified-navbar input:focus-visible {
+    outline: 2px solid var(--nav-gold);
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+.navbar-tournament-search:focus {
+    outline: none;
+    border-color: var(--nav-gold);
+    box-shadow: 0 0 0 1px var(--nav-gold-dim);
+}
+
 /* ==================== MOBILE TOGGLE ==================== */
 .navbar-mobile-toggle {
     display: none;
@@ -345,6 +796,7 @@
     border: 1px solid var(--nav-border);
     border-radius: 6px;
     cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .navbar-mobile-toggle span {
@@ -354,6 +806,15 @@
     background: var(--nav-text-muted);
     border-radius: 2px;
     transition: all 0.2s ease;
+}
+
+.navbar-mobile-toggle:hover {
+    background: var(--nav-gold-dim);
+    border-color: var(--nav-gold);
+}
+
+.navbar-mobile-toggle:hover span {
+    background: var(--nav-gold-bright);
 }
 
 /* ==================== RESPONSIVE ==================== */
@@ -384,8 +845,39 @@
         padding: 12px 16px;
     }
 
+    /* Stacked menu: an underline reads as a divider, so mark the active
+       item with a left bar instead. */
+    .navbar-link.active::after {
+        left: 0;
+        right: auto;
+        top: 6px;
+        bottom: 6px;
+        width: 2px;
+        height: auto;
+        background: linear-gradient(180deg, transparent, var(--nav-gold-bright), transparent);
+    }
+
     .navbar-user-name {
         display: none;
+    }
+
+    /* Keep the status button reachable, drop its label to save width */
+    .navbar-status-label {
+        display: none;
+    }
+
+    .navbar-status-btn {
+        padding: 6px 8px;
+    }
+
+    /*
+     * The button sits close to the right edge here, so centring the 250px dial
+     * on it would push half of it off-screen — pin it to the edge instead.
+     */
+    .navbar-status-dial-wrap {
+        left: auto;
+        right: -8px;
+        transform: none;
     }
 
     .navbar-tournament-name {
@@ -459,6 +951,16 @@ body.has-navbar {
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
     padding: 10px;
     z-index: 1100;
+    animation: navbar-dropdown-in 0.15s ease-out;
+}
+
+@keyframes navbar-dropdown-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .navbar-tournament-dropdown { animation: none; }
 }
 
 .navbar-tournament-search {
@@ -498,8 +1000,13 @@ body.has-navbar {
     cursor: pointer;
 }
 
+.navbar-tournament-item {
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
 .navbar-tournament-item:hover {
     background: var(--nav-gold-dim);
+    color: var(--nav-gold-bright);
 }
 
 .navbar-tournament-item-status {
