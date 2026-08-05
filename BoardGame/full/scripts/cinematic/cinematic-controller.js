@@ -227,6 +227,14 @@
     function buildTimeline() {
         const cfg = state.config;
         const easing = window.CineEasing;
+
+        // Snap amplitudes to 0.05 steps. The atmosphere/camera setters these
+        // feed all early-out on an unchanged value, so quantizing turns most
+        // frames' style writes into no-ops — and 0.05 is finer than the eye
+        // resolves on a fog/glow/scale modulation. Deliberately not applied
+        // to the shake (random per frame by design) or the strings drift
+        // (sampled by a sine, so stepping it would be visible).
+        const q = a => Math.round(a * 20) / 20;
         const tl = new window.CineTimeline();
 
         // Camera shake: a short, punchy, decaying jolt on the first impact
@@ -402,9 +410,9 @@
                 duration: envelopeDuration,
                 onUpdate: p => {
                     const amp = music.envelopeAt(p * envelopeDuration);
-                    state.camera.applyBoardPulse(amp);
+                    state.camera.applyBoardPulse(q(amp));
                     state.camera.setShake('music', window.CineCamera.randomOffset(cfg.shake.music, amp));
-                    state.atmosphere.applyIntensity(amp);
+                    state.atmosphere.applyIntensity(q(amp));
                 }
             });
         }
@@ -456,7 +464,7 @@
                 at: 0,
                 duration: dur,
                 onUpdate: p => state.atmosphere.applyFogIntensity(
-                    state.musicBackingVocals.envelopeAt(p * dur))
+                    q(state.musicBackingVocals.envelopeAt(p * dur)))
             });
         }
 
@@ -466,7 +474,7 @@
                 at: 0,
                 duration: dur,
                 onUpdate: p => state.camera.applyBassScale(
-                    state.musicBass.envelopeAt(p * dur), cfg.bass.scaleAmp)
+                    q(state.musicBass.envelopeAt(p * dur)), cfg.bass.scaleAmp)
             });
         }
 
@@ -507,7 +515,7 @@
                 at: 0,
                 duration: dur,
                 onUpdate: p => state.atmosphere.applySynthGlow(
-                    state.musicSynth.envelopeAt(p * dur))
+                    q(state.musicSynth.envelopeAt(p * dur)))
             });
         }
 
@@ -517,7 +525,7 @@
                 at: 0,
                 duration: dur,
                 onUpdate: p => state.atmosphere.applyBaseIntensity(
-                    state.musicOther.envelopeAt(p * dur))
+                    q(state.musicOther.envelopeAt(p * dur)))
             });
         }
 
