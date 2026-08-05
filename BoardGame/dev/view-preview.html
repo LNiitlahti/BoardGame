@@ -316,6 +316,46 @@ const SCENARIOS = [
     }) },
     { label: 'Board Resolved (bare board)', build: () => baseData({ currentPhase: { name: 'board_resolved', roundNumber: 4 } }) },
 ]},
+{ group: 'Spell Window', items: [
+    // Idle: the admin hasn't begun casting. Must stay banner-only with the
+    // normal dashboard visible -- NOT a takeover.
+    { label: 'Spell Window (idle — no takeover)', build: () => baseData({
+        currentPhase: { name: 'spell_window_1', roundNumber: 4, startedAt: '2026-08-06T12:00:00.000Z' },
+        spellPhase: { isActive: false, turnOrder: [], teamsCompleted: [] }
+    }) },
+    { label: 'Spell Window (active — nobody done)', build: () => baseData({
+        currentPhase: { name: 'spell_window_1', roundNumber: 4, startedAt: '2026-08-06T12:00:00.000Z' },
+        spellPhase: { isActive: true, turnOrder: [5, 4, 3, 2, 1], teamsCompleted: [] }
+    }) },
+    // Mid-queue with all three log shapes at once: an in-app cast
+    // (spellHistory), a table cast (spellWindowLog), and a pass (in
+    // teamsCompleted with no entry in either source).
+    { label: 'Spell Window (mid-queue, mixed log)', build: () => baseData({
+        currentPhase: { name: 'spell_window_2', roundNumber: 4, startedAt: '2026-08-06T12:00:00.000Z' },
+        spellPhase: { isActive: true, turnOrder: [5, 4, 3, 2, 1], teamsCompleted: [5, 4, 3] },
+        spellHistory: [
+            { timestamp: '2026-08-06T11:00:00.000Z', spellName: 'Edellisen ikkunan loitsu', teamId: 1, teamName: 'Tiimi 1' },
+            { timestamp: '2026-08-06T12:02:00.000Z', spellName: 'Täytä sopimus', teamId: 5, teamName: 'Tiimi 5' }
+        ],
+        spellWindowLog: [
+            { id: 'sl_1', teamId: 4, teamName: 'Tiimi 4', spellName: 'Kilpi', addedAt: '2026-08-06T12:04:00.000Z' }
+        ]
+    }) },
+    { label: 'Spell Window (all teams done)', build: () => baseData({
+        currentPhase: { name: 'spell_window_3', roundNumber: 4, startedAt: '2026-08-06T12:00:00.000Z' },
+        spellPhase: { isActive: true, turnOrder: [5, 4, 3, 2, 1], teamsCompleted: [5, 4, 3, 2, 1] },
+        spellWindowLog: [
+            { id: 'sl_1', teamId: 5, teamName: 'Tiimi 5', spellName: 'Kilpi', addedAt: '2026-08-06T12:01:00.000Z' },
+            { id: 'sl_2', teamId: 3, teamName: 'Tiimi 3', spellName: 'Varkaus', addedAt: '2026-08-06T12:05:00.000Z' }
+        ]
+    }) },
+    // god.html forcing the mode outside any spell window: empty turnOrder,
+    // must not render "undefined" anywhere.
+    { label: 'Spell Window (forced by god, empty state)', build: () => baseData({
+        currentPhase: { name: 'scoring_vp', roundNumber: 4 },
+        displayOverride: { mode: 'spell_window_1' }
+    }) },
+]},
 { group: 'Tournament End', items: [
     { label: 'Winner Celebration', build: () => baseData({
         currentPhase: { name: 'tournament_end', roundNumber: 8 },
