@@ -143,6 +143,9 @@ function displayUsers() {
                 <td>${lastLoginDate}</td>
                 <td>
                     <button class="btn-small btn-edit" onclick="editUser('${user.uid}')">${ICON_SVGS.pencil} Edit</button>
+                    <button class="btn-small btn-toggle" onclick="sendPasswordReset('${escapeHtml(user.email || '')}')" ${user.email ? '' : 'disabled title="No email on file"'}>
+                        ${ICON_SVGS.repeat} Reset Password
+                    </button>
                     <button class="btn-small btn-toggle" onclick="toggleUserStatus('${user.uid}', ${!isEnabled})">
                         ${isEnabled ? ICON_SVGS.ban + ' Disable' : ICON_SVGS.circleCheck + ' Enable'}
                     </button>
@@ -362,6 +365,48 @@ async function deleteUser(uid, displayName) {
     } catch (error) {
         console.error('[User Management] Error deleting user:', error);
         alert(`Error deleting user: ${error.message}`);
+    }
+}
+
+/**
+ * Send a password reset email to a user on their behalf.
+ *
+ * Uses the client SDK, which allows this for any address without elevated
+ * privileges — no Cloud Function and no Firestore rules change needed. It also
+ * does not touch the signed-in admin's own session.
+ *
+ * The email still lands in the player's inbox: this helps someone who can't
+ * find the reset link themselves, not someone who can't reach their email.
+ */
+async function sendPasswordReset(email) {
+    if (!email) {
+        alert('This user has no email address on file, so a reset link cannot be sent.');
+        return;
+    }
+
+    if (!confirm(`Send a password reset email to:\n\n${email}\n\nThey'll get a link to choose a new password. Their current password keeps working until they use it.`)) {
+        return;
+    }
+
+    try {
+        await firebase.auth().sendPasswordResetEmail(email);
+
+        console.log('[User Management] Sent password reset email to:', email);
+        alert(`Reset email sent to ${email}.\n\nTell them to check their spam folder if it doesn't arrive within a minute.`);
+
+    } catch (error) {
+        console.error('[User Management] Error sending password reset:', error);
+
+        let message = error.message;
+        if (error.code === 'auth/invalid-email') {
+            message = 'That address is not a valid email address.';
+        } else if (error.code === 'auth/user-not-found') {
+            message = 'No Firebase Auth account exists for that address. The user may have a Firestore record but never completed registration.';
+        } else if (error.code === 'auth/too-many-requests') {
+            message = 'Too many reset requests. Wait a few minutes before trying again.';
+        }
+
+        alert(`Could not send reset email: ${message}`);
     }
 }
 

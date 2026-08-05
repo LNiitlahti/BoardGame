@@ -61,6 +61,7 @@
             required
             autocomplete="current-password"
           >
+          <a class="auth-toggle-link" onclick="showReset()" style="display: block; margin-top: 8px; text-align: right; font-size: 0.9rem;">Forgot password?</a>
         </div>
 
         <button type="submit" class="auth-btn auth-btn-primary" id="loginBtn" disabled>
@@ -149,6 +150,35 @@
         <a class="auth-toggle-link" onclick="showLogin()">Sign in here</a>
       </div>
     </div>
+
+    <!-- Password Reset Form -->
+    <div id="resetSection" class="auth-card" style="display: none;">
+      <h2 class="auth-card-title">Reset Password</h2>
+      <p class="auth-card-description">We'll email you a link to set a new password</p>
+
+      <form id="resetForm" class="auth-form">
+        <div class="auth-form-group">
+          <label for="resetEmail" class="auth-form-label">Email</label>
+          <input
+            type="email"
+            id="resetEmail"
+            class="auth-form-input"
+            placeholder="your@email.com"
+            required
+            autocomplete="email"
+          >
+        </div>
+
+        <button type="submit" class="auth-btn auth-btn-primary" id="resetBtn" disabled>
+          Send Reset Link
+        </button>
+      </form>
+
+      <div class="auth-toggle">
+        Remembered it?
+        <a class="auth-toggle-link" onclick="showLogin()">Back to sign in</a>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -178,6 +208,7 @@
       // whatever the user typed instead of calling handleLogin/handleRegister).
       document.getElementById('loginBtn').disabled = false;
       document.getElementById('registerBtn').disabled = false;
+      document.getElementById('resetBtn').disabled = false;
 
       // Monitor auth state — ignore anonymous users (firebase-loader signs in anonymously)
       auth.onAuthStateChanged(user => {
@@ -204,6 +235,12 @@
       document.getElementById('registerForm').addEventListener('submit', function(e) {
         e.preventDefault();
         handleRegister();
+      });
+
+      // Password reset form submission
+      document.getElementById('resetForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        handlePasswordReset();
       });
     });
 
@@ -234,7 +271,12 @@
           if (err.code === 'auth/user-not-found') {
             message = 'No account found with this email.';
           } else if (err.code === 'auth/wrong-password') {
-            message = 'Incorrect password.';
+            message = "Incorrect password. Use 'Forgot password?' to reset it.";
+          } else if (err.code === 'auth/invalid-credential') {
+            // Returned instead of user-not-found/wrong-password when the
+            // project has email enumeration protection enabled, so it can't be
+            // narrowed down to which of the two actually failed.
+            message = "Email or password is incorrect. Use 'Forgot password?' to reset it.";
           } else if (err.code === 'auth/invalid-email') {
             message = 'Invalid email address.';
           }
@@ -348,15 +390,75 @@
       });
     }
 
+    function handlePasswordReset() {
+      const email = document.getElementById('resetEmail').value.trim();
+      const btn = document.getElementById('resetBtn');
+
+      if (!email) {
+        showStatus('Please enter your email address', 'error');
+        return;
+      }
+
+      btn.classList.add('loading');
+      btn.disabled = true;
+
+      auth.sendPasswordResetEmail(email)
+        .then(() => {
+          // Deliberately generic: with email enumeration protection enabled
+          // (the Firebase default) this resolves even for addresses that have
+          // no account, so confirming the address is registered would be wrong
+          // a good share of the time.
+          showStatus(
+            'If an account exists for that address, a reset link is on its way. Check your spam folder.',
+            'success'
+          );
+          btn.classList.remove('loading');
+          btn.disabled = false;
+        })
+        .catch(err => {
+          console.error('Password reset error:', err);
+          btn.classList.remove('loading');
+          btn.disabled = false;
+
+          let message = 'Could not send the reset email. Please try again.';
+          if (err.code === 'auth/invalid-email') {
+            message = 'Invalid email address.';
+          } else if (err.code === 'auth/user-not-found') {
+            message = 'No account found with this email.';
+          } else if (err.code === 'auth/too-many-requests') {
+            message = 'Too many attempts. Wait a few minutes and try again.';
+          } else if (err.code === 'auth/network-request-failed') {
+            message = 'Network error. Check your connection and try again.';
+          }
+
+          showStatus(message, 'error');
+        });
+    }
+
     function showLogin() {
       document.getElementById('loginSection').style.display = 'block';
       document.getElementById('registerSection').style.display = 'none';
+      document.getElementById('resetSection').style.display = 'none';
       hideStatus();
     }
 
     function showRegister() {
       document.getElementById('loginSection').style.display = 'none';
       document.getElementById('registerSection').style.display = 'block';
+      document.getElementById('resetSection').style.display = 'none';
+      hideStatus();
+    }
+
+    function showReset() {
+      // Carry over whatever was typed on the login form so a player who just
+      // failed a sign-in doesn't have to retype their address.
+      const typedEmail = document.getElementById('loginEmail').value.trim();
+      if (typedEmail) {
+        document.getElementById('resetEmail').value = typedEmail;
+      }
+      document.getElementById('loginSection').style.display = 'none';
+      document.getElementById('registerSection').style.display = 'none';
+      document.getElementById('resetSection').style.display = 'block';
       hideStatus();
     }
 
