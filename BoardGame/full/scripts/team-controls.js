@@ -335,6 +335,46 @@ function renderPhaseBanner() {
         }
     }
 
+    // Challenges never got the setup->lobby->playing->done sub-phase slots
+    // matches_in_progress has -- challenge_game is a flat phase whose ready
+    // check lives in gameData.currentPhase.challengeLobbyState, the same
+    // field openChallengeLobby()/isChallengeLobbyActive() (phase-manager.js)
+    // read and write. Mirror the matches_in_progress 'lobby'/'playing'
+    // branches above so a challenge participant gets the same "join
+    // Discord + confirm the game lobby" guidance instead of the old static
+    // "A challenge game is being played." string.
+    if (phaseName === 'challenge_game') {
+        const queue = gameData.gameQueue || [];
+        const myChallenge = queue.find(m =>
+            m.isChallenge === true && m.status !== 'completed' &&
+            _belongsToCurrentRound(m) && _matchInvolvesUs(m)
+        );
+
+        if (myChallenge) {
+            const lobbyActive = gameData.currentPhase?.challengeLobbyState === 'lobby';
+            if (lobbyActive) {
+                const r = (gameData.lobbyReady || {})[currentUser?.uid] || {};
+                const confirmed = r.gameLobby === true || r.ready === true;
+                if (confirmed) {
+                    desc = 'You are confirmed for the challenge game. Waiting for the remaining players...';
+                    action = false;
+                } else {
+                    desc = "You're in the challenge game — you'll be moved into Discord automatically. Confirm once you're in the game lobby.";
+                    action = true;
+                }
+            } else if (myChallenge.status === 'ongoing') {
+                const gameName = getGameDisplayName(myChallenge.gameId || myChallenge.gameType || myChallenge.game);
+                desc = `Your challenge game is live — play ${gameName}! Vote on the result when it ends.`;
+                action = true;
+            } else {
+                desc = 'A challenge game involving your team is queued up — the lobby will open shortly.';
+                action = true;
+            }
+        } else {
+            desc = 'A challenge game is being played. Not playing? Watch and cheer!';
+        }
+    }
+
     const round = gameData?.currentPhase?.roundNumber || gameData?.currentRound;
 
     el.className = 'phase-banner' + (action ? ' action-needed' : '');
@@ -438,8 +478,13 @@ function _getTeamMatchInfo() {
         if (match.isBreak || match.status === 'completed') continue;
         const sides = match.teams || match.sides || [];
 
+        // Uses getMatchSidePlayers() (same dual-shape resolution as
+        // renderReadinessStatus/renderMatchCard) instead of reading
+        // side.players[] directly -- real queue entries are teams[].playerIds,
+        // which side.players[] never matches.
         const mySide = sides.find(side =>
-            (side.players || []).some(p =>
+            getMatchSidePlayers(side).some(p =>
+                (p.teamId !== undefined && p.teamId !== null && String(p.teamId) === String(currentTeamId)) ||
                 teamData.players?.some(tp => tp.uid === p.uid || tp.name === p.name)
             )
         );

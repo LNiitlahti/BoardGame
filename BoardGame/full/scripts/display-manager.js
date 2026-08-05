@@ -1054,18 +1054,24 @@ class DisplayManager {
             }
         }
 
-        if (phaseName === 'pre_game_instructions') {
+        if (phaseName === 'pre_game_setup') {
             phaseBanner.style.display = 'block';
             phaseBanner.style.background = 'rgba(0,212,255,0.08)';
             phaseBanner.style.color = '#00d4ff';
             phaseBanner.style.borderBottom = '2px solid rgba(0,212,255,0.3)';
-            phaseBanner.textContent = 'PRE-GAME INSTRUCTIONS \u2014 Review Your Matches';
-        } else if (phaseName === 'lobby_ready') {
+            phaseBanner.textContent = 'PRE-GAME SETUP \u2014 Tournament has not started yet';
+        } else if (phaseName === 'round_advance') {
             phaseBanner.style.display = 'block';
-            phaseBanner.style.background = 'rgba(16,185,129,0.08)';
-            phaseBanner.style.color = '#10b981';
-            phaseBanner.style.borderBottom = '2px solid rgba(16,185,129,0.3)';
-            phaseBanner.textContent = 'LOBBY READY \u2014 Waiting for all players';
+            phaseBanner.style.background = 'rgba(59,130,246,0.08)';
+            phaseBanner.style.color = '#3b82f6';
+            phaseBanner.style.borderBottom = '2px solid rgba(59,130,246,0.3)';
+            phaseBanner.textContent = 'ADVANCING TO NEXT ROUND';
+        } else if (phaseName === 'tournament_end') {
+            phaseBanner.style.display = 'block';
+            phaseBanner.style.background = 'rgba(247,186,50,0.08)';
+            phaseBanner.style.color = '#f7ba32';
+            phaseBanner.style.borderBottom = '2px solid rgba(247,186,50,0.3)';
+            phaseBanner.textContent = 'TOURNAMENT CONCLUDED \u2014 Thanks for playing!';
         } else if (phaseName === 'break') {
             phaseBanner.style.display = 'block';
             phaseBanner.style.background = 'rgba(247,186,50,0.08)';
@@ -1074,11 +1080,22 @@ class DisplayManager {
             const autoFlag = data.currentPhase?.autoInserted ? ' (Scheduled)' : '';
             phaseBanner.textContent = 'BREAK TIME' + autoFlag;
         } else if (phaseName === 'challenge_game') {
+            // Mirrors matches_in_progress's lobby-aware treatment below —
+            // challengeLobbyState is 'lobby' during the ready-check, 'ready'
+            // once everyone's in and the admin just needs to hit Start, or
+            // unset while the challenge match itself is queued/being played.
             phaseBanner.style.display = 'block';
             phaseBanner.style.background = 'rgba(16,185,129,0.08)';
             phaseBanner.style.color = '#10b981';
             phaseBanner.style.borderBottom = '2px solid rgba(16,185,129,0.3)';
-            phaseBanner.textContent = 'CHALLENGE GAME';
+            const challengeLobbyState = data.currentPhase?.challengeLobbyState;
+            if (challengeLobbyState === 'lobby') {
+                phaseBanner.textContent = 'CHALLENGE GAME — LOBBY: Waiting for all players';
+            } else if (challengeLobbyState === 'ready') {
+                phaseBanner.textContent = 'CHALLENGE GAME — READY: Starting shortly';
+            } else {
+                phaseBanner.textContent = 'CHALLENGE GAME';
+            }
         } else if (phaseName === 'matches_in_progress') {
             // Match 1 and Match 2 progress independently — show both statuses
             // at once instead of picking one to display.
@@ -1109,7 +1126,7 @@ class DisplayManager {
             phaseBanner.style.background = 'rgba(245,158,11,0.08)';
             phaseBanner.style.color = '#f59e0b';
             phaseBanner.style.borderBottom = '2px solid rgba(245,158,11,0.3)';
-            phaseBanner.textContent = 'CHALLENGES \u2014 Teams choosing opponents';
+            phaseBanner.textContent = 'CHALLENGES \u2014 Teams disputing control of heart hexes';
         } else if (phaseName === 'board_resolved') {
             phaseBanner.style.display = 'block';
             phaseBanner.style.background = 'rgba(59,130,246,0.08)';

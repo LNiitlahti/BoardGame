@@ -66,8 +66,12 @@ class MatchQueueManager {
      * @param {Function}   deps.logEventCallback    - (type, data) => void (legacy)
      * @param {Function}   [deps.logActionCallback] - (actionType, category, payload, previousState) => void
      * @param {Function}   [deps.closeResultConfirm] - closes result modal
+     * @param {Function}   [deps.getTargetSlotCallback] - () => {roundNumber, slot}|null — same
+     *   shape as admin-improved-adapter.js's _computeCurrentSlot(); used by moveMatchToTop()
+     *   to bind a queue-jumped match to the slot currently being targeted. Optional — if not
+     *   supplied (no slot concept wired up), moveMatchToTop() leaves the match's slot untouched.
      */
-    constructor(gameState, { uiManager, teamManager, saveCallback, logEventCallback, logActionCallback, closeResultConfirm }) {
+    constructor(gameState, { uiManager, teamManager, saveCallback, logEventCallback, logActionCallback, closeResultConfirm, getTargetSlotCallback }) {
         this._gameState = gameState;
         this._ui = uiManager;
         this._teams = teamManager;
@@ -75,6 +79,7 @@ class MatchQueueManager {
         this._logEvent = logEventCallback || (() => {});
         this._logAction = logActionCallback || (() => {});
         this._closeResultConfirm = closeResultConfirm || (() => {});
+        this._getTargetSlot = getTargetSlotCallback || (() => null);
         this._draggedQueueId = null;
         this._asyncBusy = false;
         this._breakMenuCloseHandler = null;
@@ -284,6 +289,17 @@ class MatchQueueManager {
 
             const [match] = pendingGames.splice(idx, 1);
             pendingGames.unshift(match);
+
+            // Bind the queue-jumped match to whichever slot is currently
+            // targeted (see getTargetSlotCallback), the same way slot-tagging-
+            // on-creation does — otherwise an untagged match can surface as
+            // "Next up" on whichever slot's card happens to read from the
+            // shared pending pool, not necessarily the one intended.
+            const targetSlot = this._getTargetSlot();
+            if (targetSlot && targetSlot.slot !== null && targetSlot.slot !== undefined) {
+                match.roundNumber = targetSlot.roundNumber;
+                match.slot = match.isChallenge ? 'challenge' : targetSlot.slot;
+            }
 
             this._gameState.gameQueue = [...ongoingGames, ...pendingGames, ...completedGames];
             await this._save();

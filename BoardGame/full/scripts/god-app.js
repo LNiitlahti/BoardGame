@@ -735,6 +735,10 @@ class GodApp {
         }
 
         try {
+            if (t.seasonId && this.seasons?.removeTournamentFromSeason) {
+                await this.seasons.removeTournamentFromSeason(t.seasonId, tournamentId);
+            }
+
             await window.firebaseDB.collection('tournaments').doc(tournamentId).delete();
             this.ui.showStatus(`Deleted "${name}"`, 'success');
 

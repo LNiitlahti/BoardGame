@@ -1379,6 +1379,21 @@
       }
 
       try {
+        // Detach from any season before deleting, so the season's
+        // tournamentIds[] never ends up pointing at a deleted doc.
+        const tournamentSnap = await db.collection('tournaments').doc(tournamentId).get();
+        const seasonId = tournamentSnap.exists ? tournamentSnap.data().seasonId : null;
+        if (seasonId) {
+          const seasonRef = db.collection('seasons').doc(seasonId);
+          const batch = db.batch();
+          batch.update(seasonRef, {
+            tournamentIds: firebase.firestore.FieldValue.arrayRemove(tournamentId),
+            updatedAt: new Date().toISOString()
+          });
+          batch.update(db.collection('tournaments').doc(tournamentId), { seasonId: null });
+          await batch.commit();
+        }
+
         await db.collection('tournaments').doc(tournamentId).delete();
         errorHandler.showSuccess(`Tournament "${tournamentName}" has been permanently deleted.`);
 

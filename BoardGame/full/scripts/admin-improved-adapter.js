@@ -487,6 +487,16 @@
     }
     window.setTargetMatchSlot = _setTargetSlot;
 
+    /**
+     * Exposes {roundNumber, slot} for whatever the admin is currently
+     * targeting — same computation _tagNewQueueEntries uses to stamp newly
+     * created matches. admin.js's moveMatchToTop() (queue-jump / "Play
+     * next") reads this to bind the jumped match to the intended slot,
+     * instead of leaving it untagged where _belongsToCurrentSlot would let
+     * it surface on either slot's card.
+     */
+    window.getTargetMatchSlot = () => _computeCurrentSlot();
+
     /** Snapshot of queue entry ids, taken right before calling a creation function. */
     function _snapshotQueueIds() {
         return new Set((gameState.gameQueue || []).map(e => e.id));

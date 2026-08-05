@@ -3365,6 +3365,7 @@ async function saveMatchEdits(triggerBtn) {
     }
 
     const match = gameState.gameQueue[matchIdx];
+    const prevMatchSnapshot = JSON.parse(JSON.stringify(match));
 
     // Update game type
     match.game = document.getElementById('editGameType').value;
@@ -3399,6 +3400,11 @@ async function saveMatchEdits(triggerBtn) {
     }
 
     await saveGameState(triggerBtn);
+    window.logAction?.('match_details_edited', 'match', {
+        matchId: match.id, matchNumber: match.matchNumber,
+        game: match.game, format: playType,
+        sides: match.teams.map(t => ({ id: t.id, playerIds: t.playerIds }))
+    }, { matchEntry: prevMatchSnapshot });
     closeEditMatchModal();
     showStatus('Match updated successfully', 'success');
 }
@@ -4033,6 +4039,19 @@ async function moveMatchToTop(gameId) {
         const [match] = pendingGames.splice(idx, 1);
         pendingGames.unshift(match);
 
+        // Bind the queue-jumped match to whichever slot the TD is currently
+        // targeting, the same way slot-tagging-on-creation does (see
+        // admin-improved-adapter.js's _tagNewQueueEntries / _computeCurrentSlot).
+        // Otherwise an untagged (or wrongly-tagged) match can surface as
+        // "Next up" on whichever slot's card happens to read from the shared
+        // pending pool (_belongsToCurrentSlot / _pendingSlotMatches), not
+        // necessarily the slot the TD meant it for.
+        const targetSlot = window.getTargetMatchSlot?.();
+        if (targetSlot && targetSlot.slot !== null && targetSlot.slot !== undefined) {
+            match.roundNumber = targetSlot.roundNumber;
+            match.slot = match.isChallenge ? 'challenge' : targetSlot.slot;
+        }
+
         gameState.gameQueue = [...ongoingGames, ...pendingGames, ...completedGames];
         await saveGameState();
         showStatus('Match moved to play next', 'success');
@@ -4042,8 +4061,14 @@ async function moveMatchToTop(gameId) {
 async function removeFromQueue(gameId) {
     if (!confirm('Remove this match from the queue?')) return;
 
+    const removed = (gameState.gameQueue || []).find(g => g.id === gameId);
+    const removedSnapshot = removed ? JSON.parse(JSON.stringify(removed)) : null;
     gameState.gameQueue = (gameState.gameQueue || []).filter(g => g.id !== gameId);
     await saveGameState();
+    window.logAction?.('match_removed', 'match', {
+        matchId: gameId, matchNumber: removed?.matchNumber,
+        game: removed?.game
+    }, { removedEntry: removedSnapshot });
     showStatus('Match removed from queue', 'success');
 }
 
@@ -4173,6 +4198,11 @@ async function startMatch(gameId) {
         isChallenge: game.isChallenge || false,
         message: `${matchNum} ${gameName} started`
     });
+    window.logAction?.('match_started', 'match', {
+        matchId: game.id, matchNumber: game.matchNumber,
+        game: game.game, gameName, playType: game.playType,
+        isChallenge: game.isChallenge || false
+    }, { matchId: game.id, status: 'pending', startedAt: null });
 
     showStatus('Match started!', 'success');
     } finally { _asyncBusy = false; }

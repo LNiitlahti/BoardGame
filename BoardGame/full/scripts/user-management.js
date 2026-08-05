@@ -658,16 +658,17 @@ function renderTeamAssignmentSlots() {
  * at whoever actually played them. (team-manager.js's getMatchTeamPlayers
  * also resolves live for display, but that's a separate, orthogonal
  * concern from whether the stored playerIds get rewritten.) Mutates
- * gameState.gameQueue in place; returns the number of entries changed (0 if
- * none) so the caller knows whether gameQueue needs to be included in the
- * save.
+ * gameState.gameQueue in place; returns the ids of the entries changed
+ * (empty array if none) so the caller knows whether gameQueue needs to be
+ * included in the save, and so callers logging the swap can record exactly
+ * which matches were swept up.
  * @param {Object} gameState - Tournament game state
  * @param {string} oldPlayerId - The retired player id being swapped out
  * @param {string} newPlayerId - The freshly minted player id taking over
- * @returns {number} Count of queue entries that were rewritten
+ * @returns {Array} Ids of the queue entries that were rewritten
  */
 function rewritePendingQueueReferences(gameState, oldPlayerId, newPlayerId) {
-    let touched = 0;
+    const touchedMatchIds = [];
     for (const match of gameState.gameQueue || []) {
         if (match.status === 'completed') continue;
         let changed = false;
@@ -680,9 +681,9 @@ function rewritePendingQueueReferences(gameState, oldPlayerId, newPlayerId) {
                 }
             }
         }
-        if (changed) touched++;
+        if (changed) touchedMatchIds.push(match.id);
     }
-    return touched;
+    return touchedMatchIds;
 }
 
 /**
@@ -756,15 +757,15 @@ async function replacePlayerWithUser(teamId, playerId) {
         // (pending or ongoing) still pointing at the retired old player id
         // (see rewritePendingQueueReferences doc comment for why only
         // completed matches are excluded).
-        const rewrittenMatchCount = isSwap
+        const rewrittenMatchIds = isSwap
             ? rewritePendingQueueReferences(window.gameState, playerId, newPlayerId)
-            : 0;
+            : [];
         // Captured immediately after the rewrite, before the `await` below —
         // a remote Firestore snapshot landing during that await replaces
         // window.gameState.gameQueue wholesale (see god-app.js's
         // _onFirebaseSnapshot Object.assign), which would silently discard
         // the in-memory rewrite if we re-read window.gameState.gameQueue later.
-        const rewrittenGameQueue = rewrittenMatchCount > 0 ? window.gameState.gameQueue : null;
+        const rewrittenGameQueue = rewrittenMatchIds.length > 0 ? window.gameState.gameQueue : null;
 
         // Save to Firestore
         const batch = window.firebaseDB.batch();
@@ -843,7 +844,8 @@ async function replacePlayerWithUser(teamId, playerId) {
             window.godApp?.actionLogger?.logAction('player_swapped', 'admin', {
                 teamId: team.id, teamName: team.name,
                 oldPlayerId: playerId, oldPlayerName: oldName,
-                newPlayerId, newPlayerName: user.displayName
+                newPlayerId, newPlayerName: user.displayName,
+                rewrittenMatchIds
             });
             console.log(`[User Management] Swapped "${oldName}" (${playerId}) for "${user.displayName}" (${newPlayerId}) on ${team.name}`);
         } else {
