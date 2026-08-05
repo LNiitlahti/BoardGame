@@ -741,6 +741,7 @@ const GAME_TUTORIALS = {
     'predecessor': { url: 'https://www.youtube.com/watch?v=Wdf4sEEg2h0&t=47s', label: 'How to Play' },
     'wc3':         { url: 'https://youtu.be/5ygNDJdUVnY', label: 'How to Play' },
     'aoe4':        { url: 'https://youtu.be/V-XbTO0TZN4', label: 'How to Play' },
+    'sc2':         { url: 'https://www.youtube.com/watch?v=i6YtoTYfXjs', label: 'How to Play' },
     'overwatch2':  { url: 'https://youtu.be/u2mMbSKf6iE', label: 'How to Play' },
     'cs2':         { text: 'Mouse1 to shoot.' },
     'cod':         { text: 'Also Mouse1 to shoot.' },
