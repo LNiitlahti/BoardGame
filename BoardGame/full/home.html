@@ -971,28 +971,24 @@
       }
     }
 
-    // Show a "you've been added to a team" banner once per new appointment.
-    // appointedAt is stamped every time a god links/assigns this account to a
-    // team (see full/scripts/user-management.js); onboardingPromptSeenAt
-    // tracks whether the player has already been shown the banner for that
-    // specific appointment. Dismissing (via the × button or by clicking
-    // through to onboarding) persists onboardingPromptSeenAt to Firestore
-    // via markAssignmentSeen() below, so the check above is naturally scoped
-    // per-appointment: it only re-shows if appointedAt moves forward again
-    // (a genuinely NEW assignment), never for the same appointment the user
-    // already dismissed, and never bleeds into a future assignment to a
-    // DIFFERENT team/tournament (that stamps a fresh, later appointedAt too).
+    // Show a "you've been added to a team" banner while the assigned
+    // tournament is still in setup — i.e. onboarding is still actionable.
+    // Dismissing (via the × button) only hides it for this page view: it is
+    // NOT persisted, so it reappears on the next refresh. That's
+    // intentional — the banner's job is to nag the player into onboarding
+    // before the tournament starts, so a one-time dismissal shouldn't make
+    // it disappear for good. It stops appearing once the tournament's
+    // status leaves 'setup' (e.g. moves to 'playing'), since onboarding is
+    // no longer actionable at that point.
     async function checkNewAssignment(userData) {
       if (!userData.assignedTeamId || !userData.assignedTournamentId || !userData.assignedPlayerId || !userData.appointedAt) {
         return;
       }
-      const seenAt = userData.onboardingPromptSeenAt;
-      const isNew = !seenAt || new Date(seenAt) < new Date(userData.appointedAt);
-      if (!isNew) return;
 
-      // Resolve the tournament's display name so the banner can say WHICH
-      // tournament the assignment is for (a player can be linked into more
-      // than one at once — team name alone is ambiguous). Fetched
+      // Resolve the tournament's display name and status. The name lets the
+      // banner say WHICH tournament the assignment is for (a player can be
+      // linked into more than one at once — team name alone is ambiguous).
+      // The status gates whether the banner should show at all: fetched
       // independently rather than read off any other in-flight load (e.g.
       // loadPlayerData/loadRecentTournaments, which run concurrently via the
       // same Promise.all as this function's caller) since none of those are
@@ -1004,7 +1000,11 @@
       try {
         const tournamentDoc = await db.collection('tournaments').doc(userData.assignedTournamentId).get();
         if (tournamentDoc.exists) {
-          tournamentName = tournamentDoc.data().name || null;
+          const tournamentData = tournamentDoc.data();
+          tournamentName = tournamentData.name || null;
+          // Onboarding is only actionable before the tournament starts
+          // playing — once it's underway (or finished), stop nagging.
+          if (tournamentData.status && tournamentData.status !== 'setup') return;
         }
       } catch (e) {
         console.warn('[Home] Could not load tournament name for assignment banner:', e);
@@ -1017,26 +1017,15 @@
       text.textContent = `You've been added to ${userData.assignedTeamName}${tournamentPhrase}! Start onboarding to get set up.`;
 
       const onboardUrl = `onboarding.html?tournamentId=${encodeURIComponent(userData.assignedTournamentId)}&player=${encodeURIComponent(userData.assignedPlayerId)}`;
-      btn.onclick = async () => {
-        await markAssignmentSeen();
+      btn.onclick = () => {
         window.location.href = onboardUrl;
       };
 
       banner.style.display = 'flex';
     }
 
-    async function markAssignmentSeen() {
-      if (!currentUser) return;
-      try {
-        await db.collection('users').doc(currentUser.uid).update({ onboardingPromptSeenAt: new Date().toISOString() });
-      } catch (e) {
-        console.warn('[Home] Could not mark assignment banner as seen:', e);
-      }
-    }
-
     function dismissNewAssignmentBanner() {
       document.getElementById('newAssignmentBanner').style.display = 'none';
-      markAssignmentSeen();
     }
     window.dismissNewAssignmentBanner = dismissNewAssignmentBanner;
 

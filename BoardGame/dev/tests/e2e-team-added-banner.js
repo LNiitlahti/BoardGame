@@ -2,56 +2,47 @@
  * e2e-team-added-banner.js — regression test for TODO.md Task 16:
  * "home.html team-added banner missing tournament name + dismissable check".
  *
- * Root cause (confirmed by reading the current code, not TODO.md's
- * paraphrase — see E2E_HARNESS.md's "read current state" convention):
- * `checkNewAssignment()` (full/home.html ~978-1021) rendered its banner as
- * `You've been added to ${userData.assignedTeamName}! Start onboarding...` —
- * team name only, no tournament name, ambiguous for a player linked into
- * more than one tournament at once. The "×" close button
- * (`dismissNewAssignmentBanner()`, home.html ~1017-1021) was ALREADY fully
- * functional and already persisted the dismissal correctly: it calls
- * `markAssignmentSeen()`, which writes `onboardingPromptSeenAt` to the
- * user's Firestore doc, and `checkNewAssignment()`'s own re-show guard
- * (`isNew = !seenAt || new Date(seenAt) < new Date(userData.appointedAt)`)
- * is scoped per-appointment: a dismissal only suppresses THIS appointment
- * (`appointedAt` stays in the past relative to the new `seenAt`), and a
- * genuinely new assignment (appointedAt stamped forward again, whether same
- * team re-assigned or a different one) naturally reopens the banner because
- * seenAt is now older than the new appointedAt. This was independently
- * corroborated by docs/guides/TOURNAMENT_FLOW_BUG_TRACKER.md's existing
- * note that this banner "correctly marks itself seen... so it won't nag
- * again". So this test's fix is scoped to the actual gap: banner text now
- * also resolves and shows the tournament's display name (fetched via a
- * `tournaments/{assignedTournamentId}` read, independent of any other
- * concurrent load — see the comment above `checkNewAssignment()`).
+ * Also covers a follow-up fix: the banner used to persist its dismissal to
+ * Firestore (`onboardingPromptSeenAt`) forever, so clicking "×" made it
+ * disappear for the rest of that appointment — including after a refresh.
+ * That's wrong: the banner's job is to nag the player into onboarding
+ * before the tournament starts, so a one-time dismissal shouldn't make it
+ * disappear for good. `checkNewAssignment()` (full/home.html) now instead
+ * gates purely on the assigned tournament's `status` field: it shows
+ * whenever `status === 'setup'` (regardless of any prior dismissal) and
+ * stops showing once the tournament leaves setup (e.g. `status: 'playing'`),
+ * since onboarding is no longer actionable at that point.
+ * `dismissNewAssignmentBanner()` only hides the banner in-memory for the
+ * current page view — it no longer writes anything to Firestore.
  *
  * This test:
  *  1. Seeds PLAYER14's user doc with a fresh appointment into
  *     `e2e-navbar-secondary` (a lasting fixture from Task 11's
  *     e2e-navbar-primary-switch.js — PLAYER14 already has a real roster
- *     slot there: team id 55 "Team NavSecondary", player id "p_navsec_1").
- *     Deliberately NOT `e2e-disposable-1`, whose tournament doc's `name`
- *     field happens to equal its id — asserting on that would pass even if
- *     the fix silently fell back to interpolating the id instead of a real
- *     `.name` lookup. `e2e-navbar-secondary`'s name ("E2E Navbar Secondary")
- *     is visibly different from its id, so the assertion only passes if the
- *     Firestore `.name` field is genuinely being read.
+ *     slot there: team id 55 "Team NavSecondary", player id "p_navsec_1",
+ *     tournament status "setup"). Deliberately NOT `e2e-disposable-1`, whose
+ *     tournament doc's `name` field happens to equal its id — asserting on
+ *     that would pass even if the fix silently fell back to interpolating
+ *     the id instead of a real `.name` lookup. `e2e-navbar-secondary`'s name
+ *     ("E2E Navbar Secondary") is visibly different from its id, so the
+ *     assertion only passes if the Firestore `.name` field is genuinely
+ *     being read.
  *  2. Logs in as PLAYER14, loads home.html, asserts the banner becomes
  *     visible with text containing BOTH the team name and the tournament
  *     name.
  *  3. Clicks the real "×" close button, asserts the banner disappears.
- *  4. Reloads the page, asserts the banner stays gone (proves the Firestore
- *     dismissal persisted and is read back correctly on the next load).
- *  5. Self-review / scoping check: bumps `appointedAt` forward again
- *     (simulating a second, later re-assignment) and reloads, asserting the
- *     banner DOES reappear — proving the dismissal persistence is scoped to
- *     the specific appointment, not a blanket "never show this user a
- *     banner again" flag that would incorrectly suppress a future genuine
- *     reassignment.
+ *  4. Reloads the page while the tournament is still in `setup`, asserts the
+ *     banner is visible AGAIN — proving the dismissal is not persisted and
+ *     the banner keeps nagging until the tournament actually starts.
+ *  5. Flips the tournament's `status` to `'playing'` and reloads, asserting
+ *     the banner no longer appears — proving the real gate is tournament
+ *     phase, not a one-time-seen flag.
  *
- * PLAYER14's user doc is snapshotted/restored in a `finally` block (same
- * pattern as e2e-navbar-primary-switch.js), since e2e-ready-check.js depends
- * on its baseline pointing at e2e-disposable-1/Team Alpha.
+ * PLAYER14's user doc AND e2e-navbar-secondary's tournament doc are
+ * snapshotted/restored in `finally` blocks (same pattern as
+ * e2e-navbar-primary-switch.js), since e2e-ready-check.js depends on
+ * PLAYER14's baseline pointing at e2e-disposable-1/Team Alpha, and other
+ * tests may depend on e2e-navbar-secondary staying in `setup`.
  *
  * Run: cd BoardGame && node dev/tests/e2e-team-added-banner.js
  */
@@ -112,19 +103,28 @@ async function main() {
       `"${SECONDARY_TOURNAMENT_NAME}", got "${secondaryName}" — run e2e-navbar-primary-switch.js first, or the ` +
       `fixture's name changed and this test's constant needs updating.`);
 
-    // Snapshot PLAYER14's user doc for a full, exact restore regardless of
-    // pass/fail.
+    // Snapshot PLAYER14's user doc AND the secondary tournament's doc for a
+    // full, exact restore regardless of pass/fail (this test flips the
+    // tournament's status, which other tests may depend on).
     const originalUserDoc = await tdPage.evaluate(async (uid) => {
       const doc = await firebase.firestore().collection('users').doc(uid).get();
       return doc.data();
     }, player14Uid);
     assert(originalUserDoc, `PLAYER14's user doc (uid ${player14Uid}) must exist`);
 
+    const originalTournamentDoc = await tdPage.evaluate(async (tournamentId) => {
+      const doc = await firebase.firestore().collection('tournaments').doc(tournamentId).get();
+      return doc.data();
+    }, SECONDARY_TOURNAMENT_ID);
+    assert(originalTournamentDoc, `${SECONDARY_TOURNAMENT_ID} tournament doc must exist`);
+    assert(originalTournamentDoc.status === 'setup',
+      `Expected ${SECONDARY_TOURNAMENT_ID} to start this test in 'setup' status, got "${originalTournamentDoc.status}".`);
+
     let allAssertionsPassed = false;
     try {
       // Seed a fresh "just appointed" state: assignedTeamId/Name/PlayerId/
       // TournamentId pointing at the secondary fixture, appointedAt just
-      // now, onboardingPromptSeenAt cleared (never dismissed).
+      // now.
       const firstAppointedAt = new Date().toISOString();
       await tdPage.evaluate(async (uid, data) => {
         await firebase.firestore().collection('users').doc(uid).update({
@@ -132,8 +132,7 @@ async function main() {
           assignedTeamId: data.teamId,
           assignedTeamName: data.teamName,
           assignedPlayerId: data.playerId,
-          appointedAt: data.appointedAt,
-          onboardingPromptSeenAt: firebase.firestore.FieldValue.delete()
+          appointedAt: data.appointedAt
         });
       }, player14Uid, {
         tournamentId: SECONDARY_TOURNAMENT_ID,
@@ -172,45 +171,8 @@ async function main() {
       state = await getBannerState(page);
       assert(!state.visible, 'Banner should be hidden immediately after clicking the close button.');
 
-      // dismissNewAssignmentBanner() fires an async markAssignmentSeen()
-      // Firestore write it does not await from the onclick handler — poll
-      // the user doc via the TD session rather than racing a fixed sleep.
-      await new Promise(resolve => setTimeout(resolve, 250));
-      let seenAtAfterDismiss = null;
-      for (let i = 0; i < 20; i++) {
-        seenAtAfterDismiss = await tdPage.evaluate(async (uid) => {
-          const doc = await firebase.firestore().collection('users').doc(uid).get();
-          return doc.data().onboardingPromptSeenAt || null;
-        }, player14Uid);
-        if (seenAtAfterDismiss) break;
-        await new Promise(resolve => setTimeout(resolve, 250));
-      }
-      assert(seenAtAfterDismiss, 'onboardingPromptSeenAt should be persisted to Firestore after clicking close.');
-      assert(new Date(seenAtAfterDismiss) >= new Date(firstAppointedAt),
-        `Persisted onboardingPromptSeenAt (${seenAtAfterDismiss}) should be at/after appointedAt (${firstAppointedAt}).`);
-
-      // Reload — the core "stays dismissed" regression check.
-      await page.reload({ waitUntil: 'domcontentloaded' });
-      await page.waitForFunction(() => typeof firebase !== 'undefined' && !!window.firebaseDB, { timeout: 20000 });
-      // Give checkNewAssignment() a moment to run (it's invoked from
-      // loadUserProfile, awaited inside the page's own Promise.all) and
-      // confirm it does NOT show the banner again.
-      await page.waitForFunction(() => !!document.getElementById('homeUserName')?.textContent && document.getElementById('homeUserName').textContent !== '...', { timeout: 20000 });
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      state = await getBannerState(page);
-      assert(!state.visible, `Banner should stay dismissed after reload, but was visible with text: "${state.text}"`);
-      console.log('Banner correctly stayed dismissed after reload.');
-
-      // Self-review / scoping check: a genuinely NEW appointment (appointedAt
-      // moved forward again) must still reopen the banner — the persisted
-      // dismissal must be scoped to the specific appointment it was shown
-      // for, not a blanket "never show this user any team-added banner
-      // again" flag.
-      const secondAppointedAt = new Date(Date.now() + 5000).toISOString();
-      await tdPage.evaluate(async (uid, appointedAt) => {
-        await firebase.firestore().collection('users').doc(uid).update({ appointedAt });
-      }, player14Uid, secondAppointedAt);
-
+      // Reload — dismissal must NOT persist. While the tournament is still
+      // in 'setup', the banner should come back on the very next load.
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => typeof firebase !== 'undefined' && !!window.firebaseDB, { timeout: 20000 });
       await page.waitForFunction(() => {
@@ -218,22 +180,39 @@ async function main() {
         return !!b && b.style.display === 'flex';
       }, { timeout: 20000 });
       state = await getBannerState(page);
-      console.log('Banner text after a second, later re-appointment:', state.text);
-      assert(state.visible, 'Banner should reappear for a genuinely new (later) appointment, even though the previous one was dismissed.');
+      assert(state.visible, `Banner should reappear after reload even though it was dismissed (dismissal is not persisted), but text was: "${state.text}"`);
       assert(state.text.includes(SECONDARY_TEAM_NAME) && state.text.includes(SECONDARY_TOURNAMENT_NAME),
         `Re-shown banner text should still include both names, got: "${state.text}"`);
+      console.log('Banner correctly reappeared after reload despite prior dismissal.');
+
+      // Flip the tournament to 'playing' — onboarding is no longer
+      // actionable, so the banner must stop appearing even on a fresh load.
+      await tdPage.evaluate(async (tournamentId) => {
+        await firebase.firestore().collection('tournaments').doc(tournamentId).update({ status: 'playing' });
+      }, SECONDARY_TOURNAMENT_ID);
+
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => typeof firebase !== 'undefined' && !!window.firebaseDB, { timeout: 20000 });
+      await page.waitForFunction(() => !!document.getElementById('homeUserName')?.textContent && document.getElementById('homeUserName').textContent !== '...', { timeout: 20000 });
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      state = await getBannerState(page);
+      assert(!state.visible, `Banner should not show once the tournament has left 'setup' status, but was visible with text: "${state.text}"`);
+      console.log("Banner correctly stayed hidden once the tournament's status left 'setup'.");
 
       console.log('\nAll assertions passed:');
       console.log('  - banner text includes both tournament name and team name');
-      console.log('  - close button hides the banner and persists the dismissal to Firestore');
-      console.log('  - dismissal survives a reload');
-      console.log('  - dismissal is scoped per-appointment: a later re-appointment still re-shows the banner');
+      console.log('  - close button hides the banner for the current view only (not persisted)');
+      console.log('  - banner reappears on reload while the tournament is still in setup');
+      console.log("  - banner stops appearing once the tournament's status leaves 'setup'");
       allAssertionsPassed = true;
     } finally {
       await tdPage.evaluate(async (uid, original) => {
         await firebase.firestore().collection('users').doc(uid).set(original);
       }, player14Uid, originalUserDoc);
-      console.log("Restored PLAYER14's original user doc (assignedTournamentId/assignedTeamId/appointedAt/onboardingPromptSeenAt/etc).");
+      await tdPage.evaluate(async (tournamentId, original) => {
+        await firebase.firestore().collection('tournaments').doc(tournamentId).set(original);
+      }, SECONDARY_TOURNAMENT_ID, originalTournamentDoc);
+      console.log("Restored PLAYER14's original user doc and e2e-navbar-secondary's original tournament doc.");
     }
 
     allPassed = allAssertionsPassed;
