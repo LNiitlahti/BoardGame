@@ -355,6 +355,32 @@
   border-top: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
 }
 
+.spell-log-teams {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Colours are per-team runtime values, so the fill/outline comes from an
+   inline style on each chip; only the shape lives here. */
+.spell-log-team-chip {
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  font-family: 'Quantico', var(--font-secondary, sans-serif);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.spell-log-team-chip:hover { filter: brightness(1.15); }
+
+.spell-log-team-chip.selected { font-weight: 700; }
+
 .spell-log-entries {
   display: flex;
   flex-direction: column;
@@ -368,7 +394,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 4px 0;
+  padding: 4px 0 4px 8px;
   font-size: 0.8rem;
   color: var(--text-primary, #e0e0e0);
 }

@@ -34,6 +34,7 @@
     let _primaryAction = null;
     let _broadcastOpen = false;
     let _spellLogOpen = false;
+    let _spellLogTeamId = null;
     let _flowConfirmAction = null;
 
     // ── Phase constants (mirror phase-manager.js for timeline) ──
@@ -1441,22 +1442,63 @@
         entriesEl.style.display = _spellLogOpen ? '' : 'none';
         if (!_spellLogOpen) return;
 
-        const teamSelect = document.getElementById('spellLogTeamSelect');
-        if (teamSelect && teamSelect.options.length === 0) {
-            teamSelect.innerHTML = (gameState.teams || [])
-                .map(team => `<option value="${_esc(team.id)}">${_esc(team.name || 'Team ' + team.id)}</option>`)
-                .join('');
+        const teams = gameState.teams || [];
+
+        // Team chips are rebuilt on EVERY render (unlike the old lazily-filled
+        // <select>) so renames and colour edits show up immediately. The
+        // selection is pure local UI state: keep it across renders, but fall
+        // back to the first team when it was never set or its team is gone.
+        if (!teams.some(t => String(t.id) === String(_spellLogTeamId))) {
+            _spellLogTeamId = teams.length ? teams[0].id : null;
+        }
+
+        const teamsEl = document.getElementById('spellLogTeams');
+        if (teamsEl) {
+            teamsEl.innerHTML = teams.map(team => {
+                const color = _spellLogTeamColor(team);
+                const selected = String(team.id) === String(_spellLogTeamId);
+                // Selected = solid fill, unselected = outline only
+                const style = selected
+                    ? `background: ${color}; border-color: ${color}; color: #0b0d10;`
+                    : `background: transparent; border-color: ${color}; color: ${color};`;
+                return `<button type="button" class="spell-log-team-chip${selected ? ' selected' : ''}" ` +
+                       `style="${style}" onclick="selectSpellLogTeam('${_esc(_jsStr(team.id))}')">` +
+                       `${_esc(team.name || 'Team ' + team.id)}</button>`;
+            }).join('');
         }
 
         const log = gameState.spellWindowLog || [];
         entriesEl.innerHTML = log.length === 0
             ? '<p style="font-size: 0.8rem; color: var(--text-tertiary); padding: 4px 0;">No spells logged yet.</p>'
-            : log.map(entry =>
-                `<div class="spell-log-entry">` +
+            : log.map(entry => {
+                // entry.teamId is stored as a string; team.id may be numeric
+                const team = teams.find(t => String(t.id) === String(entry.teamId));
+                const color = _spellLogTeamColor(team);
+                return `<div class="spell-log-entry" style="border-left: 3px solid ${color};">` +
                     `<span>${_esc(entry.teamName)} — ${_esc(entry.spellName)}</span>` +
                     `<button class="remove-btn" onclick="removeSpellLogEntry('${_esc(entry.id)}')" title="Remove">✕</button>` +
-                `</div>`
-            ).join('');
+                `</div>`;
+            }).join('');
+    }
+
+    /** Escape a value for embedding inside a single-quoted JS string literal. */
+    function _jsStr(value) {
+        return String(value ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    const _HEX_COLOR_RE = /^#[0-9a-fA-F]{3,8}$/;
+
+    /**
+     * Team colour for spell-log chips/rows, sanitized so it is safe to
+     * interpolate into an inline style attribute. Anything that isn't a plain
+     * hex colour falls back to the adapter's usual neutral grey.
+     */
+    function _spellLogTeamColor(team) {
+        let color = team?.color;
+        if (!color && team && typeof getTeamColor === 'function') {
+            try { color = getTeamColor(team.id); } catch (e) { color = null; }
+        }
+        return (typeof color === 'string' && _HEX_COLOR_RE.test(color)) ? color : '#888';
     }
 
     // ── Next-up queue highlight ──
@@ -1579,9 +1621,10 @@
             '</div>' +
             '<div class="broadcast-bar" id="spellLogBar" style="display: none;">' +
                 '<span style="font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;">Spell Log</span>' +
-                '<select id="spellLogTeamSelect" style="padding: 6px 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 6px; color: white; font-size: 0.85rem;"></select>' +
+                '<div class="spell-log-teams" id="spellLogTeams"></div>' +
                 '<input type="text" id="spellLogSpellInput" placeholder="Spell name..." maxlength="60" ' +
-                    'style="flex: 1; padding: 6px 12px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 6px; color: white; font-size: 0.85rem;">' +
+                    'onkeydown="if (event.key === \'Enter\') addSpellLogEntry()" ' +
+                    'style="flex: 1; min-width: 220px; padding: 8px 12px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 6px; color: white; font-size: 0.95rem;">' +
                 '<button class="btn-small primary" onclick="addSpellLogEntry()">+ Add</button>' +
             '</div>' +
             '<div class="spell-log-entries" id="spellLogEntries" style="display: none;"></div>';
@@ -1830,10 +1873,15 @@
         }
     };
 
+    /** Pure local UI state — deliberately does NOT persist anything. */
+    window.selectSpellLogTeam = (id) => {
+        _spellLogTeamId = id;
+        _renderSpellLogBar();
+    };
+
     window.addSpellLogEntry = async () => {
-        const teamSelect = document.getElementById('spellLogTeamSelect');
         const input = document.getElementById('spellLogSpellInput');
-        const teamId = teamSelect?.value;
+        const teamId = _spellLogTeamId == null ? '' : String(_spellLogTeamId);
         const spellName = input?.value?.trim();
         if (!teamId || !spellName) return;
 
