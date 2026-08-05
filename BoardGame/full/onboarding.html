@@ -31,12 +31,20 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="../shared/css/brand-theme.css">
+    <link rel="stylesheet" href="../shared/css/void-gold-theme.css">
     <link rel="stylesheet" href="../shared/css/toast.css">
     <link rel="stylesheet" href="css/onboarding.css">
     <link rel="stylesheet" href="css/styles.css">
+    <style>
+        body {
+            background:
+                radial-gradient(ellipse at top center, rgba(255,255,255,0.04), rgba(0,0,0,0.9) 65%),
+                linear-gradient(to bottom, rgba(10,12,18,0.95), rgba(5,6,10,0.98));
+        }
+    </style>
 </head>
 <body>
     <!-- Loading Overlay -->
@@ -114,6 +122,7 @@
             <div class="completion-message" id="completionMessage">
                 Complete all tasks above
             </div>
+            <a href="home.html" class="btn secondary" id="backToHomeLink" style="margin-top: var(--spacing-sm);">Back to Home</a>
         </footer>
     </div>
 

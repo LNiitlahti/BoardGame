@@ -73,9 +73,12 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-bottom: var(--spacing-sm);
-    border-bottom: 1px solid var(--border-color);
-    margin-bottom: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: linear-gradient(180deg, var(--bg-elevated), var(--bg-secondary));
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    margin-bottom: var(--spacing-md);
     flex-wrap: wrap;
     gap: var(--spacing-sm);
     flex-shrink: 0;
@@ -91,6 +94,7 @@
     width: 36px;
     height: 36px;
     border-radius: var(--radius-md);
+    border: 1px solid var(--border-color-hover);
 }
 
 .player-view .header-logo {
@@ -101,6 +105,8 @@
 .header-text h1 {
     font-size: 1.5rem;
     margin-bottom: 2px;
+    color: var(--gold-bright, var(--text-primary));
+    letter-spacing: 0.02em;
 }
 
 .player-view .header-text h1 {
@@ -128,6 +134,18 @@
     border-color: var(--accent-success);
 }
 
+/*
+ * Gold (.btn.primary) and green (.btn-success) fills are both bright/mid-tone
+ * in the void-gold palette, so the base .btn text color (a light grey meant
+ * for dark fills) reads as low-contrast on top of them. Force dark text on
+ * these bright fills, matching the dark-on-gold convention already used by
+ * home.html's gold badges/buttons (e.g. .user-badge.god, .btn-god).
+ */
+.btn.primary,
+.btn-success {
+    color: var(--bg-primary);
+}
+
 /* =============================================================================
    STATUS EMOJI BAR
    ============================================================================= */
@@ -143,6 +161,7 @@
     border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
     background: var(--bg-secondary);
+    color: var(--text-primary);
     font-size: 1.1rem;
     cursor: pointer;
     transition: all var(--transition-fast);
@@ -150,8 +169,8 @@
     align-items: center;
     justify-content: center;
     padding: 0;
-    opacity: 0.5;
-    filter: grayscale(0.8);
+    opacity: 0.7;
+    filter: grayscale(0.5);
 }
 
 .status-btn:hover {
@@ -194,6 +213,8 @@
     align-items: center;
     justify-content: center;
     position: relative;
+    box-shadow: var(--shadow-sm);
+    transition: background 0.4s ease;
 }
 
 .player-view .progress-ring {
@@ -244,22 +265,34 @@
 }
 
 .checklist-section {
-    background: var(--bg-secondary);
+    background: linear-gradient(180deg, var(--bg-elevated), var(--bg-secondary));
     border-radius: var(--radius-lg);
     padding: var(--spacing-md);
     border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
     display: flex;
     flex-direction: column;
     min-height: 0;
+    transition: border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.checklist-section:hover {
+    border-color: var(--border-color-hover);
+    box-shadow: var(--shadow-md);
 }
 
 .checklist-section h2 {
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     margin-bottom: 2px;
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--divider-color);
     flex-shrink: 0;
     display: flex;
     align-items: center;
     gap: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--gold-bright, var(--text-primary));
 }
 
 .step-number {
@@ -270,16 +303,17 @@
     height: 22px;
     border-radius: 50%;
     background: var(--accent-primary);
-    color: var(--text-primary);
+    color: var(--bg-primary);
     font-size: 0.75rem;
     font-weight: 700;
     flex-shrink: 0;
+    box-shadow: 0 0 8px var(--gold-glow, rgba(200,179,126,0.3));
 }
 
 .checklist-section .section-desc {
     color: var(--text-tertiary);
     font-size: 0.8rem;
-    margin-bottom: var(--spacing-sm);
+    margin: var(--spacing-sm) 0;
     flex-shrink: 0;
 }
 
@@ -392,6 +426,10 @@
     transition: all var(--transition-base);
 }
 
+.friend-card:hover {
+    border-color: var(--border-color-hover);
+}
+
 .friend-card.checked {
     border-color: var(--accent-success);
     background: rgba(46, 145, 88, 0.1);
@@ -404,12 +442,50 @@
     margin-bottom: 4px;
 }
 
-.friend-card-header input[type="checkbox"] {
+/*
+ * Custom checkbox for both the friends and games checklists. The native
+ * checkbox renders as a stark white square in every browser regardless of
+ * accent-color (accent-color only tints the *checked* fill), which reads as
+ * a jarring light patch against this dark theme. appearance:none + a
+ * hand-drawn checkmark keeps both states on-theme.
+ */
+.friend-card-header input[type="checkbox"],
+.checklist-item input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
     width: 18px;
     height: 18px;
-    accent-color: var(--accent-success);
+    border-radius: 4px;
+    border: 2px solid var(--border-color-hover);
+    background: var(--bg-primary);
     cursor: pointer;
     flex-shrink: 0;
+    position: relative;
+    transition: all var(--transition-fast);
+}
+
+.friend-card-header input[type="checkbox"]:hover,
+.checklist-item input[type="checkbox"]:hover {
+    border-color: var(--accent-success);
+}
+
+.friend-card-header input[type="checkbox"]:checked,
+.checklist-item input[type="checkbox"]:checked {
+    background: var(--accent-success);
+    border-color: var(--accent-success);
+}
+
+.friend-card-header input[type="checkbox"]:checked::after,
+.checklist-item input[type="checkbox"]:checked::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 1px;
+    width: 4px;
+    height: 8px;
+    border: solid var(--bg-primary);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
 }
 
 .friend-card-header .team-dot {
@@ -569,15 +645,9 @@
 .checklist-item.checked {
     border-color: var(--accent-success);
     background: rgba(46, 145, 88, 0.1);
+    box-shadow: 0 0 0 1px rgba(0, 224, 128, 0.15) inset;
 }
 
-.checklist-item input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    accent-color: var(--accent-success);
-    cursor: pointer;
-    flex-shrink: 0;
-}
 
 .checklist-item .team-dot {
     width: 10px;
@@ -653,12 +723,13 @@
 
 .onboarding-footer {
     margin-top: var(--spacing-sm);
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: var(--spacing-md);
     background: var(--bg-secondary);
     border-radius: var(--radius-md);
     text-align: center;
     border: 1px solid var(--border-color);
     flex-shrink: 0;
+    transition: all var(--transition-base);
 }
 
 .completion-message {
@@ -670,11 +741,20 @@
 .onboarding-footer.complete {
     border-color: var(--accent-success);
     background: rgba(46, 145, 88, 0.15);
+    box-shadow: 0 0 20px rgba(0, 224, 128, 0.15);
 }
 
 .onboarding-footer.complete .completion-message {
     color: var(--accent-success);
     font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+}
+
+/* #backToHomeLink is an <a class="btn"> — strip the browser's default link
+   underline so it reads as a button, not a hyperlink. */
+#backToHomeLink {
+    text-decoration: none;
 }
 
 /* =============================================================================

@@ -127,7 +127,7 @@
     /**
      * Create the navbar HTML
      */
-    function createNavbarHTML(userRole, userName, avatarUrl) {
+    function createNavbarHTML(userRole, userName, avatarUrl, assignedTournamentId, assignedPlayerId) {
         const currentPage = getCurrentPage();
         const navItems = getNavItemsForRole(userRole);
 
@@ -157,6 +157,11 @@
         const canSwitch = hasRoleLevel(userRole, 'admin');
         const labelText = hasTournament ? tournamentName : 'No tournament';
         const labelTitle = hasTournament ? tournamentName : 'No tournament selected';
+
+        // "My Status" popup — only for players with a confirmed tournament assignment
+        const statusBtnHTML = (assignedTournamentId && assignedPlayerId)
+            ? `<button class="navbar-status-btn" id="navStatusBtn" title="My Status" data-tournament-id="${escapeHtml(assignedTournamentId)}" data-player-id="${escapeHtml(assignedPlayerId)}">🎭</button>`
+            : '';
 
         const tournamentCtxHTML = canSwitch
             ? `
@@ -193,6 +198,7 @@
 
                     <!-- User Section -->
                     <div class="navbar-user">
+                        ${statusBtnHTML}
                         <div class="navbar-connection-status" id="connectionStatus" title="Firebase: Connecting..."></div>
                         <img class="navbar-avatar" id="navbarAvatar" src="${avatarUrl || defaultAvatarPath}" alt="Avatar" onerror="this.onerror=null;this.src='${defaultAvatarPath}';">
                         <span class="navbar-role-badge ${roleClass}" id="roleBadge">${roleBadge}</span>
@@ -358,14 +364,34 @@
         container.innerHTML = html;
         document.body.style.paddingTop = '60px';
         wireTournamentSwitcher();
+        wireStatusButton();
+    }
+
+    /**
+     * Open the small "my status" popup window (same popup onboarding.js uses),
+     * scoped to the viewer's own tournament assignment rather than whatever
+     * tournament happens to be in context — so it works from any page.
+     */
+    function wireStatusButton() {
+        const btn = document.getElementById('navStatusBtn');
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            const { tournamentId, playerId } = btn.dataset;
+            const popupUrl = `${getFullBasePath()}/onboarding-status.html?tournamentId=${encodeURIComponent(tournamentId)}&player=${encodeURIComponent(playerId)}`;
+            window.open(popupUrl, 'statusPopup',
+                'width=240,height=200,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no');
+        });
     }
 
     /**
      * Save navbar state to localStorage for instant rendering on next page load
      */
-    function saveNavbarCache(userRole, userName, avatarUrl) {
+    function saveNavbarCache(userRole, userName, avatarUrl, assignedTournamentId, assignedPlayerId) {
         try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify({ role: userRole, name: userName, avatarUrl: avatarUrl || null }));
+            localStorage.setItem(CACHE_KEY, JSON.stringify({
+                role: userRole, name: userName, avatarUrl: avatarUrl || null,
+                assignedTournamentId: assignedTournamentId || null, assignedPlayerId: assignedPlayerId || null
+            }));
         } catch (e) { /* quota exceeded — ignore */ }
     }
 
@@ -386,7 +412,7 @@
         const cached = loadNavbarCache();
         if (!cached) return false;
 
-        const html = createNavbarHTML(cached.role, cached.name, cached.avatarUrl);
+        const html = createNavbarHTML(cached.role, cached.name, cached.avatarUrl, cached.assignedTournamentId, cached.assignedPlayerId);
         insertNavbar(html);
         return true;
     }
@@ -462,12 +488,13 @@
             }
 
             const avatarUrl = userData.avatarUrl || null;
+            const assignedPlayerId = userData.assignedPlayerId || null;
 
             // Cache for instant rendering on next page load
-            saveNavbarCache(userRole, userName, avatarUrl);
+            saveNavbarCache(userRole, userName, avatarUrl, assignedTournament, assignedPlayerId);
 
             // Insert navbar into page
-            const navbarHTML = createNavbarHTML(userRole, userName, avatarUrl);
+            const navbarHTML = createNavbarHTML(userRole, userName, avatarUrl, assignedTournament, assignedPlayerId);
             insertNavbar(navbarHTML);
 
             // We just fetched from Firestore, so Firebase is connected

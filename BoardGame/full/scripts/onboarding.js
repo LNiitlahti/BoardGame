@@ -847,13 +847,16 @@ function updateProgress(playerId) {
     // Update footer
     const footer = document.getElementById('completionFooter');
     const message = document.getElementById('completionMessage');
+    const homeLink = document.getElementById('backToHomeLink');
 
     if (percent === 100) {
         footer.classList.add('complete');
         message.textContent = 'All Ready!';
+        if (homeLink) homeLink.classList.replace('secondary', 'btn-success');
     } else {
         footer.classList.remove('complete');
         message.textContent = `Complete all tasks above (${completed}/${totalTasks})`;
+        if (homeLink) homeLink.classList.replace('btn-success', 'secondary');
     }
 }
 
