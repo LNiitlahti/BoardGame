@@ -73,6 +73,39 @@ function createFirestoreDb(firestore) {
                     await ref.collection('discordConfig').doc('channelCache').set(data);
                 }
             };
+        },
+
+        /**
+         * User documents, for the Admin SDK-backed user management callables.
+         * Same rationale as the tournament section: one-liners over the Admin
+         * SDK so lib/user-admin.js can be tested against a plain object.
+         */
+        users: {
+            async get(uid) {
+                const snap = await firestore.collection('users').doc(uid).get();
+                return snap.exists ? snap.data() : null;
+            },
+
+            async set(uid, data) {
+                await firestore.collection('users').doc(uid).set(data);
+            },
+
+            async update(uid, patch) {
+                await firestore.collection('users').doc(uid).update(patch);
+            },
+
+            async delete(uid) {
+                await firestore.collection('users').doc(uid).delete();
+            },
+
+            /**
+             * UIDs of every account with god rights. Used to refuse an
+             * operation that would remove the last one and lock everybody out.
+             */
+            async listGodUids() {
+                const snap = await firestore.collection('users').where('isGod', '==', true).get();
+                return snap.docs.map(doc => doc.id);
+            }
         }
     };
 }
