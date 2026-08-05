@@ -1,6 +1,9 @@
 /* ==========================================================================
    REPLAY.CSS — Tournament Replay Page Styles
-   Uses CSS variables from brand-theme.css / dark-theme.css
+
+   Loaded after brand-theme.css + void-gold-theme.css, so every colour here
+   resolves against the same void/gold tokens the rest of the suite uses.
+   Fonts match the suite: Russo One for titles, Quantico for body text.
    ========================================================================== */
 
 * {
@@ -10,27 +13,64 @@
 }
 
 body {
-    font-family: 'Orbitron', sans-serif;
-    background: var(--bg-primary, #1a1a1a);
-    color: var(--text-primary, #ffffff);
+    font-family: 'Quantico', sans-serif;
+    background: var(--bg-primary, #050710);
+    color: var(--text-primary, #c8ccd6);
     height: 100vh;
     overflow: hidden;
+}
+
+/* Titles use Russo One, matching team.html / god.html / statistics.html */
+.replay-header .tournament-name,
+.action-feed-header,
+.loading-title,
+.error-title,
+.modal-header h3,
+.summary-section h4 {
+    font-family: 'Russo One', sans-serif;
+    letter-spacing: 0.5px;
+}
+
+/* ---------- Atmosphere (matches team.html / view.html) ---------- */
+
+.atmo {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.atmo-grad {
+    background:
+        radial-gradient(ellipse at 20% 0%, rgba(200, 179, 126, 0.06), transparent 55%),
+        radial-gradient(ellipse at 80% 100%, rgba(34, 120, 163, 0.05), transparent 55%);
+}
+
+.atmo-noise {
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 /* ---------- Layout ---------- */
 
 .replay-container {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    /* navbar.js sets body padding-top: 60px itself to clear the fixed navbar,
+       so this only needs to subtract that height — adding a margin here too
+       pushed the container 60px past the bottom of the viewport and clipped
+       the standings and the info panel. */
+    height: calc(100vh - 60px);
 }
 
 /* ---------- Header ---------- */
 
 .replay-header {
-    background: var(--bg-secondary, #2a2a2a);
+    background: var(--bg-secondary, #0a0d16);
     padding: 10px 24px;
-    border-bottom: 2px solid var(--border-color, #333);
+    border-bottom: 2px solid var(--border-color, rgba(200,179,126,0.12));
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -40,7 +80,7 @@ body {
 .replay-header .tournament-name {
     font-size: 18px;
     font-weight: 700;
-    color: var(--accent-primary, #00d4ff);
+    color: var(--accent-primary, #c8b37e);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -48,7 +88,7 @@ body {
 }
 
 .replay-header .replay-badge {
-    background: var(--accent-primary, #00d4ff);
+    background: var(--accent-primary, #c8b37e);
     color: #000;
     padding: 3px 10px;
     border-radius: 12px;
@@ -63,15 +103,15 @@ body {
     align-items: center;
     gap: 12px;
     font-size: 12px;
-    color: var(--text-secondary, #aaa);
+    color: var(--text-secondary, #8a8fa0);
 }
 
 /* ---------- Timeline Bar ---------- */
 
 .replay-timeline {
-    background: var(--bg-secondary, #2a2a2a);
+    background: var(--bg-secondary, #0a0d16);
     padding: 8px 24px 12px;
-    border-bottom: 1px solid var(--border-color, #333);
+    border-bottom: 1px solid var(--border-color, rgba(200,179,126,0.12));
     flex-shrink: 0;
     position: relative;
 }
@@ -87,7 +127,7 @@ body {
     top: 0;
     transform: translateX(-50%);
     font-size: 9px;
-    color: var(--text-tertiary, #888);
+    color: var(--text-tertiary, #8a8fa0);
     font-weight: 600;
     cursor: pointer;
     padding: 1px 4px;
@@ -96,11 +136,11 @@ body {
 }
 
 .round-marker:hover {
-    color: var(--accent-primary, #00d4ff);
+    color: var(--accent-primary, #c8b37e);
 }
 
 .round-marker.active {
-    color: var(--accent-primary, #00d4ff);
+    color: var(--accent-primary, #c8b37e);
 }
 
 .timeline-slider {
@@ -108,7 +148,7 @@ body {
     -webkit-appearance: none;
     appearance: none;
     height: 6px;
-    background: var(--bg-tertiary, #3a3a3a);
+    background: var(--bg-tertiary, #101420);
     border-radius: 3px;
     outline: none;
     cursor: pointer;
@@ -120,7 +160,7 @@ body {
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: var(--accent-primary, #00d4ff);
+    background: var(--accent-primary, #c8b37e);
     cursor: grab;
     box-shadow: 0 0 6px rgba(0, 212, 255, 0.5);
 }
@@ -129,7 +169,7 @@ body {
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: var(--accent-primary, #00d4ff);
+    background: var(--accent-primary, #c8b37e);
     cursor: grab;
     border: none;
     box-shadow: 0 0 6px rgba(0, 212, 255, 0.5);
@@ -143,16 +183,16 @@ body {
     display: flex;
     justify-content: space-between;
     font-size: 10px;
-    color: var(--text-tertiary, #888);
+    color: var(--text-tertiary, #8a8fa0);
     margin-top: 4px;
 }
 
 /* ---------- Controls Bar ---------- */
 
 .replay-controls {
-    background: var(--bg-secondary, #2a2a2a);
+    background: var(--bg-secondary, #0a0d16);
     padding: 8px 24px;
-    border-bottom: 2px solid var(--border-color, #333);
+    border-bottom: 2px solid var(--border-color, rgba(200,179,126,0.12));
     display: flex;
     align-items: center;
     gap: 8px;
@@ -166,9 +206,9 @@ body {
 }
 
 .replay-controls .transport-btn {
-    background: var(--bg-tertiary, #3a3a3a);
-    border: 1px solid var(--border-color, #555);
-    color: var(--text-primary, #fff);
+    background: var(--bg-tertiary, #101420);
+    border: 1px solid var(--border-color, rgba(200,179,126,0.22));
+    color: var(--text-primary, #f2f4f7);
     padding: 5px 10px;
     border-radius: 4px;
     cursor: pointer;
@@ -179,15 +219,15 @@ body {
 }
 
 .replay-controls .transport-btn:hover {
-    background: var(--bg-primary, #1a1a1a);
-    border-color: var(--accent-primary, #00d4ff);
+    background: var(--bg-primary, #050710);
+    border-color: var(--accent-primary, #c8b37e);
 }
 
 .replay-controls .transport-btn.play-btn {
-    background: var(--accent-primary, #00d4ff);
+    background: var(--accent-primary, #c8b37e);
     color: #000;
     padding: 5px 16px;
-    border-color: var(--accent-primary, #00d4ff);
+    border-color: var(--accent-primary, #c8b37e);
 }
 
 .replay-controls .transport-btn.play-btn:hover {
@@ -195,9 +235,9 @@ body {
 }
 
 .replay-controls .transport-btn.play-btn.paused {
-    background: var(--bg-tertiary, #3a3a3a);
-    color: var(--text-primary, #fff);
-    border-color: var(--accent-primary, #00d4ff);
+    background: var(--bg-tertiary, #101420);
+    color: var(--text-primary, #f2f4f7);
+    border-color: var(--accent-primary, #c8b37e);
 }
 
 .speed-controls {
@@ -207,9 +247,9 @@ body {
 }
 
 .speed-btn {
-    background: var(--bg-tertiary, #3a3a3a);
-    border: 1px solid var(--border-color, #555);
-    color: var(--text-secondary, #aaa);
+    background: var(--bg-tertiary, #101420);
+    border: 1px solid var(--border-color, rgba(200,179,126,0.22));
+    color: var(--text-secondary, #8a8fa0);
     padding: 4px 8px;
     border-radius: 3px;
     cursor: pointer;
@@ -220,19 +260,19 @@ body {
 }
 
 .speed-btn:hover {
-    color: var(--text-primary, #fff);
+    color: var(--text-primary, #f2f4f7);
 }
 
 .speed-btn.active {
-    background: var(--accent-primary, #00d4ff);
+    background: var(--accent-primary, #c8b37e);
     color: #000;
-    border-color: var(--accent-primary, #00d4ff);
+    border-color: var(--accent-primary, #c8b37e);
 }
 
 .controls-separator {
     width: 1px;
     height: 24px;
-    background: var(--border-color, #555);
+    background: var(--border-color, rgba(200,179,126,0.22));
     margin: 0 4px;
 }
 
@@ -243,15 +283,20 @@ body {
     align-items: center;
 }
 
+/* Fixed width: as a bare flex item this select grew to fill the row, which
+   pushed the export buttons onto a third line and made the control bar three
+   rows tall. Everything now fits on one. */
 .round-jump-select {
-    background: var(--bg-tertiary, #3a3a3a);
-    border: 1px solid var(--border-color, #555);
-    color: var(--text-primary, #fff);
+    background: var(--bg-tertiary, #101420);
+    border: 1px solid var(--border-color, rgba(200,179,126,0.22));
+    color: var(--text-primary, #c8ccd6);
     padding: 4px 8px;
     border-radius: 4px;
     font-family: inherit;
     font-size: 11px;
     cursor: pointer;
+    flex: 0 0 auto;
+    width: 150px;
 }
 
 /* ---------- Main Content ---------- */
@@ -309,7 +354,7 @@ body {
 
 .standings-rank {
     font-weight: 700;
-    color: var(--text-tertiary, #888);
+    color: var(--text-tertiary, #8a8fa0);
     width: 20px;
     text-align: right;
 }
@@ -331,12 +376,12 @@ body {
 
 .standings-points {
     font-weight: 700;
-    color: var(--accent-primary, #00d4ff);
+    color: var(--accent-primary, #c8b37e);
 }
 
 .standings-record {
     font-size: 10px;
-    color: var(--text-tertiary, #888);
+    color: var(--text-tertiary, #8a8fa0);
 }
 
 /* Sidebar (right) */
@@ -344,8 +389,8 @@ body {
     flex: 4;
     display: flex;
     flex-direction: column;
-    background: var(--bg-secondary, #2a2a2a);
-    border-left: 1px solid var(--border-color, #333);
+    background: var(--bg-secondary, #0a0d16);
+    border-left: 1px solid var(--border-color, rgba(200,179,126,0.12));
     overflow: hidden;
 }
 
@@ -359,11 +404,11 @@ body {
 .action-feed-header {
     font-size: 13px;
     font-weight: 700;
-    color: var(--accent-primary, #00d4ff);
+    color: var(--accent-primary, #c8b37e);
     text-transform: uppercase;
     letter-spacing: 1px;
     padding: 12px 12px 8px;
-    border-bottom: 1px solid var(--border-color, #333);
+    border-bottom: 1px solid var(--border-color, rgba(200,179,126,0.12));
     flex-shrink: 0;
 }
 
@@ -386,7 +431,7 @@ body {
 
 .action-entry.current {
     background: rgba(0, 212, 255, 0.1);
-    border-left-color: var(--accent-primary, #00d4ff);
+    border-left-color: var(--accent-primary, #c8b37e);
 }
 
 .action-entry.undone {
@@ -396,7 +441,7 @@ body {
 
 .action-seq {
     font-size: 9px;
-    color: var(--text-tertiary, #888);
+    color: var(--text-tertiary, #8a8fa0);
     font-weight: 600;
     min-width: 28px;
     flex-shrink: 0;
@@ -418,17 +463,17 @@ body {
 .action-badge.points  { background: #4d3a1e; color: #fbbf24; }
 .action-badge.phase   { background: #1e4d4d; color: #2dd4bf; }
 .action-badge.admin   { background: #4d1e1e; color: #f87171; }
-.action-badge.default { background: #333;    color: #aaa; }
+.action-badge.default { background: rgba(200,179,126,0.12);    color: #8a8fa0; }
 
 .action-desc {
     flex: 1;
-    color: var(--text-secondary, #ccc);
+    color: var(--text-secondary, #c8ccd6);
     word-break: break-word;
 }
 
 .action-time {
     font-size: 9px;
-    color: var(--text-tertiary, #666);
+    color: var(--text-tertiary, #6a7088);
     flex-shrink: 0;
     white-space: nowrap;
 }
@@ -436,7 +481,7 @@ body {
 /* Info Panel (below feed) */
 .info-panel {
     flex-shrink: 0;
-    border-top: 1px solid var(--border-color, #333);
+    border-top: 1px solid var(--border-color, rgba(200,179,126,0.12));
     padding: 10px 12px;
     font-size: 11px;
 }
@@ -445,20 +490,20 @@ body {
     display: flex;
     justify-content: space-between;
     padding: 3px 0;
-    color: var(--text-secondary, #aaa);
+    color: var(--text-secondary, #8a8fa0);
 }
 
 .info-label {
-    color: var(--text-tertiary, #888);
+    color: var(--text-tertiary, #8a8fa0);
 }
 
 .info-value {
     font-weight: 600;
-    color: var(--text-primary, #fff);
+    color: var(--text-primary, #f2f4f7);
 }
 
 .info-phase-badge {
-    background: var(--accent-primary, #00d4ff);
+    background: var(--accent-primary, #c8b37e);
     color: #000;
     padding: 1px 6px;
     border-radius: 3px;
@@ -504,25 +549,25 @@ body {
 .loading-title {
     font-size: 18px;
     font-weight: 700;
-    color: var(--accent-primary, #00d4ff);
+    color: var(--accent-primary, #c8b37e);
 }
 
 .loading-phase {
     font-size: 12px;
-    color: var(--text-secondary, #aaa);
+    color: var(--text-secondary, #8a8fa0);
 }
 
 .loading-bar {
     width: 300px;
     height: 6px;
-    background: var(--bg-tertiary, #3a3a3a);
+    background: var(--bg-tertiary, #101420);
     border-radius: 3px;
     overflow: hidden;
 }
 
 .loading-bar-fill {
     height: 100%;
-    background: var(--accent-primary, #00d4ff);
+    background: var(--accent-primary, #c8b37e);
     border-radius: 3px;
     transition: width 0.3s ease;
     width: 0%;
@@ -561,7 +606,7 @@ body {
 
 .error-message {
     font-size: 12px;
-    color: var(--text-secondary, #aaa);
+    color: var(--text-secondary, #8a8fa0);
     max-width: 400px;
     text-align: center;
 }
@@ -582,8 +627,8 @@ body {
 }
 
 .modal-content {
-    background: var(--bg-secondary, #2a2a2a);
-    border: 1px solid var(--border-color, #555);
+    background: var(--bg-secondary, #0a0d16);
+    border: 1px solid var(--border-color, rgba(200,179,126,0.22));
     border-radius: 12px;
     max-width: 900px;
     width: 90%;
@@ -598,25 +643,25 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 16px 20px;
-    border-bottom: 1px solid var(--border-color, #333);
+    border-bottom: 1px solid var(--border-color, rgba(200,179,126,0.12));
 }
 
 .modal-header h3 {
     font-size: 16px;
-    color: var(--accent-primary, #00d4ff);
+    color: var(--accent-primary, #c8b37e);
 }
 
 .modal-close {
     background: none;
     border: none;
-    color: var(--text-secondary, #aaa);
+    color: var(--text-secondary, #8a8fa0);
     font-size: 20px;
     cursor: pointer;
     padding: 4px 8px;
 }
 
 .modal-close:hover {
-    color: var(--text-primary, #fff);
+    color: var(--text-primary, #f2f4f7);
 }
 
 .modal-body {
@@ -627,7 +672,7 @@ body {
 
 .modal-footer {
     padding: 12px 20px;
-    border-top: 1px solid var(--border-color, #333);
+    border-top: 1px solid var(--border-color, rgba(200,179,126,0.12));
     display: flex;
     gap: 8px;
     justify-content: flex-end;
@@ -640,12 +685,12 @@ body {
 
 .summary-section h4 {
     font-size: 13px;
-    color: var(--accent-primary, #00d4ff);
+    color: var(--accent-primary, #c8b37e);
     text-transform: uppercase;
     letter-spacing: 1px;
     margin-bottom: 12px;
     padding-bottom: 6px;
-    border-bottom: 1px solid var(--border-color, #333);
+    border-bottom: 1px solid var(--border-color, rgba(200,179,126,0.12));
 }
 
 .summary-overview-grid {
@@ -655,7 +700,7 @@ body {
 }
 
 .overview-card {
-    background: var(--bg-tertiary, #3a3a3a);
+    background: var(--bg-tertiary, #101420);
     border-radius: 8px;
     padding: 12px;
     text-align: center;
@@ -664,12 +709,12 @@ body {
 .overview-card .value {
     font-size: 24px;
     font-weight: 800;
-    color: var(--accent-primary, #00d4ff);
+    color: var(--accent-primary, #c8b37e);
 }
 
 .overview-card .label {
     font-size: 10px;
-    color: var(--text-tertiary, #888);
+    color: var(--text-tertiary, #8a8fa0);
     text-transform: uppercase;
     margin-top: 4px;
 }
@@ -684,9 +729,9 @@ body {
 .summary-table th {
     text-align: left;
     padding: 6px 8px;
-    color: var(--text-tertiary, #888);
+    color: var(--text-tertiary, #8a8fa0);
     font-weight: 600;
-    border-bottom: 1px solid var(--border-color, #333);
+    border-bottom: 1px solid var(--border-color, rgba(200,179,126,0.12));
     font-size: 10px;
     text-transform: uppercase;
 }
@@ -718,7 +763,7 @@ body {
 
 .key-moment .moment-seq {
     font-size: 9px;
-    color: var(--text-tertiary, #888);
+    color: var(--text-tertiary, #8a8fa0);
     min-width: 32px;
 }
 
@@ -729,7 +774,7 @@ body {
 
 .key-moment .moment-desc {
     flex: 1;
-    color: var(--text-secondary, #ccc);
+    color: var(--text-secondary, #c8ccd6);
 }
 
 /* Points chart */
@@ -760,7 +805,7 @@ body {
 
 .chart-round-label {
     font-size: 8px;
-    color: var(--text-tertiary, #888);
+    color: var(--text-tertiary, #8a8fa0);
     margin-top: 2px;
 }
 
@@ -769,7 +814,7 @@ body {
 .btn {
     padding: 6px 16px;
     border-radius: 6px;
-    border: 1px solid var(--border-color, #555);
+    border: 1px solid var(--border-color, rgba(200,179,126,0.22));
     cursor: pointer;
     font-family: inherit;
     font-size: 11px;
@@ -778,9 +823,9 @@ body {
 }
 
 .btn.primary {
-    background: var(--accent-primary, #00d4ff);
+    background: var(--accent-primary, #c8b37e);
     color: #000;
-    border-color: var(--accent-primary, #00d4ff);
+    border-color: var(--accent-primary, #c8b37e);
 }
 
 .btn.primary:hover {
@@ -788,13 +833,13 @@ body {
 }
 
 .btn.secondary {
-    background: var(--bg-tertiary, #3a3a3a);
-    color: var(--text-primary, #fff);
+    background: var(--bg-tertiary, #101420);
+    color: var(--text-primary, #f2f4f7);
 }
 
 .btn.secondary:hover {
-    background: var(--bg-primary, #1a1a1a);
-    border-color: var(--accent-primary, #00d4ff);
+    background: var(--bg-primary, #050710);
+    border-color: var(--accent-primary, #c8b37e);
 }
 
 /* ---------- Scrollbar ---------- */
@@ -811,6 +856,122 @@ body {
 
 .action-feed::-webkit-scrollbar-thumb,
 .modal-body::-webkit-scrollbar-thumb {
-    background: var(--border-color, #555);
+    background: var(--border-color, rgba(200,179,126,0.22));
     border-radius: 3px;
 }
+
+/* ==========================================================================
+   BOARD HEXES
+
+   Copied from god-modern.css (which mirrors admin.css and team-modern.css).
+   replay.css previously had no .board-hex rules at all, so the board fell back
+   to BoardRenderer's built-in defaults: white hexes with visible debug
+   coordinate labels. Kept as a local copy on purpose — extracting the shared
+   version would put the other three pages at risk for no benefit here.
+   ========================================================================== */
+
+#hexBoard { position: relative; }
+
+.board-hex {
+    cursor: default;             /* replay is read-only — no click affordance */
+    transition: filter 0.2s ease;
+}
+
+/* Team colours on hexes: thin coloured ring, hex art visible through centre */
+.board-hex.occupied::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px; right: 2px; bottom: 2px;
+    clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+    pointer-events: none;
+    z-index: 6;
+    mask-image: radial-gradient(circle, transparent 45%, black 60%, black 100%);
+    -webkit-mask-image: radial-gradient(circle, transparent 45%, black 60%, black 100%);
+    mask-size: 100% 100%;
+    -webkit-mask-size: 100% 100%;
+    mask-repeat: no-repeat;
+    -webkit-mask-repeat: no-repeat;
+}
+
+.board-hex.team-1::after { background: var(--team-1-alpha, rgba(239,68,68,1)); }
+.board-hex.team-2::after { background: var(--team-2-alpha, rgba(59,130,246,1)); }
+.board-hex.team-3::after { background: var(--team-3-alpha, rgba(34,197,94,1)); }
+.board-hex.team-4::after { background: var(--team-4-alpha, rgba(234,179,8,1)); }
+.board-hex.team-5::after { background: var(--team-5-alpha, rgba(168,85,247,1)); }
+.board-hex.team-6::after { background: var(--team-6-alpha, rgba(236,72,153,1)); }
+
+/* Effect: Heart Glow */
+body.effect-heart-glow .board-hex.side-heart::before,
+body.effect-heart-glow .board-hex.mountain-heart::before {
+    box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.6);
+}
+
+/* Effect: Pulse Animation on Hearts */
+body.effect-pulse-hearts .board-hex.side-heart,
+body.effect-pulse-hearts .board-hex.mountain-heart {
+    animation: pulse-heart 7.2s ease-in-out infinite;
+    z-index: 20;
+}
+
+@keyframes pulse-heart {
+    0%, 100% {
+        filter: brightness(1) drop-shadow(0 0 0px transparent);
+        transform: translate(-50%, -50%) scale(1);
+    }
+    50% {
+        filter: brightness(1.5) drop-shadow(0 0 8px rgba(255, 100, 150, 0.8));
+        transform: translate(-50%, -50%) scale(1.08);
+    }
+}
+
+body.effect-pulse-hearts .heart-overlay-image {
+    animation: pulse-heart-image 7.2s ease-in-out infinite;
+}
+
+@keyframes pulse-heart-image {
+    0%, 100% {
+        filter: brightness(1) drop-shadow(0 0 0px transparent);
+        transform: translate(-50%, -50%) rotate(-30deg) scale(1);
+    }
+    50% {
+        filter: brightness(1.5) drop-shadow(0 0 8px rgba(255, 100, 150, 0.8));
+        transform: translate(-50%, -50%) rotate(-30deg) scale(1.08);
+    }
+}
+
+/* Effect: Rooms */
+body.effect-rooms .board-hex.room .room-border { display: block; }
+
+/* Every .board-hex has a `transform`, making it its own stacking context - a high
+   z-index on .room-border only wins WITHIN its own hex, never against a neighboring
+   hex's box. So the room hex itself must be raised above other hex effects (heart
+   overlays z-index 25, pulsing hearts z-index 20, labels z-index 10) so its border
+   never gets clipped by an adjacent hex painting on top of it. */
+body.effect-rooms .board-hex.room { z-index: 30; }
+
+/* Dashed black/white "marching ants" hex outline (dash length 6, stroke width 3) */
+.room-border {
+    display: none;
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 100%; height: 100%;
+    transform: translate(-50%, -50%);
+    z-index: 8;
+    pointer-events: none;
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpolygon points='16.5,0 49.5,0 66,29 49.5,58 16.5,58 0,29' fill='none' stroke='black' stroke-width='3' stroke-dasharray='6 6' stroke-dashoffset='0'/%3E%3C/svg%3E"),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpolygon points='16.5,0 49.5,0 66,29 49.5,58 16.5,58 0,29' fill='none' stroke='white' stroke-width='3' stroke-dasharray='6 6' stroke-dashoffset='6'/%3E%3C/svg%3E");
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+}
+
+/* Effect: Hex Images. The per-coordinate background-image rules are injected at
+   runtime by applyHexImages() in replay.html. Pushing the label to z-index 1
+   puts it behind the tile art, which is what hides the debug coordinates. */
+body.effect-hex-images .board-hex::before {
+    background-size: cover;
+    background-position: center;
+    z-index: 5;
+}
+
+body.effect-hex-images .hex-label { z-index: 1; }

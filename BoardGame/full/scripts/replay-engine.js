@@ -156,21 +156,34 @@ class ReplayEngine {
         // Sort backups by mapped sequence (should already be in order)
         this._backups.sort((a, b) => a.mappedSeq - b.mappedSeq);
 
-        // Build round boundaries from phase_advanced actions
+        // Build round boundaries from phase_advanced actions.
+        //
+        // A round can be entered more than once in the log: the admin flow
+        // sometimes writes two consecutive `round_advance -> scoring_vp`
+        // entries for the same round (seen live on scratch-tournament1 at
+        // sequences 52/53 and 96/97). Only the FIRST entry per round number
+        // opens a boundary — otherwise the timeline grows duplicate markers
+        // ("R1 R2R2 R3 R4R4 R5") and the round-jump dropdown lists each
+        // round twice.
         this._roundBoundaries = [];
+        const seenRounds = new Set();
         let currentRound = 0;
         let roundStartSeq = 0;
 
         for (let i = 0; i < this._actions.length; i++) {
             const action = this._actions[i];
             if (action.actionType === 'phase_advanced' && action.payload?.toPhase === 'scoring_vp') {
+                const roundNumber = action.payload.roundNumber || (currentRound + 1);
+                if (seenRounds.has(roundNumber)) continue;
+                seenRounds.add(roundNumber);
+
                 // Close previous round
                 if (currentRound > 0) {
                     const lastBoundary = this._roundBoundaries[this._roundBoundaries.length - 1];
                     if (lastBoundary) lastBoundary.endSeq = action.sequenceNumber - 1;
                 }
 
-                currentRound = action.payload.roundNumber || (currentRound + 1);
+                currentRound = roundNumber;
                 roundStartSeq = action.sequenceNumber;
 
                 // Find matching backup
@@ -503,11 +516,26 @@ class ReplayEngine {
     }
 
     /**
-     * Create an initial empty state for tournaments without backups.
+     * Create an initial state for tournaments without backups.
+     *
+     * The team roster is seeded from the final tournament document so
+     * standings, plate colours and team-name resolution work even with zero
+     * backup keyframes (the common case — scratch-tournament1 has 143 actions
+     * and no backups). Only the identity fields are carried over; every
+     * accumulating stat is zeroed so it replays forward from the log instead
+     * of showing the final tally on the very first frame.
      */
     _createInitialState() {
+        const seededTeams = (this._tournamentDoc?.teams || []).map(t => ({
+            ...t,
+            points: 0,
+            gamesPlayed: 0,
+            gamesWon: 0,
+            gamesLost: 0
+        }));
+
         return {
-            teams: [],
+            teams: seededTeams,
             board: {},
             heartHexControl: {},
             rooms: [],
@@ -612,6 +640,12 @@ class ReplayEngine {
             // Phase
             case 'phase_advanced':
                 this._applyPhaseAdvanced(state, p);
+                break;
+            case 'phase_set_manual':
+                // Admin jumped the phase directly. Without this the
+                // reconstruction keeps walking the normal phase order and
+                // silently desyncs from what actually happened.
+                this._applyPhaseSetManual(state, p);
                 break;
             case 'break_started':
                 this._applyBreakStarted(state, p, action.previousState);
@@ -849,11 +883,24 @@ class ReplayEngine {
     // Points Action Handlers
     // ------------------------------------------------------------------
 
+    /**
+     * `points_awarded` is written in TWO different payload shapes:
+     *
+     *   round scoring  (stats-manager.js) -> { roundNumber, pointsAwarded: { teamName: pts } }
+     *   manual + spell (team-manager.js,   -> { teamId, teamName, amount, reason }
+     *                   spell-engine.js,
+     *                   admin.js)
+     *
+     * Handling only the first shape (the previous behaviour) silently dropped
+     * every manual adjustment and every spell heart-point from the replayed
+     * standings. Both shapes are applied here.
+     */
     _applyPointsAwarded(state, p, action) {
-        const awarded = p.pointsAwarded || {};
         const teams = state.teams || [];
+        const round = p.roundNumber || action?.roundNumber || 0;
 
-        // pointsAwarded uses team NAME as key (not ID)
+        // Shape 1: bulk round scoring, keyed by team NAME (not ID).
+        const awarded = p.pointsAwarded || {};
         for (const [teamName, points] of Object.entries(awarded)) {
             const team = teams.find(t => t.name === teamName || String(t.id) === String(teamName));
             if (team) {
@@ -861,11 +908,23 @@ class ReplayEngine {
             }
         }
 
+        // Shape 2: single-team delta.
+        if (typeof p.amount === 'number') {
+            const team = teams.find(t =>
+                String(t.id) === String(p.teamId) || t.name === p.teamName
+            );
+            if (team) {
+                team.points = Math.max(0, (team.points || 0) + p.amount);
+            }
+        }
+
         // Add to points history
         state.pointsHistory = state.pointsHistory || [];
         state.pointsHistory.push({
-            round: p.roundNumber || action?.roundNumber || 0,
-            pointsAwarded: awarded,
+            round,
+            pointsAwarded: Object.keys(awarded).length
+                ? awarded
+                : { [p.teamName || `Team ${p.teamId}`]: p.amount || 0 },
             timestamp: new Date().toISOString()
         });
 
@@ -921,6 +980,31 @@ class ReplayEngine {
         if (p.fromPhase === 'round_advance' && state.breakSettings) {
             state.breakSettings.roundsSinceLastBreak =
                 (state.breakSettings.roundsSinceLastBreak || 0) + 1;
+        }
+    }
+
+    /**
+     * Admin set the phase directly, skipping the normal order
+     * (phase-manager.js setPhaseDirect). Mirrors that method's state writes.
+     */
+    _applyPhaseSetManual(state, p) {
+        if (!p.toPhase) return;
+
+        state.currentPhase = {
+            name: p.toPhase,
+            roundNumber: p.roundNumber ?? state.currentPhase?.roundNumber ?? 0,
+            startedAt: new Date().toISOString(),
+            challengeGamesPlayed: 0
+        };
+
+        if (p.toPhase === 'matches_in_progress') {
+            state.currentPhase.slots = { 1: 'setup', 2: 'setup' };
+        }
+
+        if (p.toPhase === 'tournament_end') {
+            state.status = 'finished';
+        } else if (p.toPhase !== 'pre_game_setup' && state.status !== 'playing') {
+            state.status = 'playing';
         }
     }
 

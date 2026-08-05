@@ -34,11 +34,19 @@
     <link rel="manifest" href="../shared/images/favicon/site.webmanifest">
     <link rel="shortcut icon" href="../shared/images/favicon/favicon.ico">
 
+    <!-- Fonts: Russo One (titles) + Quantico (body) — same as the rest of the suite -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- void-gold-theme.css must load AFTER brand-theme.css so its variable
+         overrides win. dark-theme.css is deliberately NOT loaded: every rule in
+         it is scoped to `body.dark-mode`, which this page never sets, so it was
+         dead weight that only made the page look themed. -->
     <link rel="stylesheet" href="../shared/css/brand-theme.css">
-    <link rel="stylesheet" href="../shared/css/dark-theme.css">
+    <link rel="stylesheet" href="../shared/css/void-gold-theme.css">
+    <link rel="stylesheet" href="../shared/css/navbar.css">
+    <link rel="stylesheet" href="../shared/css/toast.css">
     <link rel="stylesheet" href="css/replay.css">
 </head>
 <body>
@@ -59,6 +67,17 @@
     <div class="error-message" id="errorMessage"></div>
     <button class="btn secondary" onclick="window.history.back()">Go Back</button>
 </div>
+
+<!-- Atmosphere Layers -->
+<div class="atmo atmo-grad"></div>
+<div class="atmo atmo-noise"></div>
+
+<!-- Navbar container - populated by navbar.js.
+     Note: navbar.js has no "Replay" destination on purpose. This page is
+     reachable only from god.html's Open Replay button; the navbar is here so
+     the page matches the suite and offers a way back out. -->
+<div id="navbar-container"></div>
+<script defer src="../shared/scripts/navbar.js"></script>
 
 <!-- Main Page -->
 <div class="replay-container">
@@ -218,7 +237,56 @@
             boardModule,
             { responsive: true, showHeartImages: true }
         );
+
+        // Board visuals are opt-in via body classes (same set team.html enables).
+        // Without these the board renders as bare white hexes with the debug
+        // coordinate labels showing.
+        document.body.classList.add(
+            'effect-hex-images', 'effect-heart-glow', 'effect-pulse-hearts', 'effect-rooms'
+        );
+        applyHexImages();
     });
+
+    /**
+     * Inject the per-coordinate hex artwork as a generated stylesheet.
+     *
+     * Board-state-independent — the same 91 rules every time — so it is built
+     * once at startup rather than on every render. Ported from
+     * team-controls.js applyHexImages(); admin.js and ui-manager.js carry their
+     * own copies of the same routine.
+     */
+    function applyHexImages() {
+        if (!boardModule) return;
+
+        let styleEl = document.getElementById('hex-images-dynamic-css');
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = 'hex-images-dynamic-css';
+            document.head.appendChild(styleEl);
+        }
+
+        const base = window.BOARDGAME_BASE || '.';
+        styleEl.textContent = boardModule.generateHexCoordinates()
+            .map(([q, r]) => {
+                const coord = `q${q}r${r}`;
+                return `body.effect-hex-images .board-hex[data-coord="${coord}"]::before {
+                    background-image: url('${base}/shared/images/hexes/coords/${coord}.png');
+                }`;
+            })
+            .join('\n');
+    }
+
+    /**
+     * BoardRenderer only writes `data-team` on occupied hexes; the colour ring
+     * comes from a `team-N` class. Must run after every render.
+     */
+    function applyTeamColorsToBoard(board) {
+        document.querySelectorAll('.board-hex').forEach(hex => {
+            hex.classList.remove('team-1', 'team-2', 'team-3', 'team-4', 'team-5', 'team-6');
+            const teamId = board?.[hex.dataset.coord];
+            if (teamId) hex.classList.add(`team-${teamId}`);
+        });
+    }
 
     document.addEventListener('firebase-ready', async () => {
         if (!tournamentId) return;
@@ -370,6 +438,7 @@
                 teams: state.teams || [],
                 heartHexControl: state.heartHexControl || {}
             });
+            applyTeamColorsToBoard(state.board);
         }
 
         // Update standings
@@ -388,9 +457,9 @@
         document.getElementById('timelineTimestamp').textContent =
             action ? formatTimestamp(action.timestamp) : '';
 
-        // Update header round
-        document.getElementById('headerRound').textContent =
-            `Round ${progress.roundNumber || state?.currentPhase?.roundNumber || '--'}`;
+        // Update header round. Round 0 is pre-game setup, not missing data —
+        // `0 || '--'` used to render it as "Round --".
+        document.getElementById('headerRound').textContent = formatRound(state, progress);
 
         // Update info panel
         updateInfoPanel(state, action);
@@ -418,12 +487,31 @@
         `).join('');
     }
 
+    /**
+     * Round 0 means pre-game setup. Entries logged before round 1 legitimately
+     * carry roundNumber 0, so it must not be treated as "unknown".
+     */
+    function formatRound(state, progress) {
+        const round = progress?.roundNumber
+            ?? state?.currentPhase?.roundNumber
+            ?? state?.currentRound;
+        if (round === null || round === undefined) return 'Round --';
+        return round === 0 ? 'Setup' : `Round ${round}`;
+    }
+
     function updateInfoPanel(state, action) {
-        const phaseName = state?.currentPhase?.name || action?.phaseAtTime || '--';
+        // Only currentPhase.name is a real phase name. `action.phaseAtTime` used
+        // to hold gameState.status ("playing"), which displayed as a phase; it is
+        // now written correctly by action-logger.js, but the reconstructed state
+        // is still the authoritative source here.
+        const phaseName = state?.currentPhase?.name || '--';
         document.getElementById('infoPhase').innerHTML =
-            `<span class="info-phase-badge">${phaseName.replace(/_/g, ' ')}</span>`;
+            `<span class="info-phase-badge">${escapeHtml(phaseName.replace(/_/g, ' '))}</span>`;
+
+        const round = state?.currentPhase?.roundNumber ?? state?.currentRound;
         document.getElementById('infoRound').textContent =
-            state?.currentPhase?.roundNumber || state?.currentRound || '--';
+            (round === null || round === undefined) ? '--' : (round === 0 ? 'Setup' : round);
+
         document.getElementById('infoGamesPlayed').textContent =
             state?.gamesPlayed || 0;
     }

@@ -81,8 +81,12 @@ class ActionLogger {
                     category,
                     payload: this._cleanObject(payload),
                     previousState: previousState ? this._cleanObject(previousState) : null,
-                    roundNumber: gs?.currentRound || 0,
-                    phaseAtTime: gs?.status || 'unknown',
+                    roundNumber: gs?.currentPhase?.roundNumber ?? gs?.currentRound ?? 0,
+                    // The phase NAME, not the tournament status. This field
+                    // used to be written as `gs.status` ("playing"/"finished"),
+                    // which made replay.html display "playing" as the phase.
+                    phaseAtTime: gs?.currentPhase?.name || 'unknown',
+                    statusAtTime: gs?.status || 'unknown',
                     undone: false,
                     undoneBy: null,
                     undoneAt: null
@@ -346,8 +350,24 @@ class ActionLogger {
                 return `Room hex removed: ${p.hexCoord}`;
 
             // Points
-            case 'points_awarded':
-                return `${teamName(p.teamId)} ${p.amount >= 0 ? 'gained' : 'lost'} ${Math.abs(p.amount)} points (${p.reason || 'manual'})`;
+            //
+            // Two payload shapes are in use: bulk round scoring writes
+            // { roundNumber, pointsAwarded: { teamName: pts } } (stats-manager.js),
+            // while manual adjustments and spell effects write
+            // { teamId, teamName, amount, reason }. Reading only the latter
+            // rendered every round-scoring row as "Team undefined gained NaN points".
+            case 'points_awarded': {
+                if (p.pointsAwarded && typeof p.pointsAwarded === 'object') {
+                    const parts = Object.entries(p.pointsAwarded)
+                        .map(([name, pts]) => `${name} +${pts}`);
+                    const round = p.roundNumber ? `Round ${p.roundNumber}` : 'Round ?';
+                    return parts.length
+                        ? `${round} points awarded: ${parts.join(', ')}`
+                        : `${round} points awarded`;
+                }
+                const amount = Number(p.amount) || 0;
+                return `${teamName(p.teamId)} ${amount >= 0 ? 'gained' : 'lost'} ${Math.abs(amount)} points (${p.reason || 'manual'})`;
+            }
             case 'points_corrected':
                 return `${teamName(p.teamId)} points corrected: ${p.oldPoints} → ${p.newPoints}`;
 
@@ -356,8 +376,14 @@ class ActionLogger {
                 return `Phase changed: ${p.fromPhase || '?'} → ${p.toPhase || '?'}`;
             case 'round_started':
                 return `Round ${p.roundNumber || '?'} started`;
+            case 'phase_set_manual':
+                return `Phase set manually: ${p.fromPhase || '?'} → ${p.toPhase || '?'} (Round ${p.roundNumber ?? '?'})`;
+            case 'slot_advanced':
+                return `Match ${p.slot ?? '?'}: ${p.fromSubPhase || '?'} → ${p.toSubPhase || '?'}`;
             case 'break_started':
                 return `Break added to queue${p.breakType ? ` (${p.breakType})` : ''}`;
+            case 'break_auto_inserted':
+                return `Break auto-inserted${p.returnToPhase ? ` (resumes at ${p.returnToPhase})` : ''}`;
             case 'break_ended':
                 return `Break completed`;
             case 'lobby_reset':
