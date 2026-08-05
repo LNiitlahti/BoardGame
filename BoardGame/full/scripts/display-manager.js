@@ -256,29 +256,6 @@ class DisplayManager {
     }
 
     /**
-     * Whose spell turn it is, derived from teamsCompleted rather than from
-     * spellPhase.currentTeamIndex.
-     *
-     * currentTeamIndex is NOT reliable: team.html's castSpellViaFirestore()
-     * and endSpellTurn() (team-controls.js) both arrayUnion the team into
-     * spellPhase.teamsCompleted but never advance the index — only
-     * spell-engine.js's completeTeamTurn() does. Reading the index therefore
-     * keeps naming the first team long after it has acted.
-     *
-     * @returns {*|null} the team id whose turn it is, or null if the phase
-     *   isn't active / every team has already acted.
-     */
-    _spellWindowCurrentTeamId(data) {
-        const sp = data?.spellPhase;
-        if (!sp || !sp.isActive) return null;
-        const done = (sp.teamsCompleted || []).map(String);
-        for (const id of (sp.turnOrder || [])) {
-            if (!done.includes(String(id))) return id;
-        }
-        return null;
-    }
-
-    /**
      * Every spell cast during the CURRENT spell window, merged from the two
      * independent sources that record them, oldest first:
      *
@@ -1167,17 +1144,10 @@ class DisplayManager {
             phaseBanner.style.background = 'rgba(168,85,247,0.08)';
             phaseBanner.style.color = '#a855f7';
             phaseBanner.style.borderBottom = '2px solid rgba(168,85,247,0.3)';
-            // Whose turn it is comes from _spellWindowCurrentTeamId(), NOT
-            // from spellPhase.currentTeamIndex, which team.html's cast/pass
-            // paths never advance. Shared with the spell-window slide so the
-            // strip and the slide can't contradict each other.
-            const currentTeamId = this._spellWindowCurrentTeamId(data);
-            if (currentTeamId != null) {
-                const teamName = this._getCurrentTeamName(currentTeamId) || ('Team ' + currentTeamId);
-                phaseBanner.textContent = 'SPELL WINDOW \u2014 ' + teamName + ' is choosing...';
-            } else {
-                phaseBanner.textContent = 'SPELL WINDOW';
-            }
+            // There is no turn order for spells: any player can ask the
+            // admin to log a spell at any point while the window is open, so
+            // there is no "current team" to name here.
+            phaseBanner.textContent = 'SPELL WINDOW';
         } else {
             phaseBanner.style.display = 'none';
         }
@@ -1402,30 +1372,17 @@ class DisplayManager {
      * isActive gate) — which is why every field here tolerates a
      * missing/empty spellPhase.
      *
-     * Shows a turn queue plus a live log of what has been cast in THIS
-     * window. The live log is a deliberate information-model choice (a later
-     * team sees what earlier teams played) confirmed with the user; see the
-     * spec's "Information model change" section.
-     *
-     * The queue itself has two sources, because admin.html never populates
-     * spellPhase.turnOrder (see DISPLAY_MODES' comment):
-     *   - real turnOrder present (god.html ran beginSpellPhase()): render it
-     *     as before, with `current`/`passed` tracking.
-     *   - turnOrder empty: derive a display order from data.teams sorted by
-     *     points ascending, mirroring beginSpellPhase()'s own ordering rule
-     *     (spell-engine.js). There is no turn tracking in this case, so no
-     *     team is ever `current` and a team without a cast is just
-     *     `waiting` — NOT `passed`, which is only knowable from
-     *     teamsCompleted.
+     * There is no turn order for spells: whenever the window is open, any
+     * player can walk up to the admin and ask to use a spell, and the admin
+     * types the spell name into the manual spell log (addSpellLogEntry() in
+     * admin-improved-adapter.js) next to that team. So this just lists every
+     * team from data.teams, in their natural array order, with whatever
+     * spell name(s) _collectSpellWindowCasts() found for them this window —
+     * no current team, no choosing/passed labels, no reverse-standings
+     * ordering.
      */
     _renderSpellWindowSlide(container, data) {
-        const sp = data.spellPhase || {};
-        const hasTurnOrder = (sp.turnOrder || []).length > 0;
-        const order = hasTurnOrder
-            ? sp.turnOrder
-            : [...(data.teams || [])].sort((a, b) => (a.points || 0) - (b.points || 0)).map(t => t.id);
-        const done = (sp.teamsCompleted || []).map(String);
-        const currentTeamId = this._spellWindowCurrentTeamId(data);
+        const teams = data.teams || [];
         const casts = this._collectSpellWindowCasts(data);
 
         const castsByTeam = {};
@@ -1434,41 +1391,20 @@ class DisplayManager {
             (castsByTeam[key] = castsByTeam[key] || []).push(this._escapeText(c.spellName));
         }
 
-        const queueHTML = order.map(id => {
-            const key = String(id);
-            const hasCast = !!castsByTeam[key];
-            let state, note;
-            if (hasTurnOrder) {
-                const isDone = done.includes(key);
-                const isCurrent = currentTeamId != null && String(currentTeamId) === key;
-                state = isDone ? 'done' : (isCurrent ? 'current' : 'waiting');
-                // A team in teamsCompleted with no cast in either source passed.
-                note = isDone
-                    ? (hasCast ? castsByTeam[key].join(', ') : 'passed')
-                    : (isCurrent ? 'choosing…' : '');
-            } else {
-                // No turn tracking without turnOrder: a cast means done,
-                // otherwise waiting — never current, never passed.
-                state = hasCast ? 'done' : 'waiting';
-                note = hasCast ? castsByTeam[key].join(', ') : '';
-            }
+        const queueHTML = teams.map(team => {
+            const key = String(team.id);
+            const spellNames = castsByTeam[key];
+            const hasCast = !!spellNames;
+            const state = hasCast ? 'done' : 'waiting';
+            const note = hasCast ? spellNames.join(', ') : '';
             return `
-                <div class="dm-spell-turn dm-spell-turn--${state}" style="--turn-color:${this._getTeamColor(id)};">
-                    <span class="dm-spell-turn-name">${this._escapeText(this._getCurrentTeamName(id) || ('Team ' + id))}</span>
+                <div class="dm-spell-turn dm-spell-turn--${state}" style="--turn-color:${this._getTeamColor(team.id)};">
+                    <span class="dm-spell-turn-name">${this._escapeText(this._getCurrentTeamName(team.id) || ('Team ' + team.id))}</span>
                     <span class="dm-spell-turn-note">${note}</span>
                 </div>`;
         }).join('');
 
-        const logHTML = casts.length === 0 ? '' : `
-            <div class="dm-spell-log">
-                ${casts.map(c => `
-                    <div class="dm-spell-log-row">
-                        <span style="color:${this._getTeamColor(c.teamId)};">${this._escapeText(c.teamName || this._getCurrentTeamName(c.teamId) || ('Team ' + c.teamId))}</span>
-                        cast <strong>${this._escapeText(c.spellName)}</strong>
-                    </div>`).join('')}
-            </div>`;
-
-        const bodyHTML = order.length > 0
+        const bodyHTML = teams.length > 0
             ? `<div class="dm-spell-queue">${queueHTML}</div>`
             : `<div class="dm-spell-subtitle">Waiting for the spell phase to begin</div>`;
 
@@ -1477,7 +1413,6 @@ class DisplayManager {
                 <div class="dm-spell-icon">${ICON_SVGS.sparkles}</div>
                 <div class="dm-spell-title">Spells Window</div>
                 ${bodyHTML}
-                ${logHTML}
             </div>
         `;
     }
