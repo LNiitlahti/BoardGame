@@ -1039,8 +1039,9 @@ class ReplayEngine {
                 startedAt: new Date().toISOString()
             };
         }
-        // Reset break counter
-        if (state.breakSettings) {
+        // Reset break counter — endBreak() records whether it actually reset
+        // (short manual breaks don't; auto-inserted breaks always do).
+        if (p.counterReset !== false && state.breakSettings) {
             state.breakSettings.roundsSinceLastBreak = 0;
         }
     }

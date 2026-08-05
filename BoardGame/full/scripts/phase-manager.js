@@ -732,11 +732,15 @@ class PhaseManager {
         const challengeGamesPlayed = gs.currentPhase.challengeGamesPlayed || 0;
         const previousPhase = { ...gs.currentPhase };
 
-        // Reset break interval counter — but only for a real break. A
-        // misclicked Insert Break + immediate End Break must not silently
-        // cancel the next scheduled auto-break.
+        // Reset break interval counter. The 2-minute floor only guards
+        // MANUAL breaks: a misclicked Insert Break + immediate End Break must
+        // not silently cancel the next scheduled auto-break. An auto-inserted
+        // break always resets — otherwise the counter stays at/above the
+        // interval and the break re-fires on the very next round advance.
         const breakLastedMs = Date.now() - (Date.parse(gs.currentPhase.startedAt) || 0);
-        if (gs.breakSettings && breakLastedMs >= 2 * 60 * 1000) {
+        const counterReset = !!gs.breakSettings &&
+            (gs.currentPhase.autoInserted === true || breakLastedMs >= 2 * 60 * 1000);
+        if (counterReset) {
             gs.breakSettings.roundsSinceLastBreak = 0;
             gs.breakSettings.lastBreakAt = new Date().toISOString();
         }
@@ -754,7 +758,8 @@ class PhaseManager {
         await this._save();
         this._logAction('break_ended', 'phase', {
             toPhase: returnTo,
-            roundNumber: gs.currentPhase.roundNumber
+            roundNumber: gs.currentPhase.roundNumber,
+            counterReset
         }, { currentPhase: previousPhase, status: this._gameState.status });
 
         this._ui.showStatus('Break ended.', 'success');
