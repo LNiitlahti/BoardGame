@@ -36,8 +36,7 @@
         boardWrapEl: null,
         boardWrapParent: null,
         boardWrapNextSibling: null,
-        dimOverlayEl: null,
-        pulseEl: null
+        dimOverlayEl: null
     };
 
     window.CINEMATIC = {
@@ -51,20 +50,6 @@
         el.style.cssText =
             'position:fixed;inset:0;background:#000;z-index:9999;pointer-events:none;';
         document.body.appendChild(el);
-        return el;
-    }
-
-    // Board brightness pulse (effect 1) — see cine-camera.js's
-    // applyBoardPulse for why this is an opacity overlay rather than a
-    // filter on the scene root. Lives inside .board-wrap so it brightens the
-    // board without touching the rest of the page.
-    function makePulse() {
-        const el = document.createElement('div');
-        el.id = 'cinePulse';
-        el.style.cssText =
-            'position:absolute;inset:0;pointer-events:none;opacity:0;' +
-            'background:#fff;will-change:opacity;';
-        document.querySelector('.board-wrap').appendChild(el);
         return el;
     }
 
@@ -129,7 +114,6 @@
         document.body.classList.remove('cine-active');
         document.documentElement.classList.remove('cine-pending');
         if (state.coverEl) { state.coverEl.remove(); state.coverEl = null; }
-        if (state.pulseEl) { state.pulseEl.remove(); state.pulseEl = null; }
         try { restoreBoardWrap(); } catch (e) { console.error('[Cinematic] restoreBoardWrap failed:', e); }
         document.removeEventListener('keydown', onKeydown);
         window.removeEventListener('error', bail);
@@ -163,21 +147,17 @@
         setTimeout(() => { location.href = url.toString(); }, 2000);
     }
 
-    // Persistent 72%-black veil sitting *under* the cinematic (below
-    // .board-wrap's z-index:10000, so the camera/tiles/text/atmosphere stay
-    // sharp) but above the rest of the page. Present from arm() through
+    // Persistent 50%-black/12px-blur veil sitting *under* the cinematic
+    // (below .board-wrap's z-index:10000, so the camera/tiles/text/atmosphere
+    // stay sharp) but above the rest of the page. Present from arm() through
     // teardown() (see redirectToCleanUrl, which fades it to full black rather
     // than removing it).
-    //
-    // A backdrop-filter blur was dropped here: it is a full-viewport GPU pass
-    // that re-runs whenever anything beneath it repaints, and the dashboard it
-    // was blurring is already unreadable behind this much black. The opacity
-    // was raised from 0.5 to compensate for the lost blur.
     function makeDimOverlay() {
         const el = document.createElement('div');
         el.id = 'cineDimOverlay';
         el.style.cssText =
-            'position:fixed;inset:0;z-index:9998;background-color:rgba(0,0,0,0.72);' +
+            'position:fixed;inset:0;z-index:9998;background-color:rgba(0,0,0,0.5);' +
+            'backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);' +
             'transition:background-color 0.6s ease;pointer-events:none;';
         document.body.appendChild(el);
         state.dimOverlayEl = el;
@@ -210,31 +190,21 @@
         return Math.max(0, Math.min(100, pct)) / 100;
     }
 
-    // Effect 4 (music sync): screen-wide color wash on strong beats. Rewound
-    // via the Web Animations API (see cine-tiles.js's triggerBeatPulse for
-    // why we avoid the remove-reflow-readd trick), needed because .flash may
-    // already be set from a previous beat.
+    // Effect 4 (music sync): screen-wide color wash on strong beats. See
+    // cine-tiles.js's triggerBeatPulse for the same remove-reflow-readd
+    // restart trick, needed because .flash may already be set from a
+    // previous beat.
     function triggerWash() {
         const wash = document.getElementById('cineWash');
         if (!wash) return;
-        if (!wash.classList.contains('flash')) {
-            wash.classList.add('flash'); // first application starts it naturally
-            return;
-        }
-        for (const anim of wash.getAnimations()) { anim.currentTime = 0; anim.play(); }
+        wash.classList.remove('flash');
+        void wash.offsetWidth; // force reflow so re-adding the class restarts the animation
+        wash.classList.add('flash');
     }
 
     function buildTimeline() {
         const cfg = state.config;
         const easing = window.CineEasing;
-
-        // Snap amplitudes to 0.05 steps. The atmosphere/camera setters these
-        // feed all early-out on an unchanged value, so quantizing turns most
-        // frames' style writes into no-ops — and 0.05 is finer than the eye
-        // resolves on a fog/glow/scale modulation. Deliberately not applied
-        // to the shake (random per frame by design) or the strings drift
-        // (sampled by a sine, so stepping it would be visible).
-        const q = a => Math.round(a * 20) / 20;
         const tl = new window.CineTimeline();
 
         // Camera shake: a short, punchy, decaying jolt on the first impact
@@ -410,9 +380,10 @@
                 duration: envelopeDuration,
                 onUpdate: p => {
                     const amp = music.envelopeAt(p * envelopeDuration);
-                    state.camera.applyBoardPulse(q(amp));
+                    state.camera.applyBoardPulse(amp);
+                    state.tiles.applyBeatIntensity(amp);
                     state.camera.setShake('music', window.CineCamera.randomOffset(cfg.shake.music, amp));
-                    state.atmosphere.applyIntensity(q(amp));
+                    state.atmosphere.applyIntensity(amp);
                 }
             });
         }
@@ -464,7 +435,7 @@
                 at: 0,
                 duration: dur,
                 onUpdate: p => state.atmosphere.applyFogIntensity(
-                    q(state.musicBackingVocals.envelopeAt(p * dur)))
+                    state.musicBackingVocals.envelopeAt(p * dur))
             });
         }
 
@@ -474,7 +445,7 @@
                 at: 0,
                 duration: dur,
                 onUpdate: p => state.camera.applyBassScale(
-                    q(state.musicBass.envelopeAt(p * dur)), cfg.bass.scaleAmp)
+                    state.musicBass.envelopeAt(p * dur), cfg.bass.scaleAmp)
             });
         }
 
@@ -515,7 +486,7 @@
                 at: 0,
                 duration: dur,
                 onUpdate: p => state.atmosphere.applySynthGlow(
-                    q(state.musicSynth.envelopeAt(p * dur)))
+                    state.musicSynth.envelopeAt(p * dur))
             });
         }
 
@@ -525,7 +496,7 @@
                 at: 0,
                 duration: dur,
                 onUpdate: p => state.atmosphere.applyBaseIntensity(
-                    q(state.musicOther.envelopeAt(p * dur)))
+                    state.musicOther.envelopeAt(p * dur))
             });
         }
 
@@ -543,8 +514,7 @@
 
         const scene = document.getElementById('cineScene');
         const rig = document.getElementById('cineRig');
-        state.pulseEl = makePulse();
-        state.camera = new window.CineCamera(scene, rig, state.pulseEl);
+        state.camera = new window.CineCamera(scene, rig);
         state.camera.applyPose(state.config.camera.dramatic);
 
         state.tiles = new window.CineTiles(

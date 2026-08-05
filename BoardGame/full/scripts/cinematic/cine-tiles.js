@@ -7,16 +7,10 @@
 // that actually use them, so DOM size stays proportional to the board, not
 // 4x every hex. Water has no discrete particles (its look is a glow +
 // sweeping sheen, both pure CSS pseudo-elements, no extra nodes needed).
-//
-// These counts are a performance knob: every particle is a DOM node running
-// an infinite CSS animation, and dust covers 56 of the board's 91 hexes, so
-// its count dominates the total. Raising them back up is safe — view.html
-// positions particles with :nth-of-type rules that go up to 3 (embers/motes)
-// and 4 (sparks), so counts above those would stack unpositioned nodes.
 const MATERIAL_PARTICLES = {
-    lava: { className: 'ember', count: 2 },
-    magic: { className: 'spark', count: 2 },
-    dust: { className: 'mote', count: 1 },
+    lava: { className: 'ember', count: 3 },
+    magic: { className: 'spark', count: 4 },
+    dust: { className: 'mote', count: 3 },
     water: { className: null, count: 0 }
 };
 
@@ -75,38 +69,34 @@ class CineTiles {
         fx.classList.add('active', 'flash');
     }
 
+    // Effect 2 (music sync): feeds the existing (already-shipped) material
+    // glow layers via a CSS custom property they reference on top of their
+    // own idle-loop animation — additive, not a replacement.
+    applyBeatIntensity(amp) {
+        this.boardEl.style.setProperty('--beat-intensity', String(amp));
+    }
+
     // Effect 3 (music sync): one-shot re-triggerable glow on a single hex,
     // fired per beat for whichever ring is "on" this beat (see
     // cinematic-controller.js's buildTimeline). Distinct from
     // _triggerLanding's one-shot .flash (that one never repeats; this one
-    // must replay every time it's called).
-    //
-    // Restarted via the Web Animations API rather than the usual
-    // remove-reflow-readd trick: this runs once per hex for a whole ring on
-    // every beat, so `void pulse.offsetWidth` meant up to 30 forced layout
-    // flushes in a single frame, each recomputing layout across ~600
-    // clip-path'd nodes in a 3D subtree. Rewinding the animation in place
-    // reads no layout at all.
+    // must replay every time it's called) — remove-reflow-readd is the
+    // standard trick to restart a CSS animation on an already-flashed class.
     triggerBeatPulse(coord) {
         const hex = this.hexByCoord.get(coord);
         if (!hex) return;
         const pulse = hex.querySelector(':scope > .material-fx > .beat-pulse');
         if (!pulse) return;
-        if (!pulse.classList.contains('flash')) {
-            pulse.classList.add('flash'); // first application starts it naturally
-            return;
-        }
-        for (const anim of pulse.getAnimations()) { anim.currentTime = 0; anim.play(); }
+        pulse.classList.remove('flash');
+        void pulse.offsetWidth; // force reflow so re-adding the class restarts the animation
+        pulse.classList.add('flash');
     }
 
-    // Hide every hex (and heart images) before the cascade begins. Note this
-    // deliberately does NOT set will-change: promoting all 91 hexes to their
-    // own compositor layer at once is a GPU-memory thrash on integrated
-    // chips. makeDropTrack sets it per tile instead — only a handful are ever
-    // falling at the same time.
+    // Hide every hex (and heart images) before the cascade begins.
     hideAll() {
         for (const hex of this.hexByCoord.values()) {
             hex.style.visibility = 'hidden';
+            hex.style.willChange = 'transform';
         }
         if (this.heartOverlay) this.heartOverlay.style.visibility = 'hidden';
     }
@@ -122,7 +112,6 @@ class CineTiles {
             onStart: () => {
                 if (!hex) return;
                 hex.style.visibility = 'visible';
-                hex.style.willChange = 'transform, opacity'; // cleared in onComplete
             },
             onUpdate: (p) => {
                 if (!hex) return;
@@ -167,6 +156,7 @@ class CineTiles {
                 }
             }
         }
+        this.boardEl.style.removeProperty('--beat-intensity');
         this.showHearts();
     }
 }

@@ -9,10 +9,9 @@
 const ZERO_SHAKE = { tilt: 0, spin: 0, zoom: 0 };
 
 class CineCamera {
-    constructor(sceneEl, rigEl, pulseEl) {
+    constructor(sceneEl, rigEl) {
         this.sceneEl = sceneEl;
         this.rigEl = rigEl;
-        this.pulseEl = pulseEl || null;
         this._basePose = { fov: 3500, tilt: 0, spin: 0, zoom: 1 }; // matches CSS rest default
         this._shakes = { impact: ZERO_SHAKE, music: ZERO_SHAKE };
         this._bassScale = 1;
@@ -71,16 +70,14 @@ class CineCamera {
 
     // Effect 1 (music sync): whole-board brightness, driven every frame by
     // music.envelopeAt(). amp is 0-1; subtle at rest, a noticeable glow at
-    // the track's peak. Implemented as `opacity` on a plain overlay div
-    // rather than `filter: brightness()` on sceneEl: a filter there forces
-    // the browser to rasterize the entire board subtree (91 hexes x 3
-    // clip-path layers, ~539 material-fx nodes, hundreds of running
-    // animations) into a full-viewport buffer every frame, and drags every
-    // otherwise-compositable child animation onto the main thread with it.
-    // Opacity on a single leaf element stays on the compositor.
+    // the track's peak. Applied to sceneEl (not rigEl): rigEl needs
+    // transform-style: preserve-3d to stay intact for the tile-drop
+    // cascade's translateZ depth (cine-tiles.js), and a non-none `filter`
+    // on an element forces that element's own transform-style to flatten
+    // per the CSS spec — sceneEl has no 3D-transformed children of its own,
+    // so it isn't part of that preserve-3d chain and is safe to filter.
     applyBoardPulse(amp) {
-        if (!this.pulseEl) return;
-        this.pulseEl.style.opacity = String(amp * 0.28);
+        this.sceneEl.style.filter = `brightness(${1 + amp * 0.35})`;
     }
 
     // magnitude: 0-1. 0 = no shake. 1 = full amplitude. Caller supplies an
@@ -168,7 +165,7 @@ class CineCamera {
     clearTo2D() {
         this.sceneEl.style.perspective = '';
         this.rigEl.style.transform = '';
-        if (this.pulseEl) this.pulseEl.style.opacity = '0';
+        this.sceneEl.style.filter = '';
         this._shakes = { impact: ZERO_SHAKE, music: ZERO_SHAKE };
         this._bassScale = 1;
         this._drift = { tilt: 0, spin: 0 };

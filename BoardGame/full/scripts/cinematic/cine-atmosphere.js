@@ -78,17 +78,10 @@ class CineAtmosphere {
         this.el.appendChild(this.glowEl);
     }
 
-    // Sets --atmo-intensity, read by CSS to nudge brightness/opacity.
-    //
-    // Each of the four setters below early-outs on an unchanged value. These
-    // are inherited custom properties sitting above ~30 particle elements
-    // that each resolve them through a calc() into an opacity or filter, so a
-    // write invalidates the whole subtree's style. The controller quantizes
-    // the amplitudes it feeds in (see buildTimeline's `q`), which turns most
-    // frames' writes into no-ops.
+    // Sets --atmo-intensity, read by CSS to nudge brightness/opacity — same
+    // pattern as the existing --beat-intensity custom property
+    // (cine-tiles.js's applyBeatIntensity).
     applyIntensity(amp) {
-        if (amp === this._lastIntensity) return;
-        this._lastIntensity = amp;
         this.el.style.setProperty('--atmo-intensity', String(amp));
     }
 
@@ -97,8 +90,6 @@ class CineAtmosphere {
     // stays wired to the drums envelope block in cinematic-controller.js,
     // which is out of scope for multi-stem work -- see that file's comment).
     applyFogIntensity(amp) {
-        if (amp === this._lastFogIntensity) return;
-        this._lastFogIntensity = amp;
         this.el.style.setProperty('--atmo-fog-intensity', String(amp));
         this.backEl.style.setProperty('--atmo-fog-intensity', String(amp));
     }
@@ -106,16 +97,12 @@ class CineAtmosphere {
     // "Other" stem: baseline motes/embers brightness, independent of the fog
     // channel above.
     applyBaseIntensity(amp) {
-        if (amp === this._lastBaseIntensity) return;
-        this._lastBaseIntensity = amp;
         this.el.style.setProperty('--atmo-base-intensity', String(amp));
     }
 
     // Synth stem: full-screen glow overlay opacity, proportional to synth
     // amplitude.
     applySynthGlow(amp) {
-        if (amp === this._lastSynthGlow) return;
-        this._lastSynthGlow = amp;
         this.glowEl.style.setProperty('--atmo-synth-intensity', String(amp));
     }
 

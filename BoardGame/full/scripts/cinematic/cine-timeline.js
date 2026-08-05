@@ -14,11 +14,10 @@ class CineTimeline {
         this.onFinished = null;
         this.lastTickAt = null;
         this._rafId = null;
-        this._duration = 0; // maintained incrementally by add(), read every tick
     }
 
     get duration() {
-        return this._duration;
+        return this.tracks.reduce((m, t) => Math.max(m, t.at + t.duration), 0);
     }
 
     add(track) {
@@ -29,10 +28,6 @@ class CineTimeline {
             _started: false,
             _completed: false
         });
-        // Kept up to date here rather than recomputed in the getter: tick()
-        // reads duration every frame, and a full cinematic holds ~1,000
-        // tracks, so a reduce per frame is pure waste.
-        this._duration = Math.max(this._duration, track.at + track.duration);
         return this;
     }
 
