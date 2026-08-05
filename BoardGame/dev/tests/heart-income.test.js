@@ -135,6 +135,68 @@ test('a missing boardModule returns zeros instead of throwing', () => {
     assert.strictEqual(result.byTeam[1].points, 0);
 });
 
+// ── projectRoundsToWin ────────────────────────────────────────────────────
+
+const { projectRoundsToWin } = require('../../shared/scripts/board-module.js');
+
+test('projects rounds to the win target from heart income alone', () => {
+    const gs = makeState({
+        winCondition: 50,
+        teams: [
+            { id: 1, name: 'Ravens', points: 40 },   // mountain = +2/round → 5 rounds
+            { id: 2, name: 'Wolves', points: 46 }    // one side heart = +1/round → 4 rounds
+        ],
+        heartHexControl: { q0r0: 1, 'q-4r2': 2 }
+    });
+    const projection = projectRoundsToWin(gs, boardModule);
+
+    assert.strictEqual(projection[0].teamName, 'Wolves', 'sorted by soonest to win');
+    assert.strictEqual(projection[0].roundsToWin, 4);
+    assert.strictEqual(projection[1].teamName, 'Ravens');
+    assert.strictEqual(projection[1].incomePerRound, 2);
+    assert.strictEqual(projection[1].roundsToWin, 5);
+});
+
+test('a team holding no hearts has no projection, and sorts last', () => {
+    const gs = makeState({
+        winCondition: 50,
+        teams: [
+            { id: 1, name: 'Ravens', points: 48 },
+            { id: 2, name: 'Wolves', points: 10 }
+        ],
+        heartHexControl: { q0r0: 2 }
+    });
+    const projection = projectRoundsToWin(gs, boardModule);
+
+    assert.strictEqual(projection[0].teamName, 'Wolves', 'the only team with income comes first');
+    assert.strictEqual(projection[1].teamName, 'Ravens');
+    assert.strictEqual(projection[1].roundsToWin, null, 'no hearts → no projectable pace');
+});
+
+test('a team already at the target needs zero more rounds', () => {
+    const gs = makeState({
+        winCondition: 50,
+        teams: [{ id: 1, name: 'Ravens', points: 50 }],
+        heartHexControl: { q0r0: 1 }
+    });
+    assert.strictEqual(projectRoundsToWin(gs, boardModule)[0].roundsToWin, 0);
+});
+
+test('the projection ignores the contested-heart freeze (it is about steady state)', () => {
+    const gs = makeState({
+        winCondition: 50,
+        teams: [{ id: 1, name: 'Ravens', points: 40 }],
+        heartHexControl: { q0r0: 1 },
+        gameQueue: [{ isChallenge: true, challengeHexCoord: 'q0r0', status: 'pending' }]
+    });
+    assert.strictEqual(projectRoundsToWin(gs, boardModule)[0].incomePerRound, 2);
+});
+
+test('no win target or no boardModule yields an empty projection', () => {
+    assert.deepStrictEqual(projectRoundsToWin(makeState(), boardModule), []);
+    assert.deepStrictEqual(projectRoundsToWin(makeState({ winCondition: 50 }), null), []);
+});
+
 test('HEART_INCOME is the single source of the values, and getHexValue reads it', () => {
     assert.strictEqual(HEART_INCOME['mountain-heart'], 2);
     assert.strictEqual(HEART_INCOME['side-heart'], 1);

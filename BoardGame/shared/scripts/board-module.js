@@ -371,11 +371,66 @@ function calculateHeartIncome(gameState, boardModule, roundNumber) {
     return { roundPlayed, matchesPlayed, byTeam };
 }
 
+/**
+ * How many more rounds each team needs to reach gameState.winCondition on
+ * heart income alone.
+ *
+ * A FLOOR, not a forecast: match wins and hearts not yet captured are
+ * excluded because they can't be known. The contested-heart freeze is
+ * deliberately ignored too — a projection is about steady state, and a
+ * dispute resolves. Teams holding no hearts get `roundsToWin: null` and sort
+ * last; callers render them as an em dash rather than Infinity.
+ *
+ * @param {Object} gameState
+ * @param {Object} boardModule - a BoardModule instance, for getHexType()
+ * @returns {Array<{teamId, teamName, points, incomePerRound, roundsToWin}>}
+ *          sorted by soonest-to-win first
+ */
+function projectRoundsToWin(gameState, boardModule) {
+    const target = gameState?.winCondition || 0;
+    const teams = gameState?.teams || [];
+    if (!target || !boardModule) return [];
+
+    const control = Object.entries(gameState.heartHexControl || {});
+
+    return teams.map(team => {
+        let incomePerRound = 0;
+        control.forEach(([coord, ownerId]) => {
+            if (ownerId !== team.id) return;
+            const m = coord.match(/q(-?\d+)r(-?\d+)/);
+            if (!m) return;
+            incomePerRound += HEART_INCOME[
+                boardModule.getHexType(parseInt(m[1]), parseInt(m[2]))
+            ] || 0;
+        });
+
+        const points = team.points || 0;
+        const deficit = Math.max(0, target - points);
+        const roundsToWin = deficit === 0
+            ? 0
+            : (incomePerRound > 0 ? Math.ceil(deficit / incomePerRound) : null);
+
+        return {
+            teamId: team.id,
+            teamName: team.name || `Team ${team.id}`,
+            points,
+            incomePerRound,
+            roundsToWin
+        };
+    }).sort((a, b) => {
+        if (a.roundsToWin === null && b.roundsToWin === null) return 0;
+        if (a.roundsToWin === null) return 1;
+        if (b.roundsToWin === null) return -1;
+        return a.roundsToWin - b.roundsToWin;
+    });
+}
+
 // Export for use in other scripts
 if (typeof window !== 'undefined') {
     window.BoardModule = BoardModule;
     window.countScoringMatchesInRound = countScoringMatchesInRound;
     window.calculateHeartIncome = calculateHeartIncome;
+    window.projectRoundsToWin = projectRoundsToWin;
     window.HEART_INCOME = HEART_INCOME;
 }
 
@@ -383,5 +438,6 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = BoardModule;
     module.exports.countScoringMatchesInRound = countScoringMatchesInRound;
     module.exports.calculateHeartIncome = calculateHeartIncome;
+    module.exports.projectRoundsToWin = projectRoundsToWin;
     module.exports.HEART_INCOME = HEART_INCOME;
 }
