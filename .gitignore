@@ -61,6 +61,10 @@ build/
 # Firebase
 firebase-debug.log
 .firebase/
+.firebaserc
+
+# Personal lore doc (not for git)
+LORE.md
 
 # Superpowers brainstorm sessions
 .superpowers/
