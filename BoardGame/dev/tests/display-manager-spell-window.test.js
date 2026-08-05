@@ -269,9 +269,19 @@ test('the slide marks each team as done, choosing, or waiting', () => {
         ]
     });
 
-    assert.match(html, /dm-spell-turn--done/);
-    assert.match(html, /dm-spell-turn--current/);
-    assert.match(html, /dm-spell-turn--waiting/);
+    // Pin each state class to the team row it actually landed on, not just
+    // its presence somewhere in the document -- a bug that mis-maps state
+    // to team (e.g. an off-by-one in the done.includes check) would still
+    // emit all three class strings once each and slip past a bare
+    // assert.match(html, /dm-spell-turn--done/) check.
+    const rowPattern = /<div class="dm-spell-turn dm-spell-turn--(\w+)"[^>]*>\s*<span class="dm-spell-turn-name">([^<]*)</g;
+    const rows = [...html.matchAll(rowPattern)].map(m => ({ state: m[1], name: m[2] }));
+
+    assert.deepStrictEqual(rows, [
+        { state: 'done', name: 'Tiimi 1' },
+        { state: 'current', name: 'Tiimi 2' },
+        { state: 'waiting', name: 'Tiimi 3' }
+    ]);
     assert.match(html, /Fireball/);
 });
 
