@@ -1748,7 +1748,7 @@ class PhaseManager {
         const broadcastBar = document.getElementById('broadcastBar');
         const displayControlBar = document.getElementById('displayControlBar');
 
-        if (!phase || !gs.teams) {
+        if (!gs.teams) {
             bar.style.display = 'none';
             if (broadcastBar) broadcastBar.style.display = 'none';
             if (displayControlBar) displayControlBar.style.display = 'none';
