@@ -156,8 +156,12 @@
         const el = document.createElement('div');
         el.id = 'cineDimOverlay';
         el.style.cssText =
-            'position:fixed;inset:0;z-index:9998;background-color:rgba(0,0,0,0.5);' +
-            'backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);' +
+            // Was rgba(0,0,0,0.5) plus backdrop-filter:blur(12px). The blur is
+            // gone for performance: a full-viewport backdrop filter is one of
+            // the most expensive primitives on Intel integrated graphics, and
+            // the dashboard it was blurring is unreadable behind this much
+            // black anyway. Opacity raised from 0.5 to compensate visually.
+            'position:fixed;inset:0;z-index:9998;background-color:rgba(0,0,0,0.72);' +
             'transition:background-color 0.6s ease;pointer-events:none;';
         document.body.appendChild(el);
         state.dimOverlayEl = el;

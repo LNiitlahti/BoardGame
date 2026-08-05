@@ -7,10 +7,23 @@
 // that actually use them, so DOM size stays proportional to the board, not
 // 4x every hex. Water has no discrete particles (its look is a glow +
 // sweeping sheen, both pure CSS pseudo-elements, no extra nodes needed).
+// PERFORMANCE KNOB. Previous counts were lava 3, magic 4, dust 3 (= 266 nodes).
+// Every particle is an animated element that gets its own compositor layer, and
+// on the target hardware (Intel Iris Xe, 1080p) GPU draw time measures roughly
+//     14.8 ms fixed + 0.031 ms per composited layer
+// against a 16.7 ms budget per 60 Hz frame. Dropping these from 266 to 0 (with
+// the atmosphere counts in cinematic-scene.json) took layers from 809 to 441
+// and draw time from 39.6 ms to 28.3 ms, which moved the cinematic from a
+// 3-vsync lock (21 fps) to a 2-vsync lock (a steady 31 fps).
+//
+// There is ~5 ms of headroom left before the 33.3 ms 2-vsync budget, i.e. room
+// for roughly 160 layers. Raise these if you want the drifting particles back —
+// note view.html positions them with :nth-of-type rules that go up to 3
+// (embers/motes) and 4 (sparks), so counts above those stack unpositioned nodes.
 const MATERIAL_PARTICLES = {
-    lava: { className: 'ember', count: 3 },
-    magic: { className: 'spark', count: 4 },
-    dust: { className: 'mote', count: 3 },
+    lava: { className: 'ember', count: 0 },
+    magic: { className: 'spark', count: 0 },
+    dust: { className: 'mote', count: 0 },
     water: { className: null, count: 0 }
 };
 
@@ -69,11 +82,26 @@ class CineTiles {
         fx.classList.add('active', 'flash');
     }
 
-    // Effect 2 (music sync): feeds the existing (already-shipped) material
-    // glow layers via a CSS custom property they reference on top of their
-    // own idle-loop animation — additive, not a replacement.
+    // Effect 2 (music sync): used to feed the material glow layers a CSS custom
+    // property they multiplied into a filter: brightness().
+    //
+    // DISABLED FOR PERFORMANCE, and this one is worth understanding before
+    // re-enabling it. --beat-intensity is an *inherited* custom property, so
+    // writing it on #hexBoard invalidated the computed style of that element's
+    // entire subtree — ~730 nodes (91 hexes plus each one's bevel, material-fx
+    // overlay, particles, landing flash and beat pulse) — on every single
+    // frame. Measured on the target machine: 302 style recalcs of ~872 elements
+    // averaging 16.4 ms, i.e. 5.7 s of a 21.8 s recording. Commenting out this
+    // one line halved style recalc time and took the cinematic from 13.9 to
+    // 17.4 fps.
+    //
+    // The per-hex beat brightness is a good effect and worth having back, but
+    // not via an inherited custom property on a container. The music envelope is
+    // fully precomputed (data/music-cues-*.json), so the honest fix is to bake
+    // it into a per-hex keyframe/WAAPI animation started in sync with the audio,
+    // which costs zero per-frame style writes.
     applyBeatIntensity(amp) {
-        this.boardEl.style.setProperty('--beat-intensity', String(amp));
+        // Intentionally a no-op — see above. Kept so callers need no change.
     }
 
     // Effect 3 (music sync): one-shot re-triggerable glow on a single hex,

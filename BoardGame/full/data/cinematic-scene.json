@@ -3,10 +3,11 @@
     "void": {
         "minDurationMs": 12000
     },
+    "_atmosphereNote": "PERFORMANCE KNOB. Was 40/15/6. Each particle is an animated element that gets its own compositor layer; see MATERIAL_PARTICLES in cine-tiles.js for the measured cost model. ~5ms of headroom remains before the 30fps budget on Intel Iris Xe at 1080p, so these can be raised somewhat — retest if you do.",
     "atmosphere": {
-        "particleCount": 40,
-        "emberCount": 15,
-        "ghostLightCount": 6,
+        "particleCount": 0,
+        "emberCount": 0,
+        "ghostLightCount": 0,
         "fog": { "enabled": true }
     },
     "firstImpact": {

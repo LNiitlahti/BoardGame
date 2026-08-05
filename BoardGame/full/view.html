@@ -136,7 +136,12 @@
         }
         body.cine-active .rig-3d { transform-style: preserve-3d; }
         body.cine-active #hexBoard { transform-style: preserve-3d; }
-        body.cine-active .board-hex { transform-style: preserve-3d; }
+        /* Removed for performance:
+           body.cine-active .board-hex { transform-style: preserve-3d; }
+           Each of the 91 hexes became its own 3D rendering context, which the
+           compositor cannot flatten or cache. .rig-3d and #hexBoard keep theirs
+           (they carry the depth the drop cascade translateZ needs); a .board-hex
+           has no 3D-transformed children of its own. */
 
         /* ===========================================================
            MATERIAL EFFECTS — per-hex ambient loop + one-shot landing
@@ -165,7 +170,11 @@
             content: '';
             position: absolute; inset: 0;
             background: radial-gradient(circle at 45% 40%, rgba(255,120,30,0.85), transparent 60%);
-            mix-blend-mode: screen;
+            /* mix-blend-mode: screen — removed for performance. Chrome disables
+               GL_KHR_blend_equation_advanced on this Intel driver
+               (crbug.com/661715), so each blended element needs a
+               render-target readback + shader pass. Removing all of
+               them (~120 elements) cut GPU draw 50.9ms -> 39.6ms. */
         }
         .material-fx.mat-lava.active::before { animation: cineLavaPulse 2.6s ease-in-out infinite; }
         @keyframes cineLavaPulse {
@@ -216,7 +225,11 @@
             content: '';
             position: absolute; inset: 0;
             background: radial-gradient(circle at 50% 50%, rgba(190,110,255,0.8), transparent 60%);
-            mix-blend-mode: screen;
+            /* mix-blend-mode: screen — removed for performance. Chrome disables
+               GL_KHR_blend_equation_advanced on this Intel driver
+               (crbug.com/661715), so each blended element needs a
+               render-target readback + shader pass. Removing all of
+               them (~120 elements) cut GPU draw 50.9ms -> 39.6ms. */
         }
         .material-fx.mat-magic.active::before { animation: cineMagicPulse 2.2s ease-in-out infinite; }
         @keyframes cineMagicPulse {
@@ -280,7 +293,11 @@
             position: absolute; inset: 0;
             background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.55), transparent 70%);
             opacity: 0;
-            mix-blend-mode: screen;
+            /* mix-blend-mode: screen — removed for performance. Chrome disables
+               GL_KHR_blend_equation_advanced on this Intel driver
+               (crbug.com/661715), so each blended element needs a
+               render-target readback + shader pass. Removing all of
+               them (~120 elements) cut GPU draw 50.9ms -> 39.6ms. */
         }
         .material-fx .beat-pulse.flash { animation: cineBeatPulse 250ms ease-out; }
         @keyframes cineBeatPulse {
@@ -308,7 +325,11 @@
             position: absolute; inset: 0;
             pointer-events: none;
             opacity: 0;
-            mix-blend-mode: screen;
+            /* mix-blend-mode: screen — removed for performance. Chrome disables
+               GL_KHR_blend_equation_advanced on this Intel driver
+               (crbug.com/661715), so each blended element needs a
+               render-target readback + shader pass. Removing all of
+               them (~120 elements) cut GPU draw 50.9ms -> 39.6ms. */
             background: radial-gradient(circle at 50% 50%, rgba(247,186,50,0.9), rgba(247,186,50,0.1) 70%);
         }
         #cineWash.flash { animation: cineWashFlash 250ms ease-out; }
@@ -359,7 +380,7 @@
         }
         .atmo-fog {
             position: absolute; left: -20%; right: -20%; bottom: 0; height: 35%;
-            filter: blur(8px);
+            /* filter: blur(8px); — removed for performance, see the blend-mode note above. */
             opacity: calc(0.6 + (var(--atmo-intensity, 0) + var(--atmo-fog-intensity, 0)) * 0.2);
         }
         .atmo-fog.layer-1 {
@@ -394,7 +415,7 @@
         .atmo-ghost {
             position: absolute; width: 18px; height: 18px; border-radius: 50%;
             background: radial-gradient(circle, rgba(180,220,255,0.55), transparent 70%);
-            filter: blur(2px);
+            /* filter: blur(2px); — removed for performance, see the blend-mode note above. */
             left: var(--x); top: var(--y);
             animation-duration: var(--duration); animation-delay: var(--delay);
             animation-timing-function: ease-in-out; animation-iteration-count: infinite;
@@ -438,7 +459,11 @@
         #cineGlow {
             position: absolute; inset: 0;
             pointer-events: none;
-            mix-blend-mode: screen;
+            /* mix-blend-mode: screen — removed for performance. Chrome disables
+               GL_KHR_blend_equation_advanced on this Intel driver
+               (crbug.com/661715), so each blended element needs a
+               render-target readback + shader pass. Removing all of
+               them (~120 elements) cut GPU draw 50.9ms -> 39.6ms. */
             background: radial-gradient(circle at 50% 45%, rgba(150,110,255,0.9), transparent 65%);
             opacity: calc(var(--atmo-synth-intensity, 0) * 0.7);
         }
