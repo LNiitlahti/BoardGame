@@ -118,15 +118,49 @@
         </div>
 
         <div class="auth-form-group">
-          <label for="registerPassword" class="auth-form-label">Password</label>
+          <label for="registerEmailConfirm" class="auth-form-label">Confirm Email</label>
           <input
-            type="password"
-            id="registerPassword"
+            type="email"
+            id="registerEmailConfirm"
             class="auth-form-input"
-            placeholder="Choose a strong password"
+            placeholder="Re-enter your email"
             required
-            autocomplete="new-password"
+            autocomplete="email"
           >
+        </div>
+
+        <div class="auth-form-group">
+          <label for="registerPassword" class="auth-form-label">Password</label>
+          <div class="auth-input-wrap">
+            <input
+              type="password"
+              id="registerPassword"
+              class="auth-form-input"
+              placeholder="Choose a strong password"
+              required
+              autocomplete="new-password"
+            >
+            <button type="button" class="auth-input-toggle" aria-label="Show password" onclick="togglePasswordVisibility('registerPassword', this)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="auth-form-group">
+          <label for="registerPasswordConfirm" class="auth-form-label">Confirm Password</label>
+          <div class="auth-input-wrap">
+            <input
+              type="password"
+              id="registerPasswordConfirm"
+              class="auth-form-input"
+              placeholder="Re-enter your password"
+              required
+              autocomplete="new-password"
+            >
+            <button type="button" class="auth-input-toggle" aria-label="Show password" onclick="togglePasswordVisibility('registerPasswordConfirm', this)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
         </div>
 
         <div class="auth-form-group">
@@ -191,6 +225,18 @@
     // user-doc/referral-code writes that follow it have finished — see
     // handleRegister's explicit redirect for the registration path).
     let isRegistering = false;
+
+    // Referral links (BoardGame/home.html's "copy referral URL") append
+    // ?referralCode=CODE — prefill it and jump straight to the register tab
+    // so a new player doesn't have to retype the code by hand.
+    (function prefillReferralCode() {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('referralCode');
+      if (code) {
+        document.getElementById('referralCode').value = code;
+        showRegister();
+      }
+    })();
 
     showStatus('Connecting…', 'info');
 
@@ -285,21 +331,43 @@
         });
     }
 
+    function togglePasswordVisibility(inputId, btn) {
+      const input = document.getElementById(inputId);
+      const revealing = input.type === 'password';
+      input.type = revealing ? 'text' : 'password';
+      btn.setAttribute('aria-label', revealing ? 'Hide password' : 'Show password');
+      btn.innerHTML = revealing
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 11 7 11 7a13.16 13.16 0 0 1-1.67 2.68M6.61 6.61A13.53 13.53 0 0 0 1 12s4 7 11 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="M2 2l20 20"/></svg>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>';
+    }
+
     function handleRegister() {
       const firstName = document.getElementById('firstName').value.trim();
       const lastName = document.getElementById('lastName').value.trim();
       const email = document.getElementById('registerEmail').value.trim();
+      const emailConfirm = document.getElementById('registerEmailConfirm').value.trim();
       const password = document.getElementById('registerPassword').value;
+      const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
       const code = document.getElementById('referralCode').value.trim();
       const btn = document.getElementById('registerBtn');
 
-      if (!firstName || !lastName || !email || !password || !code) {
+      if (!firstName || !lastName || !email || !emailConfirm || !password || !passwordConfirm || !code) {
         showStatus('Please fill in all fields', 'error');
+        return;
+      }
+
+      if (email.toLowerCase() !== emailConfirm.toLowerCase()) {
+        showStatus('Email addresses do not match', 'error');
         return;
       }
 
       if (password.length < 6) {
         showStatus('Password must be at least 6 characters', 'error');
+        return;
+      }
+
+      if (password !== passwordConfirm) {
+        showStatus('Passwords do not match', 'error');
         return;
       }
 

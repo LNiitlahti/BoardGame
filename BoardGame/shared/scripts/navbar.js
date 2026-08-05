@@ -177,7 +177,12 @@
                     </div>
                 </div>
               `
-            : `<span class="navbar-tournament-name ${hasTournament ? '' : 'empty'}" id="navTournamentLabel" title="${escapeHtml(labelTitle)}">${escapeHtml(labelText)}</span>`;
+            : (hasTournament
+                ? `<span class="navbar-tournament-name has-clear" id="navTournamentLabel" title="${escapeHtml(labelTitle)}">
+                        <span class="navbar-tournament-name-text">${escapeHtml(labelText)}</span>
+                        <button type="button" class="navbar-tournament-clear" id="navTournamentClear" title="Clear active tournament" aria-label="Clear active tournament">&times;</button>
+                   </span>`
+                : `<span class="navbar-tournament-name empty" id="navTournamentLabel" title="${escapeHtml(labelTitle)}">${escapeHtml(labelText)}</span>`);
 
         return `
             <nav class="unified-navbar" id="unifiedNavbar">
@@ -352,6 +357,29 @@
     }
 
     /**
+     * Clear the active-tournament context for roles that can't use the full
+     * switcher (see wireTournamentSwitcher) — the only way out for a
+     * non-admin account whose currentTournamentId got set to a tournament
+     * they aren't actually assigned to (e.g. via home.html's "Enter" on a
+     * Recent Tournaments card).
+     */
+    function wireTournamentClear() {
+        const btn = document.getElementById('navTournamentClear');
+        if (!btn) return;
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            sessionStorage.removeItem('currentTournamentId');
+            localStorage.removeItem('currentTournamentId');
+            sessionStorage.removeItem('currentTournamentName');
+            localStorage.removeItem('currentTournamentName');
+            sessionStorage.removeItem('currentTeamId');
+            localStorage.removeItem('currentTeamId');
+            window.location.href = getFullBasePath() + '/home.html';
+        });
+    }
+
+    /**
      * Insert navbar HTML into the page
      */
     function insertNavbar(html) {
@@ -364,6 +392,7 @@
         container.innerHTML = html;
         document.body.style.paddingTop = '60px';
         wireTournamentSwitcher();
+        wireTournamentClear();
         wireStatusButton();
     }
 
@@ -456,11 +485,13 @@
             const userData = userDoc.exists ? userDoc.data() : {};
             currentUserData = userData;
 
-            // Determine user role
+            // Determine user role — mirrors profile.html's derivation
+            // (isPlayer===true), not presence of assignedTeamId, which is
+            // always set (to null) at registration and so was always truthy.
             const userRole = userData.isGod ? 'god' :
                             userData.isSuperAdmin ? 'god' :
                             userData.isAdmin ? 'admin' :
-                            userData.assignedTeamId !== undefined ? 'player' : 'user';
+                            userData.isPlayer === true ? 'player' : 'user';
 
             const userName = userData.displayName || userData.firstName || user.email?.split('@')[0] || 'User';
 

@@ -209,6 +209,51 @@
   box-shadow: 0 0 0 3px rgba(200, 179, 126, 0.1);
 }
 
+/* ==================== PASSWORD VISIBILITY TOGGLE ==================== */
+
+.auth-input-wrap {
+  position: relative;
+  display: flex;
+}
+
+.auth-input-wrap .auth-form-input {
+  padding-right: 2.75rem;
+}
+
+.auth-input-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.875rem;
+  height: 1.875rem;
+  padding: 0;
+  background: none;
+  border: none;
+  color: #9aa1ad;
+  cursor: pointer;
+  border-radius: 0.5rem;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.auth-input-toggle:hover {
+  color: #c8b37e;
+  background: rgba(200, 179, 126, 0.1);
+}
+
+.auth-input-toggle:focus-visible {
+  outline: 2px solid #c8b37e;
+  outline-offset: 2px;
+}
+
+.auth-input-toggle svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
 /* ==================== BUTTONS ==================== */
 
 .auth-btn {

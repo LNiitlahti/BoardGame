@@ -368,6 +368,10 @@
       overflow-y: auto;
       box-shadow: 0 25px 60px rgba(0,0,0,0.6);
     }
+    .custom-modal::-webkit-scrollbar { width: 8px; height: 8px; }
+    .custom-modal::-webkit-scrollbar-track { background: var(--bg-primary); }
+    .custom-modal::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 4px; }
+    .custom-modal::-webkit-scrollbar-thumb:hover { background: var(--gold); }
     .custom-modal h2 {
       font-family: 'Russo One', sans-serif;
       color: #c8b37e;
@@ -1467,15 +1471,22 @@
     // ── Enter / clear active tournament ──
 
     window.enterTournament = function(tournamentId, tournamentName, teamId) {
-      currentActiveTournament = tournamentId;
-      sessionStorage.setItem('currentTournamentId', tournamentId);
-      localStorage.setItem('currentTournamentId', tournamentId);
-      sessionStorage.setItem('currentTournamentName', tournamentName);
-      localStorage.setItem('currentTournamentName', tournamentName);
+      // A plain user with no team in this tournament is just spectating via
+      // view.html — don't hijack their session-wide "active tournament"
+      // context, since the navbar gives non-admin roles no way to switch or
+      // clear it afterward (see TODO_HISTORY.md).
+      const isPrivileged = userRole === 'god' || userRole === 'admin';
+      if (teamId || isPrivileged) {
+        currentActiveTournament = tournamentId;
+        sessionStorage.setItem('currentTournamentId', tournamentId);
+        localStorage.setItem('currentTournamentId', tournamentId);
+        sessionStorage.setItem('currentTournamentName', tournamentName);
+        localStorage.setItem('currentTournamentName', tournamentName);
 
-      if (teamId) {
-        sessionStorage.setItem('currentTeamId', teamId);
-        localStorage.setItem('currentTeamId', teamId);
+        if (teamId) {
+          sessionStorage.setItem('currentTeamId', teamId);
+          localStorage.setItem('currentTeamId', teamId);
+        }
       }
 
       if (userRole === 'god') {
