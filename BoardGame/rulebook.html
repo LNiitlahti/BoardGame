@@ -6,13 +6,25 @@
     ============================================================================
 
     PURPOSE:
-    Comprehensive rulebook documenting all game rules, mechanics, and strategies.
-    Serves as the single source of truth for players, admins, and developers.
+    Player-facing rulebook. This is typically the first page a new player opens
+    after logging in, so it is written for someone who has never played.
+
+    SOURCE OF TRUTH:
+    Every rule here was verified against the code, not against older design
+    docs. When you change any of the following, update this file in the same
+    commit:
+
+      - shared/scripts/board-module.js   board layout, hex types, placement
+      - full/scripts/phase-manager.js    round/phase order, slot sub-phases
+      - full/scripts/admin.js            confirmResult(), awardRoundPoints()
+      - full/scripts/spell-engine.js     piles, hands, spell turn order
+      - shared/scripts/games-config.js   active games and formats
+      - data/spells.json                 the 15 spell definitions
+      - docs/architecture/scoring.md     the scoring contract
 
     AUDIENCE:
-    - Players learning the game
-    - Admins managing tournaments
-    - Developers understanding game logic
+    Players. Admin/TD-only tooling is deliberately out of scope — see
+    KAMPANJAOPAS.md for the organiser's manual.
 
     ============================================================================
 -->
@@ -29,117 +41,98 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- Shared suite chrome: unified navbar + void/gold theme variables -->
+    <link rel="stylesheet" href="shared/css/navbar.css">
+    <link rel="stylesheet" href="shared/css/void-gold-theme.css">
+
+    <!-- rulebook.html sits at the project root, so /full/ is one level down -->
+    <script>window.BOARDGAME_BASE = '.';</script>
+    <script defer src="shared/scripts/firebase-loader.js"></script>
+    <script defer src="shared/scripts/navbar.js"></script>
 
     <style>
-        * {
+        /*
+         * Visual language is the suite's "void / gold" theme, same as
+         * home.html, admin.html and team.html: Russo One headings on a dark
+         * void gradient, gold accent, translucent card surfaces.
+         * Colour/radius/shadow tokens come from shared/css/void-gold-theme.css
+         * — only page-specific values are declared here.
+         */
+
+        *, *::before, *::after {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
         :root {
-            --bg-primary: #0a0a0f;
-            --bg-secondary: #12121a;
-            --bg-tertiary: #1a1a25;
-            --bg-card: #1e1e2a;
-            --text-primary: #ffffff;
-            --text-secondary: #b0b0c0;
-            --text-tertiary: #707080;
-            --accent-primary: #00d4ff;
-            --accent-success: #10b981;
-            --accent-warning: #f59e0b;
-            --accent-danger: #ef4444;
-            --accent-purple: #a855f7;
-            --border-color: #2a2a3a;
-            --radius-sm: 6px;
-            --radius-md: 10px;
-            --radius-lg: 16px;
+            /* Page-local surfaces, matching home.html's .dashboard-card */
+            --surface-card: linear-gradient(180deg, rgba(30,32,42,0.7), rgba(14,16,22,0.85));
+            --surface-panel: linear-gradient(180deg, rgba(30,32,42,0.6), rgba(14,16,22,0.75));
+            --surface-inset: rgba(10,12,18,0.6);
+            --hairline: rgba(255,255,255,0.06);
 
-            /* Hex colors */
+            --text-body: #d6d9df;
+            --text-dim: #9aa1ad;
+
+            /* Hex marker colours — these mirror board-renderer.js so the
+               legend here matches what players see on the actual board. */
             --hex-mountain: #ff1744;
             --hex-side-heart: #ff6b9d;
             --hex-room: #ffa726;
-            --hex-start: #9e9e9e;
+            --hex-start: #aaaaaa;
             --hex-normal: #424242;
+
+            --navbar-height: 60px;
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
+            font-family: 'Quantico', sans-serif;
+            background:
+                radial-gradient(ellipse at top center, rgba(255,255,255,0.04), rgba(0,0,0,0.9) 65%),
+                linear-gradient(to bottom, rgba(10,12,18,0.95), rgba(5,6,10,0.98));
+            background-attachment: fixed;
+            color: var(--text-body);
             line-height: 1.7;
             min-height: 100vh;
+            /* navbar.js also sets this inline once it injects the navbar;
+               declaring it here keeps the layout correct before that runs
+               (and if the navbar never renders, e.g. signed out). */
+            padding-top: var(--navbar-height);
         }
 
-        /* Navigation */
-        .nav {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 60px;
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 24px;
-            z-index: 1000;
-        }
-
-        .nav-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 1.4rem;
-            font-weight: 700;
-            color: var(--accent-primary);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 8px;
-        }
-
-        .nav-links a {
-            padding: 8px 16px;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-sm);
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 0.85rem;
-            transition: all 0.2s;
-        }
-
-        .nav-links a:hover {
-            background: var(--bg-card);
-            color: var(--text-primary);
-            border-color: var(--accent-primary);
-        }
-
-        /* Table of Contents - Sidebar */
+        /* ── Table of Contents sidebar ── */
         .toc-sidebar {
             position: fixed;
-            top: 60px;
+            top: var(--navbar-height);
             left: 0;
             width: 280px;
-            height: calc(100vh - 60px);
-            background: var(--bg-secondary);
+            height: calc(100vh - var(--navbar-height));
+            background: linear-gradient(180deg, rgba(14,16,22,0.92), rgba(5,7,16,0.96));
             border-right: 1px solid var(--border-color);
             overflow-y: auto;
-            padding: 20px 0;
+            padding: 20px 0 40px;
             z-index: 100;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(200,179,126,0.25) transparent;
         }
 
+        .toc-sidebar::-webkit-scrollbar { width: 8px; }
+        .toc-sidebar::-webkit-scrollbar-thumb {
+            background: rgba(200,179,126,0.2);
+            border-radius: 4px;
+        }
+        .toc-sidebar::-webkit-scrollbar-thumb:hover { background: rgba(200,179,126,0.35); }
+
         .toc-title {
-            font-family: 'Orbitron', sans-serif;
+            font-family: 'Russo One', sans-serif;
             font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--text-tertiary);
+            color: var(--gold);
             text-transform: uppercase;
-            letter-spacing: 1.5px;
+            letter-spacing: 0.12em;
             padding: 0 20px 12px;
             border-bottom: 1px solid var(--border-color);
             margin-bottom: 12px;
@@ -147,426 +140,874 @@
 
         .toc-list {
             list-style: none;
+            margin: 0;
+            padding: 0;
         }
+
+        .toc-list li { margin: 0; }
 
         .toc-list a {
             display: block;
-            padding: 10px 20px;
-            color: var(--text-secondary);
+            padding: 9px 20px;
+            color: var(--text-dim);
             text-decoration: none;
-            font-size: 0.9rem;
-            transition: all 0.2s;
+            font-size: 0.88rem;
+            transition: all 0.2s ease;
             border-left: 3px solid transparent;
         }
 
-        .toc-list a:hover,
+        .toc-list a:hover {
+            background: rgba(200,179,126,0.06);
+            color: var(--gold-bright);
+        }
+
         .toc-list a.active {
-            background: var(--bg-tertiary);
-            color: var(--accent-primary);
-            border-left-color: var(--accent-primary);
+            background: rgba(200,179,126,0.1);
+            color: var(--gold-bright);
+            border-left-color: var(--gold);
         }
 
         .toc-list .toc-section {
-            font-weight: 600;
-            color: var(--text-primary);
+            font-family: 'Russo One', sans-serif;
+            font-size: 0.82rem;
+            letter-spacing: 0.03em;
+            color: var(--text-body);
+            margin-top: 8px;
         }
 
         .toc-list .toc-subsection {
             padding-left: 36px;
-            font-size: 0.85rem;
+            font-size: 0.82rem;
         }
 
-        /* Main Content */
+        /* ── Main column ── */
         .main-content {
             margin-left: 280px;
-            padding: 80px 40px 60px;
-            max-width: 1000px;
+            padding: 28px 40px 60px;
+            max-width: 1040px;
         }
 
-        /* Sections */
+        /* ── Page header, mirroring home.html's .header ── */
+        .page-header {
+            background: linear-gradient(180deg, rgba(30,32,42,0.85), rgba(14,16,22,0.9));
+            border: 1px solid rgba(200,179,126,0.15);
+            border-radius: 12px;
+            padding: 22px 26px;
+            margin-bottom: 32px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .page-header h1 {
+            font-family: 'Russo One', sans-serif;
+            font-size: 1.7rem;
+            color: var(--gold-bright);
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            text-shadow: 0 0 24px rgba(200,179,126,0.25);
+        }
+
+        .page-header .page-header-sub {
+            font-family: 'Russo One', sans-serif;
+            font-size: 0.78rem;
+            color: var(--gold);
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            margin: 4px 0 0;
+            opacity: 0.75;
+        }
+
+        .page-header p {
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            margin: 10px 0 0;
+        }
+
+        /* ── Sections ── */
         .section {
-            margin-bottom: 60px;
-            scroll-margin-top: 80px;
+            margin-bottom: 56px;
+            scroll-margin-top: calc(var(--navbar-height) + 20px);
         }
 
         .section-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--accent-primary);
+            font-family: 'Russo One', sans-serif;
+            font-size: 1.5rem;
+            color: var(--gold);
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
             margin-bottom: 24px;
             padding-bottom: 12px;
-            border-bottom: 2px solid var(--accent-primary);
+            border-bottom: 1px solid rgba(200,179,126,0.25);
         }
 
         .subsection {
-            margin-bottom: 40px;
+            margin-bottom: 36px;
+            scroll-margin-top: calc(var(--navbar-height) + 20px);
         }
 
         .subsection-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 1.3rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 16px;
+            font-family: 'Russo One', sans-serif;
+            font-size: 1.05rem;
+            color: var(--gold-bright);
+            letter-spacing: 0.04em;
+            margin-bottom: 14px;
         }
 
         h4 {
-            font-size: 1.1rem;
-            color: var(--accent-primary);
-            margin: 20px 0 12px;
+            font-family: 'Russo One', sans-serif;
+            font-size: 0.92rem;
+            font-weight: 400;
+            color: var(--gold);
+            letter-spacing: 0.04em;
+            margin: 24px 0 12px;
         }
 
         p {
             margin-bottom: 16px;
-            color: var(--text-secondary);
+            color: var(--text-body);
         }
 
-        /* Highlight boxes */
-        .highlight-box {
-            background: var(--bg-card);
+        strong { color: var(--text-bright); }
+
+        a { color: var(--gold); }
+        a:hover { color: var(--gold-bright); }
+
+        code {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.88em;
+            background: var(--surface-inset);
             border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            padding: 20px;
+            border-radius: var(--radius-sm);
+            padding: 1px 6px;
+            color: var(--gold-bright);
+        }
+
+        /* ── Highlight boxes ── */
+        .highlight-box {
+            background: var(--surface-card);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--hairline);
+            border-left: 3px solid var(--border-color-hover);
+            border-radius: 12px;
+            padding: 18px 22px;
             margin: 20px 0;
         }
 
-        .highlight-box.victory {
-            border-color: var(--accent-success);
-            background: rgba(16, 185, 129, 0.1);
-        }
-
-        .highlight-box.warning {
-            border-color: var(--accent-warning);
-            background: rgba(245, 158, 11, 0.1);
-        }
-
-        .highlight-box.danger {
-            border-color: var(--accent-danger);
-            background: rgba(239, 68, 68, 0.1);
-        }
-
-        .highlight-box.info {
-            border-color: var(--accent-primary);
-            background: rgba(0, 212, 255, 0.1);
-        }
+        .highlight-box.victory { border-left-color: var(--accent-success); }
+        .highlight-box.warning { border-left-color: var(--accent-warning); }
+        .highlight-box.danger  { border-left-color: var(--accent-danger); }
+        .highlight-box.info    { border-left-color: var(--gold); }
 
         .highlight-box-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 0.85rem;
-            font-weight: 600;
+            font-family: 'Russo One', sans-serif;
+            font-size: 0.78rem;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.1em;
             margin-bottom: 10px;
+            color: var(--gold);
         }
 
         .highlight-box.victory .highlight-box-title { color: var(--accent-success); }
         .highlight-box.warning .highlight-box-title { color: var(--accent-warning); }
-        .highlight-box.danger .highlight-box-title { color: var(--accent-danger); }
-        .highlight-box.info .highlight-box-title { color: var(--accent-primary); }
+        .highlight-box.danger  .highlight-box-title { color: var(--accent-danger); }
 
-        /* Lists */
+        .highlight-box p:last-child,
+        .highlight-box ul:last-child,
+        .highlight-box ol:last-child { margin-bottom: 0; }
+
+        /* ── Lists ── */
         ul, ol {
             margin: 16px 0;
-            padding-left: 24px;
-            color: var(--text-secondary);
+            padding-left: 22px;
+            color: var(--text-body);
         }
 
-        li {
-            margin-bottom: 8px;
+        li { margin-bottom: 8px; }
+        li::marker { color: var(--gold); }
+
+        /* ── Tables ── */
+        .table-scroll {
+            overflow-x: auto;
+            margin: 20px 0;
+            border-radius: 12px;
+            border: 1px solid var(--hairline);
         }
 
-        /* Tables */
         table {
             width: 100%;
             border-collapse: collapse;
             margin: 20px 0;
-            background: var(--bg-card);
-            border-radius: var(--radius-md);
+            background: var(--surface-panel);
+            border-radius: 12px;
             overflow: hidden;
         }
 
+        .table-scroll table { margin: 0; min-width: 520px; border-radius: 0; }
+
         th, td {
-            padding: 14px 16px;
+            padding: 13px 16px;
             text-align: left;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--hairline);
+            vertical-align: top;
         }
 
         th {
-            background: var(--bg-tertiary);
-            font-family: 'Orbitron', sans-serif;
-            font-size: 0.8rem;
-            font-weight: 600;
+            background: rgba(200,179,126,0.07);
+            font-family: 'Russo One', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 400;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--accent-primary);
+            letter-spacing: 0.1em;
+            color: var(--gold);
+            white-space: nowrap;
         }
 
         td {
-            color: var(--text-secondary);
-            font-size: 0.95rem;
+            color: var(--text-body);
+            font-size: 0.92rem;
         }
 
-        tr:last-child td {
-            border-bottom: none;
+        tr:last-child td { border-bottom: none; }
+        tbody tr { transition: background 0.15s ease; }
+        tbody tr:hover td { background: rgba(200,179,126,0.05); }
+
+        /* Rows carrying a board hex are ~66px tall; top-aligning the other
+           cells against that leaves them floating. Centre them instead. */
+        .hex-table td { vertical-align: middle; }
+        .hex-table td { padding-top: 8px; padding-bottom: 8px; }
+
+        /* ── Default vs optional game rows ── */
+        .game-default td { color: var(--text-bright); }
+        .game-default td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
+
+        .tag-default, .tag-optional {
+            font-family: 'Quantico', sans-serif;
+            font-size: 0.62rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 3px 9px;
+            border-radius: 20px;
+            white-space: nowrap;
         }
 
-        tr:hover td {
-            background: var(--bg-tertiary);
+        .tag-default {
+            background: linear-gradient(135deg, #e8d8a8, #c8b37e);
+            color: #050710;
         }
 
-        /* Hex type indicators */
+        .tag-optional {
+            background: rgba(255,255,255,0.05);
+            color: var(--text-dim);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /*
+         * ── Real board hexes ───────────────────────────────────────────
+         * These are the actual tiles from the board, not swatches: the same
+         * sliced artwork (shared/images/hexes/coords/), the same clip-path,
+         * bevel and heart overlays that board-renderer.js draws.
+         *
+         * Geometry is copied from board-renderer.js: a 66x58 flat-top hex
+         * whose board container is rotated 30deg, with heart images
+         * counter-rotated -30deg so they sit upright. The tile art is
+         * pre-rotated in the PNGs, so it must rotate WITH the hex — do not
+         * "fix" that or every tile ends up 30deg off from the live board.
+         */
         .hex-indicator {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
+            gap: 12px;
+            /* Block-level inside a table cell: an inline-flex box would sit on
+               the cell's text baseline and push the label ~8px below the
+               neighbouring cells' centred text. */
+            vertical-align: middle;
         }
 
-        .hex-dot {
-            width: 16px;
-            height: 16px;
-            border-radius: 4px;
+        .hex-table td .hex-indicator { display: flex; }
+
+        .rb-hex-wrap {
+            position: relative;
+            display: inline-flex;
+            width: 60px;
+            height: 66px;
+            flex-shrink: 0;
+            align-items: center;
+            justify-content: center;
         }
 
-        .hex-dot.mountain { background: var(--hex-mountain); }
-        .hex-dot.side-heart { background: var(--hex-side-heart); }
-        .hex-dot.room { background: var(--hex-room); }
-        .hex-dot.start { background: var(--hex-start); }
-        .hex-dot.normal { background: var(--hex-normal); }
+        .rb-hex {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 66px;
+            height: 58px;
+            background: #222;
+            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+            transform: translate(-50%, -50%) rotate(30deg);
+        }
 
+        /* Tile artwork, inset by the 2px hex border like .board-hex::before */
+        .rb-hex-art {
+            position: absolute;
+            top: 2px; left: 2px; right: 2px; bottom: 2px;
+            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+            background-color: #ddd;
+            background-size: cover;
+            background-position: center;
+        }
 
-        /* Formula box */
+        /* Same emboss as .hex-bevel: light top-left, dark bottom-right */
+        .rb-hex-bevel {
+            position: absolute;
+            top: 2px; left: 2px; right: 2px; bottom: 2px;
+            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+            pointer-events: none;
+            background: linear-gradient(
+                135deg,
+                rgba(255,255,255,0.7) 0%,
+                rgba(255,255,255,0.25) 20%,
+                transparent 40%,
+                transparent 60%,
+                rgba(0,0,0,0.25) 80%,
+                rgba(0,0,0,0.7) 100%
+            );
+        }
+
+        /* Heart overlays — counter-rotated so they read upright, exactly as
+           .heart-overlay-image does on the live board. */
+        .rb-hex-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-30deg);
+            pointer-events: none;
+        }
+
+        .rb-hex-icon.mountain { width: 72px; height: 72px; }
+        .rb-hex-icon.side     { width: 60px; height: 60px; }
+
+        /* Starting-location star, matching the ⭐ the renderer labels it with */
+        .rb-hex-star {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-30deg);
+            font-size: 26px;
+            line-height: 1;
+            pointer-events: none;
+            filter: drop-shadow(0 0 3px rgba(0,0,0,0.9));
+        }
+
+        /* Room hexes: the dashed black/white "marching ants" outline from
+           .room-border in admin.css, same 66x58 viewBox polygon. */
+        .rb-hex-room {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background-image:
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpolygon points='16.5,0 49.5,0 66,29 49.5,58 16.5,58 0,29' fill='none' stroke='black' stroke-width='3' stroke-dasharray='6 6' stroke-dashoffset='0'/%3E%3C/svg%3E"),
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 66 58'%3E%3Cpolygon points='16.5,0 49.5,0 66,29 49.5,58 16.5,58 0,29' fill='none' stroke='white' stroke-width='3' stroke-dasharray='6 6' stroke-dashoffset='6'/%3E%3C/svg%3E");
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+        }
+
+        /* Team-owned tile tint, mirroring .board-hex.occupied::after */
+        .rb-hex-owner {
+            position: absolute;
+            top: 2px; left: 2px; right: 2px; bottom: 2px;
+            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+            pointer-events: none;
+        }
+
+        /* Inline hex used mid-sentence, scaled down to sit on the text line */
+        .rb-hex-wrap.inline {
+            width: 30px;
+            height: 33px;
+            vertical-align: -10px;
+            margin: 0 2px;
+        }
+        .rb-hex-wrap.inline .rb-hex { transform: translate(-50%, -50%) rotate(30deg) scale(0.5); }
+
+        @media (max-width: 1024px) {
+            .rb-hex-wrap { width: 46px; height: 50px; }
+            .rb-hex-wrap:not(.inline) .rb-hex {
+                transform: translate(-50%, -50%) rotate(30deg) scale(0.76);
+            }
+            .hex-indicator { gap: 8px; }
+        }
+
+        /* ── Team colour swatch ── */
+        .colour-swatch {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            border: 1px solid rgba(255,255,255,0.15);
+            vertical-align: -2px;
+            margin-right: 8px;
+        }
+
+        /* ── Formula callout ── */
         .formula-box {
-            background: var(--bg-tertiary);
-            border: 2px solid var(--accent-primary);
-            border-radius: var(--radius-md);
-            padding: 24px;
+            background: var(--surface-card);
+            border: 1px solid rgba(200,179,126,0.3);
+            border-radius: 12px;
+            padding: 26px 24px;
             margin: 24px 0;
             text-align: center;
+            box-shadow: 0 0 24px rgba(200,179,126,0.06);
         }
 
         .formula {
-            font-family: 'Orbitron', monospace;
-            font-size: 2rem;
-            color: var(--accent-primary);
-            font-weight: 700;
+            font-family: 'Russo One', sans-serif;
+            font-size: 1.3rem;
+            color: var(--gold-bright);
+            letter-spacing: 0.04em;
+            line-height: 1.5;
         }
 
         .formula-label {
-            font-size: 0.9rem;
-            color: var(--text-tertiary);
-            margin-top: 8px;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-top: 10px;
         }
 
-        /* Spell cards */
+        /* ── Round/phase flow ── */
+        .phase-flow {
+            background: var(--surface-panel);
+            border: 1px solid var(--hairline);
+            border-radius: 12px;
+            padding: 22px 26px;
+            margin: 24px 0;
+        }
+
+        .phase-flow ol {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            counter-reset: phase;
+        }
+
+        .phase-flow li {
+            position: relative;
+            padding: 10px 0 10px 42px;
+            border-left: 1px solid var(--border-color);
+            margin: 0 0 0 12px;
+            counter-increment: phase;
+        }
+
+        .phase-flow li::before {
+            content: counter(phase);
+            position: absolute;
+            left: -13px;
+            top: 12px;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #0b0d16;
+            border: 1px solid rgba(200,179,126,0.35);
+            color: var(--gold);
+            font-family: 'Russo One', sans-serif;
+            font-size: 0.68rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .phase-flow li:last-child { border-left-color: transparent; }
+
+        .phase-name {
+            font-family: 'Russo One', sans-serif;
+            font-size: 0.82rem;
+            letter-spacing: 0.04em;
+            color: var(--gold-bright);
+            display: block;
+            text-transform: uppercase;
+        }
+
+        .phase-desc {
+            font-size: 0.9rem;
+            color: var(--text-dim);
+        }
+
+        .phase-flow li.spell .phase-name { color: #b89bd8; }
+        .phase-flow li.spell::before { border-color: rgba(184,155,216,0.4); color: #b89bd8; }
+        .phase-flow li.loop .phase-name { color: var(--accent-warning); }
+        .phase-flow li.loop::before { border-color: rgba(247,186,50,0.4); color: var(--accent-warning); }
+
+        /* ── Collapsible spell deck ── */
+        .spell-toggle {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            margin: 20px 0 0;
+            padding: 14px 18px;
+            background: var(--surface-card);
+            border: 1px solid rgba(200,179,126,0.25);
+            border-radius: 12px;
+            color: var(--gold-bright);
+            font-family: 'Russo One', sans-serif;
+            font-size: 0.85rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .spell-toggle:hover {
+            border-color: rgba(200,179,126,0.5);
+            box-shadow: 0 0 16px rgba(200,179,126,0.15);
+            transform: translateY(-1px);
+        }
+
+        .spell-toggle:focus-visible {
+            outline: 2px solid var(--gold);
+            outline-offset: 2px;
+        }
+
+        .spell-toggle-chevron {
+            color: var(--gold);
+            font-size: 0.7rem;
+            transition: transform 0.2s ease;
+        }
+
+        .spell-toggle[aria-expanded="true"] .spell-toggle-chevron {
+            transform: rotate(90deg);
+        }
+
+        .spell-toggle-label { flex: 1; }
+
+        .spell-toggle-hint {
+            font-family: 'Quantico', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: var(--text-dim);
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.04);
+            border-radius: 20px;
+            padding: 3px 10px;
+        }
+
+        .spell-deck[hidden] { display: none; }
+
+        .spell-deck {
+            margin-top: 8px;
+            animation: spellDeckIn 0.25s ease;
+        }
+
+        @keyframes spellDeckIn {
+            from { opacity: 0; transform: translateY(-6px); }
+            to   { opacity: 1; transform: none; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .spell-deck { animation: none; }
+            .spell-toggle,
+            .spell-toggle-chevron,
+            .spell-card { transition: none; }
+        }
+
+        /* ── Spell cards ── */
         .spell-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            padding: 20px;
+            background: var(--surface-card);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--hairline);
+            border-radius: 12px;
+            padding: 20px 22px;
             margin: 16px 0;
+            transition: all 0.25s ease;
+        }
+
+        .spell-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            border-color: rgba(200,179,126,0.2);
         }
 
         .spell-header {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: space-between;
-            margin-bottom: 12px;
+            gap: 12px;
+            flex-wrap: wrap;
         }
 
         .spell-name {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--text-primary);
+            font-family: 'Russo One', sans-serif;
+            font-size: 0.98rem;
+            color: var(--gold-bright);
+            letter-spacing: 0.03em;
         }
+
+        .spell-name-fi {
+            display: block;
+            font-family: 'Quantico', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 400;
+            color: var(--text-dim);
+            letter-spacing: 0;
+            margin-top: 2px;
+        }
+
+        .spell-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 
         .spell-type {
-            font-size: 0.75rem;
-            font-weight: 600;
+            font-family: 'Quantico', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 700;
             padding: 4px 10px;
-            border-radius: 12px;
+            border-radius: 20px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.06em;
+            white-space: nowrap;
+            border: 1px solid transparent;
         }
 
-        .spell-type.pre-game { background: rgba(168, 85, 247, 0.2); color: var(--accent-purple); }
-        .spell-type.instant { background: rgba(0, 212, 255, 0.2); color: var(--accent-primary); }
-        .spell-type.tactical { background: rgba(245, 158, 11, 0.2); color: var(--accent-warning); }
-        .spell-type.defensive { background: rgba(16, 185, 129, 0.2); color: var(--accent-success); }
-        .spell-type.aggressive { background: rgba(239, 68, 68, 0.2); color: var(--accent-danger); }
-        .spell-type.permanent { background: rgba(255, 255, 255, 0.1); color: var(--text-primary); }
-        .spell-type.counter { background: rgba(255, 107, 157, 0.2); color: var(--hex-side-heart); }
+        .spell-type.pre-game   { background: rgba(184,155,216,0.15); color: #b89bd8; border-color: rgba(184,155,216,0.25); }
+        .spell-type.instant    { background: rgba(88,152,204,0.15);  color: #5898cc; border-color: rgba(88,152,204,0.25); }
+        .spell-type.tactical   { background: rgba(247,186,50,0.15);  color: #f7ba32; border-color: rgba(247,186,50,0.25); }
+        .spell-type.defensive  { background: rgba(0,224,128,0.12);   color: #00e080; border-color: rgba(0,224,128,0.25); }
+        .spell-type.aggressive { background: rgba(216,64,64,0.15);   color: #d84040; border-color: rgba(216,64,64,0.3); }
+        .spell-type.permanent  { background: rgba(255,255,255,0.07); color: var(--text-body); border-color: rgba(255,255,255,0.12); }
+        .spell-type.counter    { background: rgba(255,107,157,0.15); color: #ff6b9d; border-color: rgba(255,107,157,0.25); }
+        .spell-type.rare       { background: linear-gradient(135deg, #e8d8a8, #c8b37e); color: #050710; border-color: #c8b37e; }
 
         .spell-effect {
-            color: var(--text-secondary);
-            font-size: 0.95rem;
-            line-height: 1.6;
+            color: var(--text-body);
+            font-size: 0.93rem;
+            line-height: 1.65;
+            margin: 14px 0 0;
         }
 
         .spell-timing {
-            margin-top: 12px;
-            font-size: 0.85rem;
-            color: var(--text-tertiary);
+            margin: 12px 0 0;
+            padding-top: 12px;
+            border-top: 1px solid var(--hairline);
+            font-size: 0.84rem;
+            color: var(--text-dim);
         }
 
-        .spell-timing strong {
-            color: var(--accent-primary);
-        }
+        .spell-timing strong { color: var(--gold); }
 
-        /* Code/Example blocks */
+        /* ── Monospace example blocks ── */
         .example-block {
-            background: var(--bg-tertiary);
-            border-left: 4px solid var(--accent-primary);
+            background: var(--surface-inset);
+            border: 1px solid var(--hairline);
+            border-left: 3px solid var(--gold);
+            border-radius: var(--radius-lg);
             padding: 16px 20px;
             margin: 20px 0;
             font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 0.9rem;
-            color: var(--text-secondary);
+            font-size: 0.88rem;
+            color: var(--text-body);
+            overflow-x: auto;
         }
 
         .example-label {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 0.7rem;
-            color: var(--accent-primary);
+            font-family: 'Russo One', sans-serif;
+            font-size: 0.68rem;
+            color: var(--gold);
             text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 8px;
+            letter-spacing: 0.1em;
+            margin-bottom: 10px;
         }
 
-        /* Responsive */
+        /* ── Responsive ── */
         @media (max-width: 1024px) {
-            .toc-sidebar {
-                display: none;
-            }
+            .toc-sidebar { display: none; }
             .main-content {
                 margin-left: 0;
-                padding: 80px 20px 40px;
+                padding: 20px 18px 40px;
+                max-width: 100%;
             }
+            .section-title { font-size: 1.25rem; }
+            .page-header { padding: 18px; }
         }
 
-        /* Print styles */
+        /* ── Print ── */
         @media print {
-            .nav, .toc-sidebar, .nav-links {
-                display: none;
-            }
-            .main-content {
-                margin: 0;
-                padding: 20px;
-            }
+            .toc-sidebar,
+            .unified-navbar,
+            #navbar-container { display: none !important; }
             body {
-                background: white;
-                color: black;
+                background: #fff;
+                color: #111;
+                padding-top: 0;
             }
-            .section-title {
-                color: #0066cc;
+            .main-content { margin: 0; padding: 20px; max-width: 100%; }
+            .section-title, .subsection-title, .highlight-box-title,
+            .phase-name, .spell-name, h4 { color: #6b5a2e; }
+            p, td, li, .spell-effect { color: #222; }
+            .highlight-box, .spell-card, .phase-flow, .formula-box,
+            .example-block, table {
+                background: #fff;
+                border: 1px solid #bbb;
+                box-shadow: none;
+                backdrop-filter: none;
             }
+            th { background: #f0ece0; color: #6b5a2e; }
+            .section { page-break-inside: avoid; }
+
+            /* The hex legend is useless in print without its tile art, so
+               force backgrounds on for the hexes specifically. */
+            .rb-hex, .rb-hex-art, .rb-hex-bevel, .rb-hex-room {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .rb-hex-wrap { page-break-inside: avoid; }
         }
     </style>
 </head>
 <body>
-    <!-- Navigation Bar -->
-    <nav class="nav">
-        <div class="nav-title">Hex Tournament Rulebook</div>
-        <div class="nav-links">
-            <a href="development-landing-page.html">Home</a>
-            <a href="full/admin.html">Admin</a>
-            <a href="full/view.html">View</a>
-            <a href="full/statistics.html">Stats</a>
-        </div>
-    </nav>
+    <!--
+        The unified navbar (shared/scripts/navbar.js) injects itself here on
+        load, showing the links the viewer's role allows. It also sets
+        body padding-top; our CSS declares the same value so the layout is
+        correct before the script runs.
+    -->
+    <div id="navbar-container"></div>
 
     <!-- Table of Contents Sidebar -->
     <aside class="toc-sidebar">
         <div class="toc-title">Table of Contents</div>
         <ul class="toc-list">
-            <li><a href="#overview" class="toc-section">1. Game Overview</a></li>
-            <li><a href="#victory" class="toc-subsection">Victory Condition</a></li>
-            <li><a href="#teams" class="toc-subsection">Teams & Players</a></li>
+            <li><a href="#overview" class="toc-section">1. How It Works</a></li>
+            <li><a href="#victory" class="toc-subsection">Winning</a></li>
+            <li><a href="#teams" class="toc-subsection">Teams &amp; Colours</a></li>
 
             <li><a href="#board" class="toc-section">2. The Board</a></li>
             <li><a href="#hex-types" class="toc-subsection">Hex Types</a></li>
             <li><a href="#coordinates" class="toc-subsection">Coordinates</a></li>
 
-            <li><a href="#tile-placement" class="toc-section">3. Tile Placement</a></li>
+            <li><a href="#matches" class="toc-section">3. Playing Matches</a></li>
+            <li><a href="#match-slots" class="toc-subsection">The Two Slots</a></li>
+            <li><a href="#ready-up" class="toc-subsection">Readying Up</a></li>
+            <li><a href="#games" class="toc-subsection">Games &amp; Formats</a></li>
+            <li><a href="#split-teams" class="toc-subsection">Split Teams</a></li>
+
+            <li><a href="#scoring" class="toc-section">4. Scoring</a></li>
+            <li><a href="#win-points" class="toc-subsection">Match Wins</a></li>
+            <li><a href="#heart-income" class="toc-subsection">Heart Income</a></li>
+            <li><a href="#no-points" class="toc-subsection">What Scores Nothing</a></li>
+
+            <li><a href="#tile-placement" class="toc-section">5. Placing Tiles</a></li>
             <li><a href="#placement-rules" class="toc-subsection">Placement Rules</a></li>
             <li><a href="#placement-effects" class="toc-subsection">Placement Effects</a></li>
-            <li><a href="#turn-queue" class="toc-subsection">Turn Queue</a></li>
+            <li><a href="#placement-timing" class="toc-subsection">When You Place</a></li>
 
-            <li><a href="#scoring" class="toc-section">4. Scoring System</a></li>
-            <li><a href="#win-points" class="toc-subsection">Win Points</a></li>
-            <li><a href="#heart-bonus" class="toc-subsection">Heart Income</a></li>
+            <li><a href="#round" class="toc-section">6. The Round</a></li>
 
-            <li><a href="#matches" class="toc-section">5. Match System</a></li>
-            <li><a href="#match-flow" class="toc-subsection">Match Flow</a></li>
-            <li><a href="#games" class="toc-subsection">Available Games</a></li>
+            <li><a href="#challenge" class="toc-section">7. Heart Challenges</a></li>
 
-            <li><a href="#challenge" class="toc-section">6. Challenge System</a></li>
+            <li><a href="#spells" class="toc-section">8. Spell Cards</a></li>
+            <li><a href="#spell-economy" class="toc-subsection">Hands &amp; Draw Piles</a></li>
+            <li><a href="#spell-windows" class="toc-subsection">Spell Windows</a></li>
+            <li><a href="#spell-list" class="toc-subsection">All 15 Spells</a></li>
+            <li><a href="#spell-strategy" class="toc-subsection">Strategy</a></li>
 
-            <li><a href="#spells" class="toc-section">7. Spell Cards</a></li>
-            <li><a href="#spell-timing" class="toc-subsection">Spell Timing</a></li>
-            <li><a href="#spell-list" class="toc-subsection">All Spells</a></li>
+            <li><a href="#your-pages" class="toc-section">9. Your Pages</a></li>
 
-            <li><a href="#special-rules" class="toc-section">8. Special Rules</a></li>
+            <li><a href="#special-rules" class="toc-section">10. Edge Cases &amp; FAQ</a></li>
 
-            <li><a href="#quick-reference" class="toc-section">9. Quick Reference</a></li>
+            <li><a href="#quick-reference" class="toc-section">11. Quick Reference</a></li>
         </ul>
     </aside>
 
     <!-- Main Content -->
     <main class="main-content">
 
-        <!-- ==================== SECTION 1: OVERVIEW ==================== -->
+        <header class="page-header">
+            <h1>Sota Vuoresta</h1>
+            <p class="page-header-sub">Board Game — Rulebook</p>
+            <p>Everything you need to play — board, scoring, rounds, challenges and all 15 spells.</p>
+        </header>
+
+        <!-- ==================== SECTION 1: HOW IT WORKS ==================== -->
         <section id="overview" class="section">
-            <h1 class="section-title">1. Game Overview</h1>
+            <h1 class="section-title">1. How It Works</h1>
 
             <p>
-                <strong>Hex Tournament</strong> is a hybrid esports tournament system that combines
-                real-time competitive gaming with strategic hex-board tile placement and spell card mechanics.
-                Teams compete in external video games, and winners earn the right to place tiles on a shared
-                hexagonal board to accumulate victory points.
+                <strong>Sota Vuoresta</strong> puts a strategy board game on top of a LAN esports
+                tournament. You and your team play real matches in real video games. Winning a match
+                doesn't just put a number on a scoreboard — it earns you the right to place a tile on
+                a shared hex board carved out of the Mountain. Territory on that board generates
+                points every round, and it is territory, not raw wins, that decides the tournament.
             </p>
 
             <div class="highlight-box info">
-                <div class="highlight-box-title">Tournament Format</div>
-                <ul>
-                    <li><strong>Teams:</strong> 5 teams of 2 players each (10 players total)</li>
-                    <li><strong>Duration:</strong> Multi-day LAN event (typically 3-4 days)</li>
-                    <li><strong>Board:</strong> 91-hex hexagonal grid</li>
-                    <li><strong>Spells:</strong> 15 unique spell cards distributed among teams</li>
-                </ul>
+                <div class="highlight-box-title">The Loop, In Four Lines</div>
+                <ol style="margin:0;">
+                    <li>Your team plays a match in a video game (CS2, Call of Duty, StarCraft II…).</li>
+                    <li>Win it, and you earn <strong>+1 point</strong> and <strong>one tile</strong> to place.</li>
+                    <li>Place that tile to claim territory — ideally a <strong>heart hex</strong> or a <strong>room</strong>.</li>
+                    <li>Every heart hex you hold pays you points <strong>every round</strong>, whether you win or not.</li>
+                </ol>
             </div>
 
+            <p>
+                That last line is the whole game. A team that wins every match but never takes a heart
+                will lose to a team that wins half as often and sits on the Mountain Heart. Match wins
+                are worth one point each; the hearts are worth up to eight points a round, forever.
+            </p>
+
             <div id="victory" class="subsection">
-                <h3 class="subsection-title">Victory Condition</h3>
+                <h3 class="subsection-title">Winning</h3>
 
                 <div class="highlight-box victory">
-                    <div class="highlight-box-title">How to Win</div>
-                    <p style="margin:0; font-size: 1.2rem; color: var(--accent-success);">
-                        <strong>First team to reach 50 victory points wins the tournament.</strong>
+                    <div class="highlight-box-title">Victory Condition</div>
+                    <p style="margin:0; font-size: 1.15rem; color: var(--accent-success);">
+                        <strong>The first team to reach the point target wins the tournament.</strong>
                     </p>
                 </div>
 
                 <p>
-                    Points are earned through strategic tile placement on the board. The more connected
-                    tiles a team has, the more points they score. Controlling special "heart" hexes
-                    provides passive point income each turn.
+                    The target defaults to <strong>50 points</strong>, but it is a per-tournament
+                    setting the organiser chooses during setup and can adjust live — anywhere from
+                    1 to 500. The current target is always shown in the interface, so check it rather
+                    than assuming 50. A short evening might run to 25; a full weekend might run to 80.
                 </p>
             </div>
 
             <div id="teams" class="subsection">
-                <h3 class="subsection-title">Teams & Players</h3>
-
-                <ul>
-                    <li><strong>5 teams</strong> compete in the tournament</li>
-                    <li><strong>2 players</strong> per team (10 players total)</li>
-                    <li>Each team is assigned a <strong>distinct color</strong> for board visualization</li>
-                    <li>Each team has a designated <strong>starting square</strong> on the board</li>
-                </ul>
+                <h3 class="subsection-title">Teams &amp; Colours</h3>
 
                 <p>
-                    Team names and colors are configured during tournament setup and displayed
-                    throughout the interface for easy identification.
+                    The system supports any number of teams of any size, but the whole event —
+                    especially the automatic match balancing — is built and tuned for
+                    <strong>5 teams of 2 players</strong>, 10 players total. That is the standard
+                    setup and what everything below assumes.
+                </p>
+
+                <p>
+                    Every team gets a distinct colour, used consistently for its tiles on the board,
+                    its row in the standings, and its name everywhere in the interface:
+                </p>
+
+                <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Team</th>
+                            <th>Colour</th>
+                            <th>Hex</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Team 1</td><td><span class="colour-swatch" style="background:#de392c"></span>Red</td><td><code>#de392c</code></td></tr>
+                        <tr><td>Team 2</td><td><span class="colour-swatch" style="background:#2278a3"></span>Blue</td><td><code>#2278a3</code></td></tr>
+                        <tr><td>Team 3</td><td><span class="colour-swatch" style="background:#2e9158"></span>Green</td><td><code>#2e9158</code></td></tr>
+                        <tr><td>Team 4</td><td><span class="colour-swatch" style="background:#f7ba32"></span>Yellow</td><td><code>#f7ba32</code></td></tr>
+                        <tr><td>Team 5</td><td><span class="colour-swatch" style="background:#22241d"></span>Black</td><td><code>#22241d</code></td></tr>
+                    </tbody>
+                </table>
+                </div>
+
+                <p>
+                    A sixth team and beyond cycles back through the same palette; the organiser can
+                    override any team's colour manually.
                 </p>
             </div>
         </section>
@@ -576,345 +1017,628 @@
             <h1 class="section-title">2. The Board</h1>
 
             <p>
-                The game is played on a <strong>91-hex hexagonal board</strong> arranged in a honeycomb pattern.
-                The board uses an axial coordinate system where each hex is identified by two coordinates:
-                <code>q</code> (column) and <code>r</code> (row).
+                The board is a <strong>91-hex</strong> honeycomb: a hexagon five rings deep in every
+                direction from the centre. Every hex is addressed by two axial coordinates,
+                <code>q</code> and <code>r</code>, written together as <code>q2r-4</code>.
             </p>
 
             <div id="hex-types" class="subsection">
                 <h3 class="subsection-title">Hex Types</h3>
 
-                <table>
+                <div class="table-scroll">
+                <table class="hex-table">
                     <thead>
                         <tr>
                             <th>Type</th>
                             <th>Count</th>
-                            <th>Effect</th>
+                            <th>What It Does</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td><span class="hex-indicator"><span class="hex-dot mountain"></span> Mountain Heart</span></td>
+                            <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Mountain Heart hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q0r0.png)"></span><span class="rb-hex-bevel"></span><img class="rb-hex-icon mountain" src="shared/images/hexes/mountain_heart_v3.png" alt=""></span></span> Mountain Heart</span></td>
                             <td>1</td>
-                            <td><strong>+2 points per turn</strong> while controlled (center of board)</td>
+                            <td><strong>+2 points every round</strong> to whoever holds it</td>
                         </tr>
                         <tr>
-                            <td><span class="hex-indicator"><span class="hex-dot side-heart"></span> Side Hearts</span></td>
+                            <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Side Heart hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q-4r2.png)"></span><span class="rb-hex-bevel"></span><img class="rb-hex-icon side" src="shared/images/hexes/side_heart_v3.png" alt=""></span></span> Side Hearts</span></td>
                             <td>6</td>
-                            <td><strong>+1 point per turn</strong> while controlled (ring around center)</td>
+                            <td><strong>+1 point every round</strong> each, to whoever holds it</td>
                         </tr>
                         <tr>
-                            <td><span class="hex-indicator"><span class="hex-dot start"></span> Starting Squares</span></td>
+                            <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Starting location hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q0r-5.png)"></span><span class="rb-hex-bevel"></span><span class="rb-hex-star" aria-hidden="true">⭐</span></span></span> Starting Locations</span></td>
                             <td>6</td>
-                            <td>Each team's first tile <strong>must</strong> be placed here</td>
+                            <td>Your <strong>first tile</strong> must go on one of these</td>
                         </tr>
                         <tr>
-                            <td><span class="hex-indicator"><span class="hex-dot room"></span> Rooms</span></td>
-                            <td>~12</td>
-                            <td><strong>Draw 1 spell card</strong> when placing a tile here</td>
+                            <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Room hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q1r-2.png)"></span><span class="rb-hex-bevel"></span><span class="rb-hex-room" aria-hidden="true"></span></span></span> Rooms</span></td>
+                            <td>varies</td>
+                            <td><strong>Draw 1 spell card</strong> when you place a tile here</td>
                         </tr>
                         <tr>
-                            <td><span class="hex-indicator"><span class="hex-dot normal"></span> Normal Hexes</span></td>
-                            <td>~66</td>
-                            <td>Standard placement areas, no special effect</td>
+                            <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Normal hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q-3r0.png)"></span><span class="rb-hex-bevel"></span></span></span> Normal Hexes</span></td>
+                            <td>the rest</td>
+                            <td>No effect — but they connect your territory</td>
                         </tr>
                     </tbody>
                 </table>
+                </div>
 
                 <h4>Mountain Heart (Vuorisydän)</h4>
                 <p>
-                    Located at the <strong>center of the board</strong> (coordinates q0, r0), the Mountain Heart
-                    is the most valuable position. The team controlling this hex receives <strong>+2 victory points</strong>
-                    after each match is played. Control is fiercely contested.
+                    The dead centre of the board, <code>q0r0</code>. It pays <strong>+2 points every
+                    round</strong> — twice any other hex on the board — and everyone can reach it from
+                    every direction, so it changes hands more than anything else. Expect to fight for
+                    it repeatedly rather than take it once.
                 </p>
 
                 <h4>Side Hearts (Sivusydämet)</h4>
                 <p>
-                    Six heart hexes arranged in a ring around the Mountain Heart. Each provides
-                    <strong>+1 victory point per turn</strong> to the controlling team. Strategically positioned
-                    to encourage expansion from the edges toward the center.
+                    Six hearts at <code>q-4r2</code>, <code>q-2r-2</code>, <code>q2r-4</code>,
+                    <code>q4r-2</code>, <code>q2r2</code> and <code>q-2r4</code>. Each pays
+                    <strong>+1 point every round</strong>.
+                </p>
+                <p>
+                    Note where these actually sit: they form a wide ring <em>four steps out</em> from
+                    the centre, not a tight ring hugging the Mountain Heart. They are much closer to
+                    the starting locations than to the middle. In practice this means the side hearts
+                    are the early game — reachable within a few placements from your corner — while
+                    the Mountain Heart is the late game.
                 </p>
 
                 <h4>Rooms (Huoneet)</h4>
                 <p>
-                    Special hexes scattered across the board. When a team places a tile on a room,
-                    they <strong>draw one spell card</strong> from the spell deck. Rooms incentivize
-                    strategic detours to gain card advantage.
+                    Rooms are how you get spell cards after the opening hand. Placing a tile on a room
+                    draws you one card. There is <strong>no fixed number of rooms</strong> and no fixed
+                    layout: the organiser marks them out on the board during tournament setup, so their
+                    count and position change from event to event. Check the live board before planning
+                    a route. Rooms can never sit on top of a heart hex.
                 </p>
             </div>
 
             <div id="coordinates" class="subsection">
                 <h3 class="subsection-title">Coordinate System</h3>
 
-                <p>
-                    The board uses <strong>axial coordinates</strong> with bounds:
-                </p>
+                <p>A hex is valid when all three of these hold:</p>
                 <ul>
                     <li><code>-5 ≤ q ≤ 5</code></li>
                     <li><code>-5 ≤ r ≤ 5</code></li>
                     <li><code>-5 ≤ q + r ≤ 5</code></li>
                 </ul>
 
+                <p>
+                    Every hex has six neighbours, reached by adding
+                    <code>(+1,0) (+1,-1) (0,-1) (-1,0) (-1,+1) (0,+1)</code> to its coordinates.
+                    "Adjacent" throughout this rulebook means exactly these six.
+                </p>
+
                 <div class="example-block">
                     <div class="example-label">Key Coordinates</div>
-                    Mountain Heart: q0r0 (center)<br>
-                    Starting Squares: q0r-5, q5r-5, q5r0, q0r5, q-5r5, q-5r0 (corners)
+                    Mountain Heart&nbsp;&nbsp;&nbsp;&nbsp;q0r0<br>
+                    Side Hearts&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;q-4r2, q-2r-2, q2r-4, q4r-2, q2r2, q-2r4<br>
+                    Starting Locations&nbsp;q0r-5, q5r-5, q5r0, q0r5, q-5r5, q-5r0
                 </div>
+
+                <p>
+                    You never have to type a coordinate. You claim hexes by clicking them on the board.
+                    The coordinates are here so you can talk to your teammate about a specific hex
+                    without pointing at a screen.
+                </p>
             </div>
         </section>
 
-        <!-- ==================== SECTION 3: TILE PLACEMENT ==================== -->
-        <section id="tile-placement" class="section">
-            <h1 class="section-title">3. Tile Placement</h1>
+        <!-- ==================== SECTION 3: MATCHES ==================== -->
+        <section id="matches" class="section">
+            <h1 class="section-title">3. Playing Matches</h1>
 
             <p>
-                When a team wins a match, they earn the right to place <strong>one tile</strong> on the board
-                and handle any events from the placement.
+                Matches are played in ordinary video games, outside this system. The system schedules
+                them, tracks who is ready, and records the result — the organiser confirms who won,
+                and everything else follows from that.
             </p>
 
-            <div id="placement-rules" class="subsection">
-                <h3 class="subsection-title">Placement Rules</h3>
+            <div id="match-slots" class="subsection">
+                <h3 class="subsection-title">The Two Slots</h3>
+
+                <p>
+                    Each round runs <strong>two matches</strong>, called <strong>Match 1</strong> and
+                    <strong>Match 2</strong>. They are deliberately built so that no player appears in
+                    both, which means they run <strong>independently and in parallel</strong> — Match 2
+                    can still be in setup while Match 1 is already being played, and vice versa.
+                </p>
+
+                <p>Each slot walks its own four stages:</p>
+
+                <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Stage</th>
+                            <th>What's Happening</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Setup</strong></td><td>The match is being created — game, format and players chosen.</td></tr>
+                        <tr><td><strong>Lobby</strong></td><td>Everyone in the match readies up. See below.</td></tr>
+                        <tr><td><strong>Playing</strong></td><td>The match is live in the game. Go play.</td></tr>
+                        <tr><td><strong>Done</strong></td><td>Result confirmed, points and tile rights awarded.</td></tr>
+                    </tbody>
+                </table>
+                </div>
 
                 <div class="highlight-box warning">
-                    <div class="highlight-box-title">First Tile</div>
+                    <div class="highlight-box-title">The Round Waits For Both</div>
                     <p style="margin:0;">
-                        If the team has no tiles yet, place in a <strong>free starting square</strong>.
-                    </p>
-                </div>
-
-                <h4>Subsequent Tiles</h4>
-                <ul>
-                    <li><strong>Must be adjacent</strong> to an existing tile owned by the same team</li>
-                    <li>Cannot be placed on hexes already occupied by another team</li>
-                </ul>
-            </div>
-
-            <div id="placement-effects" class="subsection">
-                <h3 class="subsection-title">Placement Effects</h3>
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Hex Type</th>
-                            <th>Effect</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><span class="hex-indicator"><span class="hex-dot room"></span> Room</span></td>
-                            <td><strong>Draw 1 spell card</strong></td>
-                        </tr>
-                        <tr>
-                            <td><span class="hex-indicator"><span class="hex-dot side-heart"></span> Unclaimed Side Heart</span></td>
-                            <td><strong>Take control + Draw 1 spell card</strong></td>
-                        </tr>
-                        <tr>
-                            <td><span class="hex-indicator"><span class="hex-dot mountain"></span> Unclaimed Mountain Heart</span></td>
-                            <td><strong>Take control</strong></td>
-                        </tr>
-                        <tr>
-                            <td><span class="hex-indicator"><span class="hex-dot normal"></span> Regular Area</span></td>
-                            <td>No special effect</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div id="turn-queue" class="subsection">
-                <h3 class="subsection-title">Turn Queue</h3>
-
-                <p>
-                    When multiple teams win a match together (as allies in a team game), they are all
-                    added to the <strong>turn queue</strong>. Teams then place tiles one at a time in queue order:
-                </p>
-
-                <ol>
-                    <li>Match ends, winning team(s) identified</li>
-                    <li>All winners added to turn queue</li>
-                    <li>First team in queue places their tile</li>
-                    <li>Points recalculated immediately</li>
-                    <li>Next team places their tile</li>
-                    <li>Process repeats until queue is empty</li>
-                    <li>Return to match planning phase</li>
-                </ol>
-            </div>
-        </section>
-
-        <!-- ==================== SECTION 4: SCORING ==================== -->
-        <section id="scoring" class="section">
-            <h1 class="section-title">4. Scoring System</h1>
-
-            <p>
-                Points are earned through <strong>winning matches</strong> and <strong>controlling heart hexes</strong>.
-            </p>
-
-            <div id="win-points" class="subsection">
-                <h3 class="subsection-title">Victory Points from Winning</h3>
-
-                <p>
-                    When your team wins a match and <strong>both team members played on the same side</strong>:
-                </p>
-                <ul>
-                    <li><strong>+1 victory point</strong> for the team</li>
-                    <li>Personal victory points (tracked separately)</li>
-                    <li>Right to place a tile on the board</li>
-                </ul>
-
-                <p>
-                    Split teams (members on opposite sides) mark their own points individually.
-                </p>
-            </div>
-
-            <div id="heart-bonus" class="subsection">
-                <h3 class="subsection-title">Heart Control (Passive Income)</h3>
-
-                <p>
-                    Controlling heart hexes provides <strong>passive point income</strong> after each match:
-                </p>
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Heart Type</th>
-                            <th>Points Per Match</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><span class="hex-indicator"><span class="hex-dot side-heart"></span> Side Heart (×6)</span></td>
-                            <td><strong>+1 point each</strong></td>
-                        </tr>
-                        <tr>
-                            <td><span class="hex-indicator"><span class="hex-dot mountain"></span> Mountain Heart</span></td>
-                            <td><strong>+2 points</strong></td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <div class="highlight-box victory">
-                    <div class="highlight-box-title">Maximum Heart Income</div>
-                    <p style="margin:0;">
-                        Controlling all hearts: <strong>+8 points per match</strong><br>
-                        (6 Side Hearts × 1) + (1 Mountain Heart × 2) = 6 + 2 = 8
+                        The round only moves on once <strong>both</strong> slots reach Done. If your
+                        match finished first, the round is waiting on the other one — this is the
+                        moment to plan your next placement or read your spell hand, not to wander off.
                     </p>
                 </div>
             </div>
-        </section>
 
-        <!-- ==================== SECTION 5: MATCHES ==================== -->
-        <section id="matches" class="section">
-            <h1 class="section-title">5. Match System</h1>
+            <div id="ready-up" class="subsection">
+                <h3 class="subsection-title">Readying Up</h3>
 
-            <p>
-                External video game matches are the core competitive element. Winners earn the right
-                to place tiles on the board.
-            </p>
+                <p>
+                    Before a match can start, every player in it must mark <strong>two separate
+                    ready flags</strong>:
+                </p>
 
-            <div id="match-flow" class="subsection">
-                <h3 class="subsection-title">Match Flow</h3>
+                <ul>
+                    <li><strong>Game lobby ready</strong> — you are actually in the game's lobby, in the right party, on the right side.</li>
+                    <li><strong>Discord ready</strong> — you are in the correct Discord voice channel for your side.</li>
+                </ul>
 
-                <ol>
-                    <li><strong>Planning:</strong> Admin schedules match (manual or auto-suggested)</li>
-                    <li><strong>Team Formation:</strong> Players assigned to Team A vs Team B</li>
-                    <li><strong>External Play:</strong> Match played in the chosen video game</li>
-                    <li><strong>Result Confirmation:</strong> Admin confirms winning team(s)</li>
-                    <li><strong>Tile Placement:</strong> Winners place tiles on the board</li>
-                    <li><strong>Point Calculation:</strong> Scores automatically updated</li>
-                    <li><strong>Win Check:</strong> System checks if any team reached 50 points</li>
-                </ol>
-
-                <div class="highlight-box info">
-                    <div class="highlight-box-title">Match Types</div>
-                    <ul style="margin:0;">
-                        <li><strong>1v1:</strong> One player from each team</li>
-                        <li><strong>2v2:</strong> Both players from each team</li>
-                        <li><strong>Mixed (5v5):</strong> Multiple teams ally together temporarily</li>
-                    </ul>
-                </div>
+                <p>
+                    Both. One is not enough. The moment the last player sets both flags, the slot
+                    advances to Playing on its own — nobody has to chase you, but nobody can start
+                    without you either. If a match seems stuck, it is nearly always one person missing
+                    one of these two flags.
+                </p>
             </div>
 
             <div id="games" class="subsection">
-                <h3 class="subsection-title">Available Games</h3>
+                <h3 class="subsection-title">Games &amp; Formats</h3>
 
+                <p>
+                    Sixteen games are built into the system. <strong>Five are on by default</strong> —
+                    those are the ones to actually practise before the event. The rest are available
+                    for the organiser to switch on for a given tournament.
+                </p>
+
+                <div class="table-scroll">
                 <table>
                     <thead>
                         <tr>
                             <th>Game</th>
                             <th>Format</th>
-                            <th>Type</th>
+                            <th>Genre</th>
+                            <th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td>Counter-Strike 2</td>
-                            <td>5v5</td>
-                            <td>FPS</td>
-                        </tr>
-                        <tr>
-                            <td>Predecessor</td>
-                            <td>5v5</td>
-                            <td>MOBA</td>
-                        </tr>
-                        <tr>
-                            <td>Age of Empires IV</td>
-                            <td>3v3 + 2v2</td>
-                            <td>RTS</td>
-                        </tr>
-                        <tr>
-                            <td>Space Marine 2</td>
-                            <td>5v5</td>
-                            <td>Action</td>
-                        </tr>
-                        <tr>
-                            <td>Dawn of War 2</td>
-                            <td>3v3 + 2v2</td>
-                            <td>RTS</td>
-                        </tr>
-                        <tr>
-                            <td>Call of Duty</td>
-                            <td>5v5</td>
-                            <td>FPS</td>
-                        </tr>
-                        <tr>
-                            <td>Spellbreak</td>
-                            <td>5v5</td>
-                            <td>Battle Royale</td>
-                        </tr>
+                        <tr class="game-default"><td>Call of Duty</td><td>5v5</td><td>FPS</td><td><span class="tag-default">Default</span></td></tr>
+                        <tr class="game-default"><td>Counter-Strike 2</td><td>5v5</td><td>FPS</td><td><span class="tag-default">Default</span></td></tr>
+                        <tr class="game-default"><td>Predecessor</td><td>5v5</td><td>MOBA</td><td><span class="tag-default">Default</span></td></tr>
+                        <tr class="game-default"><td>Age of Empires IV</td><td>3v3 + 2v2</td><td>RTS</td><td><span class="tag-default">Default</span></td></tr>
+                        <tr class="game-default"><td>StarCraft II</td><td>3v3 + 2v2</td><td>RTS</td><td><span class="tag-default">Default</span></td></tr>
+                        <tr><td>Overwatch 2</td><td>5v5</td><td>FPS</td><td><span class="tag-optional">Optional</span></td></tr>
+                        <tr><td>Valorant</td><td>5v5</td><td>FPS</td><td><span class="tag-optional">Optional</span></td></tr>
+                        <tr><td>Space Marine 2</td><td>5v5</td><td>Action</td><td><span class="tag-optional">Optional</span></td></tr>
+                        <tr><td>Spellbreak</td><td>5v5</td><td>Battle Royale</td><td><span class="tag-optional">Optional</span></td></tr>
+                        <tr><td>Dota 2</td><td>5v5</td><td>MOBA</td><td><span class="tag-optional">Optional</span></td></tr>
+                        <tr><td>Warcraft 3</td><td>3v3 + 2v2</td><td>RTS</td><td><span class="tag-optional">Optional</span></td></tr>
+                        <tr><td>Dawn of War 2</td><td>3v3 + 2v2</td><td>RTS</td><td><span class="tag-optional">Optional</span></td></tr>
+                        <tr><td>Rocket League</td><td>3v3</td><td>Sports</td><td><span class="tag-optional">Optional</span></td></tr>
+                        <tr><td>Hearthstone</td><td>1v1</td><td>Card</td><td><span class="tag-optional">Optional</span></td></tr>
+                        <tr><td>Tekken 8</td><td>1v1</td><td>Fighting</td><td><span class="tag-optional">Optional</span></td></tr>
+                        <tr><td>Beer Drinking</td><td>Free-for-all</td><td>…sport</td><td><span class="tag-optional">Optional</span></td></tr>
                     </tbody>
                 </table>
+                </div>
 
                 <p>
-                    Additional games may be added or removed by the tournament admin.
-                    Game availability is configured during tournament setup.
+                    <strong>3v3 + 2v2</strong> means the ten players split into a 3v3 game and a
+                    separate 2v2 game running alongside it. Both are played, and both count.
+                </p>
+
+                <div class="highlight-box info">
+                    <div class="highlight-box-title">Check The Interface, Not This Table</div>
+                    <p style="margin:0;">
+                        The organiser sets the game list per tournament, so the five defaults above are
+                        a starting point rather than a guarantee. Whatever the app shows for
+                        <em>your</em> tournament is the authority.
+                    </p>
+                </div>
+            </div>
+
+            <div id="split-teams" class="subsection">
+                <h3 class="subsection-title">Split Teams — Read This One Carefully</h3>
+
+                <p>
+                    Because most formats need five players a side and teams are only two, you will
+                    regularly be placed alongside members of other teams — and sometimes your own
+                    teammate is put on the <em>opposite</em> side. That is a <strong>split</strong>.
+                </p>
+
+                <div class="highlight-box danger">
+                    <div class="highlight-box-title">A Split Team Scores Nothing</div>
+                    <p style="margin:0;">
+                        A team only earns the win, the point and the tile if it has
+                        <strong>two or more players on the winning side</strong>. If your team is
+                        split across both sides, it gets <strong>no point, no tile, and no win</strong>
+                        — and equally, <strong>no loss</strong> on its record. The match simply does
+                        not count for you either way.
+                    </p>
+                </div>
+
+                <p>
+                    So a split round is a round where you cannot gain — but also cannot fall behind
+                    on record. Your heart income still pays out normally. Splits are distributed
+                    deliberately by the scheduler so every team eats roughly the same number.
                 </p>
             </div>
         </section>
 
-        <!-- ==================== SECTION 6: CHALLENGE SYSTEM ==================== -->
-        <section id="challenge" class="section">
-            <h1 class="section-title">6. Heart Challenges</h1>
+        <!-- ==================== SECTION 4: SCORING ==================== -->
+        <section id="scoring" class="section">
+            <h1 class="section-title">4. Scoring</h1>
 
             <p>
-                If a <strong>heart hex is already controlled</strong> by another team, you can
-                challenge for it by placing a tile adjacent to that heart.
+                Your team has exactly one number that matters: its <strong>points</strong>. It is what
+                the standings sort by, and what the victory condition checks. Points come from
+                <strong>two sources and nothing else</strong>.
             </p>
 
-            <div class="highlight-box danger">
-                <div class="highlight-box-title">Challenge Trigger</div>
-                <p style="margin:0;">
-                    Place a tile adjacent to an <strong>opponent-controlled heart hex</strong>
-                    to initiate a challenge for that heart.
+            <div class="formula-box">
+                <div class="formula">points = match wins + heart income</div>
+                <div class="formula-label">There is no third source. Nothing else adds to your score.</div>
+            </div>
+
+            <div id="win-points" class="subsection">
+                <h3 class="subsection-title">Match Wins: +1</h3>
+
+                <p>
+                    Winning a match is worth <strong>+1 point</strong>, awarded the moment the
+                    organiser confirms the result. It also adds a win to your record and earns you a
+                    tile to place.
+                </p>
+
+                <p>Two conditions gate it:</p>
+                <ul>
+                    <li>You need <strong>2+ players on the winning side</strong> (see <a href="#split-teams">Split Teams</a>).</li>
+                    <li>It must be a <strong>regular match</strong>. Challenge matches award no points at all.</li>
+                </ul>
+
+                <p>
+                    Losing costs you nothing directly. There are no negative points for a loss — you
+                    just don't gain, and you don't get a tile.
                 </p>
             </div>
 
-            <h4>Challenge Rules</h4>
+            <div id="heart-income" class="subsection">
+                <h3 class="subsection-title">Heart Income: +1 / +2 Per Round</h3>
+
+                <p>
+                    Every heart hex you control pays out <strong>once per round</strong>, during the
+                    round's scoring phase. This is passive: you get it for holding the hex, regardless
+                    of whether you played, won, or lost that round.
+                </p>
+
+                <div class="table-scroll">
+                <table class="hex-table">
+                    <thead>
+                        <tr>
+                            <th>Heart</th>
+                            <th>Income</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Side Heart hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q-4r2.png)"></span><span class="rb-hex-bevel"></span><img class="rb-hex-icon side" src="shared/images/hexes/side_heart_v3.png" alt=""></span></span> Side Heart (six of them)</span></td>
+                            <td><strong>+1 point per round</strong>, each</td>
+                        </tr>
+                        <tr>
+                            <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Mountain Heart hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q0r0.png)"></span><span class="rb-hex-bevel"></span><img class="rb-hex-icon mountain" src="shared/images/hexes/mountain_heart_v3.png" alt=""></span></span> Mountain Heart</span></td>
+                            <td><strong>+2 points per round</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+                </div>
+
+                <div class="highlight-box victory">
+                    <div class="highlight-box-title">Maximum Income</div>
+                    <p style="margin:0;">
+                        Holding every heart pays <strong>+8 points per round</strong><br>
+                        (6 side hearts × 1) + (1 Mountain Heart × 2) = 8
+                    </p>
+                </div>
+
+                <p>
+                    <strong>Per round</strong>, not per match — this is the single most commonly
+                    misread rule. A round contains two matches plus any challenge games, and the
+                    hearts pay out <em>once</em> across all of it.
+                </p>
+
+                <p>Two exceptions worth knowing before they surprise you:</p>
+
+                <div class="highlight-box warning">
+                    <div class="highlight-box-title">Round 1 Pays No Heart Income</div>
+                    <p style="margin:0;">
+                        Income is paid for a <em>completed</em> round. At the start of round 1 nothing
+                        has been played yet, so no hearts pay out. Your first heart income arrives in
+                        round 2.
+                    </p>
+                </div>
+
+                <div class="highlight-box warning">
+                    <div class="highlight-box-title">Contested Hearts Are Frozen</div>
+                    <p style="margin:0;">
+                        If a heart hex is the subject of a challenge match that hasn't been resolved
+                        yet, it pays <strong>nobody</strong> that round — not the current holder, not
+                        the challenger. The income is withheld until the dispute is settled. Challenging
+                        a heart therefore costs the defender points even if you go on to lose the
+                        challenge.
+                    </p>
+                </div>
+            </div>
+
+            <div id="no-points" class="subsection">
+                <h3 class="subsection-title">What Scores Nothing</h3>
+
+                <p>
+                    These all feel like they should be worth points. None of them are:
+                </p>
+
+                <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Action</th>
+                            <th>Why It's Worth Zero</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Placing a tile</strong></td>
+                            <td>The tile is the <em>reward</em> for the win, not a scoring event. It's worth what it lets you reach — a heart, a room, or a path to one.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Owning normal hexes</strong></td>
+                            <td>Territory size is not scored. Only heart hexes generate income. A sprawling empire of normal hexes pays exactly nothing.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Winning a challenge match</strong></td>
+                            <td>It transfers control of the heart — and therefore all its <em>future</em> income — but awards no points directly, and doesn't touch your win/loss record.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Being split across a match</strong></td>
+                            <td>No point, no tile, no win, no loss.</td>
+                        </tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== SECTION 5: TILE PLACEMENT ==================== -->
+        <section id="tile-placement" class="section">
+            <h1 class="section-title">5. Placing Tiles</h1>
+
+            <p>
+                Winning a regular match earns your team <strong>one tile</strong>. Placing it is how
+                you turn a match win into board position.
+            </p>
+
+            <div id="placement-rules" class="subsection">
+                <h3 class="subsection-title">Placement Rules</h3>
+
+                <div class="highlight-box info">
+                    <div class="highlight-box-title">Your First Tile</div>
+                    <p style="margin:0;">
+                        If your team has no tiles on the board yet, your first tile must go on a
+                        <strong>free starting location</strong> — any of the six, whichever is still
+                        unclaimed. They are not pre-assigned to teams, so which corner you get depends
+                        on when you win and what's left. Winning early means picking your corner.
+                    </p>
+                </div>
+
+                <h4>Every Tile After That</h4>
+                <ul>
+                    <li>It must be <strong>adjacent to a tile your team already owns</strong>. Your territory grows outward one step at a time; it can never jump.</li>
+                    <li>It cannot go on a hex that is <strong>already occupied</strong> — by anyone, including you.</li>
+                </ul>
+
+                <p>
+                    That adjacency rule is the core constraint of the whole board game. From your
+                    corner, every heart is a fixed number of placements away, and every placement is a
+                    match win. Count the steps before you commit to a direction — the side hearts are
+                    reachable in a handful of wins, the Mountain Heart takes most of the tournament.
+                </p>
+            </div>
+
+            <div id="placement-effects" class="subsection">
+                <h3 class="subsection-title">Placement Effects</h3>
+
+                <div class="table-scroll">
+                <table class="hex-table">
+                    <thead>
+                        <tr>
+                            <th>Place On</th>
+                            <th>Effect</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Room hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q1r-2.png)"></span><span class="rb-hex-bevel"></span><span class="rb-hex-room" aria-hidden="true"></span></span></span> Room</span></td>
+                            <td><strong>Draw 1 spell card</strong></td>
+                        </tr>
+                        <tr>
+                            <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Side Heart hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q-4r2.png)"></span><span class="rb-hex-bevel"></span><img class="rb-hex-icon side" src="shared/images/hexes/side_heart_v3.png" alt=""></span></span> Unclaimed Side Heart</span></td>
+                            <td><strong>Take control</strong> + <strong>draw 1 spell card</strong> — it starts paying +1/round</td>
+                        </tr>
+                        <tr>
+                            <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Mountain Heart hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q0r0.png)"></span><span class="rb-hex-bevel"></span><img class="rb-hex-icon mountain" src="shared/images/hexes/mountain_heart_v3.png" alt=""></span></span> Unclaimed Mountain Heart</span></td>
+                            <td><strong>Take control</strong> — it starts paying +2/round</td>
+                        </tr>
+                        <tr>
+                            <td>Adjacent to a heart someone else holds</td>
+                            <td>Lets you open a <strong>challenge</strong> for it (see <a href="#challenge">§7</a>)</td>
+                        </tr>
+                        <tr>
+                            <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Normal hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q-3r0.png)"></span><span class="rb-hex-bevel"></span></span></span> Normal hex</span></td>
+                            <td>Nothing directly — but it's a step toward something that isn't nothing</td>
+                        </tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <div id="placement-timing" class="subsection">
+                <h3 class="subsection-title">When You Actually Place</h3>
+
+                <div class="highlight-box warning">
+                    <div class="highlight-box-title">Tiles Are Placed At The Start Of The Next Round</div>
+                    <p style="margin:0;">
+                        You do not place your tile the instant you win. Matches are played at the
+                        <em>end</em> of a round; the placement phases sit near the <em>start</em> of
+                        the following one. So a match you win in round 3 becomes a tile you place in
+                        round 4.
+                    </p>
+                </div>
+
+                <p>
+                    There are two placement phases per round, and they mirror the two match slots:
+                    <strong>Hex Placement — Game 1</strong> resolves everything earned in the previous
+                    round's Match 1, and <strong>Hex Placement — Game 2</strong> resolves Match 2.
+                    Between them sits a spell window, which means a placement made in the first phase
+                    can be reacted to with a spell before the second phase happens.
+                </p>
+
+                <p>
+                    The practical consequence: <strong>you have a full round to think about your
+                    placement</strong>. When you win, don't guess — look at the board, count steps to
+                    the nearest unclaimed heart, check where the rooms are, and decide before the
+                    placement phase comes round. The round cannot advance past a placement phase while
+                    a team still owes a tile, so taking a moment costs nobody anything; dithering for
+                    ten minutes while nine people wait does.
+                </p>
+            </div>
+        </section>
+
+        <!-- ==================== SECTION 6: THE ROUND ==================== -->
+        <section id="round" class="section">
+            <h1 class="section-title">6. The Round</h1>
+
+            <p>
+                The tournament runs in rounds, and every round walks the same fixed sequence of
+                phases. You don't need to memorise the names — the interface always tells you where
+                you are and what it's waiting for — but knowing the shape tells you when you can act
+                and when you're waiting.
+            </p>
+
+            <div class="phase-flow">
+                <ol>
+                    <li>
+                        <span class="phase-name">Scoring: Victory Points</span>
+                        <span class="phase-desc">Last round's match wins are tallied. From round 2 onward this opens with an animated recap of the previous round — wins, placements, heart income, spells cast — shown on the spectator screen.</span>
+                    </li>
+                    <li>
+                        <span class="phase-name">Scoring: Hex</span>
+                        <span class="phase-desc">Heart income is paid out. This is the one moment per round your hearts pay. Contested hearts pay nobody; in round 1 nothing pays at all.</span>
+                    </li>
+                    <li>
+                        <span class="phase-name">Hex Placement — Game 1</span>
+                        <span class="phase-desc">Teams that won last round's Match 1 place their tiles. The round cannot move on until every owed tile is down.</span>
+                    </li>
+                    <li class="spell">
+                        <span class="phase-name">Spell Window 1</span>
+                        <span class="phase-desc">First chance to cast. Optional — if nobody has cards, it's skipped.</span>
+                    </li>
+                    <li>
+                        <span class="phase-name">Hex Placement — Game 2</span>
+                        <span class="phase-desc">Teams that won last round's Match 2 place their tiles.</span>
+                    </li>
+                    <li>
+                        <span class="phase-name">Challenges Issued</span>
+                        <span class="phase-desc">Any heart disputes created by the new placements are set up as challenge matches.</span>
+                    </li>
+                    <li class="spell">
+                        <span class="phase-name">Spell Window 2</span>
+                        <span class="phase-desc">Cast before the challenges are played — this is where pre-game spells aimed at a challenge belong.</span>
+                    </li>
+                    <li class="loop">
+                        <span class="phase-name">Challenge Game &nbsp;⟲</span>
+                        <span class="phase-desc">The challenge matches are played and confirmed. Up to <strong>7 challenge games</strong> can run in a single round.</span>
+                    </li>
+                    <li class="spell">
+                        <span class="phase-name">Spell Window 3</span>
+                        <span class="phase-desc">React to the challenge results. Can loop back to another Challenge Game if more disputes remain.</span>
+                    </li>
+                    <li>
+                        <span class="phase-name">Board Resolved</span>
+                        <span class="phase-desc">The board is checked and agreed. What's on screen now is the truth — speak up here if something looks wrong, not later.</span>
+                    </li>
+                    <li class="spell">
+                        <span class="phase-name">Spell Window 4</span>
+                        <span class="phase-desc">Last window before the round's own matches. Can loop back to Challenges if the board changed again.</span>
+                    </li>
+                    <li>
+                        <span class="phase-name">Matches In Progress</span>
+                        <span class="phase-desc">Match 1 and Match 2 run in parallel, each through setup → lobby → playing → done. The round waits for both. A break may be inserted automatically before this phase.</span>
+                    </li>
+                    <li>
+                        <span class="phase-name">Round Advance</span>
+                        <span class="phase-desc">Automatic. State is backed up, the round counter ticks, and it all starts again from the top.</span>
+                    </li>
+                </ol>
+            </div>
+
+            <p>
+                Two things fall outside this sequence entirely: a <strong>Break</strong> can be called
+                at any point and pauses everything, and <strong>Tournament End</strong> fires the moment
+                a team reaches the point target.
+            </p>
+
+            <div class="highlight-box info">
+                <div class="highlight-box-title">Where Your Attention Belongs</div>
+                <ul style="margin:0;">
+                    <li><strong>Phases 1–2:</strong> watch the recap, check the standings moved the way you expected.</li>
+                    <li><strong>Phases 3, 5:</strong> place your tiles — decided in advance, ideally.</li>
+                    <li><strong>Phases 4, 7, 9, 11:</strong> your four chances to cast a spell this round.</li>
+                    <li><strong>Phase 10:</strong> your last chance to dispute the board state.</li>
+                    <li><strong>Phase 12:</strong> ready up in both the game lobby and Discord, then play.</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- ==================== SECTION 7: CHALLENGES ==================== -->
+        <section id="challenge" class="section">
+            <h1 class="section-title">7. Heart Challenges</h1>
+
+            <p>
+                Hearts don't have to be taken from an empty board. If another team already holds one,
+                you can take it off them — but only by beating them for it.
+            </p>
+
+            <div class="highlight-box danger">
+                <div class="highlight-box-title">How To Start One</div>
+                <p style="margin:0;">
+                    Place a tile <strong>adjacent to a heart hex another team controls</strong>. That
+                    puts the heart in dispute, and a challenge match is set up during the round's
+                    Challenges phase.
+                </p>
+            </div>
+
+            <h4>The Rules</h4>
             <ul>
-                <li><strong>Forced Match:</strong> Challenger and defender must play against each other in the next match</li>
-                <li><strong>Game Selection:</strong> The challenger chooses which game to play</li>
-                <li><strong>Stakes:</strong> Winner gains or keeps control of the heart hex</li>
+                <li><strong>A dedicated match:</strong> challenger and defender are matched directly against each other, outside the round's two normal slots.</li>
+                <li><strong>The challenger picks the game.</strong></li>
+                <li><strong>Sides can be doubled up:</strong> a challenge supports up to two teams per side, so several disputes over the same heart can resolve in one match.</li>
+                <li><strong>Up to 7 challenge games per round.</strong></li>
             </ul>
 
-            <h4>Challenge Outcomes</h4>
+            <div class="table-scroll">
             <table>
                 <thead>
                     <tr>
@@ -923,500 +1647,752 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr>
-                        <td><strong>Challenger wins</strong></td>
-                        <td>Challenger takes control of the heart</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Defender wins</strong></td>
-                        <td>Defender keeps control of the heart</td>
-                    </tr>
+                    <tr><td><strong>Challenger wins</strong></td><td>Control of the heart transfers to the challenger</td></tr>
+                    <tr><td><strong>Defender wins</strong></td><td>The defender keeps it</td></tr>
                 </tbody>
             </table>
-
-            <div class="highlight-box info">
-                <div class="highlight-box-title">Multiple Challenges in One Turn</div>
-                <p style="margin:0;">
-                    If multiple heart challenges occur that cannot be resolved in one game,
-                    <strong>challenge matches are played consecutively</strong> before other board changes.
-                    Heart control points are only counted <strong>once per turn</strong>, not separately for each challenge game.
-                </p>
             </div>
-
-        </section>
-
-        <!-- ==================== SECTION 7: SPELLS ==================== -->
-        <section id="spells" class="section">
-            <h1 class="section-title">7. Spell Cards</h1>
-
-            <p>
-                Spells are powerful effects that can be played by any team at any time.
-            </p>
 
             <div class="highlight-box warning">
-                <div class="highlight-box-title">One Spell Per Turn</div>
+                <div class="highlight-box-title">Challenges Score Nothing — And That's The Point</div>
                 <p style="margin:0;">
-                    Each team can only play <strong>one spell per turn</strong>.
+                    A challenge match awards <strong>no victory point</strong>, <strong>no tile</strong>,
+                    and doesn't touch anyone's win/loss record. You are playing purely for the hex.
+                    What makes it worth playing is the income: the Mountain Heart is +2 <em>every
+                    remaining round</em>, which over a long tournament dwarfs any single match win.
                 </p>
             </div>
 
-            <div id="spell-timing" class="subsection">
-                <h3 class="subsection-title">Spell Timing Categories</h3>
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Type</th>
-                            <th>When to Cast</th>
-                            <th>Example</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><span class="spell-type pre-game">Pre-Game</span></td>
-                            <td>Before a match starts</td>
-                            <td>Double-sided Glow</td>
-                        </tr>
-                        <tr>
-                            <td><span class="spell-type instant">Instant</span></td>
-                            <td>During match or placement</td>
-                            <td>Mountain Purification</td>
-                        </tr>
-                        <tr>
-                            <td><span class="spell-type tactical">Tactical</span></td>
-                            <td>Strategic moment (one-time)</td>
-                            <td>All According to Plan</td>
-                        </tr>
-                        <tr>
-                            <td><span class="spell-type defensive">Defensive</span></td>
-                            <td>After losing a match</td>
-                            <td>Elf Protection</td>
-                        </tr>
-                        <tr>
-                            <td><span class="spell-type aggressive">Aggressive</span></td>
-                            <td>With tile placement</td>
-                            <td>Calculated Aggression</td>
-                        </tr>
-                        <tr>
-                            <td><span class="spell-type permanent">Permanent</span></td>
-                            <td>Anytime (lasts all game)</td>
-                            <td>Victory Strike</td>
-                        </tr>
-                        <tr>
-                            <td><span class="spell-type counter">Counter</span></td>
-                            <td>In response to opponent</td>
-                            <td>Rift of Deep Knowledge</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="highlight-box info">
+                <div class="highlight-box-title">The Hidden Cost To The Defender</div>
+                <p style="margin:0;">
+                    While a heart is under challenge, it pays <strong>nobody</strong> for that round.
+                    Simply opening a dispute denies the holder their income — so a challenge you expect
+                    to lose can still be worth issuing to stall a leader, and a defender has real
+                    reason to want it resolved fast.
+                </p>
             </div>
 
-            <div id="spell-list" class="subsection">
-                <h3 class="subsection-title">All Spells</h3>
+            <p>
+                Heart income is counted <strong>once per round</strong> regardless of how many
+                challenge games were played over it. Seven challenge games in a round does not mean
+                seven payouts.
+            </p>
+        </section>
 
-                <!-- Pre-Game Spells -->
-                <h4>Pre-Game Spells</h4>
+        <!-- ==================== SECTION 8: SPELLS ==================== -->
+        <section id="spells" class="section">
+            <h1 class="section-title">8. Spell Cards</h1>
+
+            <p>
+                Spells are the game's chaos. There are <strong>15</strong>, and they do things the
+                board rules otherwise forbid: destroy enemy tiles, double your rewards, place tiles
+                out of nowhere, challenge the Mountain Heart from across the map, or simply forbid an
+                opponent from speaking during their match.
+            </p>
+
+            <div id="spell-economy" class="subsection">
+                <h3 class="subsection-title">Hands &amp; Draw Piles</h3>
+
+                <p>Each team has its own private card economy:</p>
+
+                <ul>
+                    <li>Every team gets its <strong>own shuffled draw pile containing all 15 spells</strong> — you are not competing with other teams for copies, and two teams can hold the same card at once.</li>
+                    <li>You open the tournament with a <strong>hand of 3</strong>, drawn at random from that pile.</li>
+                    <li>You draw more by <strong>placing tiles on room hexes</strong> (1 card each).</li>
+                    <li>Cast cards go to a used pile. When your draw pile runs out, the used pile is <strong>reshuffled back in</strong> — you can never run permanently dry.</li>
+                </ul>
+
+                <p>
+                    Your hand is private to your team and visible on your team page. Cast spells are
+                    public once played.
+                </p>
+            </div>
+
+            <div id="spell-windows" class="subsection">
+                <h3 class="subsection-title">Spell Windows &amp; Turn Order</h3>
+
+                <p>
+                    You cannot cast whenever you like. Spells are cast during the round's
+                    <strong>four spell windows</strong> (see <a href="#round">§6</a>),
+                    which sit at deliberately chosen moments: after the first placement, before the
+                    challenge games, after them, and before the round's own matches.
+                </p>
+
+                <div class="highlight-box warning">
+                    <div class="highlight-box-title">One Spell Per Turn</div>
+                    <p style="margin:0;">
+                        Each team may cast at most <strong>one spell per turn</strong>. Four windows a
+                        round means up to four across a full round — but every window is a decision,
+                        not an obligation. Passing is normal.
+                    </p>
+                </div>
+
+                <div class="highlight-box victory">
+                    <div class="highlight-box-title">Last Place Acts First</div>
+                    <p style="margin:0;">
+                        Within a spell window, teams take their turns in <strong>reverse standings
+                        order</strong> — the team with the fewest points goes first, the leader goes
+                        last. This is a deliberate catch-up mechanic: if you're behind, you get to
+                        commit first and force the leader to respond. If you're ahead, you get to see
+                        everything coming and answer it.
+                    </p>
+                </div>
+
+                <p>
+                    A window with a card in it and nobody holding cards is skipped automatically.
+                </p>
+            </div>
+
+            <!--
+                The full card list is 15 cards deep and breaks the flow of the
+                manual for a first-time reader, so it is collapsed by default
+                and expanded on demand. Deep-linking to #spell-list (from the
+                contents sidebar or an external link) auto-opens it — see the
+                script at the bottom of the page.
+            -->
+            <div id="spell-list" class="subsection">
+                <h3 class="subsection-title">All 15 Spells</h3>
+
+                <p>
+                    Card text below matches the definitions the system actually uses. Where a card's
+                    original wording named a specific race, it's written here as "your team" — the
+                    effect is identical.
+                </p>
+
+                <button type="button" class="spell-toggle" id="spellToggle"
+                        aria-expanded="false" aria-controls="spellDeck">
+                    <span class="spell-toggle-chevron" aria-hidden="true">▶</span>
+                    <span class="spell-toggle-label">Show all 15 spell cards</span>
+                    <span class="spell-toggle-hint">15 cards</span>
+                </button>
+
+                <div class="spell-deck" id="spellDeck" hidden>
+
+                <h4>Pre-Game — cast before a match begins</h4>
 
                 <div class="spell-card">
                     <div class="spell-header">
-                        <span class="spell-name">Double-sided Glow / Aura of Supremacy</span>
-                        <span class="spell-type pre-game">Pre-Game</span>
+                        <span class="spell-name">Double-sided Glow / Aura of Supremacy
+                            <span class="spell-name-fi">Kaksinkertainen loisto / Ylivallan aura</span>
+                        </span>
+                        <span class="spell-tags"><span class="spell-type pre-game">Pre-Game</span></span>
                     </div>
                     <p class="spell-effect">
-                        If your team finishes in <strong>1st or 2nd place</strong> in the next match,
-                        you receive <strong>double points and double tiles</strong> for that victory.
+                        If your team finishes <strong>first or second</strong> in the winning side's
+                        final results of the next match, you receive <strong>double victory points and
+                        double tiles</strong> from it.
                     </p>
-                    <p class="spell-timing"><strong>Cast:</strong> Before match starts</p>
+                    <p class="spell-timing"><strong>Cast:</strong> before the match starts. Best on a game where individual placement is clearly ranked, and when you're confident of the win.</p>
                 </div>
 
                 <div class="spell-card">
                     <div class="spell-header">
-                        <span class="spell-name">Get Away From Me!</span>
-                        <span class="spell-type pre-game">Pre-Game</span>
+                        <span class="spell-name">Get Away From Me!
+                            <span class="spell-name-fi">Irti minusta!</span>
+                        </span>
+                        <span class="spell-tags"><span class="spell-type pre-game">Pre-Game</span></span>
                     </div>
                     <p class="spell-effect">
-                        If your team wins the next match, <strong>destroy all opponent tiles adjacent</strong>
-                        to your tiles on the board.
+                        If your side wins the next match, <strong>every opponent tile touching one of
+                        your tiles is destroyed</strong> afterwards.
                     </p>
-                    <p class="spell-timing"><strong>Cast:</strong> Before match starts</p>
+                    <p class="spell-timing"><strong>Cast:</strong> before the match starts. Devastating when enemies have crowded up against your border — check the board first and count what it would actually remove.</p>
                 </div>
 
                 <div class="spell-card">
                     <div class="spell-header">
                         <span class="spell-name">Domination! Domination! Domination!</span>
-                        <span class="spell-type pre-game">Pre-Game</span>
+                        <span class="spell-tags"><span class="spell-type rare">Rare</span><span class="spell-type pre-game">Pre-Game</span></span>
                     </div>
                     <p class="spell-effect">
-                        If your team wins <strong>3 games in a row</strong>, gain <strong>+2 bonus tiles</strong>
-                        and <strong>+2 bonus points</strong> after the third win.
+                        If your team is on the winning side of <strong>three matches in a row</strong>
+                        after this card is cast, you gain <strong>+2 extra tiles and +2 extra
+                        points</strong>.
                     </p>
-                    <p class="spell-timing"><strong>Cast:</strong> Before starting a win streak attempt</p>
+                    <p class="spell-timing"><strong>Cast:</strong> before a match, when you believe a streak is starting. A loss breaks it — you'd have to cast it again.</p>
                 </div>
 
                 <div class="spell-card">
                     <div class="spell-header">
-                        <span class="spell-name">Sabotage</span>
-                        <span class="spell-type pre-game">Pre-Game</span>
+                        <span class="spell-name">Sabotage
+                            <span class="spell-name-fi">Sabotaasia</span>
+                        </span>
+                        <span class="spell-tags"><span class="spell-type aggressive">Debuff</span></span>
                     </div>
                     <p class="spell-effect">
-                        <strong>Ban one game element</strong> (hero, weapon, strategy, etc.) from an opponent's
-                        loadout for the next game.
+                        Choose one opponent team and <strong>ban one playable thing</strong> from them
+                        for the next match — a weapon, a class, a hero, an item, a strategy.
                     </p>
-                    <p class="spell-timing"><strong>Cast:</strong> Before match starts</p>
-                </div>
-
-                <!-- Defensive Spells -->
-                <h4>Defensive Spells</h4>
-
-                <div class="spell-card">
-                    <div class="spell-header">
-                        <span class="spell-name">Elf Protection</span>
-                        <span class="spell-type defensive">Defensive</span>
-                    </div>
-                    <p class="spell-effect">
-                        After losing a match, <strong>protect all your tiles</strong> from destruction.
-                        Also grants <strong>immunity to negative spell effects</strong> for the next game.
-                    </p>
-                    <p class="spell-timing"><strong>Cast:</strong> Immediately after losing a match</p>
-                </div>
-
-                <!-- Tactical Spells -->
-                <h4>Tactical Spells</h4>
-
-                <div class="spell-card">
-                    <div class="spell-header">
-                        <span class="spell-name">All According to My Plan</span>
-                        <span class="spell-type tactical">Tactical (Rare)</span>
-                    </div>
-                    <p class="spell-effect">
-                        <strong>Copy any spell</strong> an opponent just used. The copied spell takes
-                        effect immediately with the same targets/effects.
-                    </p>
-                    <p class="spell-timing"><strong>Cast:</strong> Immediately after opponent uses a spell</p>
+                    <p class="spell-timing"><strong>Cast:</strong> before an opponent's important match. Aim at a one-trick — the ban only hurts if they had no plan B.</p>
                 </div>
 
                 <div class="spell-card">
                     <div class="spell-header">
-                        <span class="spell-name">Complete the Contract</span>
-                        <span class="spell-type tactical">Tactical</span>
+                        <span class="spell-name">Echo of Silence
+                            <span class="spell-name-fi">Hiljaisuuden kaiku</span>
+                        </span>
+                        <span class="spell-tags"><span class="spell-type aggressive">Debuff</span></span>
                     </div>
                     <p class="spell-effect">
-                        <strong>Challenge for control of the Mountain Heart</strong>, regardless of position.
-                        If you win the challenge, gain <strong>+2 bonus points</strong> in addition to control.
+                        Choose one player on any team. For the whole of the next match they
+                        <strong>cannot use a microphone or speak at all</strong>.
                     </p>
-                    <p class="spell-timing"><strong>Cast:</strong> During your turn, triggers immediate challenge</p>
+                    <p class="spell-timing"><strong>Cast:</strong> before the match. Target the shotcaller, not the best mechanical player. Counterplay: agree on hand signals or text callouts with your teammate in advance.</p>
                 </div>
-
-                <!-- Instant Spells -->
-                <h4>Instant Spells</h4>
 
                 <div class="spell-card">
                     <div class="spell-header">
-                        <span class="spell-name">Mountain Purification</span>
-                        <span class="spell-type instant">Instant</span>
+                        <span class="spell-name">Betting from the Depths
+                            <span class="spell-name-fi">Vedonlyöntiä syvyyksistä</span>
+                        </span>
+                        <span class="spell-tags"><span class="spell-type tactical">Gamble</span></span>
                     </div>
                     <p class="spell-effect">
-                        Immediately gain <strong>+1 point for each heart hex</strong> your team currently controls.
+                        Before the match, fill in a betting slip with <strong>three predictions</strong>:
+                        which side wins, who does the most damage/kills, and who dies the most. Each
+                        correct prediction is worth <strong>+1 point and +1 tile</strong>. If all three
+                        are wrong, <strong>two of your tiles are destroyed</strong>.
                     </p>
-                    <p class="spell-timing"><strong>Cast:</strong> After placing a tile (best when controlling multiple hearts)</p>
+                    <p class="spell-timing"><strong>Cast:</strong> before the match. The only card that can hand you 3 points and 3 tiles at once — and the only one that punishes you for casting it.</p>
                 </div>
 
-                <!-- Aggressive Spells -->
-                <h4>Aggressive Spells</h4>
+                <h4>Defensive</h4>
 
                 <div class="spell-card">
                     <div class="spell-header">
-                        <span class="spell-name">Calculated Aggression</span>
-                        <span class="spell-type aggressive">Aggressive</span>
+                        <span class="spell-name">Elf Protection
+                            <span class="spell-name-fi">Haltiasuoja</span>
+                        </span>
+                        <span class="spell-tags"><span class="spell-type defensive">Defensive</span></span>
                     </div>
                     <p class="spell-effect">
-                        Place <strong>1 tile</strong>. If that tile touches any enemy tiles,
-                        <strong>destroy all adjacent enemy tiles</strong>.
+                        All your tiles are <strong>protected until the end of the next match</strong>
+                        and cannot be removed by any effect. Your team also <strong>cannot be targeted
+                        by negative card effects</strong> until the end of the next round.
                     </p>
-                    <p class="spell-timing"><strong>Cast:</strong> When placing a tile adjacent to enemies</p>
+                    <p class="spell-timing"><strong>Cast:</strong> after losing a match. The direct answer to Get Away From Me! and Calculated Aggression — hold it if you can see one coming.</p>
                 </div>
 
-                <!-- Placement Spells -->
-                <h4>Placement Spells</h4>
+                <h4>Tactical</h4>
+
+                <div class="spell-card">
+                    <div class="spell-header">
+                        <span class="spell-name">All According to My Plan
+                            <span class="spell-name-fi">Kaikki on minun suunnitelmaani</span>
+                        </span>
+                        <span class="spell-tags"><span class="spell-type rare">Rare</span><span class="spell-type tactical">Tactical</span></span>
+                    </div>
+                    <p class="spell-effect">
+                        Choose <strong>one card another team has already used</strong> and play it
+                        immediately as your own — with your own targets. The copied card must be
+                        legally playable right now.
+                    </p>
+                    <p class="spell-timing"><strong>Cast:</strong> on your turn, any window. Its value is entirely determined by what has been played before it, so it gets better the longer you hold it.</p>
+                </div>
+
+                <div class="spell-card">
+                    <div class="spell-header">
+                        <span class="spell-name">Complete the Contract
+                            <span class="spell-name-fi">Täytä sopimus</span>
+                        </span>
+                        <span class="spell-tags"><span class="spell-type tactical">Challenge</span></span>
+                    </div>
+                    <p class="spell-effect">
+                        <strong>Challenge for the Mountain Heart regardless of where you are on the
+                        board.</strong> If you win the challenge you gain <strong>+2 victory
+                        points</strong> and may immediately <strong>place one tile next to the
+                        centre</strong>, removing another team's tile there if necessary.
+                    </p>
+                    <p class="spell-timing"><strong>Cast:</strong> before a game. The only way to contest the centre without first walking a tile chain to it — this card can skip half a tournament of positioning.</p>
+                </div>
+
+                <h4>Instant &amp; Placement</h4>
+
+                <div class="spell-card">
+                    <div class="spell-header">
+                        <span class="spell-name">Mountain Purification
+                            <span class="spell-name-fi">Vuoren puhdistus</span>
+                        </span>
+                        <span class="spell-tags"><span class="spell-type instant">Instant</span></span>
+                    </div>
+                    <p class="spell-effect">
+                        Gain <strong>+1 victory point for every heart hex you control</strong> at that
+                        moment — Mountain Heart and side hearts alike.
+                    </p>
+                    <p class="spell-timing"><strong>Cast:</strong> immediately after placing a tile. Place onto a heart first, <em>then</em> cast, so the new heart counts. Worth up to +7.</p>
+                </div>
+
+                <div class="spell-card">
+                    <div class="spell-header">
+                        <span class="spell-name">Calculated Aggression
+                            <span class="spell-name-fi">Harkittu aggressio</span>
+                        </span>
+                        <span class="spell-tags"><span class="spell-type aggressive">Aggressive</span></span>
+                    </div>
+                    <p class="spell-effect">
+                        Place <strong>one tile</strong>. If it ends up adjacent to any opponent tiles,
+                        you may <strong>remove those tiles from the board</strong>.
+                    </p>
+                    <p class="spell-timing"><strong>Cast:</strong> with a placement. Look for a hex that touches the most enemy tiles at once — and prefer breaking a chain that connects an opponent to a heart, since a severed chain can't be extended.</p>
+                </div>
 
                 <div class="spell-card">
                     <div class="spell-header">
                         <span class="spell-name">Knowledge from the Deep</span>
-                        <span class="spell-type instant">Placement</span>
+                        <span class="spell-tags"><span class="spell-type instant">Placement</span></span>
                     </div>
                     <p class="spell-effect">
-                        Place <strong>2 tiles anywhere on the board</strong>. Restriction: cannot place
-                        adjacent to heart hexes or enemy tiles.
+                        Place <strong>two tiles anywhere on the board</strong>, ignoring the adjacency
+                        rule. Restriction: neither tile may be next to a heart hex, and neither may be
+                        next to another team's tile.
                     </p>
-                    <p class="spell-timing"><strong>Cast:</strong> During placement phase</p>
+                    <p class="spell-timing"><strong>Cast:</strong> during a placement phase. Use it to found a second front in open board space — the restriction means it can't take a heart directly, but it can start a chain that will.</p>
                 </div>
 
-                <!-- Event Spells -->
-                <h4>Event Spells</h4>
+                <h4>Permanent, Modifier &amp; Counter</h4>
 
                 <div class="spell-card">
                     <div class="spell-header">
-                        <span class="spell-name">Double Bid</span>
-                        <span class="spell-type instant">Event Modifier</span>
+                        <span class="spell-name">Victory Strike
+                            <span class="spell-name-fi">Voitonlyönti</span>
+                        </span>
+                        <span class="spell-tags"><span class="spell-type rare">Rare</span><span class="spell-type permanent">Permanent</span></span>
                     </div>
                     <p class="spell-effect">
-                        When you would draw an event card (from placing on a Room),
-                        <strong>draw 2 cards instead of 1</strong>. One-time use.
+                        For the rest of the tournament, <strong>every new heart you capture</strong> —
+                        Mountain Heart or side heart — immediately gives <strong>+1 victory
+                        point</strong>. The effect never expires.
                     </p>
-                    <p class="spell-timing"><strong>Cast:</strong> When placing tile on a Room hex</p>
-                </div>
-
-                <!-- Permanent Spells -->
-                <h4>Permanent Spells</h4>
-
-                <div class="spell-card">
-                    <div class="spell-header">
-                        <span class="spell-name">Victory Strike</span>
-                        <span class="spell-type permanent">Permanent Buff</span>
-                    </div>
-                    <p class="spell-effect">
-                        For the rest of the tournament, each time your team <strong>captures a new heart hex</strong>,
-                        gain <strong>+1 bonus point</strong> immediately.
-                    </p>
-                    <p class="spell-timing"><strong>Cast:</strong> Anytime (best early for maximum value)</p>
-                </div>
-
-                <!-- Debuff Spells -->
-                <h4>Debuff Spells</h4>
-
-                <div class="spell-card">
-                    <div class="spell-header">
-                        <span class="spell-name">Echo of Silence</span>
-                        <span class="spell-type pre-game">Debuff</span>
-                    </div>
-                    <p class="spell-effect">
-                        Choose one opponent player. That player <strong>cannot speak or communicate verbally</strong>
-                        during the next match.
-                    </p>
-                    <p class="spell-timing"><strong>Cast:</strong> Before match starts</p>
+                    <p class="spell-timing"><strong>Cast:</strong> as early as possible. Its value is entirely a function of how many hearts you have left to take, so a card cast in round 2 is worth several times the same card cast in round 12.</p>
                 </div>
 
                 <div class="spell-card">
                     <div class="spell-header">
-                        <span class="spell-name">Betting from the Depths</span>
-                        <span class="spell-type tactical">Bet/Gamble</span>
+                        <span class="spell-name">Double Bid
+                            <span class="spell-name-fi">Kaksoisnosto</span>
+                        </span>
+                        <span class="spell-tags"><span class="spell-type instant">Modifier</span></span>
                     </div>
                     <p class="spell-effect">
-                        Make <strong>3 predictions</strong> about the upcoming match. For each correct prediction,
-                        gain <strong>+1 point/tile</strong>. If all 3 are wrong, <strong>lose 2 tiles</strong>.
+                        The next time you place a tile on a room hex, you <strong>draw two cards
+                        instead of one</strong>. It waits in effect until it is used.
                     </p>
-                    <p class="spell-timing"><strong>Cast:</strong> Before match starts</p>
+                    <p class="spell-timing"><strong>Cast:</strong> before you make a run at a room. It doesn't expire while unused, so casting it early is close to free.</p>
                 </div>
-
-                <!-- Counter Spells -->
-                <h4>Counter Spells</h4>
 
                 <div class="spell-card">
                     <div class="spell-header">
-                        <span class="spell-name">Rift of Deep Knowledge</span>
-                        <span class="spell-type counter">Counter (Rare)</span>
+                        <span class="spell-name">Rift of Deep Knowledge
+                            <span class="spell-name-fi">Syvän tiedon rako</span>
+                        </span>
+                        <span class="spell-tags"><span class="spell-type rare">Rare</span><span class="spell-type counter">Counter</span></span>
                     </div>
                     <p class="spell-effect">
-                        Keep this card in hand. When an opponent would draw an event card,
-                        <strong>counter that draw</strong> - they receive nothing.
+                        Stays in your hand until used. When another team draws a card, you may
+                        <strong>read it and then cancel the draw</strong> — the card goes straight to
+                        the used pile and is never played.
                     </p>
-                    <p class="spell-timing"><strong>Cast:</strong> In response to opponent's Room hex placement</p>
+                    <p class="spell-timing"><strong>Cast:</strong> reactively. You see the card before deciding, so there is no guesswork — let harmless draws through and cancel only what would hurt you.</p>
                 </div>
+
+                </div><!-- /.spell-deck -->
+            </div>
+
+            <div id="spell-strategy" class="subsection">
+                <h3 class="subsection-title">Strategy</h3>
+
+                <ul>
+                    <li><strong>Early:</strong> Victory Strike (its value only decays), Double Bid (free if unused), Knowledge from the Deep (a second front early is worth more than late).</li>
+                    <li><strong>Mid:</strong> Mountain Purification (cash in the hearts you've accumulated), Calculated Aggression (cut a rival's chain before it reaches a heart), Complete the Contract (contest the centre without the walk).</li>
+                    <li><strong>Late:</strong> Double-sided Glow (multiply what's left), Get Away From Me! (clear a path when the board is crowded), Elf Protection (defend a lead).</li>
+                    <li><strong>The combo:</strong> capture a heart while Victory Strike is active (+1), then cast Mountain Purification the same placement (+1 per heart held, including the new one).</li>
+                    <li><strong>Read the order:</strong> in a spell window the leader acts last and sees everything first. If you're leading, hold your counter. If you're behind, your first-mover advantage is the only edge the system hands you — use it.</li>
+                    <li><strong>Against Echo of Silence:</strong> agree hand signals or a text-callout habit with your teammate before it's ever cast on you.</li>
+                </ul>
             </div>
         </section>
 
-        <!-- ==================== SECTION 8: SPECIAL RULES ==================== -->
+        <!-- ==================== SECTION 9: YOUR PAGES ==================== -->
+        <section id="your-pages" class="section">
+            <h1 class="section-title">9. Your Pages</h1>
+
+            <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Page</th>
+                        <th>What It's For</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Home</strong></td>
+                        <td>Your landing page — current standings, your next match, and links to everything else.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>My Team</strong></td>
+                        <td>The page you'll live in. Your spell hand, your match details, your ready-up buttons, your team's board position.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Spectator</strong></td>
+                        <td>The live board, built for the big screen. Also the best way to study the map before deciding a placement.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Statistics</strong></td>
+                        <td>Win rates, per-player numbers, and how the standings moved over time.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Match Queue</strong></td>
+                        <td>A display screen of upcoming matches — check here for what you're playing next.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Onboarding</strong></td>
+                        <td>Your personal pre-event checklist: add everyone on each gaming platform, test-launch each game, enter your platform IDs. Doing this <em>before</em> the event is the single biggest thing you can do to keep the tournament running on time.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Profile</strong></td>
+                        <td>Your account, avatar, and platform IDs.</td>
+                    </tr>
+                </tbody>
+            </table>
+            </div>
+
+            <p>
+                There's also a <strong>chat widget</strong> on the tournament pages, with two rooms:
+                one for the whole tournament and one private to your team. Use the team room to plan
+                placements and spells without tipping anyone off.
+            </p>
+
+            <p>
+                Everything is live. The board, the standings and the phase indicator update on every
+                device at once, so you never need to refresh, and what your teammate sees on their
+                laptop is exactly what's on the big screen.
+            </p>
+        </section>
+
+        <!-- ==================== SECTION 10: EDGE CASES ==================== -->
         <section id="special-rules" class="section">
-            <h1 class="section-title">8. Special Rules</h1>
+            <h1 class="section-title">10. Edge Cases &amp; FAQ</h1>
 
             <div class="subsection">
-                <h3 class="subsection-title">Victory</h3>
+                <h3 class="subsection-title">Rules Questions</h3>
+
+                <p><strong>Can we cast more than one spell in a round?</strong><br>
+                One per turn, and there are four windows in a round — so yes, up to four across a full
+                round, but never two in the same window.</p>
+
+                <p><strong>Can we trade spell cards with another team?</strong><br>
+                Not by default. The organiser can allow it for a given event if they want to.</p>
+
+                <p><strong>Do spell effects survive into the next round?</strong><br>
+                Depends on the card. Permanent buffs, counters and streak bonuses never expire. Shields
+                last until the end of the next round. Modifiers wait until they're used. Everything
+                else resolves within its own round.</p>
+
+                <p><strong>What if a spell's effect is ambiguous in a specific situation?</strong><br>
+                The organiser makes the final call, and it stands. Ask before you cast if it matters.</p>
+
+                <p><strong>What if someone breaks a debuff — talks while silenced, uses a banned weapon?</strong><br>
+                The organiser decides the consequence, up to and including a points deduction.</p>
+
+                <p><strong>Our team was split and we won — why did we get nothing?</strong><br>
+                Because a split team needs 2+ players on the winning side. With one on each side, the
+                match doesn't count for your team in either direction. See
+                <a href="#split-teams">§3</a>.</p>
+
+                <p><strong>Why didn't our hearts pay out this round?</strong><br>
+                Three possibilities: it's round 1 (no income is paid at all), the heart is under an
+                unresolved challenge (frozen), or it changed hands before the scoring phase.</p>
+
+                <p><strong>We won a challenge but our score didn't move.</strong><br>
+                Correct. Challenges transfer the hex, not points. The reward arrives as income in every
+                subsequent round.</p>
+            </div>
+
+            <div class="subsection">
+                <h3 class="subsection-title">Mistakes &amp; Corrections</h3>
 
                 <p>
-                    The tournament ends when a team reaches <strong>50 points</strong>.
+                    The organiser has a full <strong>undo/redo system</strong>, and every action is
+                    logged with a timestamp. It exists for genuine errors — a misclicked hex, a result
+                    entered on the wrong side — not for strategic takebacks after you've seen what
+                    happened next.
+                </p>
+                <p>
+                    If something looks wrong, say so <strong>at the Board Resolved phase</strong>, which
+                    exists precisely for this. Once the round's matches have started, unwinding gets
+                    expensive for everyone.
                 </p>
             </div>
 
             <div class="subsection">
-                <h3 class="subsection-title">Point Calculation</h3>
+                <h3 class="subsection-title">Disconnections &amp; Interruptions</h3>
 
-                <p>Heart income points are awarded after:</p>
+                <p>
+                    If someone drops mid-match, the host game's own rules apply — remake, pause,
+                    play on, whatever that game normally does. Tournament state lives on the server,
+                    so nothing is lost by closing a tab, refreshing, or a laptop dying. The organiser
+                    can call a break at any time, and one may also be scheduled automatically between
+                    rounds.
+                </p>
+            </div>
+
+            <div class="subsection">
+                <h3 class="subsection-title">Something's Broken</h3>
+
                 <ul>
-                    <li>Each match result is confirmed</li>
-                    <li>Based on which hearts each team controls at that moment</li>
+                    <li><strong>The match won't start.</strong> Someone is missing a ready flag. Remember it's two — game lobby <em>and</em> Discord.</li>
+                    <li><strong>My spell hand is empty.</strong> You've cast everything. Land on a room hex to draw more.</li>
+                    <li><strong>The board looks out of date.</strong> It shouldn't — updates are live. If a refresh doesn't fix it, tell the organiser rather than working around it.</li>
+                    <li><strong>I can't see my team page.</strong> You may not be assigned to a team yet. Ask the organiser to link your account.</li>
                 </ul>
-
-                <p>Heart control can change due to:</p>
-                <ul>
-                    <li>Tile placement on a heart hex</li>
-                    <li>Challenge results (winning a challenge for an opponent's heart tile)</li>
-                    <li>Spell effects</li>
-                </ul>
-            </div>
-
-            <div class="subsection">
-                <h3 class="subsection-title">Undo/Redo</h3>
-
-                <p>
-                    Admins have access to an <strong>undo/redo system</strong> for correcting mistakes.
-                    All actions are logged with timestamps for accountability. This should only be used
-                    for genuine errors, not strategic "takebacks."
-                </p>
-            </div>
-
-            <div class="subsection">
-                <h3 class="subsection-title">Disconnections & Pauses</h3>
-
-                <p>
-                    If a player disconnects during an external match, the standard rules of that
-                    game apply. Tournament state is persisted in Firebase and survives page refreshes.
-                    Admins can pause tournament progression if needed.
-                </p>
             </div>
         </section>
 
-        <!-- ==================== SECTION 9: QUICK REFERENCE ==================== -->
+        <!-- ==================== SECTION 11: QUICK REFERENCE ==================== -->
         <section id="quick-reference" class="section">
-            <h1 class="section-title">9. Quick Reference</h1>
-
-            <div class="subsection">
-                <h3 class="subsection-title">Turn Sequence</h3>
-
-                <div class="example-block">
-                    <div class="example-label">After Each LAN Game</div>
-                    1. Losing teams mark their victory points<br>
-                    2. Split teams mark individual points<br>
-                    3. Winning teams (in turn):<br>
-                    &nbsp;&nbsp;&nbsp;- Mark personal + team victory points<br>
-                    &nbsp;&nbsp;&nbsp;- Place tile on board<br>
-                    &nbsp;&nbsp;&nbsp;- Handle placement effects<br>
-                    4. Check for 50 points → Victory!
-                </div>
-            </div>
+            <h1 class="section-title">11. Quick Reference</h1>
 
             <div class="subsection">
                 <h3 class="subsection-title">Key Numbers</h3>
 
+                <div class="table-scroll">
                 <table>
                     <thead>
-                        <tr>
-                            <th>Stat</th>
-                            <th>Value</th>
-                        </tr>
+                        <tr><th>Stat</th><th>Value</th></tr>
                     </thead>
                     <tbody>
-                        <tr><td>Victory Points to Win</td><td><strong>50</strong></td></tr>
-                        <tr><td>Win Bonus (both teammates same side)</td><td><strong>+1 point</strong></td></tr>
-                        <tr><td>Mountain Heart Income</td><td><strong>+2 pts/match</strong></td></tr>
-                        <tr><td>Side Heart Income (each)</td><td><strong>+1 pt/match</strong></td></tr>
-                        <tr><td>Max Heart Income</td><td><strong>+8 pts/match</strong></td></tr>
-                        <tr><td>Spells per Turn</td><td><strong>1 max</strong></td></tr>
+                        <tr><td>Points to win</td><td><strong>50 by default</strong> (organiser sets 1–500)</td></tr>
+                        <tr><td>Match win (2+ players on winning side)</td><td><strong>+1 point + 1 tile</strong></td></tr>
+                        <tr><td>Mountain Heart income</td><td><strong>+2 per round</strong></td></tr>
+                        <tr><td>Side Heart income (each)</td><td><strong>+1 per round</strong></td></tr>
+                        <tr><td>Maximum heart income</td><td><strong>+8 per round</strong></td></tr>
+                        <tr><td>Heart income in round 1</td><td><strong>none</strong></td></tr>
+                        <tr><td>Spells per turn</td><td><strong>1</strong></td></tr>
+                        <tr><td>Spell windows per round</td><td><strong>4</strong></td></tr>
+                        <tr><td>Spell turn order</td><td><strong>reverse standings</strong></td></tr>
+                        <tr><td>Starting hand</td><td><strong>3 cards</strong></td></tr>
+                        <tr><td>Total spells</td><td><strong>15</strong> (each team has all 15 in its own pile)</td></tr>
+                        <tr><td>Matches per round</td><td><strong>2</strong> (parallel slots)</td></tr>
+                        <tr><td>Max challenge games per round</td><td><strong>7</strong></td></tr>
+                        <tr><td>Board</td><td><strong>91 hexes</strong></td></tr>
+                        <tr><td>Hearts</td><td><strong>1 Mountain + 6 side</strong></td></tr>
+                        <tr><td>Starting locations</td><td><strong>6</strong> (first-come, not assigned)</td></tr>
+                        <tr><td>Rooms</td><td><strong>varies</strong> — set per tournament</td></tr>
                     </tbody>
                 </table>
+                </div>
             </div>
 
             <div class="subsection">
                 <h3 class="subsection-title">Placement Quick Guide</h3>
 
+                <div class="table-scroll">
                 <table>
                     <thead>
-                        <tr>
-                            <th>Place On</th>
-                            <th>Effect</th>
-                        </tr>
+                        <tr><th>Place On</th><th>Effect</th></tr>
                     </thead>
                     <tbody>
                         <tr><td>Room</td><td>Draw 1 spell</td></tr>
-                        <tr><td>Unclaimed Side Heart</td><td>Take control + Draw 1 spell</td></tr>
-                        <tr><td>Unclaimed Mountain Heart</td><td>Take control</td></tr>
-                        <tr><td>Adjacent to claimed Heart</td><td>Challenge for control</td></tr>
-                        <tr><td>Regular area</td><td>No effect</td></tr>
+                        <tr><td>Unclaimed side heart</td><td>Take control (+1/round) + draw 1 spell</td></tr>
+                        <tr><td>Unclaimed Mountain Heart</td><td>Take control (+2/round)</td></tr>
+                        <tr><td>Adjacent to a held heart</td><td>Opens a challenge for it</td></tr>
+                        <tr><td>Normal hex</td><td>No effect</td></tr>
+                        <tr><td>Occupied hex</td><td>Not allowed — by anyone, including you</td></tr>
+                        <tr><td>First tile ever</td><td>Must be a free starting location</td></tr>
+                        <tr><td>Any later tile</td><td>Must touch a tile you already own</td></tr>
                     </tbody>
                 </table>
+                </div>
             </div>
 
             <div class="subsection">
-                <h3 class="subsection-title">Hex Type Quick Guide</h3>
+                <h3 class="subsection-title">Hex Types At A Glance</h3>
 
-                <table>
+                <div class="table-scroll">
+                <table class="hex-table">
                     <thead>
-                        <tr>
-                            <th>Hex</th>
-                            <th>Effect</th>
-                        </tr>
+                        <tr><th>Hex</th><th>Effect</th></tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td><span class="hex-indicator"><span class="hex-dot mountain"></span> Mountain Heart</span></td>
-                            <td>+2 pts/turn</td>
+                            <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Mountain Heart hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q0r0.png)"></span><span class="rb-hex-bevel"></span><img class="rb-hex-icon mountain" src="shared/images/hexes/mountain_heart_v3.png" alt=""></span></span> Mountain Heart</span></td>
+                            <td>+2 per round</td>
                         </tr>
                         <tr>
-                            <td><span class="hex-indicator"><span class="hex-dot side-heart"></span> Side Heart</span></td>
-                            <td>+1 pt/turn</td>
+                            <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Side Heart hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q-4r2.png)"></span><span class="rb-hex-bevel"></span><img class="rb-hex-icon side" src="shared/images/hexes/side_heart_v3.png" alt=""></span></span> Side Heart</span></td>
+                            <td>+1 per round</td>
                         </tr>
                         <tr>
-                            <td><span class="hex-indicator"><span class="hex-dot room"></span> Room</span></td>
-                            <td>Draw spell card</td>
+                            <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Room hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q1r-2.png)"></span><span class="rb-hex-bevel"></span><span class="rb-hex-room" aria-hidden="true"></span></span></span> Room</span></td>
+                            <td>Draw a spell card</td>
                         </tr>
                         <tr>
-                            <td><span class="hex-indicator"><span class="hex-dot start"></span> Start</span></td>
-                            <td>First tile here</td>
+                            <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Starting location hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q0r-5.png)"></span><span class="rb-hex-bevel"></span><span class="rb-hex-star" aria-hidden="true">⭐</span></span></span> Starting Location</span></td>
+                            <td>Where your first tile must go</td>
                         </tr>
                         <tr>
-                            <td><span class="hex-indicator"><span class="hex-dot normal"></span> Normal</span></td>
+                            <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Normal hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q-3r0.png)"></span><span class="rb-hex-bevel"></span></span></span> Normal</span></td>
                             <td>No effect</td>
                         </tr>
                     </tbody>
                 </table>
+                </div>
+            </div>
+
+            <div class="subsection">
+                <h3 class="subsection-title">The Round In Brief</h3>
+
+                <div class="example-block">
+                    <div class="example-label">Every Round, In Order</div>
+                    1. Score victory points&nbsp;&nbsp;(+ recap of last round, from round 2)<br>
+                    2. Score hearts&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(the one payout per round)<br>
+                    3. Place tiles — Match 1&nbsp;(earned last round)<br>
+                    4. SPELL WINDOW 1<br>
+                    5. Place tiles — Match 2&nbsp;(earned last round)<br>
+                    6. Issue challenges<br>
+                    7. SPELL WINDOW 2<br>
+                    8. Play challenge games&nbsp;&nbsp;(up to 7)<br>
+                    9. SPELL WINDOW 3<br>
+                    10. Board resolved&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(last chance to dispute)<br>
+                    11. SPELL WINDOW 4<br>
+                    12. Play Match 1 &amp; Match 2&nbsp;(parallel; round waits for both)<br>
+                    13. Round advances&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ back to 1
+                </div>
+            </div>
+
+            <div class="subsection">
+                <h3 class="subsection-title">If You Remember Only Five Things</h3>
+
+                <div class="highlight-box victory">
+                    <ol style="margin:0;">
+                        <li><strong>Hearts, not wins.</strong> A win is +1 once. A heart is +1 or +2 every round for the rest of the tournament.</li>
+                        <li><strong>Heart income is per round, not per match</strong> — and round 1 pays nothing.</li>
+                        <li><strong>Adjacency is absolute.</strong> Every tile must touch one of yours. Count your steps to a heart before you pick a direction.</li>
+                        <li><strong>Split means nothing scored</strong> — no point, no tile, no win, no loss.</li>
+                        <li><strong>Ready up twice:</strong> game lobby <em>and</em> Discord. Both, or the match cannot start.</li>
+                    </ol>
+                </div>
             </div>
         </section>
 
         <!-- Footer -->
         <footer style="margin-top: 60px; padding-top: 30px; border-top: 1px solid var(--border-color); color: var(--text-tertiary); font-size: 0.85rem;">
             <p>
-                <strong>Hex Tournament Rulebook</strong> — Version 1.0<br>
-                Last updated: February 2026
+                <strong>Sota Vuoresta</strong> — Board Game Rulebook, Version 2.0<br>
+                Rewritten August 2026, verified against the live game code.
             </p>
             <p style="margin-top: 12px;">
-                Questions? Contact the tournament admin or check the admin panel for clarifications.
+                Anything unclear, or a situation this doesn't cover? Ask the tournament organiser —
+                their ruling is final.
             </p>
         </footer>
 
     </main>
 
-    <!-- Smooth scrolling and active TOC highlighting -->
+    <!-- Collapsible spell deck, smooth scrolling, active TOC highlighting -->
     <script>
-        // Smooth scroll for TOC links
+        // ── Collapsible spell deck ──
+        // 15 cards is a wall of text mid-manual, so the deck ships collapsed.
+        const spellToggle = document.getElementById('spellToggle');
+        const spellDeck = document.getElementById('spellDeck');
+        const spellToggleLabel = spellToggle.querySelector('.spell-toggle-label');
+
+        function setSpellDeck(open) {
+            spellDeck.hidden = !open;
+            spellToggle.setAttribute('aria-expanded', String(open));
+            spellToggleLabel.textContent = open
+                ? 'Hide the spell cards'
+                : 'Show all 15 spell cards';
+        }
+
+        spellToggle.addEventListener('click', () => {
+            const willOpen = spellToggle.getAttribute('aria-expanded') !== 'true';
+            setSpellDeck(willOpen);
+            // Collapsing from below the fold would leave the reader stranded
+            // in whatever section slid up into view — put them back on the
+            // toggle they just clicked.
+            if (!willOpen) {
+                spellToggle.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
+        });
+
+        // Deep links into the deck (or to the section that holds it) must
+        // open it, or the target scrolls to a collapsed, empty container.
+        function expandIfDeckTarget(hash) {
+            if (!hash || hash === '#') return;
+            const target = document.querySelector(hash);
+            if (!target) return;
+            if (hash === '#spell-list' || hash === '#spells' || spellDeck.contains(target)) {
+                setSpellDeck(true);
+            }
+        }
+
+        expandIfDeckTarget(location.hash);
+        window.addEventListener('hashchange', () => expandIfDeckTarget(location.hash));
+
+        // A printed rulebook must be complete regardless of screen state.
+        let deckStateBeforePrint = false;
+        window.addEventListener('beforeprint', () => {
+            deckStateBeforePrint = spellToggle.getAttribute('aria-expanded') === 'true';
+            setSpellDeck(true);
+        });
+        window.addEventListener('afterprint', () => setSpellDeck(deckStateBeforePrint));
+
+        // ── Smooth scroll for TOC links ──
         document.querySelectorAll('.toc-list a').forEach(link => {
             link.addEventListener('click', function(e) {
                 e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
+                const hash = this.getAttribute('href');
+                // Expand first: the deck's height changes where the target sits.
+                expandIfDeckTarget(hash);
+                const target = document.querySelector(hash);
                 if (target) {
                     target.scrollIntoView({ behavior: 'smooth' });
+                    history.replaceState(null, '', hash);
                 }
             });
         });
 
         // Highlight active TOC item on scroll
-        const sections = document.querySelectorAll('.section, .subsection');
+        const sections = document.querySelectorAll('.section[id], .subsection[id]');
         const tocLinks = document.querySelectorAll('.toc-list a');
 
-        window.addEventListener('scroll', () => {
+        const tocSidebar = document.querySelector('.toc-sidebar');
+        let lastActive = null;
+
+        function updateActiveToc() {
             let current = '';
             sections.forEach(section => {
-                const sectionTop = section.offsetTop;
-                if (window.scrollY >= sectionTop - 100) {
+                if (window.scrollY >= section.offsetTop - 100) {
                     current = section.getAttribute('id');
                 }
             });
 
+            let activeLink = null;
             tocLinks.forEach(link => {
-                link.classList.remove('active');
-                if (link.getAttribute('href') === '#' + current) {
-                    link.classList.add('active');
-                }
+                const isActive = link.getAttribute('href') === '#' + current;
+                link.classList.toggle('active', isActive);
+                if (isActive) activeLink = link;
             });
-        });
+
+            // The contents list is longer than the viewport, so the active
+            // entry can scroll out of sight. Nudge the sidebar just enough to
+            // keep it visible — but only when it actually changes, or we'd
+            // fight the user's own scrolling of the sidebar.
+            if (activeLink && activeLink !== lastActive && tocSidebar) {
+                const linkBox = activeLink.getBoundingClientRect();
+                const tocBox = tocSidebar.getBoundingClientRect();
+                if (linkBox.top < tocBox.top + 8 || linkBox.bottom > tocBox.bottom - 8) {
+                    tocSidebar.scrollTop += linkBox.top - tocBox.top - tocBox.height / 3;
+                }
+            }
+            lastActive = activeLink;
+        }
+
+        window.addEventListener('scroll', updateActiveToc, { passive: true });
+        updateActiveToc();
     </script>
 </body>
 </html>
