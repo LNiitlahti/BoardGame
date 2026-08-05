@@ -222,17 +222,19 @@ class GodApp {
                     .map(([team, pts]) => `${team}: +${pts}`)
                     .join(', ') || 'No points';
 
-                // Heart income is multiplied by the resolving round's match
-                // count — show it, so a ×0 (nothing played, or a round-tagging
-                // bug) is never silent. awardRoundPoints() stamps these.
-                const mult = this.stats.lastPointsMultiplier;
+                // A round in which nothing was played pays no heart income at
+                // all. Surface it, so an unpaid round is never silent.
+                const played = this.stats.lastMatchesPlayed;
                 const resolved = this.stats.lastResolvingRound;
-                const multNote = mult === undefined
-                    ? ''
-                    : ` (round ${resolved}: ${mult} match${mult === 1 ? '' : 'es'}, hearts ×${mult})`;
 
-                this.ui.showStatus(`Round ${roundNumber} points${multNote}: ${msg}`,
-                    mult === 0 ? 'warning' : 'success');
+                // Lead with the round being PAID FOR, not the round we're now
+                // in — scoring_hex sits at the top of the new round.
+                const playedNote = played === 0
+                    ? ' — no matches played, hearts pay nothing'
+                    : (played === undefined ? '' : ` (${played} match${played === 1 ? '' : 'es'} played)`);
+
+                this.ui.showStatus(`Round ${resolved ?? roundNumber} heart income${playedNote}: ${msg}`,
+                    played === 0 ? 'warning' : 'success');
             }
         };
 

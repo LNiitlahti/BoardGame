@@ -2152,18 +2152,23 @@
             .map(([team, pts]) => `${team}: +${pts}`)
             .join(', ') || 'No points awarded';
 
-        // Heart income is multiplied by the resolving round's match count —
-        // show it, so a ×0 (nothing played, or a round-tagging bug) is never
+        // A round in which nothing was played pays no heart income at all.
+        // Surface it, so an unpaid round (or a round-tagging bug) is never
         // silent. awardRoundPoints() stamps these after each run.
-        const mult = (typeof awardRoundPoints === 'function')
-            ? awardRoundPoints.lastMultiplier : undefined;
+        const played = (typeof awardRoundPoints === 'function')
+            ? awardRoundPoints.lastMatchesPlayed : undefined;
         const resolved = (typeof awardRoundPoints === 'function')
             ? awardRoundPoints.lastResolvingRound : undefined;
-        const multNote = mult === undefined
-            ? ''
-            : ` (round ${resolved}: ${mult} match${mult === 1 ? '' : 'es'}, hearts ×${mult})`;
 
-        showStatus(`Round ${roundNumber} points${multNote}: ${msg}`, mult === 0 ? 'warning' : 'success');
+        // Lead with the round being PAID FOR, not the round we're now in.
+        // scoring_hex sits at the top of the new round, so "Round 2 points"
+        // for round 1's income read as though round 2 had already scored.
+        const playedNote = played === 0
+            ? ' — no matches played, hearts pay nothing'
+            : (played === undefined ? '' : ` (${played} match${played === 1 ? '' : 'es'} played)`);
+
+        showStatus(`Round ${resolved ?? roundNumber} heart income${playedNote}: ${msg}`,
+            played === 0 ? 'warning' : 'success');
     }
 
     // ══════════════════════════════════════════════════════════════
