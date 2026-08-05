@@ -134,9 +134,13 @@
             align-items: center;
             justify-content: center;
         }
+        /* Only the rig and the board itself need a 3D context — they carry the
+           depth the drop cascade's translateZ relies on. A .board-hex has no
+           3D-transformed children of its own, so giving each of the 91 hexes
+           its own 3D rendering context bought nothing and cost the browser the
+           ability to flatten and cache them. */
         body.cine-active .rig-3d { transform-style: preserve-3d; }
         body.cine-active #hexBoard { transform-style: preserve-3d; }
-        body.cine-active .board-hex { transform-style: preserve-3d; }
 
         /* ===========================================================
            MATERIAL EFFECTS — per-hex ambient loop + one-shot landing
@@ -276,11 +280,14 @@
            whichever ring is "on" this beat. See cine-tiles.js's
            triggerBeatPulse(). Distinct from .landing-flash (one-shot,
            never repeats) — this one replays every time it's triggered. */
+        /* No mix-blend-mode here: this rule applies to all 91 hexes, and a
+           blend mode disables layer isolation and forces group compositing on
+           every one of them. The gradient is brightened to compensate.
+           #cineWash and #cineGlow keep their blend modes — one element each. */
         .material-fx .beat-pulse {
             position: absolute; inset: 0;
-            background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.55), transparent 70%);
+            background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.7), transparent 70%);
             opacity: 0;
-            mix-blend-mode: screen;
         }
         .material-fx .beat-pulse.flash { animation: cineBeatPulse 250ms ease-out; }
         @keyframes cineBeatPulse {

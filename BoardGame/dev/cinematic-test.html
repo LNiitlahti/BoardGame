@@ -16,7 +16,6 @@
         }
         body.cine-active .rig-3d { transform-style: preserve-3d; }
         body.cine-active #hexBoard { transform-style: preserve-3d; }
-        body.cine-active .board-hex { transform-style: preserve-3d; }
 
         /* ===========================================================
            MATERIAL EFFECTS — kept byte-for-byte in sync with view.html's
@@ -149,9 +148,8 @@
            never repeats) — this one replays every time it's triggered. */
         .material-fx .beat-pulse {
             position: absolute; inset: 0;
-            background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.55), transparent 70%);
+            background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.7), transparent 70%);
             opacity: 0;
-            mix-blend-mode: screen;
         }
         .material-fx .beat-pulse.flash { animation: cineBeatPulse 250ms ease-out; }
         @keyframes cineBeatPulse {

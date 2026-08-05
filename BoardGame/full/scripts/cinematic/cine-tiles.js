@@ -93,11 +93,14 @@ class CineTiles {
         for (const anim of pulse.getAnimations()) { anim.currentTime = 0; anim.play(); }
     }
 
-    // Hide every hex (and heart images) before the cascade begins.
+    // Hide every hex (and heart images) before the cascade begins. Note this
+    // deliberately does NOT set will-change: promoting all 91 hexes to their
+    // own compositor layer at once is a GPU-memory thrash on integrated
+    // chips. makeDropTrack sets it per tile instead — only a handful are ever
+    // falling at the same time.
     hideAll() {
         for (const hex of this.hexByCoord.values()) {
             hex.style.visibility = 'hidden';
-            hex.style.willChange = 'transform';
         }
         if (this.heartOverlay) this.heartOverlay.style.visibility = 'hidden';
     }
@@ -113,6 +116,7 @@ class CineTiles {
             onStart: () => {
                 if (!hex) return;
                 hex.style.visibility = 'visible';
+                hex.style.willChange = 'transform, opacity'; // cleared in onComplete
             },
             onUpdate: (p) => {
                 if (!hex) return;

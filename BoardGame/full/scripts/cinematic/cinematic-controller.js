@@ -163,17 +163,21 @@
         setTimeout(() => { location.href = url.toString(); }, 2000);
     }
 
-    // Persistent 50%-black/12px-blur veil sitting *under* the cinematic
-    // (below .board-wrap's z-index:10000, so the camera/tiles/text/atmosphere
-    // stay sharp) but above the rest of the page. Present from arm() through
+    // Persistent 72%-black veil sitting *under* the cinematic (below
+    // .board-wrap's z-index:10000, so the camera/tiles/text/atmosphere stay
+    // sharp) but above the rest of the page. Present from arm() through
     // teardown() (see redirectToCleanUrl, which fades it to full black rather
     // than removing it).
+    //
+    // A backdrop-filter blur was dropped here: it is a full-viewport GPU pass
+    // that re-runs whenever anything beneath it repaints, and the dashboard it
+    // was blurring is already unreadable behind this much black. The opacity
+    // was raised from 0.5 to compensate for the lost blur.
     function makeDimOverlay() {
         const el = document.createElement('div');
         el.id = 'cineDimOverlay';
         el.style.cssText =
-            'position:fixed;inset:0;z-index:9998;background-color:rgba(0,0,0,0.5);' +
-            'backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);' +
+            'position:fixed;inset:0;z-index:9998;background-color:rgba(0,0,0,0.72);' +
             'transition:background-color 0.6s ease;pointer-events:none;';
         document.body.appendChild(el);
         state.dimOverlayEl = el;
