@@ -964,9 +964,11 @@
         function triggerWash() {
             const wash = document.getElementById('cineWash');
             if (!wash) return;
-            wash.classList.remove('flash');
-            void wash.offsetWidth;
-            wash.classList.add('flash');
+            if (!wash.classList.contains('flash')) {
+                wash.classList.add('flash');
+                return;
+            }
+            for (const anim of wash.getAnimations()) { anim.currentTime = 0; anim.play(); }
         }
 
         // ?volume=0-100 (percent), same as production cinematic-controller.js.

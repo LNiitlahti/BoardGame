@@ -206,16 +206,18 @@
         return Math.max(0, Math.min(100, pct)) / 100;
     }
 
-    // Effect 4 (music sync): screen-wide color wash on strong beats. See
-    // cine-tiles.js's triggerBeatPulse for the same remove-reflow-readd
-    // restart trick, needed because .flash may already be set from a
-    // previous beat.
+    // Effect 4 (music sync): screen-wide color wash on strong beats. Rewound
+    // via the Web Animations API (see cine-tiles.js's triggerBeatPulse for
+    // why we avoid the remove-reflow-readd trick), needed because .flash may
+    // already be set from a previous beat.
     function triggerWash() {
         const wash = document.getElementById('cineWash');
         if (!wash) return;
-        wash.classList.remove('flash');
-        void wash.offsetWidth; // force reflow so re-adding the class restarts the animation
-        wash.classList.add('flash');
+        if (!wash.classList.contains('flash')) {
+            wash.classList.add('flash'); // first application starts it naturally
+            return;
+        }
+        for (const anim of wash.getAnimations()) { anim.currentTime = 0; anim.play(); }
     }
 
     function buildTimeline() {

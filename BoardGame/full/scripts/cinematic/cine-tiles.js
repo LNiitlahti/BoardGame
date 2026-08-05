@@ -73,16 +73,24 @@ class CineTiles {
     // fired per beat for whichever ring is "on" this beat (see
     // cinematic-controller.js's buildTimeline). Distinct from
     // _triggerLanding's one-shot .flash (that one never repeats; this one
-    // must replay every time it's called) — remove-reflow-readd is the
-    // standard trick to restart a CSS animation on an already-flashed class.
+    // must replay every time it's called).
+    //
+    // Restarted via the Web Animations API rather than the usual
+    // remove-reflow-readd trick: this runs once per hex for a whole ring on
+    // every beat, so `void pulse.offsetWidth` meant up to 30 forced layout
+    // flushes in a single frame, each recomputing layout across ~600
+    // clip-path'd nodes in a 3D subtree. Rewinding the animation in place
+    // reads no layout at all.
     triggerBeatPulse(coord) {
         const hex = this.hexByCoord.get(coord);
         if (!hex) return;
         const pulse = hex.querySelector(':scope > .material-fx > .beat-pulse');
         if (!pulse) return;
-        pulse.classList.remove('flash');
-        void pulse.offsetWidth; // force reflow so re-adding the class restarts the animation
-        pulse.classList.add('flash');
+        if (!pulse.classList.contains('flash')) {
+            pulse.classList.add('flash'); // first application starts it naturally
+            return;
+        }
+        for (const anim of pulse.getAnimations()) { anim.currentTime = 0; anim.play(); }
     }
 
     // Hide every hex (and heart images) before the cascade begins.
