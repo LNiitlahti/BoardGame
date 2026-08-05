@@ -108,7 +108,12 @@ class StatsManager {
                 }
             });
 
-            // Award wins to teams with 2+ players on winning side
+            // Award wins to teams whose FULL team was on the winning side.
+            // `count >= 2` is a PROXY for "the entire team", exact only because
+            // rosters are capped at MAX_PLAYERS_PER_TEAM = 2 (team-manager.js).
+            // If that cap rises this must compare against the real roster size:
+            // at 3 players, 2-of-3 would collect full credit — the split-team
+            // case that should score nothing. See docs/architecture/scoring.md.
             Object.entries(winningTeamCounts).forEach(([teamId, count]) => {
                 const team = gs.teams.find(t => String(t.id) === String(teamId));
                 if (team) {
@@ -121,7 +126,8 @@ class StatsManager {
                 }
             });
 
-            // Award losses to teams with 2+ players on losing side
+            // Award losses to teams whose FULL team was on the losing side.
+            // Same roster-size-2 proxy as above.
             Object.entries(losingTeamCounts).forEach(([teamId, count]) => {
                 const team = gs.teams.find(t => String(t.id) === String(teamId));
                 if (team) {

@@ -48,10 +48,26 @@ Three conditions gate it:
 - **Challenge matches award nothing.** `if (!isChallenge)` wraps the whole
   block — a heart-hex dispute changes who controls the hex, not the score, and
   does not touch `gamesWon`/`gamesLost` either.
-- **A team needs 2+ players on the winning side** to get credit
+- **The team's FULL roster must be on the winning side** to get credit
   (`teamsWithFullCredit` = teams with `count >= 2`). This is the split-team
   rule: if a team is split across both sides, it earns neither the win nor the
   point. The same threshold applies to losses (`teamsWithFullLoss`).
+
+  > `count >= 2` is a **proxy** for "the full team", exact only because
+  > `MAX_PLAYERS_PER_TEAM = 2` (duplicated in `team-manager.js` and
+  > `admin.js`). Raising that cap without revisiting the literal `2` would let
+  > a 2-of-3 split team collect full credit — the exact case the rule exists to
+  > deny. The literal appears in `admin.js` (`confirmResult()` and
+  > `recalculateTeamStats()`), `result-manager.js` (`confirmResult()` and the
+  > four filters in the result-correction path), `stats-manager.js`
+  > (`recalculateTeamStats()`), and `phase-manager.js` (the "All teams have
+  > players" gate). Do not read "2+ players" as the rule; the rule is "all of
+  > them".
+
+  A practical consequence at the current roster size: because both match slots
+  run in parallel with non-overlapping players, a 2-player team cannot field
+  both players in both matches, so **a team's maximum match-win income is +1
+  per round**, not +2.
 - Losing teams get `gamesLost`/`gamesPlayed` only — no point change.
 
 > **History note:** until 2026-08-04 admin.html incremented `gamesWon` **without**

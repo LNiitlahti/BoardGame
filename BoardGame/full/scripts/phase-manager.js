@@ -1210,6 +1210,11 @@ class PhaseManager {
                         met: (gs.rooms || []).length >= 1
                     },
                     {
+                        // "Has players" means a FULL roster. `count >= 2` is the
+                        // roster-size-2 assumption (MAX_PLAYERS_PER_TEAM = 2 in
+                        // team-manager.js/admin.js), same literal the win-credit
+                        // rule uses — see docs/architecture/scoring.md. Raising
+                        // the cap means revisiting both.
                         label: 'All teams have players',
                         met: teams.length > 0 && teams.every(t => {
                             const count = Object.values(players)

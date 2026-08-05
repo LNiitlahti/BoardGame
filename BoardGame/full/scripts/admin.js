@@ -899,6 +899,11 @@ function renderPlayerManager() {
         return;
     }
 
+    // NOT a display-only cap. The scoring rule "only a team whose FULL team is
+    // on the winning side scores" is implemented everywhere as the literal
+    // `count >= 2`, which is correct ONLY while this is 2. Raising it silently
+    // grants full credit to split teams (2-of-3 on the winning side).
+    // Duplicated in team-manager.js. See docs/architecture/scoring.md.
     const MAX_PLAYERS_PER_TEAM = 2;
 
     container.innerHTML = gameState.teams.map(team => {
@@ -4489,7 +4494,14 @@ async function confirmResult(winnerIndex) {
         }
     });
 
-    // Only credit wins to teams with 2+ players on the winning side (full team representation)
+    // FULL-TEAM RULE: the rule is "the ENTIRE team was on the winning side."
+    // `count >= 2` is a PROXY for that, exact only because rosters are capped
+    // at MAX_PLAYERS_PER_TEAM = 2 (team-manager.js, admin.js). If that cap ever
+    // rises this must become a comparison against the team's actual roster
+    // size: at 3 players, 2-of-3 would collect full credit, which is precisely
+    // the split-team case that is supposed to score nothing.
+    // Mirrored in recalculateTeamStats() below, result-manager.js,
+    // stats-manager.js and phase-manager.js. See docs/architecture/scoring.md.
     const teamsWithFullCredit = Object.entries(winningTeamPlayerCounts)
         .filter(([_, count]) => count >= 2)
         .map(([teamId]) => parseInt(teamId) || teamId);
@@ -4503,8 +4515,9 @@ async function confirmResult(winnerIndex) {
         }
     });
 
-    // Only credit losses to teams with 2+ players on losing side (full team representation)
+    // Only credit losses to teams whose FULL team was on the losing side.
     // This mirrors the win logic - split teams (with players on both sides) get neither win nor loss
+    // `count >= 2` is the same roster-size-2 proxy documented above.
     const teamsWithFullLoss = Object.entries(losingTeamPlayerCounts)
         .filter(([_, count]) => count >= 2)
         .map(([teamId]) => parseInt(teamId) || teamId);
@@ -4877,7 +4890,9 @@ async function recalculateTeamStats() {
             }
         });
 
-        // Award wins to teams with 2+ players on winning side
+        // Award wins to teams whose FULL team was on the winning side.
+        // `count >= 2` is the roster-size-2 proxy — see the FULL-TEAM RULE
+        // note in confirmResult() above.
         Object.entries(winningTeamCounts).forEach(([teamId, count]) => {
             const team = gameState.teams.find(t => String(t.id) === String(teamId));
             if (team) {
@@ -4890,7 +4905,8 @@ async function recalculateTeamStats() {
             }
         });
 
-        // Award losses to teams with 2+ players on losing side
+        // Award losses to teams whose FULL team was on the losing side.
+        // Same roster-size-2 proxy as above.
         Object.entries(losingTeamCounts).forEach(([teamId, count]) => {
             const team = gameState.teams.find(t => String(t.id) === String(teamId));
             if (team) {

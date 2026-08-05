@@ -397,7 +397,15 @@ class ResultManager {
             }
         });
 
-        // Only credit wins to teams with 2+ players on the winning side (full team representation)
+        // FULL-TEAM RULE: the rule is "the ENTIRE team was on the winning side."
+        // `count >= 2` is a PROXY for that, exact only because rosters are
+        // capped at MAX_PLAYERS_PER_TEAM = 2 (team-manager.js, admin.js). If
+        // that cap ever rises this must become a comparison against the team's
+        // actual roster size: at 3 players, 2-of-3 would collect full credit,
+        // which is precisely the split-team case that should score nothing.
+        // Mirrored in admin.js confirmResult()/recalculateTeamStats(), the
+        // result-correction path below, stats-manager.js and phase-manager.js.
+        // See docs/architecture/scoring.md.
         const teamsWithFullCredit = Object.entries(winningTeamPlayerCounts)
             .filter(([_, count]) => count >= 2)
             .map(([teamId]) => parseInt(teamId) || teamId);
@@ -411,8 +419,9 @@ class ResultManager {
             }
         });
 
-        // Only credit losses to teams with 2+ players on losing side (full team representation)
+        // Only credit losses to teams whose FULL team was on the losing side.
         // This mirrors the win logic - split teams (with players on both sides) get neither win nor loss
+        // `count >= 2` is the same roster-size-2 proxy documented above.
         const teamsWithFullLoss = Object.entries(losingTeamPlayerCounts)
             .filter(([_, count]) => count >= 2)
             .map(([teamId]) => parseInt(teamId) || teamId);
@@ -961,10 +970,13 @@ class ResultManager {
                 const tid = p.teamId || p.originalTeamId;
                 if (tid) oldWinCounts[tid] = (oldWinCounts[tid] || 0) + 1;
             });
+            // `c >= 2` here and in the three sibling filters below is the
+            // roster-size-2 proxy for "the full team" — see the FULL-TEAM RULE
+            // note in confirmResult() above.
             const oldFullCreditTeams = Object.entries(oldWinCounts)
                 .filter(([_, c]) => c >= 2).map(([tid]) => parseInt(tid) || tid);
 
-            // Get old losing team IDs with 2+ player loss
+            // Get old losing team IDs whose full team was on the losing side
             const oldLosePlayers = oldLosingTeams.flatMap(t => this._teams.getMatchTeamPlayers(t));
             const oldLoseCounts = {};
             oldLosePlayers.forEach(p => {

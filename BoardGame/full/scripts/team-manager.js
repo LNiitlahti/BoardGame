@@ -286,6 +286,11 @@ class TeamManager {
             return;
         }
 
+        // NOT a display-only cap. The scoring rule "only a team whose FULL team
+        // is on the winning side scores" is implemented everywhere as the
+        // literal `count >= 2`, which is correct ONLY while this is 2. Raising
+        // it silently grants full credit to split teams (2-of-3 on the winning
+        // side). Duplicated in admin.js. See docs/architecture/scoring.md.
         const MAX_PLAYERS_PER_TEAM = 2;
 
         container.innerHTML = this._gameState.teams.map(team => {
