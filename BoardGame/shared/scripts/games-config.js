@@ -16,7 +16,12 @@
 const GAMES_CONFIG = {
     // Master list of all games with full configuration
     games: {
-        // === CURRENTLY ACTIVE IN TOURNAMENT ===
+        // Key order below is display order in game pickers, NOT active state —
+        // read `active` per game. The tournament defaults are Call of Duty,
+        // Counter-Strike 2, Predecessor, Age of Empires IV and StarCraft II;
+        // everything else ships off and is opt-in per tournament.
+
+        // === COMMONLY USED ===
         'predecessor': {
             name: 'Predecessor',
             shortName: 'Predecessor',
@@ -40,7 +45,7 @@ const GAMES_CONFIG = {
             format: '5v5',
             icon: '🎮',
             image: 'shared/images/game-logos/Overwatch_2/Overwatch_2_icon.png',
-            active: true
+            active: false
         },
         'cs2': {
             name: 'Counter-Strike 2',
@@ -57,7 +62,7 @@ const GAMES_CONFIG = {
             splitFormat: true,
             icon: '⚔️',
             image: 'shared/images/game-logos/Warcraft_3/Warcraft_3_icon.png',
-            active: true
+            active: false
         },
         'cod': {
             name: 'Call of Duty',
@@ -68,7 +73,7 @@ const GAMES_CONFIG = {
             active: true
         },
 
-        // === OTHER AVAILABLE GAMES ===
+        // === ALSO AVAILABLE ===
         'spellbreak': {
             name: 'Spellbreak',
             shortName: 'Spellbreak',
@@ -101,7 +106,7 @@ const GAMES_CONFIG = {
             splitFormat: true,
             icon: '⚔️',
             image: 'shared/images/game-logos/StarCraft_II/StarCraft_II_icon.png',
-            active: false
+            active: true
         },
         'valorant': {
             name: 'Valorant',
