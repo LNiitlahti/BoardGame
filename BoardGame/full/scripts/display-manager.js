@@ -249,6 +249,29 @@ class DisplayManager {
         return TEAM_COLORS[teamId] || '#666666';
     }
 
+    /**
+     * Whose spell turn it is, derived from teamsCompleted rather than from
+     * spellPhase.currentTeamIndex.
+     *
+     * currentTeamIndex is NOT reliable: team.html's castSpellViaFirestore()
+     * and endSpellTurn() (team-controls.js) both arrayUnion the team into
+     * spellPhase.teamsCompleted but never advance the index — only
+     * spell-engine.js's completeTeamTurn() does. Reading the index therefore
+     * keeps naming the first team long after it has acted.
+     *
+     * @returns {*|null} the team id whose turn it is, or null if the phase
+     *   isn't active / every team has already acted.
+     */
+    _spellWindowCurrentTeamId(data) {
+        const sp = data?.spellPhase;
+        if (!sp || !sp.isActive) return null;
+        const done = (sp.teamsCompleted || []).map(String);
+        for (const id of (sp.turnOrder || [])) {
+            if (!done.includes(String(id))) return id;
+        }
+        return null;
+    }
+
     _getCurrentTeamName(teamId) {
         if (teamId && this._gameData?.teams) {
             const team = this._gameData.teams.find(t => String(t.id) === String(teamId));
