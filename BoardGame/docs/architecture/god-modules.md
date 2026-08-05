@@ -21,7 +21,7 @@
 | UndoManager | `full/scripts/undo-manager.js` | Reverse logged actions using previousState snapshots, preview changes, mark entries undone in Firestore | ActionLogger, UIManager, ResultManager, BoardManager, MatchQueueManager, StatsManager |
 | SpellEngine | `full/scripts/spell-engine.js` | Spell definitions, draw piles, spell phase turns, effect handlers, conditions, admin UI | UIManager, TeamManager, BoardManager |
 | ScoringCeremony | `full/scripts/scoring-ceremony.js` | Animated step-by-step scoring walkthrough, plays during scoring_vp phase (round 2+), driven by god.html, rendered on view.html via ceremonyState | None (leaf — receives callbacks via constructor) |
-| DisplayManager | `full/scripts/display-manager.js` | Smart display engine for view.html (v2) — renders lightweight-quality 1920×1080 layout (dual arena, territory map, queue, results, score strip), phase-aware display modes with auto-rotation, ceremony overlay | BoardModule, BoardRenderer, ScoringCeremony (static renderStep), GAMES_CONFIG, PlayerUtils |
+| DisplayManager | `full/scripts/display-manager.js` | Smart display engine for view.html (v2) — renders lightweight-quality 1920×1080 layout (dual arena, territory map, queue, results, score strip), phase-aware display modes (auto = follow phase, god can force a mode via displayOverride), ceremony overlay | BoardModule, BoardRenderer, ScoringCeremony (static renderStep), GAMES_CONFIG, PlayerUtils |
 | ReplayEngine | `full/scripts/replay-engine.js` | Backup-anchored forward replay, state reconstruction at any action, playback controls | None (leaf — reads Firestore directly, used by replay.html) |
 | SummaryGenerator | `full/scripts/summary-generator.js` | Post-tournament analytics: overview, team stats, key moments, hex analysis, round summaries | BoardModule (optional) |
 | ActionExport | `full/scripts/action-export.js` | JSON/CSV export of action log entries | ActionLogger (static describeAction) |
@@ -217,7 +217,7 @@ flowchart TD
 | SpellEngine | 12 | `loadAllSpells`, `updateTeamSpellInventory`, `distributeSpellToTeam`, `distributeRandomSpells`, `filterSpells`, `initializeSpellPiles`, `removeSpellFromTeam`, `showSpellPreview`, `removeActiveEffect`, `skipSpellTurn`, `forceEndSpellPhase` |
 | ActionLogger | 3 | `startActivityLogListener`, `stopActivityLogListener`, `loadMoreActivityLog` |
 | ScoringCeremony | 3 | `pauseCeremony`, `resumeCeremony`, `skipCeremony` |
-| Display Controls | 3 | `setDisplayOverride`, `setRotationInterval`, `clearDisplayOverride` |
+| Display Controls | 2 | `setDisplayOverride`, `clearDisplayOverride` |
 | Replay & Export | 3 | `openReplayWindow`, `exportActionLogJSON`, `exportActionLogCSV` |
 | GodApp | 8 | `onTournamentSelect`, `saveGameState`, `exportGameState`, `logout` |
 
@@ -251,7 +251,7 @@ graph TD
     GS --> activeEffects["activeEffects[] — active spell conditions/buffs"]
     GS --> spellHistory["spellHistory[] — cast spell log"]
     GS --> ceremonyState["ceremonyState{} — isActive, roundNumber, currentStepIndex, currentStep, isPaused, totalSteps"]
-    GS --> displayOverride["displayOverride{} — mode, rotationInterval, forcedSlideIndex"]
+    GS --> displayOverride["displayOverride{} — mode"]
     GS --> pointsHistory["pointsHistory[] — per-round hex territory points log"]
 
     PM[PhaseManager] -->|reads/writes| currentPhase

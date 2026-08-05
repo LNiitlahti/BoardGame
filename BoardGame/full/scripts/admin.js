@@ -20,6 +20,35 @@ let currentTournamentId = null;
 let currentUserRole = null; // 'god' or 'admin'
 let _prevRenderSignature = null;
 let _prevBoardSignature = null;
+let discordChannelConfig = null; // tournaments/{id}/discordConfig/state
+let discordChannelCache = [];    // tournaments/{id}/discordConfig/channelCache .channels: [{channelId, name}]
+let unsubscribeDiscordConfig = null;
+let unsubscribeDiscordChannelCache = null;
+
+/**
+ * Resolve the real Discord channel name for one side of a match, from the
+ * tournament's Discord config (god.html's Discord Setup tab) -- NOT from
+ * the legacy match.discordChannels counter, an arbitrary 1-5 value
+ * assigned at match-creation time with no relationship to any real
+ * Discord channel. Shared with admin-improved-adapter.js's PhaseManager
+ * wiring (same global scope, classic scripts).
+ * @param {number|string} slot - match.slot (1 or 2)
+ * @param {string} sideId - 'TEAM_A' or 'TEAM_B'
+ * @returns {string|null}
+ */
+function resolveDiscordChannelName(slot, sideId) {
+    const slotChannels = discordChannelConfig?.slotChannels;
+    if (!slotChannels || slot === undefined || slot === null) return null;
+
+    const pair = slotChannels[String(slot)];
+    if (!pair) return null;
+
+    const channelId = pair[sideId === 'TEAM_B' ? 1 : 0];
+    if (!channelId) return null;
+
+    const channel = discordChannelCache.find(c => String(c.channelId) === String(channelId));
+    return channel?.name || null;
+}
 
 // Structured action logger — instantiated eagerly (not lazily, unlike some
 // other admin.js state) so player add/remove/link/swap always have
@@ -366,6 +395,14 @@ async function loadTournament(tournamentId) {
         activeListener();
         activeListener = null;
     }
+    if (unsubscribeDiscordConfig) {
+        unsubscribeDiscordConfig();
+        unsubscribeDiscordConfig = null;
+    }
+    if (unsubscribeDiscordChannelCache) {
+        unsubscribeDiscordChannelCache();
+        unsubscribeDiscordChannelCache = null;
+    }
 
     currentTournamentId = tournamentId;
 
@@ -446,6 +483,24 @@ async function loadTournament(tournamentId) {
             console.error('Listener error:', error);
             updateConnectionStatus('disconnected');
             showStatus('Connection error', 'error');
+        });
+
+        // Real Discord channel mapping (slot+side -> channel id -> name),
+        // configured on god.html's Discord Setup tab. Loaded eagerly here
+        // (not gated behind DiscordPanel's own tab-open fetch) so the flow
+        // panel's channel badges have data as soon as a tournament loads.
+        const discordConfigRef = tournamentRef.collection('discordConfig');
+        unsubscribeDiscordConfig = window.firebaseOnSnapshot(discordConfigRef.doc('state'), (doc) => {
+            discordChannelConfig = doc.exists ? doc.data() : null;
+            updateDisplay();
+        }, (error) => {
+            console.error('Error loading discordConfig/state:', error);
+        });
+        unsubscribeDiscordChannelCache = window.firebaseOnSnapshot(discordConfigRef.doc('channelCache'), (doc) => {
+            discordChannelCache = doc.exists ? (doc.data().channels || []) : [];
+            updateDisplay();
+        }, (error) => {
+            console.error('Error loading discordConfig/channelCache:', error);
         });
 
     } catch (error) {

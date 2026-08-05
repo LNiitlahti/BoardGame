@@ -180,7 +180,9 @@
             logActionCallback: logAction,
             onDisplayRefresh: () => {
                 if (typeof updateDisplay === 'function') updateDisplay();
-            }
+            },
+            resolveDiscordChannelName: (slot, sideId) =>
+                typeof resolveDiscordChannelName === 'function' ? resolveDiscordChannelName(slot, sideId) : null
         });
 
         // Wire pending hex count (used by phase requirements)

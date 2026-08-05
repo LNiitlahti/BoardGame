@@ -131,13 +131,15 @@ class PhaseManager {
      * @param {Function}   deps.saveCallback        (triggerBtn?) => Promise<void>
      * @param {Function}   [deps.logActionCallback]  (actionType, category, payload, prev) => void
      * @param {Function}   [deps.onDisplayRefresh]   () => void
+     * @param {Function}   [deps.resolveDiscordChannelName]  (slot, sideId) => string|null
      */
     constructor(gameState, {
         uiManager,
         teamManager,
         saveCallback,
         logActionCallback,
-        onDisplayRefresh
+        onDisplayRefresh,
+        resolveDiscordChannelName
     }) {
         this._gameState = gameState;
         this._ui = uiManager;
@@ -145,6 +147,7 @@ class PhaseManager {
         this._save = saveCallback;
         this._logAction = logActionCallback || (() => {});
         this._refresh = onDisplayRefresh || (() => {});
+        this._resolveDiscordChannelName = resolveDiscordChannelName || (() => null);
 
         // Injected later by GodApp (after ResultManager is created)
         this._getPendingHexCount = () => 0;
@@ -1460,7 +1463,11 @@ class PhaseManager {
                     teamId,
                     teamName: team?.name || side.name ||
                         (teamId !== undefined ? `Team ${teamId}` : 'TBD'),
-                    discordChannel: m.discordChannels?.[teamId] ?? null
+                    // Resolved from the tournament's real Discord config
+                    // (slot + side id -> channel), not the legacy
+                    // match.discordChannels counter -- see
+                    // resolveDiscordChannelName() in admin.js/god-app.js.
+                    discordChannel: this._resolveDiscordChannelName(m.slot, side.id)
                 };
             })
         }));
@@ -1715,10 +1722,6 @@ class PhaseManager {
             if (modeSelect) {
                 modeSelect.value = gs.displayOverride?.mode || '';
             }
-            const intervalSelect = document.getElementById('displayRotationInterval');
-            if (intervalSelect && gs.displayOverride?.rotationInterval) {
-                intervalSelect.value = String(gs.displayOverride.rotationInterval);
-            }
         }
 
         // Break styling
@@ -1871,7 +1874,7 @@ class PhaseManager {
             const sides = m.sides.map(s =>
                 `<span class="slot-detail-team">${this._escHtml(s.teamName)}` +
                 (s.discordChannel
-                    ? ` <span class="slot-detail-channel">${ICON_SVGS.headphones} #${this._escHtml(String(s.discordChannel))}</span>`
+                    ? ` <span class="slot-detail-channel">${ICON_SVGS.headphones} ${this._escHtml(String(s.discordChannel))}</span>`
                     : '') +
                 `</span>`
             ).join('<span class="slot-detail-vs">vs</span>');

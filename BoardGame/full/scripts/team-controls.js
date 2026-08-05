@@ -16,6 +16,10 @@ let gameData = null;
 let teamData = null;
 let boardRenderer = null;
 let unsubscribeGameListener = null;
+let unsubscribeDiscordConfigListener = null;
+let unsubscribeDiscordChannelCacheListener = null;
+let discordChannelConfig = null; // tournaments/{id}/discordConfig/state (slotChannels: {"1":[idA,idB],"2":[idA,idB]})
+let discordChannelCache = [];    // tournaments/{id}/discordConfig/channelCache .channels: [{channelId, name}]
 let selectedVote = null;
 let _prevRenderSignature = null;
 let _prevBoardSignature = null;
@@ -164,10 +168,53 @@ async function loadTournamentData() {
             showStatus('Error loading tournament data: ' + error.message, 'error');
         });
 
+        // Real Discord channel mapping (slot+side -> channel id -> name),
+        // configured on god.html's Discord Setup tab. Separate docs from
+        // the main tournament doc, so they need their own listeners; a
+        // change here only affects the Discord badge, so just re-render
+        // the pieces that show it rather than the whole page.
+        const discordConfigRef = tournamentRef.collection('discordConfig');
+        unsubscribeDiscordConfigListener = discordConfigRef.doc('state').onSnapshot((doc) => {
+            discordChannelConfig = doc.exists ? doc.data() : null;
+            if (gameData) { renderTeammates(); renderPhaseOverlays(); }
+        }, (error) => {
+            console.error('[Team Controls] Error loading discordConfig/state:', error);
+        });
+        unsubscribeDiscordChannelCacheListener = discordConfigRef.doc('channelCache').onSnapshot((doc) => {
+            discordChannelCache = doc.exists ? (doc.data().channels || []) : [];
+            if (gameData) { renderTeammates(); renderPhaseOverlays(); }
+        }, (error) => {
+            console.error('[Team Controls] Error loading discordConfig/channelCache:', error);
+        });
+
     } catch (error) {
         console.error('[Team Controls] Error in loadTournamentData:', error);
         showStatus('Error loading tournament: ' + error.message, 'error');
     }
+}
+
+/**
+ * Resolve the real Discord channel name for one side of a match, from the
+ * tournament's Discord config (god.html's Discord Setup tab) -- NOT from
+ * the legacy match.discordChannels counter, which is an arbitrary 1-5
+ * value assigned at match-creation time with no relationship to any real
+ * Discord channel (see assignDiscordAndLobby() in admin.js).
+ * @param {Object} match - queue entry; needs .slot (1 or 2)
+ * @param {string} mySideId - 'TEAM_A' or 'TEAM_B'
+ * @returns {string|null} the configured channel's display name, or null
+ */
+function _resolveDiscordChannelName(match, mySideId) {
+    const slotChannels = discordChannelConfig?.slotChannels;
+    if (!slotChannels || match.slot === undefined || match.slot === null) return null;
+
+    const pair = slotChannels[String(match.slot)];
+    if (!pair) return null;
+
+    const channelId = pair[mySideId === 'TEAM_B' ? 1 : 0];
+    if (!channelId) return null;
+
+    const channel = discordChannelCache.find(c => String(c.channelId) === String(channelId));
+    return channel?.name || null;
 }
 
 /**
@@ -457,7 +504,7 @@ function renderTeammates() {
     if (matchInfo.hasMatch) {
         let assignmentHTML = '<div class="teammate-assignment-info">';
         if (matchInfo.discordChannel) {
-            assignmentHTML += `<div class="assignment-badge discord-badge">&#x1F3A7; Discord Channel <strong>#${matchInfo.discordChannel}</strong></div>`;
+            assignmentHTML += `<div class="assignment-badge discord-badge">&#x1F3A7; Discord Channel <strong>${_escapeHtmlSafe(matchInfo.discordChannel)}</strong></div>`;
         }
         if (matchInfo.sideLabel) {
             assignmentHTML += `<div class="assignment-badge side-badge">&#x1F3AE; Game Lobby <strong>${matchInfo.sideLabel}</strong></div>`;
@@ -494,10 +541,8 @@ function _getTeamMatchInfo() {
         result.hasMatch = true;
         const mySideId = mySide.id || 'TEAM_A';
 
-        // Discord channel
-        if (match.discordChannels?.[mySideId]) {
-            result.discordChannel = match.discordChannels[mySideId];
-        }
+        // Discord channel, resolved from the tournament's real config
+        result.discordChannel = _resolveDiscordChannelName(match, mySideId);
 
         // Side label: TEAM_A → "Side A", TEAM_B → "Side B"
         const sideIndex = sides.indexOf(mySide);
@@ -1994,10 +2039,10 @@ function renderMatchCardsWithDiscord(container) {
         const mySide = mine?.side;
         const mySideId = mySide?.id || 'TEAM_A';
 
-        // Discord channel for our side
-        const discordChannel = match.discordChannels?.[mySideId];
+        // Discord channel for our side, resolved from the tournament's real config
+        const discordChannel = _resolveDiscordChannelName(match, mySideId);
         const discordHTML = discordChannel
-            ? `<div class="discord-channel-badge">${ICON_SVGS.headphones} Discord Channel #${discordChannel}</div>`
+            ? `<div class="discord-channel-badge">${ICON_SVGS.headphones} Discord Channel ${_escapeHtmlSafe(discordChannel)}</div>`
             : '';
 
         // Show every side's actual players, not a single "opponent team"
@@ -2523,5 +2568,11 @@ function showStatus(message, type = 'info') {
 window.addEventListener('beforeunload', () => {
     if (unsubscribeGameListener) {
         unsubscribeGameListener();
+    }
+    if (unsubscribeDiscordConfigListener) {
+        unsubscribeDiscordConfigListener();
+    }
+    if (unsubscribeDiscordChannelCacheListener) {
+        unsubscribeDiscordChannelCacheListener();
     }
 });

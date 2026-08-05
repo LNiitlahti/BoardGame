@@ -13,6 +13,10 @@ class GodApp {
     constructor() {
         this.gameState = {};
         this._activeListener = null;
+        this._unsubDiscordConfig = null;
+        this._unsubDiscordChannelCache = null;
+        this._discordChannelConfig = null; // tournaments/{id}/discordConfig/state
+        this._discordChannelCache = [];    // tournaments/{id}/discordConfig/channelCache .channels
         this._currentTournamentId = null;
         this._currentUser = null;
         this._currentUserRole = null;
@@ -20,6 +24,7 @@ class GodApp {
         this._boardRenderer = null;
         this._suppressLoadToast = false;
         this._allTournaments = [];
+        this._statusChangeTournamentId = null; // which tournament the state modal is targeting -- may differ from _currentTournamentId when opened from the list
         this._prevRenderSignature = null;
 
         // Action logger (created in init)
@@ -74,7 +79,8 @@ class GodApp {
             teamManager: this.teams,
             saveCallback: save,
             logActionCallback: logAction,
-            onDisplayRefresh: refresh
+            onDisplayRefresh: refresh,
+            resolveDiscordChannelName: (slot, sideId) => this._resolveDiscordChannelName(slot, sideId)
         });
 
         const onPhaseChanged = () => this.phase?.recheckRequirements();
@@ -363,9 +369,11 @@ class GodApp {
                         Round: ${t.currentRound || 0} | Matches played: ${matchCount}
                     </div>
                     <div class="tournament-actions">
+                        <button class="btn-small secondary tournament-state-btn state-${status}" onclick="openStatusChangeModalFor('${t.id}')" title="Change status">${emoji} ${escapeHtml(status)}</button>
                         <button class="btn-view" onclick="window.open('view.html?tournamentId=${encodeURIComponent(t.id)}', '_blank')">${ICON_SVGS.eye} View</button>
                         <button class="btn-small secondary" onclick="openEditTournamentModal('${t.id}')" title="Edit name / win condition">${ICON_SVGS.pencil} Edit</button>
                         <button class="btn-small secondary" onclick="duplicateTournamentFromList('${t.id}')" title="Duplicate this tournament">${ICON_SVGS.copy} Duplicate</button>
+                        <button class="btn-small secondary" onclick="openBackupsFor('${t.id}')" title="Load this tournament as active and jump to its backups">${ICON_SVGS.save} Backups</button>
                         <button class="btn-small danger" onclick="deleteTournamentFromList('${t.id}')" title="Permanently delete">${ICON_SVGS.trash2} Delete</button>
                     </div>
                 </div>
@@ -428,6 +436,14 @@ class GodApp {
         if (this._activeListener) {
             this._activeListener();
             this._activeListener = null;
+        }
+        if (this._unsubDiscordConfig) {
+            this._unsubDiscordConfig();
+            this._unsubDiscordConfig = null;
+        }
+        if (this._unsubDiscordChannelCache) {
+            this._unsubDiscordChannelCache();
+            this._unsubDiscordChannelCache = null;
         }
         if (this.actionLogger) {
             this.actionLogger.unsubscribe();
@@ -501,10 +517,51 @@ class GodApp {
                 this.ui.updateConnectionStatus('disconnected');
                 this.ui.showStatus('Connection error', 'error');
             });
+            // Real Discord channel mapping (slot+side -> channel id -> name),
+            // configured on god.html's Discord Setup tab. Loaded eagerly
+            // here (not gated behind DiscordPanel's own tab-open fetch) so
+            // the slot panels have data as soon as a tournament loads.
+            const discordConfigRef = tournamentRef.collection('discordConfig');
+            this._unsubDiscordConfig = window.firebaseOnSnapshot(discordConfigRef.doc('state'), (doc) => {
+                this._discordChannelConfig = doc.exists ? doc.data() : null;
+                this.updateDisplay();
+            }, (error) => {
+                console.error('Error loading discordConfig/state:', error);
+            });
+            this._unsubDiscordChannelCache = window.firebaseOnSnapshot(discordConfigRef.doc('channelCache'), (doc) => {
+                this._discordChannelCache = doc.exists ? (doc.data().channels || []) : [];
+                this.updateDisplay();
+            }, (error) => {
+                console.error('Error loading discordConfig/channelCache:', error);
+            });
+
         } catch (error) {
             console.error('Error loading tournament:', error);
             this.ui.showStatus('Error loading tournament', 'error');
         }
+    }
+
+    /**
+     * Resolve the real Discord channel name for one side of a match, from
+     * the tournament's Discord config -- NOT the legacy
+     * match.discordChannels counter (arbitrary 1-5 value with no
+     * relationship to any real channel; see admin.js's identical helper).
+     * @param {number|string} slot - match.slot (1 or 2)
+     * @param {string} sideId - 'TEAM_A' or 'TEAM_B'
+     * @returns {string|null}
+     */
+    _resolveDiscordChannelName(slot, sideId) {
+        const slotChannels = this._discordChannelConfig?.slotChannels;
+        if (!slotChannels || slot === undefined || slot === null) return null;
+
+        const pair = slotChannels[String(slot)];
+        if (!pair) return null;
+
+        const channelId = pair[sideId === 'TEAM_B' ? 1 : 0];
+        if (!channelId) return null;
+
+        const channel = this._discordChannelCache.find(c => String(c.channelId) === String(channelId));
+        return channel?.name || null;
     }
 
     // ------------------------------------------------------------------
@@ -544,13 +601,30 @@ class GodApp {
         btn.className = 'btn-small tournament-state-btn state-' + state;
     }
 
+    // Navbar's own state badge always targets whichever tournament is active.
     openStateChangeModal() {
         if (!this.gameState?.teams || !this._currentTournamentId) {
             this.ui.showStatus('Load a tournament first', 'warning');
             return;
         }
+        this.openStatusChangeModalFor(this._currentTournamentId);
+    }
 
-        const currentState = this.gameState.status || 'setup';
+    /**
+     * Opens the state modal targeting an arbitrary tournament by id --
+     * used both by the navbar state badge (always the active tournament)
+     * and by each row's status button in the tournament list (any
+     * tournament, active or not). Mirrors edit/duplicate/delete's existing
+     * "operate directly on a tournament by id" convention below.
+     */
+    openStatusChangeModalFor(tournamentId) {
+        const isActive = tournamentId === this._currentTournamentId;
+        const t = isActive ? this.gameState : this._allTournaments.find(x => x.id === tournamentId);
+        if (!t) { this.ui.showStatus('Tournament not found', 'error'); return; }
+
+        this._statusChangeTournamentId = tournamentId;
+
+        const currentState = t.status || 'setup';
         const options = document.querySelectorAll('#stateOptions .state-option');
         options.forEach(opt => {
             const state = opt.dataset.state;
@@ -569,6 +643,9 @@ class GodApp {
             warningEl.style.display = (currentState === 'archived' && this._currentUserRole !== 'god') ? 'block' : 'none';
         }
 
+        const hintEl = document.querySelector('#stateChangeModal .modal-hint');
+        if (hintEl) hintEl.textContent = `Select the new state for "${t.name || tournamentId}".`;
+
         const modal = document.getElementById('stateChangeModal');
         if (modal) modal.style.display = 'flex';
     }
@@ -576,44 +653,68 @@ class GodApp {
     closeStateChangeModal() {
         const modal = document.getElementById('stateChangeModal');
         if (modal) modal.style.display = 'none';
+        this._statusChangeTournamentId = null;
     }
 
     async confirmStateChange(newState) {
-        if (!this.gameState || !this._currentTournamentId) return;
+        const tournamentId = this._statusChangeTournamentId;
+        if (!tournamentId) return;
 
-        const currentState = this.gameState.status || 'setup';
+        const isActive = tournamentId === this._currentTournamentId;
+        const source = isActive ? this.gameState : this._allTournaments.find(x => x.id === tournamentId);
+        if (!source) { this.closeStateChangeModal(); return; }
+
+        const currentState = source.status || 'setup';
         if (newState === currentState) { this.closeStateChangeModal(); return; }
 
-        if (newState === 'archived') {
-            if (!confirm('Archive this tournament? Archived tournaments are protected from edits.')) return;
-            this.gameState.archivedAt = new Date().toISOString();
+        if (newState === 'archived' && !confirm('Archive this tournament? Archived tournaments are protected from edits.')) {
+            return;
+        }
+        if (currentState === 'archived' && this._currentUserRole !== 'god') {
+            this.ui.showStatus('Only God users can unarchive tournaments', 'error');
+            return;
         }
 
-        if (currentState === 'archived') {
-            if (this._currentUserRole !== 'god') {
-                this.ui.showStatus('Only God users can unarchive tournaments', 'error');
-                return;
+        try {
+            if (isActive) {
+                // Same live gameState + saveGameState() path as before --
+                // unchanged for anything already relying on this behavior.
+                this.gameState.status = newState;
+                if (newState === 'archived') this.gameState.archivedAt = new Date().toISOString();
+                if (currentState === 'archived') this.gameState.archivedAt = null;
+                if (newState === 'playing' && !this.gameState.currentPhase) {
+                    this.phase?.initializePhase();
+                }
+                await this.saveGameState();
+                this.updateTournamentStateButton();
+
+                this.actionLogger?.logAction('phase_advanced', 'phase', {
+                    fromPhase: currentState,
+                    toPhase: newState
+                }, { status: currentState });
+            } else {
+                // Not loaded -- write directly to its doc, same as
+                // edit/duplicate/delete, without disturbing the active
+                // tournament. actionLogger is skipped here on purpose: it
+                // always attributes to _currentTournamentId, which would
+                // mislabel this entry onto a different tournament's log.
+                const updates = { status: newState };
+                if (newState === 'archived') updates.archivedAt = new Date().toISOString();
+                if (currentState === 'archived') updates.archivedAt = null;
+                if (newState === 'playing' && !source.currentPhase) {
+                    updates.currentPhase = { name: 'pre_game_setup', roundNumber: 0, startedAt: new Date().toISOString() };
+                    updates.breakSettings = source.breakSettings || { intervalRounds: 2, roundsSinceLastBreak: 0, lastBreakAt: null };
+                }
+                await window.firebaseDB.collection('tournaments').doc(tournamentId).update(updates);
             }
-            this.gameState.archivedAt = null;
+
+            this.closeStateChangeModal();
+            this.ui.showStatus(`Tournament state changed to ${newState}`, 'success');
+            await this.loadTournamentsList();
+        } catch (error) {
+            console.error('Error changing tournament state:', error);
+            this.ui.showStatus('Error changing tournament state', 'error');
         }
-
-        const oldState = currentState;
-        this.gameState.status = newState;
-
-        // Auto-initialize phase system when entering "playing"
-        if (newState === 'playing' && !this.gameState.currentPhase) {
-            this.phase?.initializePhase();
-        }
-
-        await this.saveGameState();
-        this.actionLogger?.logAction('phase_advanced', 'phase', {
-            fromPhase: oldState,
-            toPhase: newState
-        }, { status: oldState });
-        this.updateTournamentStateButton();
-        this.closeStateChangeModal();
-        this.ui.showStatus(`Tournament state changed to ${newState}`, 'success');
-        this.loadTournamentsList();
     }
 
     // ------------------------------------------------------------------
@@ -753,6 +854,37 @@ class GodApp {
             console.error('Error deleting tournament:', error);
             this.ui.showStatus('Error deleting tournament', 'error');
         }
+    }
+
+    /**
+     * Backups are scoped to whichever tournament is loaded active (see
+     * backup-manager.js -- it reads/writes gs.tournamentId throughout), so
+     * unlike edit/duplicate/delete this can't operate on a non-active
+     * tournament directly. Instead this makes the clicked tournament active
+     * the same way the navbar switcher does (storage + reload, mirroring
+     * navbar.js's selectTournament()) and lands on the Backups panel via
+     * the URL hash, so a full-page reload does the scrolling for free.
+     */
+    openBackupsFor(tournamentId) {
+        const t = this._allTournaments.find(x => x.id === tournamentId);
+        if (!t) { this.ui.showStatus('Tournament not found', 'error'); return; }
+
+        if (tournamentId === this._currentTournamentId) {
+            document.getElementById('backupsPanelSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+        }
+
+        const name = t.name || tournamentId;
+        localStorage.setItem('currentTournamentId', tournamentId);
+        sessionStorage.setItem('currentTournamentId', tournamentId);
+        localStorage.setItem('currentTournamentName', name);
+        sessionStorage.setItem('currentTournamentName', name);
+
+        const url = new URL(window.location.href);
+        url.searchParams.delete('tournament');
+        url.searchParams.set('tournamentId', tournamentId);
+        url.hash = 'backupsPanelSection';
+        window.location.href = url.toString();
     }
 
     // ------------------------------------------------------------------
@@ -1241,6 +1373,7 @@ class GodApp {
         window.onTournamentSelect = (id) => app.onTournamentSelect(id);
         window.refreshTournaments = () => app.refreshTournaments();
         window.openStateChangeModal = () => app.openStateChangeModal();
+        window.openStatusChangeModalFor = (id) => app.openStatusChangeModalFor(id);
         window.closeStateChangeModal = () => app.closeStateChangeModal();
         window.confirmStateChange = (s) => app.confirmStateChange(s);
         window.saveGameState = (btn) => app.saveGameState(btn);
@@ -1291,18 +1424,10 @@ class GodApp {
             app.ui?.showStatus(mode ? `Display forced to: ${mode}` : 'Display set to auto', 'success');
         };
 
-        window.setRotationInterval = async (seconds) => {
-            app.gameState.displayOverride = app.gameState.displayOverride || {};
-            app.gameState.displayOverride.rotationInterval = parseInt(seconds, 10);
-            await app.saveGameState();
-        };
-
         window.clearDisplayOverride = async () => {
             app.gameState.displayOverride = null;
             const modeSelect = document.getElementById('displayModeOverride');
             if (modeSelect) modeSelect.value = '';
-            const intervalSelect = document.getElementById('displayRotationInterval');
-            if (intervalSelect) intervalSelect.value = '15';
             await app.saveGameState();
             app.ui?.showStatus('Display override cleared.', 'success');
         };
@@ -1334,6 +1459,7 @@ class GodApp {
         window.saveTournamentEdits = () => app.saveTournamentEdits();
         window.duplicateTournamentFromList = (id) => app.duplicateTournamentFromList(id);
         window.deleteTournamentFromList = (id) => app.deleteTournamentFromList(id);
+        window.openBackupsFor = (id) => app.openBackupsFor(id);
 
         // Match creation (old god-scripts.js → new MatchCreationManager)
         window.addGameToQueue = (btn) => app.creation?.addMatchToQueue(btn);

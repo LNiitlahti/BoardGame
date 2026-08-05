@@ -4,82 +4,83 @@
  * Renders the lightweight-quality 1920×1080 infoscreen layout:
  * dual arena matches, territory map, hex board, queue, results, score strip.
  *
- * Phase 3 overlay features: phase-aware display modes with auto-rotation,
+ * Phase 3 overlay features: phase-aware display modes (auto = follow the
+ * phase manager's state; god.html can force a mode via displayOverride),
  * scoring ceremony sync, broadcast messages, active spell conditions.
  *
  * v2.0 — Rewritten to produce lightweight-quality HTML into lightweight DOM.
  */
 
-// Display mode definitions — maps phase names to display configurations
+// Display mode definitions — maps phase names to display configurations.
+// `slide: null` means "no fullscreen takeover" (the normal dashboard stays
+// visible; only the phase banner / hex overlay react to those phases).
+// Selection is snapshot-driven: displayOverride.mode (god's manual pick)
+// wins, otherwise the current phase name decides — there is no timed
+// rotation; the screen changes exactly when the tournament state does.
 const DISPLAY_MODES = {
     break: {
         name: 'Break',
-        slides: ['break_screen'],
-        hidePanels: true
+        slide: 'break_screen'
     },
     // ── Scoring phases ──
     scoring_vp: {
         name: 'Scoring: Victory Points',
-        slides: ['results_large'],
-        hidePanels: true
+        slide: 'results_large'
     },
     scoring_hex: {
         name: 'Scoring: Hex',
-        slides: ['board_focus'],
-        hidePanels: true
+        slide: 'board_focus'
     },
     // ── Hex placement phases ──
     hex_placement_1: {
         name: 'Hex Placement — Game 1',
-        slides: null,
-        hidePanels: false
+        slide: null
     },
     hex_placement_2: {
         name: 'Hex Placement — Game 2',
-        slides: null,
-        hidePanels: false
+        slide: null
     },
     // ── Spell windows ──
-    spell_window_1: { name: 'Spell Window', slides: null, hidePanels: false },
-    spell_window_2: { name: 'Spell Window', slides: null, hidePanels: false },
-    spell_window_3: { name: 'Spell Window', slides: null, hidePanels: false },
-    spell_window_4: { name: 'Spell Window', slides: null, hidePanels: false },
+    spell_window_1: { name: 'Spell Window', slide: null },
+    spell_window_2: { name: 'Spell Window', slide: null },
+    spell_window_3: { name: 'Spell Window', slide: null },
+    spell_window_4: { name: 'Spell Window', slide: null },
     // ── Challenge phases ──
     challenges: {
         name: 'Challenges Issued',
-        slides: null,
-        hidePanels: false
+        slide: null
     },
     challenge_game: {
         name: 'Challenge Game',
-        slides: ['live_matches_large'],
-        hidePanels: true
+        slide: 'live_matches_large'
     },
     // ── Board resolved ──
     board_resolved: {
         name: 'Board Resolved',
-        slides: ['board_focus'],
-        hidePanels: true
+        slide: 'board_focus'
     },
     // ── Matches In Progress — Match 1 / Match 2 run independently now, so
     // any of setup/lobby/playing can be true for either slot at once.
-    // Shown side-by-side in a single dual-slot slide instead of rotating. ──
+    // Shown side-by-side in a single dual-slot slide. ──
     matches_in_progress: {
         name: 'Matches In Progress',
-        slides: ['matches_dual_slot'],
-        hidePanels: true
+        slide: 'matches_dual_slot'
     },
     // ── Round advance ──
     round_advance: {
         name: 'Round Advance',
-        slides: ['results_large'],
-        hidePanels: true
+        slide: 'results_large'
     },
     // ── Tournament end ──
     tournament_end: {
         name: 'Tournament End',
-        slides: ['winner_celebration'],
-        hidePanels: true
+        slide: 'winner_celebration'
+    },
+    // ── Manual-only (no phase is ever named 'standings'; reachable only
+    // via god.html's display override dropdown) ──
+    standings: {
+        name: 'Standings',
+        slide: 'standings_large'
     }
 };
 
@@ -92,7 +93,6 @@ class DisplayManager {
      * @param {BoardRenderer} options.boardRenderer  - SVG board renderer
      * @param {Function} [options.renderBoard]       - Board render callback (applies team colors to hexes)
      * @param {Function} [options.getResultLogCache] - Returns resultLogCache array
-     * @param {Function} [options.getOnboardingState]- Returns onboardingState object
      * @param {Object} [options.matchStartTimes]     - Shared match start time tracker { match1, match2 }
      * @param {Object} [options.prevArenaSignatures]  - Shared arena diff signatures { match1, match2 }
      * @param {Object} [options.prevQueueSignature]   - Shared queue diff signature { value }
@@ -104,7 +104,6 @@ class DisplayManager {
         this._boardRenderer = options.boardRenderer;
         this._renderBoardFn = options.renderBoard || null;
         this._getResultLogCache = options.getResultLogCache || (() => []);
-        this._getOnboardingState = options.getOnboardingState || (() => null);
         this._matchStartTimes = options.matchStartTimes || { match1: null, match2: null };
         this._prevArenaSignatures = options.prevArenaSignatures || { match1: null, match2: null };
         this._prevQueueSignature = options.prevQueueSignature || { value: null };
@@ -113,13 +112,6 @@ class DisplayManager {
 
         // Display mode state
         this._currentMode = null;
-        this._currentSlideIndex = 0;
-        this._rotationTimer = null;
-        this._rotationInterval = 15000;
-
-        // URL param override for rotation interval
-        const urlInterval = new URLSearchParams(window.location.search).get('rotateInterval');
-        if (urlInterval) this._rotationInterval = parseInt(urlInterval, 10) || 15000;
 
         this._prevBoardSignature = null;
     }
@@ -986,57 +978,6 @@ class DisplayManager {
     }
 
     // ==================================================================
-    // Status strip (#statusStrip — onboarding emojis)
-    // ==================================================================
-
-    _renderStatusStrip() {
-        const strip = document.getElementById('statusStrip');
-        if (!strip) return;
-
-        const onboardingState = this._getOnboardingState();
-        if (!onboardingState?.statuses) {
-            strip.innerHTML = '';
-            return;
-        }
-
-        const STATUS_EMOJIS = {
-            eating: iconSvg('pizza', '#f97316'),
-            smoking: iconSvg('cigarette', '#fef9c3'),
-            wc: iconSvg('toilet', '#9ca3af'),
-            sleeping: iconSvg('moon', '#818cf8'),
-            alert: iconSvg('circleAlert', '#ef4444'),
-            question: iconSvg('circleQuestionMark', '#f59e0b')
-        };
-        const teams = this._gameData?.teams || [];
-
-        let html = '';
-        for (const [playerId, statusObj] of Object.entries(onboardingState.statuses)) {
-            const status = statusObj?.status;
-            if (!status || status === 'available') continue;
-
-            const emoji = STATUS_EMOJIS[status] || iconSvg('circleQuestionMark', '#f59e0b');
-
-            // Find player name and team color
-            let playerName = playerId;
-            let teamColor = '#888';
-            for (const team of teams) {
-                const player = (team.players || []).find(p =>
-                    String(p.id) === String(playerId) || String(p.uid) === String(playerId)
-                );
-                if (player) {
-                    playerName = player.name || playerId;
-                    teamColor = team.color || '#888';
-                    break;
-                }
-            }
-
-            html += `<span class="ss-item" style="color:${teamColor}">${emoji} ${playerName}</span>`;
-        }
-
-        strip.innerHTML = html;
-    }
-
-    // ==================================================================
     // Phase display (banner injected after header)
     // ==================================================================
 
@@ -1259,12 +1200,8 @@ class DisplayManager {
             return gameData.displayOverride.mode;
         }
 
-        if (gameData.displayOverride?.rotationInterval) {
-            this._rotationInterval = gameData.displayOverride.rotationInterval * 1000;
-        }
-
         const phaseName = gameData.currentPhase?.name;
-        if (phaseName && DISPLAY_MODES[phaseName] && DISPLAY_MODES[phaseName].slides) {
+        if (phaseName && DISPLAY_MODES[phaseName] && DISPLAY_MODES[phaseName].slide) {
             return phaseName;
         }
 
@@ -1278,93 +1215,25 @@ class DisplayManager {
     }
 
     _applyDisplayMode(modeKey, gameData) {
-        this._stopRotation();
-
         const primary = document.getElementById('displayPrimary');
-        const indicators = document.getElementById('slideIndicators');
+        const slide = modeKey ? DISPLAY_MODES[modeKey]?.slide : null;
 
-        if (!modeKey || !DISPLAY_MODES[modeKey]) {
+        if (!slide) {
             if (primary) primary.classList.remove('active');
-            if (indicators) indicators.classList.remove('active');
-            this._container.removeAttribute('data-display-mode');
-            return;
-        }
-
-        const mode = DISPLAY_MODES[modeKey];
-        const slides = mode.slides || [];
-
-        if (slides.length === 0) {
-            if (primary) primary.classList.remove('active');
-            if (indicators) indicators.classList.remove('active');
             this._container.removeAttribute('data-display-mode');
             return;
         }
 
         if (primary) primary.classList.add('active');
-
-        if (indicators && slides.length > 1) {
-            indicators.innerHTML = slides.map((_, i) =>
-                `<div class="slide-dot${i === 0 ? ' active' : ''}"></div>`
-            ).join('');
-            indicators.classList.add('active');
-        } else if (indicators) {
-            indicators.classList.remove('active');
-        }
-
-        this._currentSlideIndex = 0;
-        this._renderSlide(slides[0], gameData);
-
-        if (slides.length > 1) {
-            this._startRotation(slides, gameData);
-        }
-    }
-
-    _startRotation(slides, gameData) {
-        this._stopRotation();
-        this._rotationSlides = slides;
-
-        this._rotationTimer = setInterval(() => {
-            this._currentSlideIndex = (this._currentSlideIndex + 1) % slides.length;
-
-            const primary = document.getElementById('displayPrimary');
-            if (primary) {
-                primary.style.opacity = '0';
-                setTimeout(() => {
-                    this._renderSlide(slides[this._currentSlideIndex], this._gameData);
-                    primary.style.opacity = '1';
-                }, 300);
-            }
-
-            this._updateSlideIndicators();
-        }, this._rotationInterval);
-    }
-
-    _stopRotation() {
-        if (this._rotationTimer) {
-            clearInterval(this._rotationTimer);
-            this._rotationTimer = null;
-        }
-        this._rotationSlides = null;
+        this._renderSlide(slide, gameData);
     }
 
     _refreshCurrentSlide(gameData) {
-        if (!this._currentMode || !DISPLAY_MODES[this._currentMode]) return;
-        const slides = DISPLAY_MODES[this._currentMode].slides;
-        if (!slides || slides.length === 0) return;
-
-        const slideKey = slides[this._currentSlideIndex];
-        if (slideKey) {
-            this._renderSlide(slideKey, gameData);
+        if (!this._currentMode) return;
+        const slide = DISPLAY_MODES[this._currentMode]?.slide;
+        if (slide) {
+            this._renderSlide(slide, gameData);
         }
-    }
-
-    _updateSlideIndicators() {
-        const indicators = document.getElementById('slideIndicators');
-        if (!indicators) return;
-        const dots = indicators.querySelectorAll('.slide-dot');
-        dots.forEach((dot, i) => {
-            dot.classList.toggle('active', i === this._currentSlideIndex);
-        });
     }
 
     // ==================================================================
@@ -1699,9 +1568,9 @@ class DisplayManager {
      * hex board.
      *
      * Called unconditionally every onFirebaseSnapshot tick, independent of
-     * the DISPLAY_MODES slide/rotation system entirely -- board_focus's
+     * the DISPLAY_MODES slide system entirely -- board_focus's
      * slide renderer used to own this, but hex_placement_1/2 have
-     * `slides: null` (no slide at all), so _applyDisplayMode short-circuits
+     * `slide: null` (no slide at all), so _applyDisplayMode short-circuits
      * before ever reaching a slide renderer for them. That left the overlay
      * with no code path to hide itself when scoring_hex handed off to
      * hex_placement_1: found while adding the placement-queue view below.

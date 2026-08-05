@@ -79,22 +79,13 @@
                 <select id="displayModeOverride"
                         onchange="setDisplayOverride(this.value)"
                         style="padding: 6px 12px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 6px; color: white; font-size: 0.85rem;">
-                    <option value="">Auto (phase-based)</option>
-                    <option value="break">Break</option>
+                    <option value="">Auto (follows phase)</option>
+                    <option value="break">Break Screen</option>
                     <option value="matches_in_progress">Matches (Live/Lobby)</option>
-                    <option value="scoring_vp">Results</option>
+                    <option value="scoring_vp">Latest Results</option>
                     <option value="board_resolved">Board Focus</option>
-                    <option value="tournament_end">Standings</option>
-                </select>
-                <span style="font-size: 0.75rem; color: var(--text-tertiary);">Rotate:</span>
-                <select id="displayRotationInterval"
-                        onchange="setRotationInterval(this.value)"
-                        style="padding: 6px 8px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 6px; color: white; font-size: 0.85rem; width: 70px;">
-                    <option value="5">5s</option>
-                    <option value="10">10s</option>
-                    <option value="15" selected>15s</option>
-                    <option value="20">20s</option>
-                    <option value="30">30s</option>
+                    <option value="standings">Standings</option>
+                    <option value="tournament_end">Winner Celebration</option>
                 </select>
                 <button class="btn-small secondary" onclick="clearDisplayOverride()">Reset</button>
             </div>
@@ -154,7 +145,7 @@
             </div>
 
             <!-- Backups (scoped to the single active tournament, not the whole environment) -->
-            <div class="panel" style="margin-top: 20px;">
+            <div class="panel" id="backupsPanelSection" style="margin-top: 20px;">
                 <h3>Backups — <span id="backupActiveTournamentName" style="color: var(--accent-primary);">—</span></h3>
                 <p style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 12px;">
                     Snapshots the active tournament's state to Firestore (<code>tournaments/{id}/backups</code>).

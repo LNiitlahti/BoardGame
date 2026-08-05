@@ -1424,25 +1424,6 @@
         }
         @keyframes dm-fade-in { from { opacity: 0; } to { opacity: 1; } }
 
-        .slide-indicators {
-            display: none;
-            justify-content: center;
-            gap: 8px; padding: 8px 0;
-            position: absolute;
-            bottom: 28px; left: 0; right: 0;
-            z-index: 60;
-        }
-        .slide-indicators.active { display: flex; }
-        .slide-dot {
-            width: 10px; height: 10px; border-radius: 50%;
-            background: rgba(255,255,255,0.25);
-            transition: all 0.3s ease;
-        }
-        .slide-dot.active {
-            background: var(--gold-bright, #e8d8a8);
-            box-shadow: 0 0 8px var(--gold-glow, rgba(200,179,126,0.3));
-        }
-
         /* Board focus mode: hide side panels */
         body[data-display-mode="board_focus"] .results-panel,
         body[data-display-mode="board_focus"] .queue-panel { display: none; }
@@ -1915,7 +1896,6 @@
 
     <!-- Phase 3: Display Mode Full-Screen Overlay -->
     <div id="displayPrimary" class="display-primary"></div>
-    <div id="slideIndicators" class="slide-indicators"></div>
 
     <div class="atmo atmo-grad"></div>
     <div class="atmo atmo-noise"></div>
@@ -2079,6 +2059,64 @@
     let onboardingListener = null;
     let onboardingState = null;
     let resultLogCache = [];
+
+    // ====================================================================
+    // CONNECTION HEALTH — this screen runs unattended on a LAN-event
+    // spectator display for hours; nobody is watching the console. The dot
+    // must tell the truth about whether it's actually live, and a wedged
+    // connection must self-heal instead of freezing the last-known state
+    // forever with a happily pulsing green dot.
+    // ====================================================================
+    const CONNECTION_COLORS = {
+        connecting: '#64748b', // not yet proven live -- don't default to green
+        live:       '#10b981', // matches DisplayManager's own green (kept in sync below)
+        stale:      '#f59e0b', // got a snapshot, but it's served from local cache
+        error:      '#ef4444'  // listener error or the tournament doc is gone
+    };
+    // Starts unset (not 'connecting') so the first setConnectionState('connecting')
+    // call at DOMContentLoaded is a real transition and actually paints the
+    // dot, instead of no-op'ing against an identical initial value.
+    let connectionState = null;
+    let connectionBadSince = null; // set on entering any non-live state, cleared on recovery
+    let lastSnapshotAt = Date.now(); // covers the "Firebase never even loaded" case too
+
+    function setConnectionState(state) {
+        if (state === connectionState) return;
+        connectionState = state;
+        connectionBadSince = state === 'live' ? null : (connectionBadSince || Date.now());
+        const dot = document.querySelector('.h-dot');
+        if (dot) {
+            const color = CONNECTION_COLORS[state] || CONNECTION_COLORS.connecting;
+            dot.style.background = color;
+            dot.style.boxShadow = `0 0 6px ${color}`;
+        }
+    }
+
+    // No snapshot (fresh or cached) in this long, while otherwise idle, is
+    // suspicious for a tournament that's actually running -- flag it rather
+    // than let a stuck listener look identical to a quiet phase.
+    const STALE_MS = 45000;
+    // 3 continuous minutes of bad connection means the WebChannel is
+    // probably wedged, not just a blip the SDK is retrying past -- reload
+    // forces a clean reconnect without anyone having to walk up to the
+    // machine. Harmless to repeat if the underlying cause hasn't cleared.
+    const RELOAD_MS = 180000;
+    function startConnectionWatchdog() {
+        setInterval(() => {
+            if (Date.now() - lastSnapshotAt > STALE_MS &&
+                (connectionState === 'live' || connectionState === 'connecting')) {
+                setConnectionState('stale');
+            }
+            // Never reload out from under an in-progress cinematic -- a hard
+            // reload kills the audio/timeline instantly with no teardown,
+            // unlike the cinematic's own graceful bail(). Just skip this
+            // tick; the interval re-checks in 10s once it's done.
+            if (connectionBadSince && Date.now() - connectionBadSince > RELOAD_MS &&
+                !(window.CINEMATIC && window.CINEMATIC.shouldDeferRenders())) {
+                location.reload();
+            }
+        }, 10000);
+    }
 
     const tournamentId = resolveTournamentId({
         search: window.location.search,
@@ -2299,6 +2337,8 @@
         const tournamentRef = db.collection('tournaments').doc(tournamentId);
 
         activeListener = window.firebaseOnSnapshot(tournamentRef, (docSnapshot) => {
+            lastSnapshotAt = Date.now();
+
             if (docSnapshot.exists) {
                 const newData = docSnapshot.data();
                 const newSig = getViewRelevantSignature(newData);
@@ -2310,11 +2350,16 @@
                     prevViewSignature = newSig;
                     updateDisplay();
                 }
+                setConnectionState(docSnapshot.metadata?.fromCache ? 'stale' : 'live');
             } else {
                 console.warn('Tournament not found:', tournamentId);
+                setConnectionState('error');
+                const title = document.getElementById('hTitle');
+                if (title) title.textContent = 'Tournament Not Found';
             }
         }, (error) => {
             console.error('Listener error:', error);
+            setConnectionState('error');
         });
 
         // Set up result log listener
@@ -2353,6 +2398,7 @@
             updateDisplay();
         }, (error) => {
             console.error('Result log listener error:', error);
+            setConnectionState('error');
         });
     }
 
@@ -2433,7 +2479,6 @@
             renderBoard: renderBoard,
             // Provide result log cache access
             getResultLogCache: () => resultLogCache,
-            getOnboardingState: () => onboardingState,
             // Provide match start times ref for elapsed timer tracking
             matchStartTimes: matchStartTimes,
             // Provide diff state
@@ -2537,6 +2582,12 @@
         updateClock();
         setInterval(updateClock, 1000);
         setInterval(updateMatchTimers, 1000);
+
+        // Runs unconditionally (not gated on firebase-ready) so a blocked/
+        // slow-loading Firebase SDK is itself caught as staleness instead
+        // of leaving the dot on its default green forever.
+        setConnectionState('connecting');
+        startConnectionWatchdog();
 
         if (!tournamentId) {
             sessionStorage.setItem('homeNotice', 'No tournament selected. Pick a tournament below to spectate.');
