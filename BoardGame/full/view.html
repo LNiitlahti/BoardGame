@@ -1644,24 +1644,24 @@
         /* ── Spells Window ───────────────────────────── */
         .dm-spell-screen { width: 100%; max-width: 1800px; text-align: center; }
         .dm-spell-screen .dm-spell-icon {
-            font-size: 140px; color: #a855f7; margin-bottom: 24px;
+            font-size: 120px; line-height: 1; color: #a855f7; margin-bottom: 22px;
             filter: drop-shadow(0 0 16px rgba(168,85,247,0.5));
         }
-        .dm-spell-screen .dm-spell-icon svg { width: 140px; height: 140px; }
+        .dm-spell-screen .dm-spell-icon svg { width: 120px; height: 120px; }
         .dm-spell-screen .dm-spell-title {
             font-family: 'Russo One', sans-serif;
-            font-size: 140px; font-weight: 800; color: #a855f7;
+            font-size: 104px; line-height: 1.1; font-weight: 800; color: #a855f7;
             letter-spacing: 6px; text-transform: uppercase;
             text-shadow: 0 0 20px rgba(168,85,247,0.4);
-            margin-bottom: 28px;
+            margin-bottom: 22px;
         }
         .dm-spell-screen .dm-spell-subtitle {
             font-family: 'Quantico', sans-serif;
-            font-size: 44px; font-weight: 600; color: var(--text-muted);
+            font-size: 40px; line-height: 1.2; font-weight: 600; color: var(--text-muted);
         }
         .dm-spell-queue {
-            display: flex; flex-direction: column; gap: 10px;
-            max-width: 1100px; margin: 0 auto 28px;
+            display: flex; flex-direction: column; gap: 9px;
+            max-width: 1100px; margin: 0 auto 20px;
         }
         .dm-spell-turn {
             display: flex; justify-content: space-between; align-items: center;
@@ -1670,22 +1670,32 @@
             background: rgba(255,255,255,0.03);
             font-family: 'Quantico', sans-serif;
         }
-        .dm-spell-turn-name { font-size: 46px; font-weight: 700; color: var(--turn-color); }
-        .dm-spell-turn-note { font-size: 34px; font-weight: 600; color: var(--text-muted); }
+        .dm-spell-turn-name {
+            font-size: 38px; line-height: 1.15; font-weight: 700; color: var(--turn-color);
+            flex: 1 1 auto; min-width: 0; text-align: left;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .dm-spell-turn-note {
+            font-size: 28px; line-height: 1.15; font-weight: 600; color: var(--text-muted);
+            flex: 0 0 auto; max-width: 420px; min-width: 0; text-align: right; margin-left: 20px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
         .dm-spell-turn--current {
             background: rgba(168,85,247,0.14);
             box-shadow: 0 0 24px rgba(168,85,247,0.35);
         }
         .dm-spell-turn--current .dm-spell-turn-note { color: #a855f7; }
-        .dm-spell-turn--done { opacity: 0.45; }
+        .dm-spell-turn--done { opacity: 0.7; }
+        .dm-spell-turn--done .dm-spell-turn-note { color: var(--text-bright); }
         .dm-spell-log {
             max-width: 1100px; margin: 0 auto;
-            border-top: 2px solid rgba(168,85,247,0.25); padding-top: 18px;
+            border-top: 2px solid rgba(168,85,247,0.25); padding-top: 16px;
         }
         .dm-spell-log-row {
             font-family: 'Quantico', sans-serif;
-            font-size: 32px; font-weight: 600; color: var(--text-bright);
+            font-size: 26px; line-height: 1.2; font-weight: 600; color: var(--text-bright);
             padding: 4px 0;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
 
         /* ── Matches Dual Slot ───────────────────────── */
