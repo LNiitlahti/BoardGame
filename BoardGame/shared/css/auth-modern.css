@@ -405,6 +405,25 @@
   text-shadow: 0 0 8px rgba(200, 179, 126, 0.3);
 }
 
+/* Secondary/utility link (e.g. "Forgot password?") — quieter than
+   auth-toggle-link, which is reserved for the primary form-switch CTA */
+.auth-link-subtle {
+  display: block;
+  margin-top: 0.5rem;
+  text-align: right;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: #9aa1ad;
+  text-decoration: none;
+  cursor: pointer;
+  font-family: 'Quantico', 'Inter', sans-serif;
+  transition: color 0.15s ease;
+}
+
+.auth-link-subtle:hover {
+  color: #c8b37e;
+}
+
 /* ==================== LOADING SPINNER ==================== */
 
 .loading-spinner {

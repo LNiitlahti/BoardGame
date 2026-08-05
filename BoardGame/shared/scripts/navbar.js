@@ -208,7 +208,7 @@
                         <img class="navbar-avatar" id="navbarAvatar" src="${avatarUrl || defaultAvatarPath}" alt="Avatar" onerror="this.onerror=null;this.src='${defaultAvatarPath}';">
                         <span class="navbar-role-badge ${roleClass}" id="roleBadge">${roleBadge}</span>
                         <div class="navbar-user-info">
-                            <span class="navbar-user-name" id="userName">${userName || 'User'}</span>
+                            <a class="navbar-user-name" id="userName" href="${getFullBasePath()}/profile.html" title="My Profile">${userName || 'User'}</a>
                             <button class="navbar-logout-btn" onclick="window.navbarLogout()" title="Logout">Exit</button>
                         </div>
                     </div>

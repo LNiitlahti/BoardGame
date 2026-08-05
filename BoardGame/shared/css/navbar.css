@@ -305,6 +305,14 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.navbar-user-name:hover {
+    color: var(--nav-gold-bright);
+    text-decoration: underline;
 }
 
 .navbar-logout-btn {
