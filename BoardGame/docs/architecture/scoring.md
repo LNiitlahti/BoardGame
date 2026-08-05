@@ -134,7 +134,8 @@ Timing and edge cases that are easy to get wrong:
 - **Contested hearts are frozen.** Any heart hex that is the subject of a
   `pending` or `ongoing` challenge match is skipped for that round — its income
   is withheld until the dispute resolves, rather than paid to the current
-  holder. The freeze wins over the multiplier: a frozen heart pays 0, not 0×n.
+  holder. A frozen heart contributes nothing, and the team's other hearts pay
+  normally.
 - **Double-award guard.** `_awardPointsForRound()` records each payout in
   `gameState.pointsHistory` keyed by round number and returns early if that
   round is already present, so re-entering the phase cannot pay twice.
