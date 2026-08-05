@@ -272,6 +272,50 @@ class DisplayManager {
         return null;
     }
 
+    /**
+     * Every spell cast during the CURRENT spell window, merged from the two
+     * independent sources that record them, oldest first:
+     *
+     *   spellHistory[]   — in-app casts written by team.html. Cumulative for
+     *                      the whole tournament, so filtered to entries at or
+     *                      after currentPhase.startedAt. Both fields are ISO
+     *                      8601 strings, so a lexical compare is correct.
+     *   spellWindowLog[] — the admin's manual entries for cards played
+     *                      physically at the table. Already scoped to one
+     *                      window (phase-manager.js nulls it on exit), so it
+     *                      is used whole.
+     *
+     * The two sources are disjoint by construction — nothing writes both —
+     * so no deduplication is needed.
+     *
+     * @returns {Array<{teamId, teamName, spellName, at}>}
+     */
+    _collectSpellWindowCasts(data) {
+        const startedAt = data?.currentPhase?.startedAt || null;
+
+        // No window boundary => no way to tell this window's casts from the
+        // whole tournament's. Drop the cumulative source rather than dumping
+        // every spell ever cast onto the room display.
+        const fromHistory = !startedAt ? [] : (data?.spellHistory || [])
+            .filter(e => e && e.timestamp && e.timestamp >= startedAt)
+            .map(e => ({
+                teamId: e.teamId,
+                teamName: e.teamName,
+                spellName: e.spellName || e.spellId,
+                at: e.timestamp
+            }));
+
+        const fromManual = (data?.spellWindowLog || []).map(e => ({
+            teamId: e.teamId,
+            teamName: e.teamName,
+            spellName: e.spellName,
+            at: e.addedAt || ''
+        }));
+
+        return [...fromHistory, ...fromManual]
+            .sort((a, b) => String(a.at).localeCompare(String(b.at)));
+    }
+
     _getCurrentTeamName(teamId) {
         if (teamId && this._gameData?.teams) {
             const team = this._gameData.teams.find(t => String(t.id) === String(teamId));
