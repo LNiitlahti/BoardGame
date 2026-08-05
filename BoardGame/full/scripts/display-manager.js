@@ -1596,53 +1596,30 @@ class DisplayManager {
     }
 
     /**
-     * Live preview of what each team is ABOUT to score from hex territory
-     * control. Mirrors stats-manager.js's awardRoundPoints() exactly (same
-     * mountain-heart=2/side-heart=1 rule, same per-match multiplier, same
-     * contested-hex exclusion) but read-only -- this only PREVIEWS the award
-     * that fires when the admin actually leaves scoring_hex.
+     * Live preview of what each team is ABOUT to score from heart hexes.
+     * Reads calculateHeartIncome() in board-module.js — the same function the
+     * payout uses — so this panel can never disagree with what admin awards.
+     * Read-only: the award itself fires when the admin leaves scoring_hex.
      */
     _buildHexScoringHTML(data) {
-        const teams = data.teams || [];
-        const heartHexControl = data.heartHexControl || {};
-        const queue = data.gameQueue || [];
-
-        // Heart income pays per match played in the round being resolved
-        // (the one that just ended), not once per round.
+        // Heart income settles the round that just ended; scoring_hex sits at
+        // the top of the new one.
         const resolvingRound = (data.currentPhase?.roundNumber || 0) - 1;
-        const matchesPlayed = countScoringMatchesInRound(data, resolvingRound);
+        const { matchesPlayed, byTeam } =
+            calculateHeartIncome(data, this._boardModule, resolvingRound);
 
-        const contestedHexes = new Set();
-        queue.forEach(m => {
-            if (m.isChallenge && m.challengeHexCoord &&
-                (m.status === 'pending' || m.status === 'ongoing')) {
-                contestedHexes.add(m.challengeHexCoord);
-            }
-        });
-
-        const pending = teams.map(team => {
-            let heartIncome = 0, mountainCount = 0, sideCount = 0;
-            Object.entries(heartHexControl).forEach(([coord, ownerId]) => {
-                if (contestedHexes.has(coord) || ownerId !== team.id) return;
-                const m = coord.match(/q(-?\d+)r(-?\d+)/);
-                if (!m) return;
-                const hexType = this._boardModule?.getHexType(parseInt(m[1]), parseInt(m[2]));
-                if (hexType === 'mountain-heart') { heartIncome += 2; mountainCount++; }
-                else if (hexType === 'side-heart') { heartIncome += 1; sideCount++; }
-            });
-            return { team, points: heartIncome * matchesPlayed, mountainCount, sideCount };
-        }).filter(t => t.points > 0).sort((a, b) => b.points - a.points);
+        const pending = (data.teams || [])
+            .map(team => ({ team, ...(byTeam[team.id] || { points: 0, mountainCount: 0, sideCount: 0 }) }))
+            .filter(t => t.points > 0)
+            .sort((a, b) => b.points - a.points);
 
         const rowsHTML = pending.length > 0
             ? pending.map(({ team, points, mountainCount, sideCount }) => {
                 const color = team.color || '#888';
                 const breakdown = [
-                    [
-                        mountainCount > 0 ? `${mountainCount} × Mountain Heart` : '',
-                        sideCount > 0 ? `${sideCount} × Side Heart` : ''
-                    ].filter(Boolean).join(' + '),
-                    `× ${matchesPlayed} match${matchesPlayed === 1 ? '' : 'es'}`
-                ].join(' ');
+                    mountainCount > 0 ? `${mountainCount} × Mountain Heart` : '',
+                    sideCount > 0 ? `${sideCount} × Side Heart` : ''
+                ].filter(Boolean).join(' + ');
                 return `
                     <div class="dm-hex-score-row" style="--c:${color};">
                         <span class="dm-hex-score-team" style="color:${color};">${team.name || 'Team'}</span>

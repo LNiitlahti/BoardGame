@@ -135,6 +135,36 @@ test('a missing boardModule returns zeros instead of throwing', () => {
     assert.strictEqual(result.byTeam[1].points, 0);
 });
 
+// ── view.html's live Hex Scoring panel ────────────────────────────────────
+
+global.window = global.window || { location: { search: '' } };
+global.ICON_SVGS = global.ICON_SVGS || new Proxy({}, { get: () => '' });
+// display-manager.js calls these as bare globals, the way the browser sees
+// board-module.js's window assignments.
+global.countScoringMatchesInRound = BoardModule.countScoringMatchesInRound;
+global.calculateHeartIncome = calculateHeartIncome;
+require('../../full/scripts/display-manager.js');
+const DisplayManager = global.window.DisplayManager;
+
+test('the live Hex Scoring panel shows the flat per-round income, not a multiple', () => {
+    const dm = new DisplayManager({ container: null, boardModule, boardRenderer: null });
+    const gs = makeState({ heartHexControl: { q0r0: 1, 'q-4r2': 1 } });
+
+    const html = dm._buildHexScoringHTML(gs);
+
+    assert.match(html, /\+3</, 'mountain (2) + side (1) = 3 for the round');
+    assert.doesNotMatch(html, /×\s*\d+\s*match/,
+        'the "× N matches" breakdown belonged to the multiplier and must be gone');
+    assert.match(html, /1 × Mountain Heart \+ 1 × Side Heart/);
+});
+
+test('the live panel says nothing pays when no match was played', () => {
+    const dm = new DisplayManager({ container: null, boardModule, boardRenderer: null });
+    const gs = makeState({ heartHexControl: { q0r0: 1 }, gameHistory: [] });
+
+    assert.match(dm._buildHexScoringHTML(gs), /No matches played this round/);
+});
+
 // ── projectRoundsToWin ────────────────────────────────────────────────────
 
 const { projectRoundsToWin } = require('../../shared/scripts/board-module.js');
