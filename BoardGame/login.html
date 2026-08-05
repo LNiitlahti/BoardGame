@@ -314,7 +314,12 @@
           btn.disabled = false;
 
           let message = 'Login failed. Please try again.';
-          if (err.code === 'auth/user-not-found') {
+          if (err.code === 'auth/user-disabled') {
+            // Reachable since disable became a real Auth operation rather than
+            // a Firestore flag that enforced nothing. Says who to go to,
+            // because the person cannot fix this themselves.
+            message = 'This account has been disabled by an administrator. Contact them to get it re-enabled.';
+          } else if (err.code === 'auth/user-not-found') {
             message = 'No account found with this email.';
           } else if (err.code === 'auth/wrong-password') {
             message = "Incorrect password. Use 'Forgot password?' to reset it.";

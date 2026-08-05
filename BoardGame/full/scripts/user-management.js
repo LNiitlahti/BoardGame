@@ -166,6 +166,46 @@ function escapeHtml(text) {
 }
 
 /**
+ * Calls one of the Admin SDK-backed user management functions.
+ *
+ * Delete, disable/enable and create cannot be done from the browser: the
+ * client SDK can only reach Firestore, so those operations used to leave the
+ * Auth account untouched. They now run in europe-north1 Cloud Functions that
+ * re-check the caller's god rights server-side.
+ *
+ * Throws an Error whose message is already fit to show a person — HttpsError
+ * codes are mapped here, in the same style as sendPasswordReset's handling.
+ */
+async function callUserAdmin(name, payload) {
+    if (!window.firebaseFunctions) {
+        throw new Error('Cloud Functions are not loaded on this page. Reload and try again.');
+    }
+
+    try {
+        const callable = window.firebaseFunctions.httpsCallable(name);
+        const response = await callable(payload);
+        return response.data;
+    } catch (error) {
+        console.error('[User Management] Callable failed:', name, error);
+
+        // failed-precondition, invalid-argument and internal all carry a
+        // server-written message that already names the specific problem
+        // (self-target, last god, which field was wrong), so those pass
+        // through unchanged.
+        let message = error.message;
+        if (error.code === 'functions/unauthenticated') {
+            message = 'Your session has expired. Sign in again.';
+        } else if (error.code === 'functions/permission-denied') {
+            message = 'Only god-level accounts can do this.';
+        } else if (error.code === 'functions/unavailable') {
+            message = 'Could not reach the server. Check your connection and try again.';
+        }
+
+        throw new Error(message);
+    }
+}
+
+/**
  * Show create user modal
  */
 function showCreateUserModal() {
@@ -258,32 +298,20 @@ async function saveUser(event) {
             alert(`User "${displayName}" updated successfully!`);
 
         } else {
-            // CREATE new user
-            // Note: Creating Firebase Auth users requires Firebase Admin SDK on the server
-            // This is a CLIENT-SIDE workaround that creates the Firestore document only
-            // For production, you should use Firebase Functions with Admin SDK
+            // CREATE new user — server-side, so a real Auth account exists and
+            // the person can actually sign in with what you typed here. The
+            // role flags are computed on the server from the same hierarchy as
+            // the update branch above.
+            const result = await callUserAdmin('adminCreateUser', {
+                email,
+                password,
+                displayName,
+                role,
+                enabled
+            });
 
-            alert('⚠️ WARNING: Creating new Firebase Authentication users requires server-side implementation.\n\nThis will only create the Firestore user document.\n\nTo create a full Firebase Auth user, implement a Firebase Cloud Function with Admin SDK.');
-
-            // Generate a pseudo-UID for demonstration (in production, use Auth UID)
-            const newUid = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-            // Hierarchical role system: god > admin > player > user
-            const newUserData = {
-                email: email,
-                displayName: displayName,
-                disabled: !enabled,
-                isGod: role === 'god',
-                isAdmin: role === 'admin' || role === 'god', // Gods are also admins
-                isPlayer: role === 'player' || role === 'admin' || role === 'god', // Higher roles include player permissions
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            };
-
-            await db.collection('users').doc(newUid).set(newUserData);
-
-            console.log('[User Management] Created user document:', newUid);
-            alert(`User document created!\n\nUID: ${newUid}\n\nNOTE: This user needs to be created in Firebase Auth separately.`);
+            console.log('[User Management] Created user:', result.uid);
+            alert(`User "${displayName}" created.\n\nThey can sign in with ${email} and the password you set.`);
         }
 
         // Close modal and reload users
@@ -307,18 +335,16 @@ async function toggleUserStatus(uid, enable) {
     }
 
     const action = enable ? 'enable' : 'disable';
-    const confirmMessage = `Are you sure you want to ${action} this user?\n\nName: ${user.displayName}\nEmail: ${user.email}`;
+    const confirmMessage = enable
+        ? `Re-enable this user?\n\nName: ${user.displayName}\nEmail: ${user.email}\n\nThey'll be able to sign in again.`
+        : `Disable this user?\n\nName: ${user.displayName}\nEmail: ${user.email}\n\nThey will be signed out and refused at login until you re-enable them.`;
 
     if (!confirm(confirmMessage)) {
         return;
     }
 
     try {
-        const db = firebase.firestore();
-        await db.collection('users').doc(uid).update({
-            disabled: !enable,
-            updatedAt: new Date().toISOString()
-        });
+        await callUserAdmin('adminSetUserDisabled', { uid, disabled: !enable });
 
         console.log('[User Management]', action, 'user:', uid);
         alert(`User ${enable ? 'enabled' : 'disabled'} successfully!`);
@@ -335,7 +361,7 @@ async function toggleUserStatus(uid, enable) {
  * Delete user
  */
 async function deleteUser(uid, displayName) {
-    const confirmMessage = `⚠️ WARNING: You are about to DELETE this user!\n\nName: ${displayName}\nUID: ${uid}\n\nThis will:\n- Delete the Firestore user document\n- NOT delete the Firebase Auth user (requires Admin SDK)\n\nType the user's name to confirm deletion:`;
+    const confirmMessage = `⚠️ WARNING: You are about to DELETE this user!\n\nName: ${displayName}\nUID: ${uid}\n\nThis will:\n- Delete their Firebase Auth account, so they can no longer sign in\n- Delete their Firestore user document\n- LEAVE their match history and roster entries intact\n\nType the user's name to confirm deletion:`;
 
     const userInput = prompt(confirmMessage);
 
@@ -354,11 +380,12 @@ async function deleteUser(uid, displayName) {
     }
 
     try {
-        const db = firebase.firestore();
-        await db.collection('users').doc(uid).delete();
+        const result = await callUserAdmin('adminDeleteUser', { uid });
 
         console.log('[User Management] Deleted user:', uid);
-        alert(`User "${displayName}" has been deleted from Firestore.\n\nNOTE: The Firebase Auth user still exists and should be deleted separately.`);
+        alert(result.authAccountMissing
+            ? `"${displayName}" has been deleted.\n\n(There was no Firebase Auth account for this record — it was a leftover document.)`
+            : `"${displayName}" has been deleted, both their sign-in account and their user record.`);
 
         await loadAllUsers();
 
