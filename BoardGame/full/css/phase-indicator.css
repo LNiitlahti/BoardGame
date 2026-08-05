@@ -355,6 +355,35 @@
   border-top: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
 }
 
+.spell-log-entries {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 20px 8px;
+  background: rgba(0, 212, 255, 0.04);
+  border-top: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
+}
+
+.spell-log-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 0.8rem;
+  color: var(--text-primary, #e0e0e0);
+}
+
+.spell-log-entry .remove-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim, #666);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 12px;
+}
+
+.spell-log-entry .remove-btn:hover { color: var(--danger, #e05252); }
+
 /* ==================== FORCE ADVANCE MODAL ==================== */
 
 .force-advance-req {

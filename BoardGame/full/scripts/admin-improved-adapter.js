@@ -33,6 +33,7 @@
     let _initialized = false;
     let _primaryAction = null;
     let _broadcastOpen = false;
+    let _spellLogOpen = false;
     let _flowConfirmAction = null;
 
     // ── Phase constants (mirror phase-manager.js for timeline) ──
@@ -642,6 +643,10 @@
         _renderActionItems(phase);
         _renderControls(phase, step);
         _renderBroadcastBar();
+        // Must run AFTER _renderControls (its _renderSpellWindowControls closes
+        // the bar when the phase isn't a spell window) — keeps the entry list
+        // alive across live Firestore updates and _restoreFlowPanelDOM rebuilds.
+        _renderSpellLogBar();
         _renderMatchSlotCards(phase);
     }
 
@@ -1364,6 +1369,11 @@
         if (!_phaseManager.isSpellWindow(phase)) {
             container.style.display = 'none';
             container.innerHTML = '';
+            _spellLogOpen = false;
+            const bar = document.getElementById('spellLogBar');
+            const entriesEl = document.getElementById('spellLogEntries');
+            if (bar) bar.style.display = 'none';
+            if (entriesEl) entriesEl.style.display = 'none';
             return;
         }
 
@@ -1397,6 +1407,8 @@
             html += `<span style="font-size: 0.75rem; color: var(--text-tertiary);">${_esc(loopInfo.label)}</span>`;
         }
 
+        html += `<button class="btn-small secondary" onclick="toggleSpellLogBar()" title="Log which team used which spell">📜 Spell Log</button>`;
+
         container.innerHTML = html;
     }
 
@@ -1416,6 +1428,35 @@
         if (broadcastInput && hasMessage && !broadcastInput.value) {
             broadcastInput.value = gameState.broadcastMessage.text;
         }
+    }
+
+    // ── Spell Log Bar (collapsed behind the 📜 toggle, visible only during spell windows) ──
+
+    function _renderSpellLogBar() {
+        const bar = document.getElementById('spellLogBar');
+        const entriesEl = document.getElementById('spellLogEntries');
+        if (!bar || !entriesEl) return;
+
+        bar.style.display = _spellLogOpen ? 'flex' : 'none';
+        entriesEl.style.display = _spellLogOpen ? '' : 'none';
+        if (!_spellLogOpen) return;
+
+        const teamSelect = document.getElementById('spellLogTeamSelect');
+        if (teamSelect && teamSelect.options.length === 0) {
+            teamSelect.innerHTML = (gameState.teams || [])
+                .map(team => `<option value="${_esc(team.id)}">${_esc(team.name || 'Team ' + team.id)}</option>`)
+                .join('');
+        }
+
+        const log = gameState.spellWindowLog || [];
+        entriesEl.innerHTML = log.length === 0
+            ? '<p style="font-size: 0.8rem; color: var(--text-tertiary); padding: 4px 0;">No spells logged yet.</p>'
+            : log.map(entry =>
+                `<div class="spell-log-entry">` +
+                    `<span>${_esc(entry.teamName)} — ${_esc(entry.spellName)}</span>` +
+                    `<button class="remove-btn" onclick="removeSpellLogEntry('${_esc(entry.id)}')" title="Remove">✕</button>` +
+                `</div>`
+            ).join('');
     }
 
     // ── Next-up queue highlight ──
@@ -1535,7 +1576,15 @@
                     'style="flex: 1; padding: 6px 12px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 6px; color: white; font-size: 0.85rem;">' +
                 '<button class="btn-small primary" onclick="setBroadcastMessage()">Send</button>' +
                 '<button class="btn-small secondary" onclick="clearBroadcastMessage()">Clear</button>' +
-            '</div>';
+            '</div>' +
+            '<div class="broadcast-bar" id="spellLogBar" style="display: none;">' +
+                '<span style="font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;">Spell Log</span>' +
+                '<select id="spellLogTeamSelect" style="padding: 6px 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 6px; color: white; font-size: 0.85rem;"></select>' +
+                '<input type="text" id="spellLogSpellInput" placeholder="Spell name..." maxlength="60" ' +
+                    'style="flex: 1; padding: 6px 12px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 6px; color: white; font-size: 0.85rem;">' +
+                '<button class="btn-small primary" onclick="addSpellLogEntry()">+ Add</button>' +
+            '</div>' +
+            '<div class="spell-log-entries" id="spellLogEntries" style="display: none;"></div>';
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -1771,6 +1820,42 @@
         if (_broadcastOpen) {
             document.getElementById('broadcastInput')?.focus();
         }
+    };
+
+    window.toggleSpellLogBar = () => {
+        _spellLogOpen = !_spellLogOpen;
+        _renderSpellLogBar();
+        if (_spellLogOpen) {
+            document.getElementById('spellLogSpellInput')?.focus();
+        }
+    };
+
+    window.addSpellLogEntry = async () => {
+        const teamSelect = document.getElementById('spellLogTeamSelect');
+        const input = document.getElementById('spellLogSpellInput');
+        const teamId = teamSelect?.value;
+        const spellName = input?.value?.trim();
+        if (!teamId || !spellName) return;
+
+        const team = (gameState.teams || []).find(t => String(t.id) === String(teamId));
+        gameState.spellWindowLog = gameState.spellWindowLog || [];
+        gameState.spellWindowLog.push({
+            id: `sl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            teamId,
+            teamName: team?.name || `Team ${teamId}`,
+            spellName,
+            addedAt: new Date().toISOString()
+        });
+
+        if (input) input.value = '';
+        await saveGameState();
+        _renderSpellLogBar();
+    };
+
+    window.removeSpellLogEntry = async (id) => {
+        gameState.spellWindowLog = (gameState.spellWindowLog || []).filter(e => e.id !== id);
+        await saveGameState();
+        _renderSpellLogBar();
     };
 
     window.initializePhaseSystem = async () => {
