@@ -43,6 +43,7 @@
             --text-dim: #3a3f52;
             --gold: #c8b37e;
             --gold-bright: #e8d8a8;
+            --gold-glow: rgba(200,179,126,0.3);
             --gold-dim: rgba(200,179,126,0.1);
             --border-faint: rgba(255,255,255,0.05);
             --border-gold: rgba(200,179,126,0.2);
@@ -64,9 +65,35 @@
         /* Header */
         .page-header {
             text-align: center;
-            margin-bottom: 24px;
-            padding-bottom: 16px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
             border-bottom: 1px solid var(--border-gold);
+        }
+
+        .export-pdf-btn {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 10;
+            font-family: 'Quantico', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 700;
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            background: var(--gold-dim);
+            border: 1px solid var(--border-gold);
+            color: var(--gold-bright);
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .export-pdf-btn:hover {
+            background: rgba(200,179,126,0.2);
+        }
+
+        .export-pdf-btn:disabled {
+            opacity: 0.5;
+            cursor: default;
         }
 
         .page-header h1 {
@@ -93,17 +120,17 @@
             margin: 0 auto;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 5px;
         }
 
         .match-card {
             background: var(--bg-card);
             border: 1px solid var(--border-faint);
             border-radius: var(--radius-md);
-            padding: 12px 16px;
+            padding: 8px 12px;
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 12px;
         }
 
         .match-card.ongoing {
@@ -196,7 +223,7 @@
 
         .player-tag {
             font-size: 0.8rem;
-            padding: 3px 8px;
+            padding: 2px 7px;
             border-radius: var(--radius-sm);
             background: rgba(255,255,255,0.03);
             border-left: 3px solid var(--player-color, #666);
@@ -255,8 +282,53 @@
             margin-right: 8px;
         }
 
+        /* PDF Generation Overlay (copied from statistics.css) */
+        .pdf-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(5, 7, 16, 0.92);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .pdf-overlay.hidden {
+            display: none;
+        }
+
+        .pdf-progress {
+            text-align: center;
+            color: var(--text-bright);
+            max-width: 320px;
+        }
+
+        .pdf-progress .spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--border-gold);
+            border-top-color: var(--gold-bright);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+            box-shadow: 0 0 16px var(--gold-glow);
+        }
+
+        .pdf-progress-text {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
         /* Print-friendly */
         @media print {
+            .export-pdf-btn { display: none; }
             body { background: #fff; color: #222; padding: 10px; }
             .match-card { border: 1px solid #ccc; background: #fafafa; }
             .match-num { color: #333; }
@@ -268,6 +340,8 @@
     </style>
 </head>
 <body>
+    <button class="export-pdf-btn" id="exportPdfBtn" onclick="generateQueuePDF()" disabled>Export PDF</button>
+
     <div class="page-header">
         <h1 id="pageTitle">Match Queue</h1>
         <div class="subtitle" id="pageSubtitle">Loading...</div>
@@ -277,12 +351,24 @@
         <div class="status-msg">Loading tournament data...</div>
     </div>
 
+    <!-- PDF Generation Overlay (copied from statistics.html) -->
+    <div id="pdfOverlay" class="pdf-overlay hidden">
+        <div class="pdf-progress">
+            <div class="spinner"></div>
+            <div>Generating PDF...</div>
+            <div class="pdf-progress-text" id="pdfProgressText">Preparing tournament data</div>
+        </div>
+    </div>
+
     <script>window.BOARDGAME_BASE = '..';</script>
     <script src="../shared/scripts/firebase-loader.js"></script>
     <script defer src="../shared/scripts/hex-image-preloader.js"></script>
     <script src="../shared/scripts/games-config.js"></script>
     <script src="../shared/scripts/player-utils.js"></script>
     <script src="../shared/scripts/resolve-tournament-id.js"></script>
+    <script defer src="../shared/vendor/jspdf.umd.min.js"></script>
+    <script defer src="../shared/vendor/jspdf.plugin.autotable.min.js"></script>
+    <script defer src="../shared/scripts/pdf-generator.js"></script>
 
     <script>
         let gameState = null;
@@ -317,6 +403,7 @@
                 document.getElementById('pageTitle').textContent =
                     (gameState.name || 'Tournament') + ' — Match Queue';
 
+                document.getElementById('exportPdfBtn').disabled = false;
                 renderMatchList();
             } catch (error) {
                 console.error('Error loading tournament:', error);
@@ -444,6 +531,233 @@
             const game = GAMES_CONFIG.getGame(gameId);
             if (!game || !game.image) return null;
             return GAMES_CONFIG.resolveImagePath(game.image);
+        }
+
+        // Copied from shared/scripts/pdf-generator.js (_hexToRgb / hexToRgb helper)
+        function hexToRgb(hex) {
+            hex = (hex || '#666666').replace('#', '');
+            if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+            return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+        }
+
+        const GAME_ICON_SIZE = 5;
+
+        async function generateQueuePDF() {
+            if (!gameState || typeof window.jspdf === 'undefined') return;
+
+            const overlay = document.getElementById('pdfOverlay');
+            const progressText = document.getElementById('pdfProgressText');
+            if (overlay) overlay.classList.remove('hidden');
+
+            try {
+                const queue = (gameState.gameQueue || []).filter(g => g.status !== 'completed');
+                const ongoing = queue.filter(g => g.status === 'ongoing');
+                const pending = queue.filter(g => g.status !== 'ongoing');
+                const allMatches = [...ongoing, ...pending];
+                const breakCount = allMatches.filter(g => g.isBreak).length;
+                const matchCount = allMatches.length - breakCount;
+
+                // Pre-load game icons (same helper statistics.html/god.html use for their PDF export)
+                if (progressText) progressText.textContent = 'Loading assets...';
+                const gameIconMap = {};
+                if (typeof window.loadImageForPDF === 'function') {
+                    const gamesUsed = new Set();
+                    allMatches.forEach(g => { if (!g.isBreak) gamesUsed.add(g.game || g.gameType); });
+                    await Promise.all([...gamesUsed].map(async (gameId) => {
+                        const imagePath = getGameImage(gameId);
+                        if (!imagePath) return;
+                        const dataUrl = await window.loadImageForPDF(imagePath, true);
+                        if (dataUrl) gameIconMap[gameId] = dataUrl;
+                    }));
+                }
+
+                if (progressText) progressText.textContent = 'Building PDF...';
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+                const pageW = doc.internal.pageSize.getWidth();
+                const pageH = doc.internal.pageSize.getHeight();
+                const margin = 15;
+
+                const C = {
+                    bg: [5, 7, 16],
+                    gold: [200, 179, 126],
+                    goldBright: [232, 216, 168],
+                    text: [200, 204, 214],
+                    textMuted: [106, 112, 136],
+                    panel: [16, 20, 32],
+                    panelAlt: [12, 15, 26],
+                    headerBg: [30, 34, 50],
+                    live: [10, 40, 28],
+                    liveText: [0, 224, 128],
+                    challenge: [42, 14, 14],
+                    challengeText: [216, 96, 96],
+                    border: [40, 44, 60],
+                    breakBg: [26, 22, 14]
+                };
+
+                function drawPageBg() {
+                    doc.setFillColor(...C.bg);
+                    doc.rect(0, 0, pageW, pageH, 'F');
+                    doc.setFillColor(...C.gold);
+                    doc.rect(0, 0, pageW, 2.5, 'F');
+                }
+                const origAddPage = doc.addPage.bind(doc);
+                doc.addPage = function (...args) { origAddPage(...args); drawPageBg(); return doc; };
+                drawPageBg();
+
+                const tournamentName = gameState.name || gameState.tournamentId || 'Tournament';
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(18);
+                doc.setTextColor(...C.goldBright);
+                doc.text(`${tournamentName} — Match Queue`, pageW / 2, 16, { align: 'center' });
+
+                const now = new Date();
+                const genStamp = `${now.toLocaleDateString('en-GB')} ${now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                doc.setTextColor(...C.textMuted);
+                const subtitle = `${matchCount} matches` +
+                    (breakCount > 0 ? ` + ${breakCount} breaks` : '') +
+                    (ongoing.length > 0 ? ` (${ongoing.length} live)` : '') +
+                    ` — Generated ${genStamp}`;
+                doc.text(subtitle, pageW / 2, 22, { align: 'center' });
+
+                const filename = `${tournamentName.replace(/[^a-zA-Z0-9]/g, '_')}_match_queue.pdf`;
+
+                if (allMatches.length === 0) {
+                    doc.setFontSize(11);
+                    doc.setTextColor(...C.text);
+                    doc.text('No matches in queue.', pageW / 2, 40, { align: 'center' });
+                    doc.save(filename);
+                    if (overlay) overlay.classList.add('hidden');
+                    return;
+                }
+
+                // rowMeta carries per-row draw data: game id (for icon) + colored player names (for Side A/B)
+                const rowMeta = [];
+                const body = allMatches.map(game => {
+                    if (game.isBreak) {
+                        rowMeta.push({ isBreak: true });
+                        const label = `${game.breakEmoji || '⏸'}  ${game.breakLabel || 'Break'}`;
+                        return [{
+                            content: (game.status === 'ongoing' ? '[LIVE] ' : '') + label,
+                            colSpan: 5,
+                            styles: { halign: 'center', fontStyle: 'bold', textColor: C.gold, fillColor: C.breakBg }
+                        }];
+                    }
+
+                    const isOngoing = game.status === 'ongoing';
+                    const isChallenge = game.isChallenge === true;
+                    const gameId = game.game || game.gameType;
+                    const teams = game.teams || [];
+
+                    const sideAPlayers = resolveTeamPlayers(teams[0]).map(p => ({ name: p.name, color: hexToRgb(p.teamColor) }));
+                    const sideBPlayers = teams[1] ? resolveTeamPlayers(teams[1]).map(p => ({ name: p.name, color: hexToRgb(p.teamColor) })) : [];
+                    rowMeta.push({ isOngoing, isChallenge, gameId, sideA: sideAPlayers, sideB: sideBPlayers });
+
+                    const matchNum = game.matchNumber ? `#${game.matchNumber}` : '';
+                    let gameName = getDisplayName(gameId || 'Unknown');
+                    if (game.playType) gameName += ` (${game.playType})`;
+                    if (isOngoing) gameName = '[LIVE] ' + gameName;
+                    if (isChallenge) gameName = '[CHALLENGE] ' + gameName;
+
+                    const sideA = sideAPlayers.map(p => p.name).join(', ') || 'TBD';
+                    const sideB = teams[1] ? (sideBPlayers.map(p => p.name).join(', ') || 'TBD') : '';
+
+                    return [matchNum, gameName, sideA, teams.length > 1 ? 'vs' : '', sideB];
+                });
+
+                doc.autoTable({
+                    startY: 28,
+                    margin: { left: margin, right: margin },
+                    head: [['#', 'Match', 'Side A', '', 'Side B']],
+                    body,
+                    styles: {
+                        textColor: C.text, lineColor: C.border, lineWidth: 0.1,
+                        fontSize: 8.5, cellPadding: 2.5, font: 'helvetica'
+                    },
+                    headStyles: { fillColor: C.headerBg, textColor: C.gold, fontStyle: 'bold', fontSize: 8 },
+                    columnStyles: {
+                        0: { cellWidth: 12, halign: 'center' },
+                        1: { cellWidth: 48, cellPadding: { left: GAME_ICON_SIZE + 4, top: 2.5, right: 2.5, bottom: 2.5 } },
+                        3: { cellWidth: 8, halign: 'center', textColor: C.gold, fontStyle: 'bold' }
+                    },
+                    didParseCell: function (data) {
+                        if (data.section !== 'body') return;
+                        const meta = rowMeta[data.row.index];
+                        if (!meta || meta.isBreak) return;
+
+                        let fill;
+                        if (meta.isOngoing) fill = C.live;
+                        else if (meta.isChallenge) fill = C.challenge;
+                        else fill = data.row.index % 2 === 0 ? C.panel : C.panelAlt;
+                        data.cell.styles.fillColor = fill;
+
+                        if (data.column.index === 1) {
+                            if (meta.isOngoing) data.cell.styles.textColor = C.liveText;
+                            else if (meta.isChallenge) data.cell.styles.textColor = C.challengeText;
+                        }
+                        // Side A / Side B: hide the default plain-text render (same trick as
+                        // pdf-generator.js's match-history table) so didDrawCell can paint
+                        // each player name in their own team color on top.
+                        if (data.column.index === 2 || data.column.index === 4) {
+                            data.cell.styles.textColor = fill;
+                        }
+                    },
+                    didDrawCell: function (data) {
+                        if (data.section !== 'body') return;
+                        const meta = rowMeta[data.row.index];
+                        if (!meta || meta.isBreak) return;
+
+                        if (data.column.index === 1) {
+                            const iconData = gameIconMap[meta.gameId];
+                            if (iconData) {
+                                const iconY = data.cell.y + (data.cell.height - GAME_ICON_SIZE) / 2;
+                                doc.addImage(iconData, 'PNG', data.cell.x + 2, iconY, GAME_ICON_SIZE, GAME_ICON_SIZE);
+                            }
+                        }
+
+                        if (data.column.index === 2 || data.column.index === 4) {
+                            const players = data.column.index === 2 ? meta.sideA : meta.sideB;
+                            if (players && players.length > 0) {
+                                const fs = data.cell.styles.fontSize || 8.5;
+                                doc.setFontSize(fs);
+                                doc.setFont('helvetica', 'normal');
+                                const padLeft = typeof data.cell.padding === 'function' ? data.cell.padding('left') : 2.5;
+                                let curX = data.cell.x + padLeft;
+                                const textY = data.cell.y + data.cell.height / 2 + fs * 0.353 / 2;
+                                players.forEach((p, idx) => {
+                                    doc.setTextColor(...p.color);
+                                    doc.text(p.name, curX, textY);
+                                    curX += doc.getTextWidth(p.name);
+                                    if (idx < players.length - 1) {
+                                        doc.setTextColor(...C.textMuted);
+                                        doc.text(', ', curX, textY);
+                                        curX += doc.getTextWidth(', ');
+                                    }
+                                });
+                            }
+                        }
+                    },
+                    didDrawPage: function () {
+                        doc.setFont('helvetica', 'normal');
+                        doc.setFontSize(7);
+                        doc.setTextColor(...C.textMuted);
+                        doc.text(`${tournamentName} — Match Queue`, pageW / 2, pageH - 8, { align: 'center' });
+                    }
+                });
+
+                if (progressText) progressText.textContent = 'Downloading PDF...';
+                doc.save(filename);
+
+                if (overlay) overlay.classList.add('hidden');
+                if (typeof showToast === 'function') showToast('PDF generated successfully!', 'success');
+            } catch (error) {
+                console.error('PDF generation error:', error);
+                if (overlay) overlay.classList.add('hidden');
+                if (typeof showToast === 'function') showToast('Failed to generate PDF: ' + error.message, 'error');
+            }
         }
 
         function showStatus(message, isError = false) {
