@@ -143,14 +143,12 @@ class BoardModule {
     }
 
     /**
-     * Get passive income value for a hex
-     * Returns VP per game when this hex is controlled
+     * Get passive income value for a hex.
+     * Reads HEART_INCOME so the values live in exactly one place —
+     * see calculateHeartIncome() below and docs/architecture/scoring.md.
      */
     getHexValue(q, r) {
-        const type = this.getHexType(q, r);
-        if (type === 'mountain-heart') return 2; // Mountain heart: +2 VP per game
-        if (type === 'side-heart') return 1;     // Side heart: +1 VP per game
-        return 0; // Normal hex: no passive income
+        return HEART_INCOME[this.getHexType(q, r)] || 0;
     }
 
     /**
@@ -259,22 +257,26 @@ class BoardModule {
 }
 
 /**
- * How many matches a round's heart income is multiplied by.
+ * Points per ROUND for each heart type. Not per match — there is no
+ * multiplier anywhere in the scoring path. The only place these numbers
+ * live; getHexValue() and calculateHeartIncome() both read them.
+ */
+const HEART_INCOME = Object.freeze({
+    'mountain-heart': 2,
+    'side-heart': 1
+});
+
+/**
+ * How many scoring matches a round actually contained.
  *
- * Heart hexes pay once per ROUND, but the payout scales with how many
- * scoring matches that round actually contained — a team holding one side
- * heart through a normal two-match round earns +2, not +1. Only matches a
- * team could win count: challenge matches award nothing (they move hex
- * control, not score), so they don't multiply heart income either. Breaks
- * obviously don't count.
- *
- * A round where both slots were force-skipped played nothing and therefore
- * pays nothing — that is the rule, not a bug. Callers surface the count in
- * the UI so a 0 is visible to the TD before they advance.
+ * This is a GATE, not a multiplier: a round in which nothing was played pays
+ * no heart income at all, but a round with four matches pays exactly the same
+ * as a round with one. Only matches a team could win count — challenge matches
+ * award nothing (they move hex control, not score) and breaks are not matches.
  *
  * Counts from gameHistory, which is append-only and survives queue clears.
- * confirmResult() stamps `roundNumber` onto every history entry from the
- * queue entry's own tag; see docs/architecture/scoring.md.
+ * confirmResult() stamps `roundNumber` onto every history entry from the queue
+ * entry's own tag; see docs/architecture/scoring.md.
  *
  * @param {Object} gameState
  * @param {number} roundNumber - the round being paid for (the one that just ended)
@@ -287,17 +289,99 @@ function countScoringMatchesInRound(gameState, roundNumber) {
         entry &&
         !entry.isChallenge &&
         !entry.isBreak &&
+        // Untagged entries (pre-phase-flow matches, stamped `roundNumber: null`)
+        // belong to no round. Without this guard `Number(null) === 0` matches
+        // them all whenever roundNumber is 0 — which is exactly what the
+        // previews pass during round 1, so a round that pays nothing would
+        // preview a full backlog's worth of income.
+        entry.roundNumber !== null &&
+        entry.roundNumber !== undefined &&
         Number(entry.roundNumber) === Number(roundNumber)
     ).length;
+}
+
+/**
+ * Heart income for every team, for one round.
+ *
+ * THE single heart-income calculation. Payouts (admin.js, stats-manager.js)
+ * and previews (stats-manager.js's Next Round modal, display-manager.js's
+ * live panel on view.html) all call this, so a preview can never promise a
+ * different number than the payout delivers. It used to be written out four
+ * times, and the copies drifted.
+ *
+ * Income is FLAT per round: Mountain Heart +2, each Side Heart +1, paid once
+ * at the scoring_hex phase for the hearts a team still holds at that moment.
+ *
+ * @param {Object} gameState
+ * @param {Object} boardModule - a BoardModule instance, for getHexType()
+ * @param {number} roundNumber - the round being paid for (the one that ended)
+ * @returns {{
+ *   roundPlayed: boolean,
+ *   matchesPlayed: number,
+ *   byTeam: Object<string, {points: number, mountainCount: number, sideCount: number}>
+ * }}
+ */
+function calculateHeartIncome(gameState, boardModule, roundNumber) {
+    const teams = gameState?.teams || [];
+    const byTeam = {};
+    teams.forEach(team => {
+        byTeam[team.id] = { points: 0, mountainCount: 0, sideCount: 0 };
+    });
+
+    const matchesPlayed = countScoringMatchesInRound(gameState, roundNumber);
+    const roundPlayed = matchesPlayed > 0;
+
+    // A round nobody played pays nobody. Before the multiplier was removed
+    // this fell out of `× 0`; it is now an explicit rule.
+    if (!gameState || !boardModule || !roundPlayed) {
+        return { roundPlayed, matchesPlayed, byTeam };
+    }
+
+    // Hexes under an unresolved challenge pay nobody — not the holder, not
+    // the challenger. The income is withheld until the dispute settles.
+    const contestedHexes = new Set();
+    (gameState.gameQueue || []).forEach(m => {
+        if (m && m.isChallenge && m.challengeHexCoord &&
+            (m.status === 'pending' || m.status === 'ongoing')) {
+            contestedHexes.add(m.challengeHexCoord);
+        }
+    });
+
+    const control = Object.entries(gameState.heartHexControl || {});
+
+    teams.forEach(team => {
+        const entry = byTeam[team.id];
+        control.forEach(([coord, ownerId]) => {
+            if (contestedHexes.has(coord)) return;
+            if (ownerId !== team.id) return;
+
+            const m = coord.match(/q(-?\d+)r(-?\d+)/);
+            if (!m) return;
+
+            const hexType = boardModule.getHexType(parseInt(m[1]), parseInt(m[2]));
+            const value = HEART_INCOME[hexType];
+            if (!value) return;
+
+            entry.points += value;
+            if (hexType === 'mountain-heart') entry.mountainCount++;
+            else entry.sideCount++;
+        });
+    });
+
+    return { roundPlayed, matchesPlayed, byTeam };
 }
 
 // Export for use in other scripts
 if (typeof window !== 'undefined') {
     window.BoardModule = BoardModule;
     window.countScoringMatchesInRound = countScoringMatchesInRound;
+    window.calculateHeartIncome = calculateHeartIncome;
+    window.HEART_INCOME = HEART_INCOME;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = BoardModule;
     module.exports.countScoringMatchesInRound = countScoringMatchesInRound;
+    module.exports.calculateHeartIncome = calculateHeartIncome;
+    module.exports.HEART_INCOME = HEART_INCOME;
 }
