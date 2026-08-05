@@ -185,7 +185,9 @@ class StatsManager {
 
     /**
      * Award points to teams based on currently controlled heart hexes.
-     * Side hearts = +1 point, Mountain heart (center) = +2 points.
+     * Side hearts = +1, Mountain heart (center) = +2 — PER MATCH PLAYED in
+     * the round being paid for. Mirrors admin.js's awardRoundPoints()
+     * exactly. See countScoringMatchesInRound() in board-module.js.
      * Returns object with points awarded per team for display.
      */
     awardRoundPoints() {
@@ -194,6 +196,11 @@ class StatsManager {
         if (!gs?.teams || !this._boardModule) {
             return {};
         }
+
+        // Payout fires on leaving scoring_hex, at the TOP of the new round —
+        // the round it pays for is the one that just ended.
+        const resolvingRound = (gs.currentPhase?.roundNumber || 0) - 1;
+        const matchesPlayed = countScoringMatchesInRound(gs, resolvingRound);
 
         // Collect hex coords under active challenge (pending/ongoing challenge matches)
         const contestedHexes = new Set();
@@ -207,7 +214,7 @@ class StatsManager {
         const pointsAwarded = {};
 
         gs.teams.forEach(team => {
-            let roundPoints = 0;
+            let heartIncome = 0;
 
             // Count points from controlled heart hexes
             Object.entries(gs.heartHexControl || {}).forEach(([coord, ownerId]) => {
@@ -221,13 +228,16 @@ class StatsManager {
                         const hexType = this._boardModule.getHexType(parseInt(q), parseInt(r));
 
                         if (hexType === 'mountain-heart') {
-                            roundPoints += 2; // Center hex = 2 points
+                            heartIncome += 2; // Center hex = 2 per match
                         } else if (hexType === 'side-heart') {
-                            roundPoints += 1; // Side hex = 1 point
+                            heartIncome += 1; // Side hex = 1 per match
                         }
                     }
                 }
             });
+
+            // Heart income is paid once per match played in the resolving round
+            const roundPoints = heartIncome * matchesPlayed;
 
             // ADD points to existing total (not replace)
             if (roundPoints > 0) {
@@ -235,6 +245,11 @@ class StatsManager {
                 pointsAwarded[team.name || `Team ${team.id}`] = roundPoints;
             }
         });
+
+        // Expose the multiplier so callers can show "×2" in the payout message —
+        // a silent ×0 (nothing played, or a round-tagging bug) must be visible.
+        this.lastPointsMultiplier = matchesPlayed;
+        this.lastResolvingRound = resolvingRound;
 
         return pointsAwarded;
     }
@@ -258,14 +273,20 @@ class StatsManager {
             return;
         }
 
-        // Preview points that will be awarded
+        // Preview points that will be awarded. Must apply the SAME per-match
+        // multiplier as awardRoundPoints(), or the modal promises a different
+        // number than the payout delivers.
+        const resolvingRound = (gs.currentPhase?.roundNumber || 0) - 1;
+        const matchesPlayed = countScoringMatchesInRound(gs, resolvingRound);
+
         const previewContainer = document.getElementById('nextRoundPreview');
-        let previewHtml = '<h5>Points to be awarded:</h5>';
+        let previewHtml = `<h5>Points to be awarded (round ${resolvingRound}: ` +
+            `${matchesPlayed} match${matchesPlayed === 1 ? '' : 'es'} played → heart income ×${matchesPlayed}):</h5>`;
 
         let hasAnyPoints = false;
 
         gs.teams.forEach(team => {
-            let roundPoints = 0;
+            let heartIncome = 0;
 
             // Calculate points from controlled heart hexes
             Object.entries(gs.heartHexControl || {}).forEach(([coord, ownerId]) => {
@@ -276,13 +297,15 @@ class StatsManager {
                         const hexType = this._boardModule.getHexType(parseInt(q), parseInt(r));
 
                         if (hexType === 'mountain-heart') {
-                            roundPoints += 2;
+                            heartIncome += 2;
                         } else if (hexType === 'side-heart') {
-                            roundPoints += 1;
+                            heartIncome += 1;
                         }
                     }
                 }
             });
+
+            const roundPoints = heartIncome * matchesPlayed;
 
             if (roundPoints > 0) hasAnyPoints = true;
 
@@ -301,7 +324,9 @@ class StatsManager {
         });
 
         if (!hasAnyPoints) {
-            previewHtml += '<p style="color: var(--text-tertiary); font-size: 0.8rem; margin-top: 8px;">No heart hexes are controlled by any team.</p>';
+            previewHtml += matchesPlayed === 0
+                ? '<p style="color: var(--text-tertiary); font-size: 0.8rem; margin-top: 8px;">No matches were played in this round, so heart income pays nothing (×0).</p>'
+                : '<p style="color: var(--text-tertiary); font-size: 0.8rem; margin-top: 8px;">No heart hexes are controlled by any team.</p>';
         }
 
         previewContainer.innerHTML = previewHtml;

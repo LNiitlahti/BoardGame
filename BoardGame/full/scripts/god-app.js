@@ -221,7 +221,18 @@ class GodApp {
                 const msg = Object.entries(pointsAwarded)
                     .map(([team, pts]) => `${team}: +${pts}`)
                     .join(', ') || 'No points';
-                this.ui.showStatus(`Round ${roundNumber} points: ${msg}`, 'success');
+
+                // Heart income is multiplied by the resolving round's match
+                // count — show it, so a ×0 (nothing played, or a round-tagging
+                // bug) is never silent. awardRoundPoints() stamps these.
+                const mult = this.stats.lastPointsMultiplier;
+                const resolved = this.stats.lastResolvingRound;
+                const multNote = mult === undefined
+                    ? ''
+                    : ` (round ${resolved}: ${mult} match${mult === 1 ? '' : 'es'}, hearts ×${mult})`;
+
+                this.ui.showStatus(`Round ${roundNumber} points${multNote}: ${msg}`,
+                    mult === 0 ? 'warning' : 'success');
             }
         };
 

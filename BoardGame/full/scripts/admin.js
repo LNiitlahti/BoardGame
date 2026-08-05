@@ -4595,6 +4595,13 @@ async function confirmResult(winnerIndex) {
         // Enhanced statistics fields
         matchDuration: matchDuration,
         tournamentRound: gameState.currentRound || 1,
+        // Phase-flow round/slot, carried over from the queue entry's own tag.
+        // tournamentRound above reads the LEGACY currentRound counter, which
+        // phase-managed tournaments never advance — so it cannot be used to
+        // group matches by round. awardRoundPoints() multiplies heart income
+        // by the number of matches carrying each roundNumber.
+        roundNumber: selectedQueuedGame.roundNumber ?? gameState.currentPhase?.roundNumber ?? null,
+        slot: selectedQueuedGame.slot ?? null,
         matchNumberInRound: ((gameState.gameHistory?.length || 0) % (gameState.teams?.length || 5)) + 1,
         teamStatsSnapshot: teamStatsSnapshot,
         challengeHexCoord: selectedQueuedGame.challengeHexCoord || null
@@ -4945,14 +4952,26 @@ window.recalculateTeamStats = recalculateTeamStats;
 // =============================================================================
 
 /**
- * Award points to teams based on currently controlled heart hexes
- * Side hearts = +1 point, Mountain heart (center) = +2 points
- * Returns object with points awarded per team for display
+ * Award points to teams based on currently controlled heart hexes.
+ * Side hearts = +1, Mountain heart (center) = +2 — PER MATCH PLAYED in the
+ * round being paid for. One side heart held through a normal two-match round
+ * is +2, a mountain heart is +4. Challenge games do not multiply (they award
+ * no points at all). See countScoringMatchesInRound() in board-module.js.
+ *
+ * Control is read at payout time, i.e. AFTER the round's results were
+ * confirmed — so only hexes a team still holds pay out.
+ *
+ * Returns object with points awarded per team for display.
  */
 function awardRoundPoints() {
     if (!gameState?.teams || !boardModule) {
         return {};
     }
+
+    // Payout fires on leaving scoring_hex, which sits at the TOP of the new
+    // round — the round it pays for is the one that just ended.
+    const resolvingRound = (gameState.currentPhase?.roundNumber || 0) - 1;
+    const matchesPlayed = countScoringMatchesInRound(gameState, resolvingRound);
 
     // Collect hex coords under active challenge (pending/ongoing challenge matches)
     const contestedHexes = new Set();
@@ -4966,7 +4985,7 @@ function awardRoundPoints() {
     const pointsAwarded = {};
 
     gameState.teams.forEach(team => {
-        let roundPoints = 0;
+        let heartIncome = 0;
 
         // Count points from controlled heart hexes
         Object.entries(gameState.heartHexControl || {}).forEach(([coord, ownerId]) => {
@@ -4980,13 +4999,16 @@ function awardRoundPoints() {
                     const hexType = boardModule.getHexType(parseInt(q), parseInt(r));
 
                     if (hexType === 'mountain-heart') {
-                        roundPoints += 2; // Center hex = 2 points
+                        heartIncome += 2; // Center hex = 2 per match
                     } else if (hexType === 'side-heart') {
-                        roundPoints += 1; // Side hex = 1 point
+                        heartIncome += 1; // Side hex = 1 per match
                     }
                 }
             }
         });
+
+        // Heart income is paid once per match played in the resolving round
+        const roundPoints = heartIncome * matchesPlayed;
 
         // ADD points to existing total (not replace)
         if (roundPoints > 0) {
@@ -4994,6 +5016,11 @@ function awardRoundPoints() {
             pointsAwarded[team.name || `Team ${team.id}`] = roundPoints;
         }
     });
+
+    // Expose the multiplier so callers can show "×2" in the payout message —
+    // a silent ×0 (nothing played, or a round-tagging bug) must be visible.
+    awardRoundPoints.lastMultiplier = matchesPlayed;
+    awardRoundPoints.lastResolvingRound = resolvingRound;
 
     return pointsAwarded;
 }

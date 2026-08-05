@@ -258,11 +258,46 @@ class BoardModule {
     }
 }
 
+/**
+ * How many matches a round's heart income is multiplied by.
+ *
+ * Heart hexes pay once per ROUND, but the payout scales with how many
+ * scoring matches that round actually contained — a team holding one side
+ * heart through a normal two-match round earns +2, not +1. Only matches a
+ * team could win count: challenge matches award nothing (they move hex
+ * control, not score), so they don't multiply heart income either. Breaks
+ * obviously don't count.
+ *
+ * A round where both slots were force-skipped played nothing and therefore
+ * pays nothing — that is the rule, not a bug. Callers surface the count in
+ * the UI so a 0 is visible to the TD before they advance.
+ *
+ * Counts from gameHistory, which is append-only and survives queue clears.
+ * confirmResult() stamps `roundNumber` onto every history entry from the
+ * queue entry's own tag; see docs/architecture/scoring.md.
+ *
+ * @param {Object} gameState
+ * @param {number} roundNumber - the round being paid for (the one that just ended)
+ * @returns {number} count of scoring matches in that round
+ */
+function countScoringMatchesInRound(gameState, roundNumber) {
+    if (!gameState || roundNumber === undefined || roundNumber === null) return 0;
+
+    return (gameState.gameHistory || []).filter(entry =>
+        entry &&
+        !entry.isChallenge &&
+        !entry.isBreak &&
+        Number(entry.roundNumber) === Number(roundNumber)
+    ).length;
+}
+
 // Export for use in other scripts
 if (typeof window !== 'undefined') {
     window.BoardModule = BoardModule;
+    window.countScoringMatchesInRound = countScoringMatchesInRound;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = BoardModule;
+    module.exports.countScoringMatchesInRound = countScoringMatchesInRound;
 }

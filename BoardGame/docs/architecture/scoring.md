@@ -18,7 +18,7 @@ exactly **two** sources:
 | Source | Amount | When |
 |---|---|---|
 | **Match win** | **+1** | The moment the TD confirms a match result |
-| **Heart hex income** | **+1** per side heart, **+2** for the mountain heart | Once per round, on leaving the `scoring_hex` phase |
+| **Heart hex income** | **(+1** per side heart, **+2** for the mountain heart**) × matches played in the round** | Once per round, on leaving the `scoring_hex` phase |
 
 **Win condition:** first team to reach `gameState.winCondition` points.
 Default **50**, set in the setup wizard (`setup.html` `#winCondition`) and
@@ -60,33 +60,79 @@ Three conditions gate it:
 
 ---
 
-## 2. Heart hex income: +1 / +2 per round
+## 2. Heart hex income: (+1 / +2) × matches played
 
 **Where:** `awardRoundPoints()` in `full/scripts/admin.js`, invoked via
 `_awardPointsForRound()` in `admin-improved-adapter.js`, which is wired to
 PhaseManager's `_onAwardPoints` hook.
 
 ```js
-if (hexType === 'mountain-heart')  roundPoints += 2;
-else if (hexType === 'side-heart') roundPoints += 1;
+if (hexType === 'mountain-heart')  heartIncome += 2;
+else if (hexType === 'side-heart') heartIncome += 1;
 ...
+const roundPoints = heartIncome * matchesPlayed;
 team.points = (team.points || 0) + roundPoints;   // ADDs, never replaces
 ```
+
+**The payout is once per round, but scales with that round's match count.**
+A normal round contains two matches, so one side heart held through it is
+**+2**, and the mountain heart is **+4**. This is a single lump payment, not
+one payment per match — the distinction matters because control is read once,
+at payout time.
 
 Timing and edge cases that are easy to get wrong:
 
 - **Fires on leaving `scoring_hex`**, once per round — `phase-manager.js`:
   `if (current === 'scoring_hex' && this._onAwardPoints && newRound > 1)`.
+- **The round paid for is `currentPhase.roundNumber - 1`.** `scoring_hex` sits
+  at the *top* of the new round, so the payout settles the round that just
+  ended. The multiplier counts that round's matches, not the new one's.
 - **Round 1 awards no heart income.** The `newRound > 1` guard is deliberate:
   income is paid for a *completed* round, and at the start of round 1 no round
   has been played.
+- **Challenge games do not multiply.** `countScoringMatchesInRound()` skips
+  `isChallenge` entries. This follows the existing rule that a challenge match
+  awards no points at all — it moves hex control, not score. A round with 2
+  matches and 5 challenge games still pays ×2.
+- **Control is read after the round's results are confirmed**, so a heart lost
+  during the round pays its new holder, not the old one.
+- **A round where nothing was played pays ×0.** That is the rule, not a bug —
+  but both the god.html/admin.html status message and view.html's live Hex
+  Scoring panel print the multiplier, so a `×0` is always visible to the TD
+  rather than silently zeroing everyone's income.
 - **Contested hearts are frozen.** Any heart hex that is the subject of a
   `pending` or `ongoing` challenge match is skipped for that round — its income
   is withheld until the dispute resolves, rather than paid to the current
-  holder.
+  holder. The freeze wins over the multiplier: a frozen heart pays 0, not 0×n.
 - **Double-award guard.** `_awardPointsForRound()` records each payout in
   `gameState.pointsHistory` keyed by round number and returns early if that
   round is already present, so re-entering the phase cannot pay twice.
+
+### Where the match count comes from
+
+`countScoringMatchesInRound(gameState, roundNumber)` in
+`shared/scripts/board-module.js` — the one shared script all four pages
+(admin/god/view/replay) load. It counts non-challenge, non-break entries in
+`gameState.gameHistory` whose `roundNumber` matches.
+
+`roundNumber` is stamped onto each history entry at confirm time, in **both**
+`confirmResult()` (admin.js) and `ResultManager.confirmResult()`
+(result-manager.js), copied from the queue entry's own `{roundNumber, slot}`
+tag. The pre-existing `tournamentRound` field on history entries is **not**
+usable for this: it reads the legacy `gameState.currentRound` counter, which
+phase-managed tournaments deliberately never advance.
+
+Four places must agree on this formula. If you change one, change all four:
+
+| File | Function | Role |
+|---|---|---|
+| `full/scripts/admin.js` | `awardRoundPoints()` | the payout (admin.html) |
+| `full/scripts/stats-manager.js` | `awardRoundPoints()` | the payout (god.html) |
+| `full/scripts/stats-manager.js` | `advanceRound()` | legacy Next Round modal preview |
+| `full/scripts/display-manager.js` | `_buildHexScoringHTML()` | view.html live preview |
+
+`replay-engine.js` needs no change: it replays the logged `points_awarded`
+payload rather than recomputing heart income.
 
 ---
 

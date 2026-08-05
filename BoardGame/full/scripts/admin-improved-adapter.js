@@ -2018,7 +2018,19 @@
         const msg = Object.entries(pointsAwarded)
             .map(([team, pts]) => `${team}: +${pts}`)
             .join(', ') || 'No points awarded';
-        showStatus(`Round ${roundNumber} points: ${msg}`, 'success');
+
+        // Heart income is multiplied by the resolving round's match count —
+        // show it, so a ×0 (nothing played, or a round-tagging bug) is never
+        // silent. awardRoundPoints() stamps these after each run.
+        const mult = (typeof awardRoundPoints === 'function')
+            ? awardRoundPoints.lastMultiplier : undefined;
+        const resolved = (typeof awardRoundPoints === 'function')
+            ? awardRoundPoints.lastResolvingRound : undefined;
+        const multNote = mult === undefined
+            ? ''
+            : ` (round ${resolved}: ${mult} match${mult === 1 ? '' : 'es'}, hearts ×${mult})`;
+
+        showStatus(`Round ${roundNumber} points${multNote}: ${msg}`, mult === 0 ? 'warning' : 'success');
     }
 
     // ══════════════════════════════════════════════════════════════

@@ -497,6 +497,14 @@ class ResultManager {
             // Enhanced statistics fields
             matchDuration: matchDuration,
             tournamentRound: this._gameState.currentRound || 1,
+            // Phase-flow round/slot, carried over from the queue entry's own
+            // tag — mirrors admin.js confirmResult(). tournamentRound above
+            // reads the LEGACY currentRound counter, which phase-managed
+            // tournaments never advance. awardRoundPoints() multiplies heart
+            // income by the number of matches carrying each roundNumber.
+            roundNumber: this._selectedQueuedGame.roundNumber
+                ?? this._gameState.currentPhase?.roundNumber ?? null,
+            slot: this._selectedQueuedGame.slot ?? null,
             matchNumberInRound: ((this._gameState.gameHistory?.length || 0) % (this._gameState.teams?.length || 5)) + 1,
             teamStatsSnapshot: teamStatsSnapshot,
             challengeHexCoord: this._selectedQueuedGame.challengeHexCoord || null
