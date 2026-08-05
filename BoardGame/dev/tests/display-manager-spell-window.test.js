@@ -197,7 +197,7 @@ test('the phase banner drops the "is choosing" suffix once every team has acted'
     }
 });
 
-test('an IDLE spell window does not take over the screen', () => {
+test('an IDLE spell window still takes over the screen (admin.html never sets isActive)', () => {
     const dm = makeDisplayManager();
     const data = {
         currentPhase: { name: 'spell_window_1', roundNumber: 2 },
@@ -205,7 +205,7 @@ test('an IDLE spell window does not take over the screen', () => {
         gameQueue: []
     };
 
-    assert.strictEqual(dm._determineDisplayMode(data), null);
+    assert.strictEqual(dm._determineDisplayMode(data), 'spell_window_1');
 });
 
 test('an ACTIVE spell window takes over the screen', () => {
@@ -232,9 +232,10 @@ test('god.html can force the spell slide even with no active spell phase', () =>
     assert.strictEqual(dm._determineDisplayMode(data), 'spell_window_1');
 });
 
-test('an idle spell window still falls through to live matches', () => {
-    // Pre-existing behavior, unchanged by the guard: a stale ongoing queue
-    // entry outranks a phase that yields no slide.
+test('the spell-window phase now wins over the ongoing-matches fallback', () => {
+    // The isActive gate is gone: the spell-window slide is a real slide with
+    // a slot in DISPLAY_MODES, so it wins over the live-matches fallback
+    // exactly like any other slide-bearing phase does.
     const dm = makeDisplayManager();
     const data = {
         currentPhase: { name: 'spell_window_1', roundNumber: 2 },
@@ -242,7 +243,7 @@ test('an idle spell window still falls through to live matches', () => {
         gameQueue: [{ id: 'm1', status: 'ongoing' }]
     };
 
-    assert.strictEqual(dm._determineDisplayMode(data), 'matches_in_progress');
+    assert.strictEqual(dm._determineDisplayMode(data), 'spell_window_1');
 });
 
 function renderSpellSlide(data) {
@@ -319,4 +320,92 @@ test('an admin-typed spell name is HTML-escaped', () => {
 
     assert.doesNotMatch(html, /<img/);
     assert.match(html, /&lt;img/);
+});
+
+// ── Change B: derived queue when turnOrder is empty (admin.html's reality) ──
+
+test('with an empty turnOrder, the derived queue is ordered by points ascending', () => {
+    // Mirrors beginSpellPhase()'s own ordering rule (spell-engine.js): last
+    // place goes first. admin.html never populates turnOrder, so this is the
+    // only ordering the takeover ever gets there.
+    const html = renderSpellSlide({
+        currentPhase: { name: 'spell_window_1' },
+        teams: [
+            { id: 't1', name: 'Tiimi 1', color: '#ff0000', points: 10 },
+            { id: 't2', name: 'Tiimi 2', color: '#00ff00', points: 2 },
+            { id: 't3', name: 'Tiimi 3', color: '#0000ff', points: 6 }
+        ],
+        spellPhase: { isActive: false, turnOrder: [], teamsCompleted: [] }
+    });
+
+    const rowPattern = /<span class="dm-spell-turn-name">([^<]*)</g;
+    const names = [...html.matchAll(rowPattern)].map(m => m[1]);
+
+    assert.deepStrictEqual(names, ['Tiimi 2', 'Tiimi 3', 'Tiimi 1']);
+});
+
+test('in the derived-order case, a team with a cast is done and shows its spell; a team without is waiting with no note', () => {
+    const html = renderSpellSlide({
+        currentPhase: { name: 'spell_window_1', startedAt: '2026-08-06T12:00:00.000Z' },
+        teams: [
+            { id: 't1', name: 'Tiimi 1', color: '#ff0000', points: 10 },
+            { id: 't2', name: 'Tiimi 2', color: '#00ff00', points: 2 }
+        ],
+        spellPhase: { isActive: false, turnOrder: [], teamsCompleted: [] },
+        spellWindowLog: [
+            { id: 'sl_1', teamId: 't2', teamName: 'Tiimi 2', spellName: 'Fireball', addedAt: '2026-08-06T12:01:00.000Z' }
+        ]
+    });
+
+    const rowPattern = /<div class="dm-spell-turn dm-spell-turn--(\w+)"[^>]*>\s*<span class="dm-spell-turn-name">([^<]*)<\/span>\s*<span class="dm-spell-turn-note">([^<]*)</g;
+    const rows = [...html.matchAll(rowPattern)].map(m => ({ state: m[1], name: m[2], note: m[3] }));
+
+    assert.deepStrictEqual(rows, [
+        { state: 'done', name: 'Tiimi 2', note: 'Fireball' },
+        { state: 'waiting', name: 'Tiimi 1', note: '' }
+    ]);
+});
+
+test('in the derived-order case, no team is "current" and the word "passed" never appears', () => {
+    const html = renderSpellSlide({
+        currentPhase: { name: 'spell_window_1', startedAt: '2026-08-06T12:00:00.000Z' },
+        teams: SPELL_TEAMS,
+        spellPhase: { isActive: false, turnOrder: [], teamsCompleted: [] },
+        spellWindowLog: [
+            { id: 'sl_1', teamId: 't1', teamName: 'Tiimi 1', spellName: 'Fireball', addedAt: '2026-08-06T12:01:00.000Z' }
+        ]
+    });
+
+    assert.doesNotMatch(html, /dm-spell-turn--current/);
+    assert.doesNotMatch(html, /passed/);
+});
+
+test('with no turnOrder and no teams, the genuinely-empty subtitle still renders', () => {
+    const html = renderSpellSlide({
+        currentPhase: { name: 'spell_window_1' },
+        teams: [],
+        spellPhase: undefined
+    });
+
+    assert.match(html, /dm-spell-subtitle/);
+});
+
+test('the real turnOrder path is unaffected: an existing turnOrder still marks the right team current', () => {
+    const html = renderSpellSlide({
+        currentPhase: { name: 'spell_window_1', startedAt: '2026-08-06T12:00:00.000Z' },
+        teams: SPELL_TEAMS,
+        spellPhase: { isActive: true, turnOrder: ['t1', 't2', 't3'], teamsCompleted: ['t1'] },
+        spellWindowLog: [
+            { id: 'sl_1', teamId: 't1', teamName: 'Tiimi 1', spellName: 'Fireball', addedAt: '2026-08-06T12:01:00.000Z' }
+        ]
+    });
+
+    const rowPattern = /<div class="dm-spell-turn dm-spell-turn--(\w+)"[^>]*>\s*<span class="dm-spell-turn-name">([^<]*)</g;
+    const rows = [...html.matchAll(rowPattern)].map(m => ({ state: m[1], name: m[2] }));
+
+    assert.deepStrictEqual(rows, [
+        { state: 'done', name: 'Tiimi 1' },
+        { state: 'current', name: 'Tiimi 2' },
+        { state: 'waiting', name: 'Tiimi 3' }
+    ]);
 });

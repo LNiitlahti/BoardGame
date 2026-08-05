@@ -41,9 +41,12 @@ const DISPLAY_MODES = {
         slide: null
     },
     // ── Spell windows ──
-    // slide is gated at runtime in _determineDisplayMode(): the takeover only
-    // appears once spellPhase.isActive is true, so a window the admin simply
-    // advances past never blanks the board. There are 4 of these per round.
+    // The takeover shows for the WHOLE spell-window phase, not just while
+    // casting is happening. There is no "casting has started" signal to gate
+    // on: admin.html has no "Begin Spells" button, so spellPhase.isActive
+    // (and turnOrder) are never set there — spells are played physically at
+    // the table, and _onSpellPhaseEntered/beginSpellPhase are only wired on
+    // god.html. There are 4 of these per round.
     spell_window_1: { name: 'Spell Window', slide: 'spell_window' },
     spell_window_2: { name: 'Spell Window', slide: 'spell_window' },
     spell_window_3: { name: 'Spell Window', slide: 'spell_window' },
@@ -1286,16 +1289,7 @@ class DisplayManager {
         }
 
         const phaseName = gameData.currentPhase?.name;
-
-        // A spell window only takes over the screen once casting has actually
-        // begun. Idle windows fall through to the normal dashboard, so the
-        // board stays visible for the ones nobody casts in. Note this sits
-        // AFTER the displayOverride check above on purpose — god.html can
-        // still force the slide manually for a rehearsal.
-        const isIdleSpellWindow =
-            phaseName?.startsWith('spell_window') && !gameData.spellPhase?.isActive;
-
-        if (phaseName && DISPLAY_MODES[phaseName]?.slide && !isIdleSpellWindow) {
+        if (phaseName && DISPLAY_MODES[phaseName]?.slide) {
             return phaseName;
         }
 
@@ -1403,19 +1397,33 @@ class DisplayManager {
     }
 
     /**
-     * Full-screen "SPELLS WINDOW" takeover, shown only while
-     * spellPhase.isActive (see the guard in _determineDisplayMode) or when
-     * god.html forces the mode — which is why every field here tolerates a
+     * Full-screen "SPELLS WINDOW" takeover, shown for the whole spell-window
+     * phase (see DISPLAY_MODES' spell_window_* comment for why there's no
+     * isActive gate) — which is why every field here tolerates a
      * missing/empty spellPhase.
      *
-     * Shows the reverse-standings turn queue plus a live log of what has been
-     * cast in THIS window. The live log is a deliberate information-model
-     * choice (a later team sees what earlier teams played) confirmed with the
-     * user; see the spec's "Information model change" section.
+     * Shows a turn queue plus a live log of what has been cast in THIS
+     * window. The live log is a deliberate information-model choice (a later
+     * team sees what earlier teams played) confirmed with the user; see the
+     * spec's "Information model change" section.
+     *
+     * The queue itself has two sources, because admin.html never populates
+     * spellPhase.turnOrder (see DISPLAY_MODES' comment):
+     *   - real turnOrder present (god.html ran beginSpellPhase()): render it
+     *     as before, with `current`/`passed` tracking.
+     *   - turnOrder empty: derive a display order from data.teams sorted by
+     *     points ascending, mirroring beginSpellPhase()'s own ordering rule
+     *     (spell-engine.js). There is no turn tracking in this case, so no
+     *     team is ever `current` and a team without a cast is just
+     *     `waiting` — NOT `passed`, which is only knowable from
+     *     teamsCompleted.
      */
     _renderSpellWindowSlide(container, data) {
         const sp = data.spellPhase || {};
-        const order = sp.turnOrder || [];
+        const hasTurnOrder = (sp.turnOrder || []).length > 0;
+        const order = hasTurnOrder
+            ? sp.turnOrder
+            : [...(data.teams || [])].sort((a, b) => (a.points || 0) - (b.points || 0)).map(t => t.id);
         const done = (sp.teamsCompleted || []).map(String);
         const currentTeamId = this._spellWindowCurrentTeamId(data);
         const casts = this._collectSpellWindowCasts(data);
@@ -1428,13 +1436,22 @@ class DisplayManager {
 
         const queueHTML = order.map(id => {
             const key = String(id);
-            const isDone = done.includes(key);
-            const isCurrent = currentTeamId != null && String(currentTeamId) === key;
-            const state = isDone ? 'done' : (isCurrent ? 'current' : 'waiting');
-            // A team in teamsCompleted with no cast in either source passed.
-            const note = isDone
-                ? (castsByTeam[key] ? castsByTeam[key].join(', ') : 'passed')
-                : (isCurrent ? 'choosing…' : '');
+            const hasCast = !!castsByTeam[key];
+            let state, note;
+            if (hasTurnOrder) {
+                const isDone = done.includes(key);
+                const isCurrent = currentTeamId != null && String(currentTeamId) === key;
+                state = isDone ? 'done' : (isCurrent ? 'current' : 'waiting');
+                // A team in teamsCompleted with no cast in either source passed.
+                note = isDone
+                    ? (hasCast ? castsByTeam[key].join(', ') : 'passed')
+                    : (isCurrent ? 'choosing…' : '');
+            } else {
+                // No turn tracking without turnOrder: a cast means done,
+                // otherwise waiting — never current, never passed.
+                state = hasCast ? 'done' : 'waiting';
+                note = hasCast ? castsByTeam[key].join(', ') : '';
+            }
             return `
                 <div class="dm-spell-turn dm-spell-turn--${state}" style="--turn-color:${this._getTeamColor(id)};">
                     <span class="dm-spell-turn-name">${this._escapeText(this._getCurrentTeamName(id) || ('Team ' + id))}</span>
