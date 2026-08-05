@@ -907,10 +907,19 @@ async function ch8Finish(page, viewPage) {
   // from the final state. Exactness is covered by dev/tests/heart-income.test.js.
   const payouts = await page.evaluate(() => {
     const gs = window.gameState || (typeof gameState !== 'undefined' ? gameState : null);
-    const matchesIn = (r) => (gs?.gameHistory || []).filter(e =>
-      e && !e.isChallenge && !e.isBreak &&
-      e.roundNumber !== null && e.roundNumber !== undefined &&
-      Number(e.roundNumber) === Number(r)).length;
+    // Mirror calculateHeartIncome(): a match is a SLOT — a slot split into
+    // several games still counts once. Untagged entries count individually.
+    const matchesIn = (r) => {
+      const keys = new Set();
+      (gs?.gameHistory || []).forEach((e, i) => {
+        if (!e || e.isChallenge || e.isBreak) return;
+        if (e.roundNumber === null || e.roundNumber === undefined) return;
+        if (Number(e.roundNumber) !== Number(r)) return;
+        keys.add(e.slot !== null && e.slot !== undefined
+          ? `slot:${e.slot}` : `entry:${e.matchNumber ?? i}`);
+      });
+      return keys.size;
+    };
     return (gs?.pointsHistory || []).map(e => ({
       round: e.round,
       paid: e.pointsAwarded || {},

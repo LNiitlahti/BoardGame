@@ -329,6 +329,12 @@ function countScoringMatchesInRound(gameState, roundNumber) {
  * pays each holder for their own matches. Entries without a snapshot
  * (confirmed before stamping existed) are judged by current control.
  *
+ * A MATCH IS A SLOT, not a history entry. A slot split into several smaller
+ * games produces one history entry per game (seen in tournament
+ * "perseenkulli": round 5 had entries at slots [1, 2, 2]) — those collapse
+ * into one heart-match, judged by the slot's first-confirmed snapshot.
+ * Entries with no slot tag can't be grouped and each count as one match.
+ *
  * Still paid once per round, at the scoring_hex phase, guarded against
  * double-award by pointsHistory. Hearts under an unresolved challenge are
  * frozen for the whole round. A round with no scoring matches pays nothing.
@@ -351,7 +357,18 @@ function calculateHeartIncome(gameState, boardModule, roundNumber) {
         byTeam[team.id] = { points: 0, mountainCount: 0, sideCount: 0 };
     });
 
-    const matches = scoringMatchesInRound(gameState, roundNumber);
+    // Collapse split slots: one heart-match per slot, represented by the
+    // slot's first-confirmed entry (games in a slot run simultaneously, so
+    // control cannot change between them — placements happen between slots).
+    const entries = scoringMatchesInRound(gameState, roundNumber);
+    const segments = new Map();
+    entries.forEach((e, i) => {
+        const key = (e.slot !== null && e.slot !== undefined)
+            ? `slot:${e.slot}`
+            : `entry:${e.matchNumber ?? i}`;
+        if (!segments.has(key)) segments.set(key, e);
+    });
+    const matches = [...segments.values()];
     const matchesPlayed = matches.length;
     const roundPlayed = matchesPlayed > 0;
 

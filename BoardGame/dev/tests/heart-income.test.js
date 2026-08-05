@@ -115,6 +115,43 @@ test('a mixed holding sums per heart per match and reports both counts', () => {
     assert.strictEqual(entry.sideCount, 4);
 });
 
+test('a split slot counts as ONE match for heart income', () => {
+    // Real data from tournament "perseenkulli", round 5: slot 2 was split
+    // into two smaller games (matches 10 and 11), so the round had 3 history
+    // entries for 2 real match slots. Hearts must pay per SLOT, not per
+    // game — the mountain heart here earns 2 × 2 = 4, not 2 × 3 = 6.
+    const snap = { q0r0: 1 };
+    const gs = makeState({
+        heartHexControl: snap,
+        gameHistory: [
+            { roundNumber: 3, slot: 1, heartControlSnapshot: snap },
+            { roundNumber: 3, slot: 2, heartControlSnapshot: snap },
+            { roundNumber: 3, slot: 2, heartControlSnapshot: snap }
+        ]
+    });
+    const result = calculateHeartIncome(gs, boardModule, 3);
+
+    assert.strictEqual(result.matchesPlayed, 2, 'two slots, however many games');
+    assert.strictEqual(result.byTeam[1].points, 4, '+2 per slot held through');
+});
+
+test('entries without a slot tag each count as their own match', () => {
+    // Pre-slot-tagging entries can't be grouped; treat each as one match
+    // rather than collapsing them all into a single "undefined" slot.
+    const snap = { 'q-4r2': 1 };
+    const gs = makeState({
+        heartHexControl: snap,
+        gameHistory: [
+            { roundNumber: 3, matchNumber: 7, heartControlSnapshot: snap },
+            { roundNumber: 3, matchNumber: 8, heartControlSnapshot: snap }
+        ]
+    });
+    const result = calculateHeartIncome(gs, boardModule, 3);
+
+    assert.strictEqual(result.matchesPlayed, 2);
+    assert.strictEqual(result.byTeam[1].points, 2);
+});
+
 test('a round with no played matches pays nothing (the zero-match gate)', () => {
     const gs = makeState({ heartHexControl: { q0r0: 1 }, gameHistory: [] });
     const result = calculateHeartIncome(gs, boardModule, 3);

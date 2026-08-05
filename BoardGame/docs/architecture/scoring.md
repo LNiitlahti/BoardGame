@@ -141,11 +141,12 @@ Timing and edge cases that are easy to get wrong:
   the subject of a `pending` or `ongoing` challenge match at payout time pays
   nobody that round, even for matches it was held through. The freeze wins
   over the snapshots; the team's other hearts pay normally.
-- **Duplicate confirms inflate income.** Because every confirmed scoring match
-  is a heart-match credit, a round that somehow gets two confirms per slot
-  (seen once in test data: `slots [1,1,2,2]`) pays hearts double. The e2e
-  guard bounds each payout at 8 × the settled round's match count, but the
-  real fix is not confirming the same slot twice.
+- **A match is a slot, not a history entry.** A slot split into several
+  smaller games produces one history entry per game (perseenkulli round 5:
+  entries at slots `[1, 2, 2]`), and those collapse into ONE heart-match,
+  judged by the slot's first-confirmed snapshot. This is also why the old
+  `slots [1,1,2,2]` data paid hearts double before the grouping existed.
+  Entries with no slot tag can't be grouped and each count as one match.
 - **Double-award guard.** `_awardPointsForRound()` records each payout in
   `gameState.pointsHistory` keyed by round number and returns early if that
   round is already present, so re-entering the phase cannot pay twice.
