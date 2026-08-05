@@ -5041,25 +5041,14 @@ function advanceRound() {
 
     let hasAnyPoints = false;
 
+    // Legacy preview — reachable only for tournaments with no currentPhase
+    // (the guard above returns for phase-managed ones). Still reads the one
+    // shared calculation so it can't drift from the payout.
+    const { byTeam: previewByTeam } = calculateHeartIncome(
+        gameState, boardModule, (gameState.currentRound || 1) - 1);
+
     gameState.teams.forEach(team => {
-        let roundPoints = 0;
-
-        // Calculate points from controlled heart hexes
-        Object.entries(gameState.heartHexControl || {}).forEach(([coord, ownerId]) => {
-            if (ownerId === team.id) {
-                const matches = coord.match(/q(-?\d+)r(-?\d+)/);
-                if (matches) {
-                    const [, q, r] = matches;
-                    const hexType = boardModule.getHexType(parseInt(q), parseInt(r));
-
-                    if (hexType === 'mountain-heart') {
-                        roundPoints += 2;
-                    } else if (hexType === 'side-heart') {
-                        roundPoints += 1;
-                    }
-                }
-            }
-        });
+        const roundPoints = previewByTeam[team.id]?.points || 0;
 
         if (roundPoints > 0) hasAnyPoints = true;
 

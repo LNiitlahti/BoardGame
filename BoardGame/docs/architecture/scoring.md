@@ -161,8 +161,16 @@ phase-managed tournaments deliberately never advance.
 |---|---|---|
 | `full/scripts/admin.js` | `awardRoundPoints()` | the payout (admin.html) |
 | `full/scripts/stats-manager.js` | `awardRoundPoints()` | the payout (god.html) |
-| `full/scripts/stats-manager.js` | `advanceRound()` | Next Round modal preview |
+| `full/scripts/admin-improved-adapter.js` | `_computeRoundPointsPreview()` | the "Award Points ▶" confirmation dialog |
+| `full/scripts/stats-manager.js` | `advanceRound()` | Next Round modal preview (god.html) |
+| `full/scripts/admin.js` | `advanceRound()` | legacy Next Round preview — unreachable while `currentPhase` exists |
 | `full/scripts/display-manager.js` | `_buildHexScoringHTML()` | view.html live preview |
+
+> There were **six**, not the four an earlier version of this file listed. The
+> two it missed were both previews with their own hardcoded +2/+1 and **no**
+> multiplier — so admin's own "Award Points ▶" dialog promised +2 for the
+> mountain heart and the payout then delivered +4. Shown ≠ paid. That is the
+> strongest possible argument for the single-function rule below.
 
 None of them contains the values or the loop — they call
 `calculateHeartIncome()` and render or accumulate `byTeam`. **Keep it that

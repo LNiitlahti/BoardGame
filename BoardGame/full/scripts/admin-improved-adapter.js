@@ -1690,11 +1690,22 @@
     // ══════════════════════════════════════════════════════════════
 
     /**
-     * Compute the territory points each team would receive right now.
-     * Mirrors awardRoundPoints() in admin.js, INCLUDING the contested-hex
-     * freeze (the legacy Next Round preview ignored it — this one doesn't).
+     * Compute the heart income each team would receive right now.
+     *
+     * Reads calculateHeartIncome() in board-module.js — the same function the
+     * payout uses. It previously had its own copy of the +2/+1 values with no
+     * multiplier, while awardRoundPoints() multiplied by the round's match
+     * count: this dialog promised +2 for the mountain heart and the payout
+     * then delivered +4. Both now come from one place, so what the TD is
+     * shown is what the TD gets.
      */
     function _computeRoundPointsPreview() {
+        const resolvingRound = (gameState.currentPhase?.roundNumber || 0) - 1;
+        const { matchesPlayed, byTeam } =
+            calculateHeartIncome(gameState, boardModule, resolvingRound);
+
+        // Frozen hexes are excluded by calculateHeartIncome(); count them
+        // here purely so the dialog can say how many are withheld.
         const contested = new Set();
         (gameState.gameQueue || []).forEach(m => {
             if (m.isChallenge && m.challengeHexCoord &&
@@ -1703,26 +1714,21 @@
             }
         });
 
-        const rows = [];
+        const teamIds = new Set((gameState.teams || []).map(t => String(t.id)));
         let frozenCount = 0;
-        let total = 0;
+        Object.entries(gameState.heartHexControl || {}).forEach(([coord, ownerId]) => {
+            if (contested.has(coord) && teamIds.has(String(ownerId))) frozenCount++;
+        });
 
+        const rows = [];
+        let total = 0;
         (gameState.teams || []).forEach(team => {
-            let pts = 0;
-            Object.entries(gameState.heartHexControl || {}).forEach(([coord, ownerId]) => {
-                if (ownerId !== team.id) return;
-                if (contested.has(coord)) { frozenCount++; return; }
-                const m = coord.match(/q(-?\d+)r(-?\d+)/);
-                if (!m || !boardModule) return;
-                const hexType = boardModule.getHexType(parseInt(m[1]), parseInt(m[2]));
-                if (hexType === 'mountain-heart') pts += 2;
-                else if (hexType === 'side-heart') pts += 1;
-            });
+            const pts = byTeam[team.id]?.points || 0;
             total += pts;
             rows.push({ team, pts });
         });
 
-        return { rows, frozenCount, total };
+        return { rows, frozenCount, total, matchesPlayed };
     }
 
     window.confirmScoringHexAdvance = () => {
