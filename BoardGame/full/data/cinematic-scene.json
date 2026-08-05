@@ -4,9 +4,9 @@
         "minDurationMs": 12000
     },
     "atmosphere": {
-        "particleCount": 40,
-        "emberCount": 15,
-        "ghostLightCount": 6,
+        "particleCount": 20,
+        "emberCount": 8,
+        "ghostLightCount": 4,
         "fog": { "enabled": true }
     },
     "firstImpact": {

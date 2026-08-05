@@ -7,10 +7,16 @@
 // that actually use them, so DOM size stays proportional to the board, not
 // 4x every hex. Water has no discrete particles (its look is a glow +
 // sweeping sheen, both pure CSS pseudo-elements, no extra nodes needed).
+//
+// These counts are a performance knob: every particle is a DOM node running
+// an infinite CSS animation, and dust covers 56 of the board's 91 hexes, so
+// its count dominates the total. Raising them back up is safe — view.html
+// positions particles with :nth-of-type rules that go up to 3 (embers/motes)
+// and 4 (sparks), so counts above those would stack unpositioned nodes.
 const MATERIAL_PARTICLES = {
-    lava: { className: 'ember', count: 3 },
-    magic: { className: 'spark', count: 4 },
-    dust: { className: 'mote', count: 3 },
+    lava: { className: 'ember', count: 2 },
+    magic: { className: 'spark', count: 2 },
+    dust: { className: 'mote', count: 1 },
     water: { className: null, count: 0 }
 };
 
