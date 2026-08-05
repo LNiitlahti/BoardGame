@@ -254,9 +254,12 @@ function renderScoreStrip() {
     container.innerHTML = teams.map(team => {
         const color = getHexColor(team.color);
         const players = team.players || [];
-        const hexPts = team.points || 0;
-        const victoryPts = team.gamesWon || 0;
-        const totalPts = hexPts + victoryPts;
+        // `points` is the whole score (wins + heart income). Derive the
+        // split — each win is +1 — instead of summing two sources, which
+        // counted every win twice.
+        const totalPts = team.points || 0;
+        const victoryPts = Math.min(team.gamesWon || 0, totalPts);
+        const hexPts = Math.max(0, totalPts - victoryPts);
         const isYou = String(team.id) === String(currentTeamId);
 
         const playersHtml = players.map((p, i) => {

@@ -963,9 +963,14 @@ class DisplayManager {
         container.innerHTML = teams.map(team => {
             const color = team.color || (window.TEAM_COLORS || {})[team.id];
             const players = team.players || [];
-            const hexPts = team.points || 0;
-            const victoryPts = team.gamesWon || 0;
-            const totalPts = hexPts + victoryPts;
+            // `points` is the whole score — match wins AND heart income. The
+            // strip shows the two apart, so DERIVE the split instead of
+            // summing two sources: each win is worth exactly +1, so whatever
+            // is left over is heart income. Adding gamesWon to points here
+            // showed a team with one win and no hearts as 1 + 1 = 2.
+            const totalPts = team.points || 0;
+            const victoryPts = Math.min(team.gamesWon || 0, totalPts);
+            const hexPts = Math.max(0, totalPts - victoryPts);
 
             const playersHtml = players.map((p, i) => {
                 const w = p.id ? (playerWins[p.id] || 0) : 0;

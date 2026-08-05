@@ -404,9 +404,12 @@ function renderStandings() {
         const rank = index + 1;
         const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
 
-        const victoryPts = team.gamesWon || 0;
-        const hexPts = team.points || 0;
-        const totalPts = victoryPts + hexPts;
+        // `points` is the whole score (wins + heart income). Derive the
+        // split — each win is +1 — instead of summing two sources, which
+        // counted every win twice.
+        const totalPts = team.points || 0;
+        const victoryPts = Math.min(team.gamesWon || 0, totalPts);
+        const hexPts = Math.max(0, totalPts - victoryPts);
         const losses = team.gamesLost || 0;
         const played = team.gamesPlayed || (victoryPts + losses);
         const winRate = played > 0 ? ((victoryPts / played) * 100).toFixed(0) : 0;

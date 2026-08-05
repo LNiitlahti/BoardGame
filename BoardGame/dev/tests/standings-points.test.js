@@ -46,6 +46,46 @@ function renderScoreBars(data) {
     return appended;
 }
 
+function renderScoreStrip(data) {
+    const fake = { innerHTML: '' };
+    global.document = { getElementById: (id) => (id === 'scoreStrip' ? fake : null) };
+    const dm = new DisplayManager({ container: null, boardModule, boardRenderer: null });
+    dm._renderScoreStrip(data);
+    return fake.innerHTML;
+}
+
+test('score strip: one win and no hearts reads 1 win / 0 hex / 1 total', () => {
+    const html = renderScoreStrip({
+        teams: [{ id: 4, name: 'Tiimi 4', points: 1, gamesWon: 1, players: [] }]
+    });
+
+    assert.match(html, /sc-score-num w">1</, 'one match win');
+    assert.match(html, /sc-score-num pts">0</,
+        'the pts column is HEART income — the win must not be counted here too');
+    assert.match(html, /sc-score-num total">1</,
+        'total is team.points, which already contains the win');
+});
+
+test('score strip: wins and heart income split out of the single total', () => {
+    // 3 points = 1 match win + 2 from the mountain heart.
+    const html = renderScoreStrip({
+        teams: [{ id: 4, name: 'Tiimi 4', points: 3, gamesWon: 1, players: [] }]
+    });
+
+    assert.match(html, /sc-score-num w">1</);
+    assert.match(html, /sc-score-num pts">2</);
+    assert.match(html, /sc-score-num total">3</);
+});
+
+test('score strip: never shows a negative hex figure', () => {
+    const html = renderScoreStrip({
+        teams: [{ id: 4, name: 'Tiimi 4', points: 1, gamesWon: 3, players: [] }]
+    });
+
+    assert.doesNotMatch(html, /sc-score-num pts">-/);
+    assert.match(html, /sc-score-num total">1</);
+});
+
 test('score bars show points alone — one win is 1 point, not 2', () => {
     const html = renderScoreBars({
         teams: [{ id: 1, name: 'Ravens', points: 1, gamesWon: 1, gamesLost: 0 }],

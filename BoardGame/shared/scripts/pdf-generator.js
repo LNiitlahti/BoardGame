@@ -615,13 +615,18 @@
                 const sortedTeamColors = sortedTeams.map(t => teamColorMap[t.id] || C.text);
 
                 const standingsData = sortedTeams.map((team, i) => {
-                    const victoryPts = team.gamesWon || 0;
-                    const hexPts = team.points || 0;
+                    // `points` is the whole score (wins + heart income).
+                    // Derive the split — each win is +1 — instead of summing
+                    // two sources, which counted every win twice.
+                    const totalPts = team.points || 0;
+                    const victoryPts = Math.min(team.gamesWon || 0, totalPts);
+                    const hexPts = Math.max(0, totalPts - victoryPts);
+                    const wins = team.gamesWon || 0;
                     const losses = team.gamesLost || 0;
-                    const played = team.gamesPlayed || (victoryPts + losses);
-                    const winRate = played > 0 ? ((victoryPts / played) * 100).toFixed(0) + '%' : '0%';
+                    const played = team.gamesPlayed || (wins + losses);
+                    const winRate = played > 0 ? ((wins / played) * 100).toFixed(0) + '%' : '0%';
                     const hexCount = Object.values(gameState.board || {}).filter(t => t === team.id).length;
-                    return [String(i + 1), team.name || 'Team ' + team.id, String(victoryPts + hexPts), String(victoryPts), String(hexPts), `${victoryPts}-${losses}`, winRate, String(hexCount)];
+                    return [String(i + 1), team.name || 'Team ' + team.id, String(totalPts), String(victoryPts), String(hexPts), `${wins}-${losses}`, winRate, String(hexCount)];
                 });
 
                 doc.autoTable({
