@@ -416,6 +416,8 @@ class ActionLogger {
                 return `Spell board effect: ${p.spellId || '?'} (${(p.destroyedTiles || []).length} tiles destroyed)`;
             case 'spell_pile_recycled':
                 return `Spell pile recycled for ${teamName(p.teamId)}`;
+            case 'spell_used_manual':
+                return `${teamName(p.teamId)} used "${p.spellName}"${p.roundNumber ? ` (Round ${p.roundNumber})` : ''}`;
             case 'condition_expired':
                 return `Condition expired: ${p.spellName || '?'}`;
             case 'condition_removed':
