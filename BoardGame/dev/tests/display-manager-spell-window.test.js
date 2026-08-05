@@ -244,3 +244,69 @@ test('an idle spell window still falls through to live matches', () => {
 
     assert.strictEqual(dm._determineDisplayMode(data), 'matches_in_progress');
 });
+
+function renderSpellSlide(data) {
+    const dm = makeDisplayManager();
+    dm._gameData = data;   // _getTeamColor / _getCurrentTeamName read this
+    const container = { innerHTML: '' };
+    dm._renderSpellWindowSlide(container, data);
+    return container.innerHTML;
+}
+
+const SPELL_TEAMS = [
+    { id: 't1', name: 'Tiimi 1', color: '#ff0000' },
+    { id: 't2', name: 'Tiimi 2', color: '#00ff00' },
+    { id: 't3', name: 'Tiimi 3', color: '#0000ff' }
+];
+
+test('the slide marks each team as done, choosing, or waiting', () => {
+    const html = renderSpellSlide({
+        currentPhase: { name: 'spell_window_1', startedAt: '2026-08-06T12:00:00.000Z' },
+        teams: SPELL_TEAMS,
+        spellPhase: { isActive: true, turnOrder: ['t1', 't2', 't3'], teamsCompleted: ['t1'] },
+        spellWindowLog: [
+            { id: 'sl_1', teamId: 't1', teamName: 'Tiimi 1', spellName: 'Fireball', addedAt: '2026-08-06T12:01:00.000Z' }
+        ]
+    });
+
+    assert.match(html, /dm-spell-turn--done/);
+    assert.match(html, /dm-spell-turn--current/);
+    assert.match(html, /dm-spell-turn--waiting/);
+    assert.match(html, /Fireball/);
+});
+
+test('a team that completed without casting is labelled as having passed', () => {
+    const html = renderSpellSlide({
+        currentPhase: { name: 'spell_window_1', startedAt: '2026-08-06T12:00:00.000Z' },
+        teams: SPELL_TEAMS,
+        spellPhase: { isActive: true, turnOrder: ['t1', 't2'], teamsCompleted: ['t1'] },
+        spellWindowLog: []
+    });
+
+    assert.match(html, /passed/);
+});
+
+test('the slide renders with an empty turnOrder (god.html forced it)', () => {
+    const html = renderSpellSlide({
+        currentPhase: { name: 'spell_window_1' },
+        teams: SPELL_TEAMS,
+        spellPhase: undefined
+    });
+
+    assert.match(html, /dm-spell-screen/);
+    assert.doesNotMatch(html, /undefined/);
+});
+
+test('an admin-typed spell name is HTML-escaped', () => {
+    const html = renderSpellSlide({
+        currentPhase: { name: 'spell_window_1', startedAt: '2026-08-06T12:00:00.000Z' },
+        teams: SPELL_TEAMS,
+        spellPhase: { isActive: true, turnOrder: ['t1'], teamsCompleted: ['t1'] },
+        spellWindowLog: [
+            { id: 'sl_1', teamId: 't1', teamName: 'Tiimi 1', spellName: '<img src=x onerror=alert(1)>', addedAt: '2026-08-06T12:01:00.000Z' }
+        ]
+    });
+
+    assert.doesNotMatch(html, /<img/);
+    assert.match(html, /&lt;img/);
+});

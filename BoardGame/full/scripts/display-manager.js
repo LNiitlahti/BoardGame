@@ -1361,6 +1361,9 @@ class DisplayManager {
             case 'break_screen':
                 this._renderBreakScreen(primary, data);
                 break;
+            case 'spell_window':
+                this._renderSpellWindowSlide(primary, data);
+                break;
             case 'matches_dual_slot':
                 this._renderMatchesDualSlot(primary, data);
                 break;
@@ -1386,6 +1389,78 @@ class DisplayManager {
                 <div class="dm-break-icon">${ICON_SVGS.pause}</div>
                 <div class="dm-break-title">On Break</div>
                 <div class="dm-break-subtitle">${auto ? 'Scheduled break — ' : ''}The tournament resumes shortly</div>
+            </div>
+        `;
+    }
+
+    /** Escape free text before it reaches innerHTML. Mirrors replay.html's escapeHtml(). */
+    _escapeText(str) {
+        return String(str ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    /**
+     * Full-screen "SPELLS WINDOW" takeover, shown only while
+     * spellPhase.isActive (see the guard in _determineDisplayMode) or when
+     * god.html forces the mode — which is why every field here tolerates a
+     * missing/empty spellPhase.
+     *
+     * Shows the reverse-standings turn queue plus a live log of what has been
+     * cast in THIS window. The live log is a deliberate information-model
+     * choice (a later team sees what earlier teams played) confirmed with the
+     * user; see the spec's "Information model change" section.
+     */
+    _renderSpellWindowSlide(container, data) {
+        const sp = data.spellPhase || {};
+        const order = sp.turnOrder || [];
+        const done = (sp.teamsCompleted || []).map(String);
+        const currentTeamId = this._spellWindowCurrentTeamId(data);
+        const casts = this._collectSpellWindowCasts(data);
+
+        const castsByTeam = {};
+        for (const c of casts) {
+            const key = String(c.teamId);
+            (castsByTeam[key] = castsByTeam[key] || []).push(this._escapeText(c.spellName));
+        }
+
+        const queueHTML = order.map(id => {
+            const key = String(id);
+            const isDone = done.includes(key);
+            const isCurrent = currentTeamId != null && String(currentTeamId) === key;
+            const state = isDone ? 'done' : (isCurrent ? 'current' : 'waiting');
+            // A team in teamsCompleted with no cast in either source passed.
+            const note = isDone
+                ? (castsByTeam[key] ? castsByTeam[key].join(', ') : 'passed')
+                : (isCurrent ? 'choosing…' : '');
+            return `
+                <div class="dm-spell-turn dm-spell-turn--${state}" style="--turn-color:${this._getTeamColor(id)};">
+                    <span class="dm-spell-turn-name">${this._escapeText(this._getCurrentTeamName(id) || ('Team ' + id))}</span>
+                    <span class="dm-spell-turn-note">${note}</span>
+                </div>`;
+        }).join('');
+
+        const logHTML = casts.length === 0 ? '' : `
+            <div class="dm-spell-log">
+                ${casts.map(c => `
+                    <div class="dm-spell-log-row">
+                        <span style="color:${this._getTeamColor(c.teamId)};">${this._escapeText(c.teamName || this._getCurrentTeamName(c.teamId) || ('Team ' + c.teamId))}</span>
+                        cast <strong>${this._escapeText(c.spellName)}</strong>
+                    </div>`).join('')}
+            </div>`;
+
+        const bodyHTML = order.length > 0
+            ? `<div class="dm-spell-queue">${queueHTML}</div>`
+            : `<div class="dm-spell-subtitle">Waiting for the spell phase to begin</div>`;
+
+        container.innerHTML = `
+            <div class="dm-spell-screen">
+                <div class="dm-spell-icon">${ICON_SVGS.sparkles}</div>
+                <div class="dm-spell-title">Spells Window</div>
+                ${bodyHTML}
+                ${logHTML}
             </div>
         `;
     }
