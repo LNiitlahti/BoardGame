@@ -41,10 +41,13 @@ const DISPLAY_MODES = {
         slide: null
     },
     // ── Spell windows ──
-    spell_window_1: { name: 'Spell Window', slide: null },
-    spell_window_2: { name: 'Spell Window', slide: null },
-    spell_window_3: { name: 'Spell Window', slide: null },
-    spell_window_4: { name: 'Spell Window', slide: null },
+    // slide is gated at runtime in _determineDisplayMode(): the takeover only
+    // appears once spellPhase.isActive is true, so a window the admin simply
+    // advances past never blanks the board. There are 4 of these per round.
+    spell_window_1: { name: 'Spell Window', slide: 'spell_window' },
+    spell_window_2: { name: 'Spell Window', slide: 'spell_window' },
+    spell_window_3: { name: 'Spell Window', slide: 'spell_window' },
+    spell_window_4: { name: 'Spell Window', slide: 'spell_window' },
     // ── Challenge phases ──
     challenges: {
         name: 'Challenges Issued',
@@ -1283,7 +1286,16 @@ class DisplayManager {
         }
 
         const phaseName = gameData.currentPhase?.name;
-        if (phaseName && DISPLAY_MODES[phaseName] && DISPLAY_MODES[phaseName].slide) {
+
+        // A spell window only takes over the screen once casting has actually
+        // begun. Idle windows fall through to the normal dashboard, so the
+        // board stays visible for the ones nobody casts in. Note this sits
+        // AFTER the displayOverride check above on purpose — god.html can
+        // still force the slide manually for a rehearsal.
+        const isIdleSpellWindow =
+            phaseName?.startsWith('spell_window') && !gameData.spellPhase?.isActive;
+
+        if (phaseName && DISPLAY_MODES[phaseName]?.slide && !isIdleSpellWindow) {
             return phaseName;
         }
 

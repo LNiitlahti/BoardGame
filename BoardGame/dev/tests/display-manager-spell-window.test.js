@@ -158,20 +158,22 @@ test('the phase banner names the derived current team, not the stale index', () 
     // so set it by hand.
     dm._gameData = { teams: [{ id: 't5', name: 'Tiimi 5' }, { id: 't4', name: 'Tiimi 4' }] };
 
-    dm.renderPhaseDisplay({
-        currentPhase: { name: 'spell_window_1', roundNumber: 2 },
-        teams: [{ id: 't5', name: 'Tiimi 5' }, { id: 't4', name: 'Tiimi 4' }],
-        spellPhase: {
-            isActive: true,
-            turnOrder: ['t5', 't4'],
-            currentTeamIndex: 0,      // stale — t5 has already cast
-            teamsCompleted: ['t5']
-        }
-    });
+    try {
+        dm.renderPhaseDisplay({
+            currentPhase: { name: 'spell_window_1', roundNumber: 2 },
+            teams: [{ id: 't5', name: 'Tiimi 5' }, { id: 't4', name: 'Tiimi 4' }],
+            spellPhase: {
+                isActive: true,
+                turnOrder: ['t5', 't4'],
+                currentTeamIndex: 0,      // stale — t5 has already cast
+                teamsCompleted: ['t5']
+            }
+        });
 
-    assert.match(banner.textContent, /Tiimi 4 is choosing/);
-
-    delete global.document;
+        assert.match(banner.textContent, /Tiimi 4 is choosing/);
+    } finally {
+        delete global.document;
+    }
 });
 
 test('the phase banner drops the "is choosing" suffix once every team has acted', () => {
@@ -182,13 +184,63 @@ test('the phase banner drops the "is choosing" suffix once every team has acted'
         querySelector: () => null
     };
 
-    dm.renderPhaseDisplay({
+    try {
+        dm.renderPhaseDisplay({
+            currentPhase: { name: 'spell_window_1', roundNumber: 2 },
+            teams: [{ id: 't5', name: 'Tiimi 5' }],
+            spellPhase: { isActive: true, turnOrder: ['t5'], teamsCompleted: ['t5'] }
+        });
+
+        assert.strictEqual(banner.textContent, 'SPELL WINDOW');
+    } finally {
+        delete global.document;
+    }
+});
+
+test('an IDLE spell window does not take over the screen', () => {
+    const dm = makeDisplayManager();
+    const data = {
         currentPhase: { name: 'spell_window_1', roundNumber: 2 },
-        teams: [{ id: 't5', name: 'Tiimi 5' }],
-        spellPhase: { isActive: true, turnOrder: ['t5'], teamsCompleted: ['t5'] }
-    });
+        spellPhase: { isActive: false, turnOrder: [], teamsCompleted: [] },
+        gameQueue: []
+    };
 
-    assert.strictEqual(banner.textContent, 'SPELL WINDOW');
+    assert.strictEqual(dm._determineDisplayMode(data), null);
+});
 
-    delete global.document;
+test('an ACTIVE spell window takes over the screen', () => {
+    const dm = makeDisplayManager();
+    const data = {
+        currentPhase: { name: 'spell_window_3', roundNumber: 2 },
+        spellPhase: { isActive: true, turnOrder: ['t1'], teamsCompleted: [] },
+        gameQueue: []
+    };
+
+    assert.strictEqual(dm._determineDisplayMode(data), 'spell_window_3');
+});
+
+test('god.html can force the spell slide even with no active spell phase', () => {
+    // displayOverride is checked before the isActive guard, deliberately, so
+    // the screen can be rehearsed before the event.
+    const dm = makeDisplayManager();
+    const data = {
+        displayOverride: { mode: 'spell_window_1' },
+        currentPhase: { name: 'scoring_vp', roundNumber: 2 },
+        gameQueue: []
+    };
+
+    assert.strictEqual(dm._determineDisplayMode(data), 'spell_window_1');
+});
+
+test('an idle spell window still falls through to live matches', () => {
+    // Pre-existing behavior, unchanged by the guard: a stale ongoing queue
+    // entry outranks a phase that yields no slide.
+    const dm = makeDisplayManager();
+    const data = {
+        currentPhase: { name: 'spell_window_1', roundNumber: 2 },
+        spellPhase: { isActive: false },
+        gameQueue: [{ id: 'm1', status: 'ongoing' }]
+    };
+
+    assert.strictEqual(dm._determineDisplayMode(data), 'matches_in_progress');
 });
