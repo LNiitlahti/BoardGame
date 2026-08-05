@@ -719,8 +719,12 @@ class StatsManager {
             labels.push(`M${i + 1}`);
             gs.teams.forEach((team, ti) => {
                 const snap = match.teamStatsSnapshot?.[team.id];
+                // `points` in the snapshot already includes the +1 per match
+                // win. Adding gamesWon counted every win twice AND disagreed
+                // with the 'Now' datapoint below, which uses points alone —
+                // so the line dropped at its final step.
                 datasets[ti].data.push(snap
-                    ? (snap.points || 0) + (snap.gamesWon || 0)
+                    ? (snap.points || 0)
                     : datasets[ti].data[datasets[ti].data.length - 1] || 0);
             });
         });

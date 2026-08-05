@@ -415,15 +415,25 @@ class DisplayManager {
         if (!container) return;
 
         const teams = data.teams || [];
-        const victoryCondition = data.victoryCondition || 50;
+        // `winCondition` is the real field (setup.html writes it, admin's
+        // "Win At" badge edits it). `victoryCondition` was read here and
+        // written nowhere, so these bars always scaled to 50.
+        const victoryCondition = data.winCondition || 50;
         const sorted = [...teams].sort((a, b) => this._getTeamTotalPoints(b) - this._getTeamTotalPoints(a));
         const ticks = '<div class="tm-ticks"><div class="tm-tick" style="left:20%;"></div><div class="tm-tick" style="left:40%;"></div><div class="tm-tick" style="left:60%;"></div><div class="tm-tick" style="left:80%;"></div></div>';
 
         const rowsHtml = sorted.map(team => {
             const color = team.color || (window.TEAM_COLORS || {})[team.id];
-            const hexPts = team.points || 0;
-            const wins = team.gamesWon || 0;
-            const totalPts = hexPts + wins;
+            // `points` is the whole score — it ALREADY contains +1 per match
+            // win as well as heart income. Adding gamesWon on top counted
+            // every win twice (a team with one win and no hearts showed 2).
+            // The bar still splits into a win segment and a heart segment,
+            // but by DERIVING the split from the total rather than summing
+            // two sources: each win is worth exactly +1, so the rest is heart
+            // income. Clamped so a corrupted state can't emit a negative flex.
+            const totalPts = team.points || 0;
+            const wins = Math.min(team.gamesWon || 0, totalPts);
+            const hexPts = Math.max(0, totalPts - wins);
             const pct = Math.min((totalPts / victoryCondition) * 100, 100);
 
             const segs = [];
