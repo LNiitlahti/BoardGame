@@ -1161,13 +1161,13 @@ class DisplayManager {
             phaseBanner.style.background = 'rgba(168,85,247,0.08)';
             phaseBanner.style.color = '#a855f7';
             phaseBanner.style.borderBottom = '2px solid rgba(168,85,247,0.3)';
-            const sp = data.spellPhase;
-            if (sp && sp.isActive) {
-                const currentTeam = (data.teams || []).find(
-                    t => t.id === sp.turnOrder?.[sp.currentTeamIndex]
-                );
-                const teamName = currentTeam?.name ||
-                    'Team ' + (sp.turnOrder?.[sp.currentTeamIndex] || '?');
+            // Whose turn it is comes from _spellWindowCurrentTeamId(), NOT
+            // from spellPhase.currentTeamIndex, which team.html's cast/pass
+            // paths never advance. Shared with the spell-window slide so the
+            // strip and the slide can't contradict each other.
+            const currentTeamId = this._spellWindowCurrentTeamId(data);
+            if (currentTeamId != null) {
+                const teamName = this._getCurrentTeamName(currentTeamId) || ('Team ' + currentTeamId);
                 phaseBanner.textContent = 'SPELL WINDOW \u2014 ' + teamName + ' is choosing...';
             } else {
                 phaseBanner.textContent = 'SPELL WINDOW';
