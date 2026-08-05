@@ -413,6 +413,12 @@ class PhaseManager {
 
         // Break interval check: when advancing into the matches segment, auto-insert break if due
         if (nextPhase === 'matches_in_progress' && this._isBreakDue()) {
+            // This returns before the exit hooks below, and the break returns
+            // to matches_in_progress rather than back here — so finalize the
+            // spell window now or its manual log entries are orphaned.
+            // gs.currentPhase still names the spell window, so the default
+            // phaseContext attributes them correctly.
+            if (this.isSpellWindow(current)) this._clearSpellPhaseState();
             await this._autoInsertBreak('matches_in_progress');
             return true;
         }
@@ -888,6 +894,11 @@ class PhaseManager {
             startedAt: new Date().toISOString()
         };
         gs.status = 'finished';
+
+        // Spell/casting state must not survive into the archived tournament.
+        // currentPhase is already tournament_end here, so attribute any
+        // spell-log entries to the window we just left (same as setPhaseDirect).
+        this._clearSpellPhaseState(previousPhase);
 
         await this._save();
         this._logAction('phase_advanced', 'phase', {

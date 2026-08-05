@@ -136,6 +136,19 @@
             <button class="btn-small primary" onclick="setBroadcastMessage()">Send</button>
             <button class="btn-small secondary" onclick="clearBroadcastMessage()">Clear</button>
         </div>
+
+        <!-- Manual Spell-Use Log (collapsed behind the Spell Log toggle).
+             Must stay byte-identical to the copy emitted by
+             _restoreFlowPanelDOM() in admin-improved-adapter.js. -->
+        <div class="broadcast-bar" id="spellLogBar" style="display: none;">
+            <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;">Spell Log</span>
+            <select id="spellLogTeamSelect" style="padding: 6px 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 6px; color: white; font-size: 0.85rem;"></select>
+            <input type="text" id="spellLogSpellInput" placeholder="Spell name..."
+                   maxlength="60"
+                   style="flex: 1; padding: 6px 12px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 6px; color: white; font-size: 0.85rem;">
+            <button class="btn-small primary" onclick="addSpellLogEntry()">+ Add</button>
+        </div>
+        <div class="spell-log-entries" id="spellLogEntries" style="display: none;"></div>
     </div>
 
     <div class="admin-container">
