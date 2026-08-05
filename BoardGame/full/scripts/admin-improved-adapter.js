@@ -2313,6 +2313,37 @@
     function _renderWinConditionBadge() {
         const el = document.getElementById('winConditionValue');
         if (el) el.textContent = gameState?.winCondition ?? 50;
+        _renderWinPaceBadge();
+    }
+
+    /**
+     * "N rounds" until the front-runner reaches the win target on heart
+     * income alone. A floor, not a forecast — match wins and hearts not yet
+     * captured are excluded because they can't be known. Hidden entirely
+     * until at least one team holds a heart.
+     */
+    function _renderWinPaceBadge() {
+        const badge = document.getElementById('winPaceBadge');
+        const value = document.getElementById('winPaceValue');
+        if (!badge || !value) return;
+
+        if (typeof projectRoundsToWin !== 'function' || !boardModule) {
+            badge.style.display = 'none';
+            return;
+        }
+
+        const leader = projectRoundsToWin(gameState, boardModule)
+            .find(t => t.roundsToWin !== null);
+
+        if (!leader) {
+            badge.style.display = 'none';
+            return;
+        }
+
+        badge.style.display = '';
+        value.textContent = leader.roundsToWin === 0
+            ? `${leader.teamName} — target reached`
+            : `${leader.teamName} in ~${leader.roundsToWin} rd`;
     }
 
     window.openWinConditionModal = () => {
@@ -2325,8 +2356,15 @@
         if (note) {
             const teams = gameState?.teams || [];
             const leader = teams.reduce((a, b) => ((b?.points || 0) > (a?.points || 0) ? b : a), teams[0]);
+            const pace = (typeof projectRoundsToWin === 'function' && boardModule)
+                ? projectRoundsToWin(gameState, boardModule).find(t => t.roundsToWin !== null)
+                : null;
+            const paceNote = (pace && pace.roundsToWin > 0)
+                ? ` At current heart income (${pace.incomePerRound}/round, match wins not counted), ` +
+                  `${pace.teamName} reaches ${gameState?.winCondition ?? 50} in ~${pace.roundsToWin} rounds.`
+                : '';
             note.textContent = leader
-                ? `Current leader: ${leader.name || 'Team ' + leader.id} with ${leader.points || 0} points.`
+                ? `Current leader: ${leader.name || 'Team ' + leader.id} with ${leader.points || 0} points.${paceNote}`
                 : '';
         }
         modal.style.display = 'flex';
