@@ -68,3 +68,6 @@ LORE.md
 
 # Superpowers brainstorm sessions
 .superpowers/
+
+# Claude Design sync bundle (upload artifact; .design-sync/ stays tracked)
+ds-bundle/
