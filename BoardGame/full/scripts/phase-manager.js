@@ -550,9 +550,33 @@ class PhaseManager {
 
     /**
      * Clear spell phase active state (called when leaving a spell window).
+     * @param {{name?: string, roundNumber?: number}} [phaseContext] The phase
+     *   the spell-log entries should be attributed to. Defaults to
+     *   gs.currentPhase, which is correct for callers that clear BEFORE
+     *   reassigning currentPhase; setPhaseDirect() clears afterwards and must
+     *   pass its captured previousPhase.
      */
-    _clearSpellPhaseState() {
+    _clearSpellPhaseState(phaseContext) {
         const gs = this._gameState;
+
+        // Finalize any manual spell-use entries recorded during this window
+        // into the audit log before they're discarded.
+        if (gs.spellWindowLog && gs.spellWindowLog.length > 0) {
+            const ctx = phaseContext || gs.currentPhase;
+            const roundNumber = ctx?.roundNumber;
+            const phase = ctx?.name;
+            for (const entry of gs.spellWindowLog) {
+                this._logAction('spell_used_manual', 'spell', {
+                    teamId: entry.teamId,
+                    teamName: entry.teamName,
+                    spellName: entry.spellName,
+                    phase,
+                    roundNumber
+                }, null);
+            }
+        }
+        gs.spellWindowLog = null;
+
         if (gs.spellPhase?.isActive) {
             gs.spellPhase.isActive = false;
         }
@@ -902,8 +926,10 @@ class PhaseManager {
         if (name === 'tournament_end') gs.status = 'finished';
         else if (name !== 'pre_game_setup' && gs.status !== 'playing') gs.status = 'playing';
 
-        // Spell/casting state must not leak into a phase that didn't start it
-        this._clearSpellPhaseState();
+        // Spell/casting state must not leak into a phase that didn't start it.
+        // currentPhase is already the destination here, so attribute any
+        // spell-log entries to the window we just left.
+        this._clearSpellPhaseState(previousPhase);
 
         await this._save();
         this._logAction('phase_set_manual', 'admin', {
