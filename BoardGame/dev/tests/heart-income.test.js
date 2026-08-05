@@ -1,11 +1,18 @@
 /**
  * Unit coverage for the single heart-income calculation in board-module.js.
  *
- * Heart income used to be `value × matchesPlayedInRound`, written out in four
- * separate files. That multiplier made the Mountain Heart pay +4 a round while
- * the constant at the call site read `2`, and the four copies could drift.
- * Both are gone: the values live in HEART_INCOME, the calculation lives in
- * calculateHeartIncome(), and the match count is now only a yes/no gate.
+ * The rule (decided 2026-08-06, tournament "perseenkulli"): a heart pays for
+ * every match it was HELD THROUGH — +1 per side heart, +2 for the mountain
+ * heart, per scoring match in the round, judged by the control snapshot taken
+ * when each match result was confirmed. Capture a heart mid-round and it pays
+ * only for the matches confirmed after the capture.
+ *
+ * History: income was first `value × matchesPlayed` with control read once at
+ * payout (paid teams for matches they had NOT held the heart through), then
+ * briefly flat per round (underpaid teams that held a heart all round). Both
+ * were wrong in opposite directions; the snapshot rule is the one the game
+ * actually means. The values live only in HEART_INCOME, the calculation only
+ * in calculateHeartIncome() — all payouts and previews call it.
  *
  * See docs/architecture/scoring.md.
  */
@@ -24,37 +31,88 @@ function makeState(overrides = {}) {
         heartHexControl: {},
         gameQueue: [],
         gameHistory: [
-            { roundNumber: 3 },
-            { roundNumber: 3 }
+            { roundNumber: 3, heartControlSnapshot: {} },
+            { roundNumber: 3, heartControlSnapshot: {} }
         ],
         currentPhase: { name: 'scoring_hex', roundNumber: 4 },
         ...overrides
     };
 }
 
-test('mountain heart pays +2 for the round, NOT +2 per match', () => {
-    const gs = makeState({ heartHexControl: { q0r0: 1 } });
+test('a heart held through both matches pays per match: mountain = +4 over a 2-match round', () => {
+    const gs = makeState({
+        heartHexControl: { q0r0: 1 },
+        gameHistory: [
+            { roundNumber: 3, heartControlSnapshot: { q0r0: 1 } },
+            { roundNumber: 3, heartControlSnapshot: { q0r0: 1 } }
+        ]
+    });
     const result = calculateHeartIncome(gs, boardModule, 3);
 
-    assert.strictEqual(result.matchesPlayed, 2, 'the round had two matches');
-    assert.strictEqual(result.byTeam[1].points, 2,
-        'flat +2 — a x2 here is the multiplier regression');
-    assert.strictEqual(result.byTeam[1].mountainCount, 1);
+    assert.strictEqual(result.matchesPlayed, 2);
+    assert.strictEqual(result.byTeam[1].points, 4, '+2 for each match held through');
+    assert.strictEqual(result.byTeam[1].mountainCount, 2, 'credited for two heart-matches');
     assert.strictEqual(result.byTeam[2].points, 0);
 });
 
-test('side heart pays +1 for the round regardless of match count', () => {
-    const gs = makeState({ heartHexControl: { 'q-4r2': 1 } });
-    assert.strictEqual(calculateHeartIncome(gs, boardModule, 3).byTeam[1].points, 1);
+test('a heart captured mid-round pays only for matches confirmed after the capture', () => {
+    // Match 1 confirmed while nobody held q2r-4; Ravens captured it in the
+    // placement after match 1, so match 2's snapshot shows them holding it.
+    const gs = makeState({
+        heartHexControl: { 'q2r-4': 1 },
+        gameHistory: [
+            { roundNumber: 3, heartControlSnapshot: {} },
+            { roundNumber: 3, heartControlSnapshot: { 'q2r-4': 1 } }
+        ]
+    });
+    const result = calculateHeartIncome(gs, boardModule, 3);
+
+    assert.strictEqual(result.byTeam[1].points, 1,
+        'held during one match only — +1, not +2');
+    assert.strictEqual(result.byTeam[1].sideCount, 1);
 });
 
-test('a mixed holding sums flat values and reports both counts', () => {
-    const gs = makeState({ heartHexControl: { q0r0: 1, 'q-4r2': 1, q2r2: 1 } });
+test('a heart that changed hands mid-round pays each holder for their matches', () => {
+    const gs = makeState({
+        heartHexControl: { q0r0: 2 },
+        gameHistory: [
+            { roundNumber: 3, heartControlSnapshot: { q0r0: 1 } },
+            { roundNumber: 3, heartControlSnapshot: { q0r0: 2 } }
+        ]
+    });
+    const result = calculateHeartIncome(gs, boardModule, 3);
+
+    assert.strictEqual(result.byTeam[1].points, 2, 'old holder paid for match 1');
+    assert.strictEqual(result.byTeam[2].points, 2, 'new holder paid for match 2');
+});
+
+test('an entry with no snapshot falls back to current control', () => {
+    // Matches confirmed before snapshot stamping existed carry no
+    // heartControlSnapshot; they are judged by control as it stands now.
+    const gs = makeState({
+        heartHexControl: { 'q-4r2': 1 },
+        gameHistory: [
+            { roundNumber: 3 },
+            { roundNumber: 3, heartControlSnapshot: { 'q-4r2': 1 } }
+        ]
+    });
+    assert.strictEqual(calculateHeartIncome(gs, boardModule, 3).byTeam[1].points, 2);
+});
+
+test('a mixed holding sums per heart per match and reports both counts', () => {
+    const snap = { q0r0: 1, 'q-4r2': 1, q2r2: 1 };
+    const gs = makeState({
+        heartHexControl: snap,
+        gameHistory: [
+            { roundNumber: 3, heartControlSnapshot: snap },
+            { roundNumber: 3, heartControlSnapshot: snap }
+        ]
+    });
     const entry = calculateHeartIncome(gs, boardModule, 3).byTeam[1];
 
-    assert.strictEqual(entry.points, 4, '2 (mountain) + 1 + 1 (sides)');
-    assert.strictEqual(entry.mountainCount, 1);
-    assert.strictEqual(entry.sideCount, 2);
+    assert.strictEqual(entry.points, 8, '(2 mountain + 1 + 1 sides) × 2 matches');
+    assert.strictEqual(entry.mountainCount, 2);
+    assert.strictEqual(entry.sideCount, 4);
 });
 
 test('a round with no played matches pays nothing (the zero-match gate)', () => {
@@ -63,22 +121,22 @@ test('a round with no played matches pays nothing (the zero-match gate)', () => 
 
     assert.strictEqual(result.roundPlayed, false);
     assert.strictEqual(result.matchesPlayed, 0);
-    assert.strictEqual(result.byTeam[1].points, 0,
-        'without the multiplier, the empty-round rule must be an explicit gate');
+    assert.strictEqual(result.byTeam[1].points, 0);
 });
 
-test('challenge and break entries do not open the gate on their own', () => {
+test('challenge and break entries neither pay nor open the gate', () => {
     const gs = makeState({
         heartHexControl: { q0r0: 1 },
         gameHistory: [
-            { roundNumber: 3, isChallenge: true },
-            { roundNumber: 3, isBreak: true }
+            { roundNumber: 3, isChallenge: true, heartControlSnapshot: { q0r0: 1 } },
+            { roundNumber: 3, isBreak: true, heartControlSnapshot: { q0r0: 1 } }
         ]
     });
     const result = calculateHeartIncome(gs, boardModule, 3);
 
     assert.strictEqual(result.roundPlayed, false);
-    assert.strictEqual(result.byTeam[1].points, 0);
+    assert.strictEqual(result.byTeam[1].points, 0,
+        'challenge games are not matches — holding a heart through one pays nothing');
 });
 
 test('untagged history entries never count toward round 0 (Number(null) === 0)', () => {
@@ -99,27 +157,43 @@ test('untagged history entries never count toward round 0 (Number(null) === 0)',
     assert.strictEqual(result.byTeam[1].points, 0);
 });
 
-test('a contested heart pays nobody', () => {
+test('a contested heart pays nobody, even for matches it was held through', () => {
+    const snap = { q0r0: 1, 'q-4r2': 1 };
     const gs = makeState({
-        heartHexControl: { q0r0: 1, 'q-4r2': 1 },
+        heartHexControl: snap,
+        gameHistory: [
+            { roundNumber: 3, heartControlSnapshot: snap },
+            { roundNumber: 3, heartControlSnapshot: snap }
+        ],
         gameQueue: [{ isChallenge: true, challengeHexCoord: 'q0r0', status: 'pending' }]
     });
     const entry = calculateHeartIncome(gs, boardModule, 3).byTeam[1];
 
-    assert.strictEqual(entry.points, 1, 'only the uncontested side heart pays');
+    assert.strictEqual(entry.points, 2, 'only the uncontested side heart pays (×2 matches)');
     assert.strictEqual(entry.mountainCount, 0);
 });
 
 test('a resolved challenge does not freeze the heart', () => {
     const gs = makeState({
         heartHexControl: { q0r0: 1 },
+        gameHistory: [
+            { roundNumber: 3, heartControlSnapshot: { q0r0: 1 } },
+            { roundNumber: 3, heartControlSnapshot: { q0r0: 1 } }
+        ],
         gameQueue: [{ isChallenge: true, challengeHexCoord: 'q0r0', status: 'completed' }]
     });
-    assert.strictEqual(calculateHeartIncome(gs, boardModule, 3).byTeam[1].points, 2);
+    assert.strictEqual(calculateHeartIncome(gs, boardModule, 3).byTeam[1].points, 4);
 });
 
 test('non-heart hexes and unknown owners pay nothing, and every team gets an entry', () => {
-    const gs = makeState({ heartHexControl: { q3r0: 1, 'q2r-4': 99 } });
+    const snap = { q3r0: 1, 'q2r-4': 99 };
+    const gs = makeState({
+        heartHexControl: snap,
+        gameHistory: [
+            { roundNumber: 3, heartControlSnapshot: snap },
+            { roundNumber: 3, heartControlSnapshot: snap }
+        ]
+    });
     const result = calculateHeartIncome(gs, boardModule, 3);
 
     assert.strictEqual(result.byTeam[1].points, 0, 'a normal hex is not income');
@@ -146,16 +220,20 @@ global.calculateHeartIncome = calculateHeartIncome;
 require('../../full/scripts/display-manager.js');
 const DisplayManager = global.window.DisplayManager;
 
-test('the live Hex Scoring panel shows the flat per-round income, not a multiple', () => {
+test('the live Hex Scoring panel shows per-match income from the snapshots', () => {
     const dm = new DisplayManager({ container: null, boardModule, boardRenderer: null });
-    const gs = makeState({ heartHexControl: { q0r0: 1, 'q-4r2': 1 } });
+    const snap = { q0r0: 1, 'q-4r2': 1 };
+    const gs = makeState({
+        heartHexControl: snap,
+        gameHistory: [
+            { roundNumber: 3, heartControlSnapshot: snap },
+            { roundNumber: 3, heartControlSnapshot: snap }
+        ]
+    });
 
     const html = dm._buildHexScoringHTML(gs);
 
-    assert.match(html, /\+3</, 'mountain (2) + side (1) = 3 for the round');
-    assert.doesNotMatch(html, /×\s*\d+\s*match/,
-        'the "× N matches" breakdown belonged to the multiplier and must be gone');
-    assert.match(html, /1 × Mountain Heart \+ 1 × Side Heart/);
+    assert.match(html, /\+6</, '(mountain 2 + side 1) × 2 matches held');
 });
 
 test('the live panel says nothing pays when no match was played', () => {
@@ -169,22 +247,22 @@ test('the live panel says nothing pays when no match was played', () => {
 
 const { projectRoundsToWin } = require('../../shared/scripts/board-module.js');
 
-test('projects rounds to the win target from heart income alone', () => {
+test('projects rounds to the win target assuming 2 matches per round', () => {
     const gs = makeState({
         winCondition: 50,
         teams: [
-            { id: 1, name: 'Ravens', points: 40 },   // mountain = +2/round → 5 rounds
-            { id: 2, name: 'Wolves', points: 46 }    // one side heart = +1/round → 4 rounds
+            { id: 1, name: 'Ravens', points: 40 },   // mountain = 2×2 = +4/round → 3 rounds
+            { id: 2, name: 'Wolves', points: 47 }    // side heart = 1×2 = +2/round → 2 rounds
         ],
         heartHexControl: { q0r0: 1, 'q-4r2': 2 }
     });
     const projection = projectRoundsToWin(gs, boardModule);
 
     assert.strictEqual(projection[0].teamName, 'Wolves', 'sorted by soonest to win');
-    assert.strictEqual(projection[0].roundsToWin, 4);
+    assert.strictEqual(projection[0].roundsToWin, 2);
     assert.strictEqual(projection[1].teamName, 'Ravens');
-    assert.strictEqual(projection[1].incomePerRound, 2);
-    assert.strictEqual(projection[1].roundsToWin, 5);
+    assert.strictEqual(projection[1].incomePerRound, 4);
+    assert.strictEqual(projection[1].roundsToWin, 3);
 });
 
 test('a team holding no hearts has no projection, and sorts last', () => {
@@ -219,7 +297,7 @@ test('the projection ignores the contested-heart freeze (it is about steady stat
         heartHexControl: { q0r0: 1 },
         gameQueue: [{ isChallenge: true, challengeHexCoord: 'q0r0', status: 'pending' }]
     });
-    assert.strictEqual(projectRoundsToWin(gs, boardModule)[0].incomePerRound, 2);
+    assert.strictEqual(projectRoundsToWin(gs, boardModule)[0].incomePerRound, 4);
 });
 
 test('no win target or no boardModule yields an empty projection', () => {

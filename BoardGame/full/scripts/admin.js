@@ -4617,6 +4617,11 @@ async function confirmResult(winnerIndex) {
         slot: selectedQueuedGame.slot ?? null,
         matchNumberInRound: ((gameState.gameHistory?.length || 0) % (gameState.teams?.length || 5)) + 1,
         teamStatsSnapshot: teamStatsSnapshot,
+        // Heart control AT CONFIRM TIME. calculateHeartIncome() pays each
+        // heart per match it was held through, judged by this snapshot — a
+        // heart captured mid-round only earns for matches confirmed after
+        // the capture. See docs/architecture/scoring.md.
+        heartControlSnapshot: { ...(gameState.heartHexControl || {}) },
         challengeHexCoord: selectedQueuedGame.challengeHexCoord || null
     };
 

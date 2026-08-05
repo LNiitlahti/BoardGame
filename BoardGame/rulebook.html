@@ -950,7 +950,7 @@
             <p>
                 That last line is the whole game. A team that wins every match but never takes a heart
                 will lose to a team that wins half as often and sits on the Mountain Heart. Match wins
-                are worth one point each; holding every heart is worth eight points a round, forever.
+                are worth one point each; holding every heart is worth sixteen points a round, forever.
             </p>
 
             <div id="victory" class="subsection">
@@ -1317,14 +1317,16 @@
             </div>
 
             <div id="heart-income" class="subsection">
-                <h3 class="subsection-title">Heart Income: +1 / +2 Per Round</h3>
+                <h3 class="subsection-title">Heart Income: +1 / +2 Per Match Held</h3>
 
                 <p>
-                    Every heart hex you control pays out <strong>once per round</strong>, during the
-                    round's scoring phase. A Side Heart is <strong>+1</strong> and the Mountain Heart
-                    is <strong>+2</strong> — flat, however many matches the round contained. This is
-                    passive: you get it for holding the hex, regardless of whether you played, won,
-                    or lost that round.
+                    Every heart hex pays for <strong>every match it was in your hands for</strong>:
+                    a Side Heart is <strong>+1</strong> and the Mountain Heart <strong>+2</strong>
+                    for each of the round's matches you held it through. Hold a Side Heart through
+                    a normal two-match round and it pays <strong>+2</strong>; take it midway through
+                    the round and it pays only for the matches after the capture. This is passive:
+                    you get it for holding the hex, regardless of whether you played, won, or lost
+                    those matches.
                 </p>
 
                 <div class="table-scroll">
@@ -1338,11 +1340,11 @@
                     <tbody>
                         <tr>
                             <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Side Heart hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q-4r2.png)"></span><span class="rb-hex-bevel"></span><img class="rb-hex-icon side" src="shared/images/hexes/side_heart_v3.png" alt=""></span></span> Side Heart (six of them)</span></td>
-                            <td><strong>+1 per round</strong>, each</td>
+                            <td><strong>+1 per match held through</strong>, each — +2 in a normal two-match round</td>
                         </tr>
                         <tr>
                             <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Mountain Heart hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q0r0.png)"></span><span class="rb-hex-bevel"></span><img class="rb-hex-icon mountain" src="shared/images/hexes/mountain_heart_v3.png" alt=""></span></span> Mountain Heart</span></td>
-                            <td><strong>+2 per round</strong></td>
+                            <td><strong>+2 per match held through</strong> — +4 in a normal two-match round</td>
                         </tr>
                     </tbody>
                 </table>
@@ -1351,22 +1353,25 @@
                 <div class="highlight-box victory">
                     <div class="highlight-box-title">Maximum Income</div>
                     <p style="margin:0;">
-                        Holding every heart pays <strong>+8 points</strong> every round<br>
-                        (6 side hearts × 1) + (1 Mountain Heart × 2) = 8
+                        Holding every heart through a normal two-match round pays <strong>+16 points</strong><br>
+                        (6 side hearts × 1) + (1 Mountain Heart × 2) = 8 per match, × 2 matches
                     </p>
                 </div>
 
                 <p>
-                    <strong>One payment, at the end of the round</strong> — you are not paid after
-                    each match. You are paid once, at the round's scoring phase, for the hearts you
-                    <em>still hold</em> then. Hold a Side Heart through the round and it pays 1; lose
-                    it to a challenge partway through and it pays you nothing at all.
+                    <strong>One payment, counted per match</strong> — the money arrives once, at the
+                    round's scoring phase, but its size is decided match by match: for each of the
+                    round's matches, every heart pays whoever held it <em>when that match's result
+                    went in</em>. Capture a heart between the two matches and you earn for the
+                    second one only; lose one mid-round and the team that took it earns for the
+                    matches after the takeover.
                 </p>
 
                 <p>
                     <strong>Challenge games are not matches.</strong> They move hex control, never
-                    the scoreboard. A round of nothing but challenge games counts as a round in which
-                    no match was played — see below.
+                    the scoreboard. Holding a heart through seven challenge games earns nothing —
+                    only the round's real matches count, and a round of nothing but challenge games
+                    counts as a round in which no match was played (see below).
                 </p>
 
                 <p>Three exceptions worth knowing before they surprise you:</p>
@@ -1565,7 +1570,7 @@
                     </li>
                     <li>
                         <span class="phase-name">Scoring: Hex</span>
-                        <span class="phase-desc">Heart income is paid out — a flat +2 for the Mountain Heart and +1 per Side Heart. This is the one moment per round your hearts pay, and it settles the round that just ended. Contested hearts pay nobody; in round 1 nothing pays at all, and neither does a round in which no match was played.</span>
+                        <span class="phase-desc">Heart income is paid out — +2 per Mountain Heart and +1 per Side Heart for each of last round's matches the heart was held through. This is the one moment per round your hearts pay, and it settles the round that just ended. Contested hearts pay nobody; in round 1 nothing pays at all, and neither does a round in which no match was played.</span>
                     </li>
                     <li>
                         <span class="phase-name">Hex Placement — Game 1</span>
@@ -1678,8 +1683,9 @@
                 <p style="margin:0;">
                     A challenge match awards <strong>no victory point</strong>, <strong>no tile</strong>,
                     and doesn't touch anyone's win/loss record. You are playing purely for the hex.
-                    What makes it worth playing is the income: the Mountain Heart is +2 <em>every
-                    remaining round</em>, which over a long tournament dwarfs any single match win.
+                    What makes it worth playing is the income: the Mountain Heart is +4 <em>every
+                    remaining two-match round</em>, which over a long tournament dwarfs any single
+                    match win.
                 </p>
             </div>
 
@@ -1694,9 +1700,10 @@
             </div>
 
             <p>
-                Heart income is paid <strong>once per round</strong>, at a flat rate — challenge
-                games never change its size. Seven challenge games in a round does not mean seven
-                payouts, or a bigger one. They move the hex; the hex pays what it pays.
+                Heart income is paid <strong>once per round</strong>, sized by the round's real
+                matches — challenge games never change it. Seven challenge games in a round does
+                not mean seven payouts, or a bigger one. They move the hex; only matches make
+                the hex pay.
             </p>
         </section>
 
@@ -2126,10 +2133,10 @@
                 unresolved challenge (frozen), it changed hands before the scoring phase, or the
                 round contained no completed matches (hearts only pay for rounds that were played).</p>
 
-                <p><strong>We held one Side Heart all round and got 1 point. Is that right?</strong><br>
-                Yes. Heart income is flat and paid once per round: +1 per Side Heart, +2 for the
-                Mountain Heart, no matter how many matches the round contained. Challenge games
-                don't add to it either.</p>
+                <p><strong>We held one Side Heart all round and got 2 points. Is that right?</strong><br>
+                Yes. A heart pays for each of the round's matches you held it through — a Side
+                Heart is +1 per match, and a normal round has two matches. If you'd captured it
+                between the matches you'd have gotten 1. Challenge games never add to it.</p>
 
                 <p><strong>We won a challenge but our score didn't move.</strong><br>
                 Correct. Challenges transfer the hex, not points. The reward arrives as income in every
@@ -2191,9 +2198,9 @@
                     <tbody>
                         <tr><td>Points to win</td><td><strong>50 by default</strong> (organiser sets 1–500)</td></tr>
                         <tr><td>Match win (2+ players on winning side)</td><td><strong>+1 point + 1 tile</strong></td></tr>
-                        <tr><td>Mountain Heart income</td><td><strong>+2 per round</strong></td></tr>
-                        <tr><td>Side Heart income (each)</td><td><strong>+1 per round</strong></td></tr>
-                        <tr><td>Maximum heart income</td><td><strong>+8 per round</strong> (all seven hearts)</td></tr>
+                        <tr><td>Mountain Heart income</td><td><strong>+2 per match held through</strong> (+4 in a normal round)</td></tr>
+                        <tr><td>Side Heart income (each)</td><td><strong>+1 per match held through</strong> (+2 in a normal round)</td></tr>
+                        <tr><td>Maximum heart income</td><td><strong>+16 in a normal round</strong> (all seven hearts, both matches)</td></tr>
                         <tr><td>Heart income in round 1</td><td><strong>none</strong></td></tr>
                         <tr><td>Spells per turn</td><td><strong>1</strong></td></tr>
                         <tr><td>Spell windows per round</td><td><strong>4</strong></td></tr>
@@ -2244,11 +2251,11 @@
                     <tbody>
                         <tr>
                             <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Mountain Heart hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q0r0.png)"></span><span class="rb-hex-bevel"></span><img class="rb-hex-icon mountain" src="shared/images/hexes/mountain_heart_v3.png" alt=""></span></span> Mountain Heart</span></td>
-                            <td>+2 per round</td>
+                            <td>+2 per match held through</td>
                         </tr>
                         <tr>
                             <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Side Heart hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q-4r2.png)"></span><span class="rb-hex-bevel"></span><img class="rb-hex-icon side" src="shared/images/hexes/side_heart_v3.png" alt=""></span></span> Side Heart</span></td>
-                            <td>+1 per round</td>
+                            <td>+1 per match held through</td>
                         </tr>
                         <tr>
                             <td><span class="hex-indicator"><span class="rb-hex-wrap" role="img" aria-label="Room hex"><span class="rb-hex"><span class="rb-hex-art" style="background-image:url(shared/images/hexes/coords/q1r-2.png)"></span><span class="rb-hex-bevel"></span><span class="rb-hex-room" aria-hidden="true"></span></span></span> Room</span></td>

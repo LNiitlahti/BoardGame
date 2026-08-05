@@ -516,6 +516,9 @@ class ResultManager {
             slot: this._selectedQueuedGame.slot ?? null,
             matchNumberInRound: ((this._gameState.gameHistory?.length || 0) % (this._gameState.teams?.length || 5)) + 1,
             teamStatsSnapshot: teamStatsSnapshot,
+            // Heart control AT CONFIRM TIME — mirrors admin.js. See
+            // calculateHeartIncome() in board-module.js.
+            heartControlSnapshot: { ...(this._gameState.heartHexControl || {}) },
             challengeHexCoord: this._selectedQueuedGame.challengeHexCoord || null
         };
 

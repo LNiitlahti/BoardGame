@@ -896,27 +896,40 @@ async function ch8Finish(page, viewPage) {
   standings.forEach(s => assert(s.points >= s.gamesWon,
     `${s.name} has ${s.points} pts but ${s.gamesWon} wins — a win did not award its +1 point`));
 
-  // Heart income is FLAT per round: mountain +2, side +1, no multiplier. Every
-  // logged payout must therefore sit at or below +8 (all seven hearts held).
-  // Under the old `× matchesPlayed` rule a single mountain heart alone paid +4
-  // and all hearts paid +16, so a value above 8 means the multiplier is back.
+  // Heart income pays per match held through: side +1, mountain +2, per
+  // scoring match, judged by each match's confirm-time control snapshot.
+  // All seven hearts is 8 per match, so no payout can exceed 8 × the number
+  // of scoring matches in the round it settles. A higher figure means income
+  // is being paid more than once per heart-match.
   //
   // This is a bound, not an exact reconciliation: heartHexControl has moved on
   // since those payouts fired, so the exact per-round figure can't be replayed
   // from the final state. Exactness is covered by dev/tests/heart-income.test.js.
   const payouts = await page.evaluate(() => {
     const gs = window.gameState || (typeof gameState !== 'undefined' ? gameState : null);
-    return (gs?.pointsHistory || []).map(e => ({ round: e.round, paid: e.pointsAwarded || {} }));
+    const matchesIn = (r) => (gs?.gameHistory || []).filter(e =>
+      e && !e.isChallenge && !e.isBreak &&
+      e.roundNumber !== null && e.roundNumber !== undefined &&
+      Number(e.roundNumber) === Number(r)).length;
+    return (gs?.pointsHistory || []).map(e => ({
+      round: e.round,
+      paid: e.pointsAwarded || {},
+      // pointsHistory[].round is the round the payout FIRED in; it settles
+      // the previous one (scoring_hex sits at the top of the new round).
+      settledMatches: matchesIn((e.round || 0) - 1),
+    }));
   });
 
-  payouts.forEach(({ round, paid }) => {
+  payouts.forEach(({ round, paid, settledMatches }) => {
+    const cap = 8 * settledMatches;
     Object.entries(paid).forEach(([team, pts]) => {
-      assert(pts <= 8,
-        `round ${round}: ${team} was paid ${pts} heart income — above the ` +
-        `all-hearts maximum of 8, which means a multiplier is back`);
+      assert(pts <= cap,
+        `round ${round}: ${team} was paid ${pts} heart income but the settled ` +
+        `round had ${settledMatches} matches (all-hearts cap ${cap}) — income ` +
+        `is being paid more than once per heart-match`);
     });
   });
-  log(`  heart income within flat per-round bounds across ${payouts.length} payouts`);
+  log(`  heart income within per-match bounds across ${payouts.length} payouts`);
 
   // view.html's live Hex Scoring panel must show what admin will actually
   // award. Both read calculateHeartIncome(); this proves they still agree.

@@ -18,16 +18,12 @@ exactly **two** sources:
 | Source | Amount | When |
 |---|---|---|
 | **Match win** | **+1** | The moment the TD confirms a match result |
-| **Heart hex income** | **+1** per side heart, **+2** for the mountain heart | Once per round, on leaving the `scoring_hex` phase — in rounds where at least one match was played |
+| **Heart hex income** | **+1** per side heart, **+2** for the mountain heart — **per scoring match the heart was held through** | Paid once per round, on leaving the `scoring_hex` phase |
 
 **Win condition:** first team to reach `gameState.winCondition` points.
 Default **50**, set in the setup wizard (`setup.html` `#winCondition`) and
-editable live from admin.html's "Win At" badge.
-
-> Heart income halved on 2026-08-05 when the multiplier was removed, and the
-> 50 default was deliberately **not** changed — the tournament simply runs
-> longer. Retune from admin's "Win At" badge if that turns out wrong; the Pace
-> badge beside it shows what the current target costs in rounds.
+editable live from admin.html's "Win At" badge. The Pace badge beside it shows
+what the current target costs in rounds at current heart control.
 
 `points` is the **single source of truth for standings everywhere**. Nothing
 that displays a ranking may add anything on top of it.
@@ -81,7 +77,7 @@ Three conditions gate it:
 
 ---
 
-## 2. Heart hex income: +1 / +2, flat, per round
+## 2. Heart hex income: +1 / +2 per match held through
 
 **Where:** `calculateHeartIncome()` in `shared/scripts/board-module.js` — the
 one shared script all four pages (admin/god/view/replay) load. Everything that
@@ -91,23 +87,32 @@ itself is `awardRoundPoints()` in `full/scripts/admin.js`, invoked via
 PhaseManager's `_onAwardPoints` hook.
 
 ```js
-const HEART_INCOME = Object.freeze({
+const HEART_INCOME = Object.freeze({   // points per MATCH HELD THROUGH
     'mountain-heart': 2,
     'side-heart': 1
 });
 // → { roundPlayed, matchesPlayed, byTeam: { [id]: { points, mountainCount, sideCount } } }
 ```
 
-**The payout is once per round and does not scale with anything.** A team
-holding the mountain heart through a round gets +2, whether the round
-contained one match or four. Holding every heart is +8.
+**The rule: a heart pays for every scoring match it was held through.**
+"Held through" is judged per match, by the `heartControlSnapshot` that
+`confirmResult()` stamps onto each history entry at confirm time:
 
-> **History note:** until 2026-08-05 income was `value × matchesPlayed`, so the
-> mountain heart actually paid +4 a round while the constant at the call site
-> read `2`. The multiplier was deliberate (it arrived on its own branch,
-> `feat/heart-income-per-match`) but unreadable, the rulebook contradicted
-> itself about the resulting totals, and the calculation was duplicated in four
-> files. All three are fixed.
+- Hold a side heart through a normal two-match round → **+2** (+1 × 2 matches).
+- Capture it in the placement after match 1 → **+1** (held during match 2 only).
+- Heart changes hands mid-round → **each holder is paid for their own matches**.
+- Mountain heart through a two-match round → **+4**. All seven hearts → **+16**.
+
+The total is still paid as **one lump sum per round**, at the `scoring_hex`
+phase — the snapshots only decide its size. History entries without a
+snapshot (confirmed before stamping existed) are judged by current control.
+
+> **History note:** this rule is the third iteration. Income was first
+> `value × matchesPlayed` with control read **once at payout** — which paid a
+> team for matches it had NOT held the heart through, and lived in six
+> drifting copies. It was then briefly flat per round (2026-08-05), which
+> underpaid a heart held all round. The snapshot rule (2026-08-06, decided
+> after tournament "perseenkulli") pays exactly for what was held, when.
 
 Timing and edge cases that are easy to get wrong:
 
@@ -129,31 +134,41 @@ Timing and edge cases that are easy to get wrong:
   phase-flow tagging existed carry `roundNumber: null`, and `Number(null) === 0`
   would otherwise match them all whenever the round being counted is 0 — which
   is exactly what the previews pass during round 1.
-- **Control is read after the round's results are confirmed**, so a heart lost
-  during the round pays its new holder, not the old one.
-- **Contested hearts are frozen.** Any heart hex that is the subject of a
-  `pending` or `ongoing` challenge match is skipped for that round — its income
-  is withheld until the dispute resolves, rather than paid to the current
-  holder. A frozen heart contributes nothing, and the team's other hearts pay
-  normally.
+- **Control is read per match, from the snapshot** — not from the board as it
+  stands at payout time. A heart lost mid-round pays the old holder for the
+  matches before the loss and the new holder for the matches after.
+- **Contested hearts are frozen for the whole round.** Any heart hex that is
+  the subject of a `pending` or `ongoing` challenge match at payout time pays
+  nobody that round, even for matches it was held through. The freeze wins
+  over the snapshots; the team's other hearts pay normally.
+- **Duplicate confirms inflate income.** Because every confirmed scoring match
+  is a heart-match credit, a round that somehow gets two confirms per slot
+  (seen once in test data: `slots [1,1,2,2]`) pays hearts double. The e2e
+  guard bounds each payout at 8 × the settled round's match count, but the
+  real fix is not confirming the same slot twice.
 - **Double-award guard.** `_awardPointsForRound()` records each payout in
   `gameState.pointsHistory` keyed by round number and returns early if that
   round is already present, so re-entering the phase cannot pay twice.
 
-### Where the match count comes from
+### Where the matches come from
 
-`countScoringMatchesInRound(gameState, roundNumber)` in
-`shared/scripts/board-module.js`. It counts non-challenge, non-break,
-round-tagged entries in `gameState.gameHistory` whose `roundNumber` matches.
-It is called from exactly one place — inside `calculateHeartIncome()` — and
-its result is a **gate**, not a factor.
+`scoringMatchesInRound(gameState, roundNumber)` in
+`shared/scripts/board-module.js` returns the non-challenge, non-break,
+round-tagged entries in `gameState.gameHistory` whose `roundNumber` matches
+(`countScoringMatchesInRound()` is its length). `calculateHeartIncome()`
+iterates those entries and reads each one's `heartControlSnapshot`.
 
-`roundNumber` is stamped onto each history entry at confirm time, in **both**
+Two fields are stamped onto each history entry at confirm time, in **both**
 `confirmResult()` (admin.js) and `ResultManager.confirmResult()`
-(result-manager.js), copied from the queue entry's own `{roundNumber, slot}`
-tag. The pre-existing `tournamentRound` field on history entries is **not**
-usable for this: it reads the legacy `gameState.currentRound` counter, which
-phase-managed tournaments deliberately never advance.
+(result-manager.js):
+
+- `roundNumber` (+ `slot`), copied from the queue entry's own tag. The
+  pre-existing `tournamentRound` field is **not** usable for this: it reads
+  the legacy `gameState.currentRound` counter, which phase-managed
+  tournaments deliberately never advance.
+- `heartControlSnapshot`, a copy of `gameState.heartHexControl` as it stood
+  when the result was confirmed — the record of who held what during that
+  match. Follows the same pattern as the existing `teamStatsSnapshot`.
 
 ### Callers
 
@@ -184,11 +199,12 @@ payload rather than recomputing heart income.
 ### Pace projection
 
 `projectRoundsToWin(gameState, boardModule)` in the same file estimates how
-many rounds each team needs to reach `winCondition` **on heart income alone**.
-Match wins and future heart captures are excluded, so it is a floor rather than
-a forecast; the contested-heart freeze is ignored because a projection is about
-steady state. Rendered on admin.html's Pace badge and in the Win Condition
-modal. Display-only — it never touches `team.points`.
+many rounds each team needs to reach `winCondition` **on heart income alone**,
+assuming `TYPICAL_MATCHES_PER_ROUND` (= 2) matches per round and uninterrupted
+control. Match wins and future heart captures are excluded, so it is a floor
+rather than a forecast; the contested-heart freeze is ignored because a
+projection is about steady state. Rendered on admin.html's Pace badge and in
+the Win Condition modal. Display-only — it never touches `team.points`.
 
 ---
 
@@ -225,13 +241,15 @@ win, because the win's point is already inside `points`.
 
 **Regression guards:**
 - `dev/tests/heart-income.test.js` — unit coverage for `calculateHeartIncome()`
-  and `projectRoundsToWin()`: flat values, the zero-match gate, the untagged-
+  and `projectRoundsToWin()`: per-match snapshot crediting (including
+  mid-round capture and change of hands), the zero-match gate, the untagged-
   entry guard, the contested freeze, and view.html's panel rendering the same
   numbers as the payout.
 - `dev/tests/e2e-full-flow.js` —
   1. every team must satisfy `points >= gamesWon` (proves each win awarded its +1);
-  2. no heart payout may exceed +8 (all seven hearts held) — a higher figure
-     means a multiplier is back;
+  2. no heart payout may exceed 8 × the settled round's match count (all
+     seven hearts held through every match) — a higher figure means income is
+     being paid more than once per heart-match;
   3. the number rendered in `.dm-winner-points` on view.html is compared
      directly against admin's `gameState`.
 

@@ -257,14 +257,22 @@ class BoardModule {
 }
 
 /**
- * Points per ROUND for each heart type. Not per match — there is no
- * multiplier anywhere in the scoring path. The only place these numbers
- * live; getHexValue() and calculateHeartIncome() both read them.
+ * Points per MATCH HELD THROUGH for each heart type. A heart pays for every
+ * scoring match whose confirm-time control snapshot shows you holding it —
+ * see calculateHeartIncome(). The only place these numbers live;
+ * getHexValue() and calculateHeartIncome() both read them.
  */
 const HEART_INCOME = Object.freeze({
     'mountain-heart': 2,
     'side-heart': 1
 });
+
+/**
+ * A normal round has two match slots. Used ONLY by projectRoundsToWin() to
+ * turn per-match income into an expected per-round pace — the actual payout
+ * never assumes this, it counts the matches that really happened.
+ */
+const TYPICAL_MATCHES_PER_ROUND = 2;
 
 /**
  * How many scoring matches a round actually contained.
@@ -282,8 +290,8 @@ const HEART_INCOME = Object.freeze({
  * @param {number} roundNumber - the round being paid for (the one that just ended)
  * @returns {number} count of scoring matches in that round
  */
-function countScoringMatchesInRound(gameState, roundNumber) {
-    if (!gameState || roundNumber === undefined || roundNumber === null) return 0;
+function scoringMatchesInRound(gameState, roundNumber) {
+    if (!gameState || roundNumber === undefined || roundNumber === null) return [];
 
     return (gameState.gameHistory || []).filter(entry =>
         entry &&
@@ -297,7 +305,11 @@ function countScoringMatchesInRound(gameState, roundNumber) {
         entry.roundNumber !== null &&
         entry.roundNumber !== undefined &&
         Number(entry.roundNumber) === Number(roundNumber)
-    ).length;
+    );
+}
+
+function countScoringMatchesInRound(gameState, roundNumber) {
+    return scoringMatchesInRound(gameState, roundNumber).length;
 }
 
 /**
@@ -305,12 +317,21 @@ function countScoringMatchesInRound(gameState, roundNumber) {
  *
  * THE single heart-income calculation. Payouts (admin.js, stats-manager.js)
  * and previews (stats-manager.js's Next Round modal, display-manager.js's
- * live panel on view.html) all call this, so a preview can never promise a
- * different number than the payout delivers. It used to be written out four
- * times, and the copies drifted.
+ * live panel on view.html, the adapter's Award Points dialog) all call this,
+ * so a preview can never promise a different number than the payout delivers.
+ * It used to be written out six times, and the copies drifted.
  *
- * Income is FLAT per round: Mountain Heart +2, each Side Heart +1, paid once
- * at the scoring_hex phase for the hearts a team still holds at that moment.
+ * The rule: a heart pays for every scoring match it was HELD THROUGH —
+ * +1 per side heart, +2 for the mountain heart, per match. "Held through"
+ * is judged by the control snapshot confirmResult() stamps onto each history
+ * entry (heartControlSnapshot), so a heart captured mid-round pays only for
+ * the matches confirmed after the capture, and a heart that changed hands
+ * pays each holder for their own matches. Entries without a snapshot
+ * (confirmed before stamping existed) are judged by current control.
+ *
+ * Still paid once per round, at the scoring_hex phase, guarded against
+ * double-award by pointsHistory. Hearts under an unresolved challenge are
+ * frozen for the whole round. A round with no scoring matches pays nothing.
  *
  * @param {Object} gameState
  * @param {Object} boardModule - a BoardModule instance, for getHexType()
@@ -320,6 +341,8 @@ function countScoringMatchesInRound(gameState, roundNumber) {
  *   matchesPlayed: number,
  *   byTeam: Object<string, {points: number, mountainCount: number, sideCount: number}>
  * }}
+ * byTeam counts are heart-match credits: a mountain heart held through two
+ * matches is mountainCount 2 (and +4 points).
  */
 function calculateHeartIncome(gameState, boardModule, roundNumber) {
     const teams = gameState?.teams || [];
@@ -328,17 +351,17 @@ function calculateHeartIncome(gameState, boardModule, roundNumber) {
         byTeam[team.id] = { points: 0, mountainCount: 0, sideCount: 0 };
     });
 
-    const matchesPlayed = countScoringMatchesInRound(gameState, roundNumber);
+    const matches = scoringMatchesInRound(gameState, roundNumber);
+    const matchesPlayed = matches.length;
     const roundPlayed = matchesPlayed > 0;
 
-    // A round nobody played pays nobody. Before the multiplier was removed
-    // this fell out of `× 0`; it is now an explicit rule.
     if (!gameState || !boardModule || !roundPlayed) {
         return { roundPlayed, matchesPlayed, byTeam };
     }
 
     // Hexes under an unresolved challenge pay nobody — not the holder, not
-    // the challenger. The income is withheld until the dispute settles.
+    // the challenger, and not even for matches they were held through. The
+    // income is withheld until the dispute settles.
     const contestedHexes = new Set();
     (gameState.gameQueue || []).forEach(m => {
         if (m && m.isChallenge && m.challengeHexCoord &&
@@ -347,13 +370,13 @@ function calculateHeartIncome(gameState, boardModule, roundNumber) {
         }
     });
 
-    const control = Object.entries(gameState.heartHexControl || {});
+    const teamIds = new Set(teams.map(t => t.id));
 
-    teams.forEach(team => {
-        const entry = byTeam[team.id];
-        control.forEach(([coord, ownerId]) => {
+    matches.forEach(match => {
+        const control = match.heartControlSnapshot || gameState.heartHexControl || {};
+        Object.entries(control).forEach(([coord, ownerId]) => {
             if (contestedHexes.has(coord)) return;
-            if (ownerId !== team.id) return;
+            if (!teamIds.has(ownerId)) return;
 
             const m = coord.match(/q(-?\d+)r(-?\d+)/);
             if (!m) return;
@@ -362,6 +385,7 @@ function calculateHeartIncome(gameState, boardModule, roundNumber) {
             const value = HEART_INCOME[hexType];
             if (!value) return;
 
+            const entry = byTeam[ownerId];
             entry.points += value;
             if (hexType === 'mountain-heart') entry.mountainCount++;
             else entry.sideCount++;
@@ -378,8 +402,10 @@ function calculateHeartIncome(gameState, boardModule, roundNumber) {
  * A FLOOR, not a forecast: match wins and hearts not yet captured are
  * excluded because they can't be known. The contested-heart freeze is
  * deliberately ignored too — a projection is about steady state, and a
- * dispute resolves. Teams holding no hearts get `roundsToWin: null` and sort
- * last; callers render them as an em dash rather than Infinity.
+ * dispute resolves. Income is per match held through, so the per-round pace
+ * assumes TYPICAL_MATCHES_PER_ROUND matches and uninterrupted control.
+ * Teams holding no hearts get `roundsToWin: null` and sort last; callers
+ * render them as an em dash rather than Infinity.
  *
  * @param {Object} gameState
  * @param {Object} boardModule - a BoardModule instance, for getHexType()
@@ -394,15 +420,16 @@ function projectRoundsToWin(gameState, boardModule) {
     const control = Object.entries(gameState.heartHexControl || {});
 
     return teams.map(team => {
-        let incomePerRound = 0;
+        let incomePerMatch = 0;
         control.forEach(([coord, ownerId]) => {
             if (ownerId !== team.id) return;
             const m = coord.match(/q(-?\d+)r(-?\d+)/);
             if (!m) return;
-            incomePerRound += HEART_INCOME[
+            incomePerMatch += HEART_INCOME[
                 boardModule.getHexType(parseInt(m[1]), parseInt(m[2]))
             ] || 0;
         });
+        const incomePerRound = incomePerMatch * TYPICAL_MATCHES_PER_ROUND;
 
         const points = team.points || 0;
         const deficit = Math.max(0, target - points);
