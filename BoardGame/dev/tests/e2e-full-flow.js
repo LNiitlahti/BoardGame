@@ -870,9 +870,11 @@ async function ch7Undo(page) {
 async function ch8Finish(page, viewPage) {
   chapter(8, 'Finish tournament + winner celebration');
 
-  // view.html ranks by _getTeamTotalPoints() = points + gamesWon
-  // (display-manager.js), NOT by the raw `points` that admin.html's Teams
-  // column shows. Reproduce the display's own formula or this assertion
+  // Every ranking surface sorts by `points` ALONE — it already contains the
+  // +1 per match win as well as heart income (_getTeamTotalPoints() in
+  // display-manager.js). This used to reproduce a `points + gamesWon` formula
+  // to match the display; that formula was the double-count bug, fixed
+  // 2026-08-05. Reproduce the display's real formula or this assertion
   // compares two different things.
   const standings = await page.evaluate(() => {
     const gs = window.gameState || (typeof gameState !== 'undefined' ? gameState : null);
@@ -881,7 +883,7 @@ async function ch8Finish(page, viewPage) {
         name: t.name,
         points: t.points || 0,
         gamesWon: t.gamesWon || 0,
-        total: (t.points || 0) + (t.gamesWon || 0)
+        total: t.points || 0
       }))
       .sort((a, b) => b.total - a.total);
   });
@@ -893,6 +895,51 @@ async function ch8Finish(page, viewPage) {
   // admin.html has drifted back to incrementing gamesWon without points.
   standings.forEach(s => assert(s.points >= s.gamesWon,
     `${s.name} has ${s.points} pts but ${s.gamesWon} wins — a win did not award its +1 point`));
+
+  // Heart income is FLAT per round: mountain +2, side +1, no multiplier. Every
+  // logged payout must therefore sit at or below +8 (all seven hearts held).
+  // Under the old `× matchesPlayed` rule a single mountain heart alone paid +4
+  // and all hearts paid +16, so a value above 8 means the multiplier is back.
+  //
+  // This is a bound, not an exact reconciliation: heartHexControl has moved on
+  // since those payouts fired, so the exact per-round figure can't be replayed
+  // from the final state. Exactness is covered by dev/tests/heart-income.test.js.
+  const payouts = await page.evaluate(() => {
+    const gs = window.gameState || (typeof gameState !== 'undefined' ? gameState : null);
+    return (gs?.pointsHistory || []).map(e => ({ round: e.round, paid: e.pointsAwarded || {} }));
+  });
+
+  payouts.forEach(({ round, paid }) => {
+    Object.entries(paid).forEach(([team, pts]) => {
+      assert(pts <= 8,
+        `round ${round}: ${team} was paid ${pts} heart income — above the ` +
+        `all-hearts maximum of 8, which means a multiplier is back`);
+    });
+  });
+  log(`  heart income within flat per-round bounds across ${payouts.length} payouts`);
+
+  // view.html's live Hex Scoring panel must show what admin will actually
+  // award. Both read calculateHeartIncome(); this proves they still agree.
+  const adminPreview = await page.evaluate(() => {
+    const gs = window.gameState || (typeof gameState !== 'undefined' ? gameState : null);
+    const bm = window.boardModule || (typeof boardModule !== 'undefined' ? boardModule : null);
+    if (!gs || !bm || typeof calculateHeartIncome !== 'function') return null;
+    const resolving = (gs.currentPhase?.roundNumber || 0) - 1;
+    const { byTeam } = calculateHeartIncome(gs, bm, resolving);
+    return Object.values(byTeam).reduce((sum, e) => sum + (e.points || 0), 0);
+  });
+
+  if (adminPreview !== null && viewPage) {
+    const viewTotal = await viewPage.$$eval('.dm-hex-score-pts',
+      els => els.reduce((sum, el) => sum + (parseInt(el.textContent.replace(/[^\d]/g, ''), 10) || 0), 0)
+    ).catch(() => null);
+    if (viewTotal !== null) {
+      assert(viewTotal === adminPreview,
+        `view.html's Hex Scoring panel shows ${viewTotal} total but admin computes ${adminPreview} — ` +
+        `the preview and the payout have drifted apart`);
+      log(`  view.html hex-scoring preview matches admin (${adminPreview})`);
+    }
+  }
 
   const topTotal = standings[0].total;
   const leaders = standings.filter(s => s.total === topTotal);
