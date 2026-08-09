@@ -299,6 +299,30 @@ body {
     width: 150px;
 }
 
+/* ---------- Video Export Status ---------- */
+
+.video-export-status {
+    background: var(--bg-secondary, #0a0d16);
+    border-bottom: 1px solid var(--border-color, rgba(200,179,126,0.12));
+    padding: 6px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-shrink: 0;
+    font-size: 11px;
+    color: var(--accent-primary, #c8b37e);
+}
+
+.video-export-status.hidden {
+    display: none;
+}
+
+.video-export-status .btn {
+    padding: 3px 12px;
+    font-size: 10px;
+}
+
 /* ---------- Main Content ---------- */
 
 .replay-main {

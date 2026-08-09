@@ -136,7 +136,14 @@
             <button class="btn secondary" onclick="openSummary()">Summary</button>
             <button class="btn secondary" onclick="exportJSON()">Export JSON</button>
             <button class="btn secondary" onclick="exportCSV()">Export CSV</button>
+            <button class="btn secondary" id="exportVideoBtn" onclick="exportVideo()">Export Video</button>
         </div>
+    </div>
+
+    <!-- Video Export Status (shown only while a screen-recording export is in progress) -->
+    <div class="video-export-status hidden" id="videoExportStatus">
+        <span id="videoExportText">Recording…</span>
+        <button class="btn secondary" onclick="cancelVideoExport()">Stop</button>
     </div>
 
     <!-- Main Content -->
@@ -714,6 +721,223 @@
 
     function exportCSV() {
         if (actionExport) actionExport.exportCSV();
+    }
+
+    // ===== Video Export =====
+    // Records the full scrubbable replay to a downloadable .webm by driving
+    // playback at speed while the browser's native tab/screen-share picker
+    // feeds a MediaStream into MediaRecorder. Entirely client-side, no
+    // Firestore writes. `videoExportState` is non-null only while an export
+    // is in flight; every exit path (natural end, user-cancelled picker,
+    // user-stopped-sharing mid-capture, manual Stop, recorder error) funnels
+    // through finishVideoExport() so the UI/speed always get restored.
+    let videoExportState = null;
+
+    const VIDEO_EXPORT_SPEED = 5; // fast but still watchable default
+
+    function pickVideoMimeType() {
+        if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
+        const candidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+        return candidates.find(type => MediaRecorder.isTypeSupported(type)) || '';
+    }
+
+    async function exportVideo() {
+        if (!replayEngine || replayEngine.totalActions === 0) return;
+        if (videoExportState?.active) return; // export already running
+
+        if (!navigator.mediaDevices?.getDisplayMedia) {
+            setVideoExportText('Screen recording is not supported in this browser.');
+            showVideoExportStatus(true);
+            setTimeout(() => showVideoExportStatus(false), 4000);
+            return;
+        }
+
+        // Stop any ongoing playback before the picker opens, and remember the
+        // speed the user had selected so it can be restored afterwards.
+        replayEngine.pause();
+        updatePlayButton();
+        const originalSpeed = replayEngine.speed;
+
+        let stream;
+        try {
+            stream = await navigator.mediaDevices.getDisplayMedia({
+                video: { frameRate: 30 },
+                audio: false
+            });
+        } catch (err) {
+            // User cancelled the picker, or permission was denied — not a crash.
+            console.warn('Screen share not granted:', err);
+            setVideoExportText('Video export cancelled — screen sharing was not granted.');
+            showVideoExportStatus(true);
+            setTimeout(() => showVideoExportStatus(false), 3500);
+            return;
+        }
+
+        const mimeType = pickVideoMimeType();
+        let mediaRecorder;
+        try {
+            mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+        } catch (err) {
+            console.error('MediaRecorder init failed:', err);
+            stream.getTracks().forEach(t => t.stop());
+            setVideoExportText('Recording could not be started on this browser.');
+            showVideoExportStatus(true);
+            setTimeout(() => showVideoExportStatus(false), 4000);
+            return;
+        }
+
+        const chunks = [];
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) chunks.push(e.data);
+        };
+        mediaRecorder.onstop = () => finalizeVideoExport(mimeType);
+        mediaRecorder.onerror = (e) => {
+            console.error('MediaRecorder error:', e);
+            if (videoExportState) videoExportState.stoppedReason = 'A recording error occurred.';
+            finishVideoExport();
+        };
+
+        videoExportState = {
+            mediaRecorder,
+            stream,
+            chunks,
+            mimeType,
+            originalSpeed,
+            active: true,
+            seenPlaying: false,       // becomes true once play() has actually started stepping
+            startTime: Date.now(),
+            pollTimer: null,
+            stoppedReason: null
+        };
+
+        // If the admin stops sharing from the browser's own share-bar (not our
+        // button), the shared track ends — capture what we have so far.
+        const [videoTrack] = stream.getVideoTracks();
+        videoTrack?.addEventListener('ended', () => {
+            if (videoExportState?.active) {
+                videoExportState.stoppedReason = 'Screen sharing was stopped.';
+                finishVideoExport();
+            }
+        });
+
+        const btn = document.getElementById('exportVideoBtn');
+        btn.disabled = true;
+        btn.textContent = 'Recording…';
+        showVideoExportStatus(true);
+        updateVideoExportProgress();
+
+        // Rewind, switch to capture speed, start recorder, then start playback.
+        seekStart();
+        setSpeed(VIDEO_EXPORT_SPEED);
+        mediaRecorder.start(1000);
+        replayEngine.play();
+        updatePlayButton();
+
+        // play() is synchronous and isPlaying is already true right after the
+        // call above, so we can't treat "isPlaying === true" as a signal on
+        // its own. Instead we watch for the LATER transition true -> false,
+        // which is what _scheduleNextStep()'s auto-pause-at-end produces
+        // (verified in replay-engine.js: play()/pause()/_scheduleNextStep()).
+        videoExportState.pollTimer = setInterval(() => {
+            if (!videoExportState?.active) return;
+
+            updateVideoExportProgress();
+
+            if (replayEngine.isPlaying) {
+                videoExportState.seenPlaying = true;
+            } else if (videoExportState.seenPlaying) {
+                finishVideoExport();
+            }
+        }, 250);
+    }
+
+    function updateVideoExportProgress() {
+        if (!videoExportState || !replayEngine) return;
+        const idx = replayEngine.currentIndex + 1;
+        const total = replayEngine.totalActions;
+        const elapsedSec = Math.round((Date.now() - videoExportState.startTime) / 1000);
+        setVideoExportText(`Recording… action ${idx} / ${total} — ${elapsedSec}s elapsed`);
+    }
+
+    function setVideoExportText(text) {
+        const el = document.getElementById('videoExportText');
+        if (el) el.textContent = text;
+    }
+
+    function showVideoExportStatus(visible) {
+        document.getElementById('videoExportStatus')?.classList.toggle('hidden', !visible);
+    }
+
+    /**
+     * Single entry point for ending capture, from any trigger (natural end,
+     * mid-capture cancellation, manual Stop, recorder error). Idempotent via
+     * the `active` guard so overlapping triggers (e.g. poll + track 'ended'
+     * firing close together) can't double-run this.
+     */
+    function finishVideoExport() {
+        if (!videoExportState?.active) return;
+        videoExportState.active = false;
+
+        if (videoExportState.pollTimer) {
+            clearInterval(videoExportState.pollTimer);
+            videoExportState.pollTimer = null;
+        }
+
+        replayEngine?.pause();
+        updatePlayButton();
+
+        const recorder = videoExportState.mediaRecorder;
+        if (recorder && recorder.state !== 'inactive') {
+            recorder.stop(); // -> onstop -> finalizeVideoExport()
+        } else {
+            // Recorder never got going — finalize directly so the UI doesn't
+            // get stuck waiting for an onstop that will never fire.
+            finalizeVideoExport(videoExportState.mimeType);
+        }
+
+        videoExportState.stream?.getTracks().forEach(t => t.stop());
+    }
+
+    function cancelVideoExport() {
+        if (!videoExportState?.active) return;
+        videoExportState.stoppedReason = 'Export stopped by user.';
+        finishVideoExport();
+    }
+
+    /**
+     * Assembles the recorded chunks into a Blob and triggers the download,
+     * then restores the page to a normal (non-fast-forwarded) state:
+     * re-enable the button, restore the speed the user had before export,
+     * and fade out the status line.
+     */
+    function finalizeVideoExport(mimeType) {
+        const chunks = videoExportState?.chunks || [];
+        const reason = videoExportState?.stoppedReason;
+
+        if (chunks.length > 0) {
+            const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
+            const safeName = (replayEngine?.tournamentName || tournamentId || 'tournament')
+                .replace(/[^a-z0-9_-]+/gi, '_');
+            const filename = `replay-${safeName}-${tournamentId}-${Date.now()}.webm`;
+            downloadFile(blob, filename, mimeType || 'video/webm');
+            setVideoExportText(reason ? `${reason} Partial video downloaded.` : 'Video export complete — download started.');
+        } else {
+            setVideoExportText(reason || 'Recording produced no video data.');
+        }
+
+        const btn = document.getElementById('exportVideoBtn');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Export Video';
+        }
+
+        // Restore the speed the user had selected before export started, and
+        // leave playback paused rather than mid-fast-forward.
+        if (replayEngine) setSpeed(videoExportState?.originalSpeed || 1);
+
+        setTimeout(() => showVideoExportStatus(false), 4000);
+
+        videoExportState = null;
     }
 
     // ===== Utilities =====
