@@ -145,6 +145,33 @@ flowchart TD
     style G1 fill:#ffffcc
 ```
 
+## 4b. Seasons — `seasons/{seasonId}` — KNOWN GAP, NOT YET FIXED
+
+**No rule block exists for this collection at all.** `season-manager.js` (god.html's
+Season Management tab) and the new `full/season-stats.html` (added 2026-08-10,
+aggregates standings across every tournament linked to a season) both read
+`seasons/{id}` — with no matching rule, every read/write hits Firestore's
+default-deny, meaning both season-listing paths are permission-denied in
+production today, even for a God account. Discovered independently by two
+agents building the season-stats page; not introduced by that change, and not
+fixed here since `firestore.rules` is gitignored (deployed by hand via
+`firebase deploy --only firestore:rules`, not through this repo — see the
+"which ruleset is actually deployed" open question in TODO.md).
+
+Needed rule block, mirroring the existing collection patterns above (read
+gated to any authenticated user like tournaments; write restricted to God
+like referral-code create/delete):
+
+```
+match /seasons/{seasonId} {
+  allow read: if isAuthenticated();
+  allow create, update, delete: if isGod();
+}
+```
+
+Apply this to the real deployed `firestore.rules` and redeploy before relying
+on either season-manager.js's season list or season-stats.html in production.
+
 ## 5. Global Action Log — `actionLog/{logId}`
 
 ```mermaid
