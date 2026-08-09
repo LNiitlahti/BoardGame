@@ -131,6 +131,41 @@ class TeamManager {
     }
 
     /**
+     * Names (case-insensitive, trimmed) that appear on more than one roster
+     * slot across all teams in the currently loaded tournament. Used to
+     * decide when a player needs a disambiguator in the roster UI — two
+     * different users can share a display name (e.g. both named "Eve")
+     * while linked to different teams, and without this the admin has no
+     * way to tell them apart by name alone.
+     */
+    getDuplicateRosterNames(teams) {
+        const seen = new Map();
+        (teams || []).forEach(team => {
+            (team.players || []).forEach(p => {
+                const key = (p.name || '').trim().toLowerCase();
+                if (!key) return;
+                seen.set(key, (seen.get(key) || 0) + 1);
+            });
+        });
+        const duplicates = new Set();
+        seen.forEach((count, key) => { if (count > 1) duplicates.add(key); });
+        return duplicates;
+    }
+
+    /**
+     * Short, stable text to tell apart two roster players who share a
+     * display name. Prefers email (most human-readable); falls back to a
+     * short uid suffix for linked accounts; unlinked placeholders get no
+     * reliable identity to show, so they're left unmarked.
+     */
+    getPlayerDisambiguator(player) {
+        if (!player) return '';
+        if (player.email) return player.email;
+        if (player.uid) return `id ${player.uid.slice(-6)}`;
+        return '';
+    }
+
+    /**
      * Look up a player's current name from team roster by ID.
      */
     getPlayerCurrentName(player) {
@@ -159,19 +194,28 @@ class TeamManager {
             return;
         }
 
+        const duplicateNames = this.getDuplicateRosterNames(this._gameState.teams);
+
         container.innerHTML = this._gameState.teams.map(team => {
             const teamColor = team.color || this.getTeamColor(team.id);
             const players = team.players || [];
 
-            const playerItems = players.map((p, idx) => `
+            const playerItems = players.map((p, idx) => {
+                const isDuplicate = duplicateNames.has((p.name || '').trim().toLowerCase());
+                const disambiguator = isDuplicate ? this.getPlayerDisambiguator(p) : '';
+                const disambiguatorHtml = disambiguator
+                    ? `<span class="player-disambiguator" title="Shown because another player in this tournament has the same name" style="font-size:0.7rem;color:var(--text-tertiary);margin-left:4px;">(${this.escapeHtml(disambiguator)})</span>`
+                    : '';
+                return `
                 <div class="player-item"
                      draggable="true"
                      ondragstart="dragPlayer(event, ${team.id}, ${idx})"
                      ondragend="dragEnd(event)">
                     <span class="player-drag-handle">${ICON_SVGS.gripVertical}</span>
-                    <span class="player-name">${this.escapeHtml(p.name)}</span>
+                    <span class="player-name">${this.escapeHtml(p.name)}</span>${disambiguatorHtml}
                 </div>
-            `).join('');
+            `;
+            }).join('');
 
             const splitCount = team.splitCount || 0;
             const challengeSplitCount = team.challengeSplitCount || 0;
@@ -293,6 +337,8 @@ class TeamManager {
         // side). Duplicated in admin.js. See docs/architecture/scoring.md.
         const MAX_PLAYERS_PER_TEAM = 2;
 
+        const duplicateNames = this.getDuplicateRosterNames(this._gameState.teams);
+
         container.innerHTML = this._gameState.teams.map(team => {
             const teamColor = team.color || this.getTeamColor(team.id);
             const players = team.players || [];
@@ -307,6 +353,11 @@ class TeamManager {
                           Swap
                       </button>`
                     : '';
+                const isDuplicate = duplicateNames.has((player.name || '').trim().toLowerCase());
+                const disambiguator = isDuplicate ? this.getPlayerDisambiguator(player) : '';
+                const disambiguatorHtml = disambiguator
+                    ? `<span class="pm-player-disambiguator" title="Another player in this tournament has the same name" style="font-size:0.7rem;color:var(--text-tertiary);white-space:nowrap;">${this.escapeHtml(disambiguator)}</span>`
+                    : '';
                 return `
                 <div class="pm-player">
                     <div class="pm-player-info" style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
@@ -316,6 +367,7 @@ class TeamManager {
                         <span class="pm-player-badge" style="font-size:0.7rem;color:${isLinked ? '#10b981' : '#f59e0b'};">
                             ${isLinked ? '\u25cf Linked' : '\u25cb Placeholder'}
                         </span>
+                        ${disambiguatorHtml}
                     </div>
                     ${swapHint}
                     <button class="btn-remove" onclick="removePlayerFromTeam(${team.id}, ${idx})" title="Delete this slot">${ICON_SVGS.x}</button>
