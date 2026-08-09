@@ -2293,9 +2293,12 @@ function setupMatchAssignmentTapToSelect() {
             const isDropZone = (el) => el.classList.contains('drop-zone');
             return (isUnit(sourceEl) && isDropZone(targetEl)) || (isDropZone(sourceEl) && isUnit(targetEl));
         },
-        onInvalidTarget: () => {
-            showStatus('Tap a team/player and a match side (either one first) to assign', 'warning');
-        },
+        // No onInvalidTarget here: since isValidTarget only ever rejects a
+        // same-type pair (two units or two drop-zones), every rejection is a
+        // legitimate re-arm ("I meant to pick this one instead"), not a
+        // mistaken tap -- there's no genuinely confusing case left to warn
+        // about once either-order is supported, so a toast here would fire
+        // on ordinary "changed my mind" selection changes.
         onSelect: (sourceEl, targetEl) => {
             // Either tap could have been the drop-zone or the team/player --
             // figure out which is which rather than assuming sourceEl is
