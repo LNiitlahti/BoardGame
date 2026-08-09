@@ -116,11 +116,13 @@
 
 <div class="round">Round 4 complete</div>
 
-<div class="round">Round 5 — video export (queued, after round 4 wraps)</div>
+<div class="round">Round 5 — video export — done</div>
 <div class="piece" id="p10">
-  <span class="status pending">scoped, not started</span>
+  <span class="status done">fixed, merged to main, harsh-critic clean</span>
   <h2>P10 — Export tournament replay as video</h2>
-  <p>User request: after a tournament finishes, export its replay as a video file so players can relive the story. Scoped: source is the full scrubbable replay (replay.html/replay-engine.js), not the separate one-shot cinematic outro on view.html (different, DOM/CSS-animated subsystem, no shared code). Capture via the browser's screen/tab-share picker (<code>getDisplayMedia()</code> + <code>MediaRecorder</code>) — client-side, zero new dependencies. User confirmed the one-time capture-permission prompt per export is an acceptable trade-off over rearchitecting replay.html onto Canvas for direct <code>captureStream()</code>.</p>
+  <p>New "Export Video" button on replay.html: rewinds to the start, prompts the browser's screen/tab-share picker (<code>getDisplayMedia()</code>), records via <code>MediaRecorder</code> while driving the replay at 5x speed, and downloads a .webm on completion — zero new dependencies. Went through 2 real critique rounds: round 1 caught a disqualifying bug in the losing candidate (a full-screen progress overlay that would have recorded a black screen instead of the actual replay board — exactly what adversarial review exists to catch), and a follow-up fix round caught its own regression (a stale status-bar timer from one export could hide a subsequent export's live progress) that a broken/placeholder critic result initially missed — re-verified independently before merging.</p>
+  <p>Correctly distinguishes playback-just-started from playback-actually-finished (polls for <code>isPlaying</code>'s true→false transition, not the synchronous true right after calling <code>play()</code>), handles the user cancelling the picker or stopping screen-share mid-capture from the browser's own UI, restores the admin's original scrub position and speed on every exit path, and cleans up on page unload.</p>
+  <p class="meta">replay.html · commits b971325, 1aaab2d, cf82c13 · needs a real screen-share to visually verify — not yet verified live</p>
 </div>
 
 <div class="piece">
