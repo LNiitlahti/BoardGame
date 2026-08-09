@@ -37,6 +37,19 @@
 // of 10.2s, 17.7s, and 38.9s freezes with the old enablePersistence API on
 // the exact same swap/delete actions. Confirms the migration resolves the
 // freeze.
+//
+// FOLLOW-UP (2026-08-10): the settings({cache:{...tabManager:
+// firebase.firestore.persistentMultipleTabManager()}}) call quoted above
+// was later found to be silently broken — that function doesn't exist on
+// the compat SDK build this app loads, so the call threw and was swallowed
+// by a try/catch, meaning persistence was never actually re-enabled at all
+// for this measurement run (see firebase-loader.js and TODO.md). The
+// freeze-is-gone RESULT above still holds (no persistence == no lease
+// contention == no freeze), but the "confirms the [new API] migration
+// resolves the freeze" framing overstates it: this run confirms turning
+// persistence OFF resolves the freeze, not that the new cache API is a
+// working, non-deprecated multi-tab replacement — compat's SDK doesn't
+// have one.
 
 require('dotenv').config({ path: __dirname + '/.env.e2e' });
 const path = require('path');

@@ -46,31 +46,60 @@ document.addEventListener('DOMContentLoaded', function() {
             // Get Firestore instance
             const db = firebase.firestore();
 
-            // Serve reads from the local IndexedDB cache when the data is
-            // already there instead of always hitting the network — cuts
-            // read cost on page reloads and repeated one-time get() calls
-            // for data that hasn't changed. persistentMultipleTabManager lets
-            // it work even when a device has more than one tab of this app
-            // open (e.g. admin.html + god.html side by side) instead of just
-            // failing for every tab after the first.
+            // Offline/local-cache persistence is intentionally left OFF here —
+            // do not re-enable it without reading this comment in full.
             //
-            // Migrated off the deprecated enableMultiTabIndexedDbPersistence-
-            // style enablePersistence({synchronizeTabs:true}) call: it was
-            // implicated in multi-second (10-39s) UI freezes on player-swap/
-            // delete actions with several tabs open, coinciding with
-            // "Failed to obtain primary lease" console errors — the old
-            // API's single-primary-tab lease contention. settings({cache})
-            // is the SDK's own suggested replacement.
-            try {
-                db.settings({
-                    cache: {
-                        kind: 'persistent',
-                        tabManager: firebase.firestore.persistentMultipleTabManager()
-                    }
-                });
-            } catch (err) {
-                console.warn('[Firebase] Persistent multi-tab cache unavailable, falling back to memory cache:', err.message);
-            }
+            // History: this used to call the deprecated
+            // enablePersistence({synchronizeTabs:true}) (== compat's
+            // enableMultiTabIndexedDbPersistence()) to serve reads from
+            // IndexedDB across multiple open tabs (e.g. admin.html + god.html
+            // side by side). That was confirmed via e2e-multitab-freeze.js to
+            // cause multi-second (10-39s) UI freezes on player-swap/delete
+            // actions with several tabs open, coinciding with "Failed to
+            // obtain primary lease" console errors — the old API's
+            // single-primary-tab lease contention.
+            //
+            // A later pass "migrated" this to db.settings({cache: {kind:
+            // 'persistent', tabManager: firebase.firestore
+            // .persistentMultipleTabManager()}}), believing that to be the
+            // SDK's modern FirestoreSettings.cache replacement. That call was
+            // silently broken: firebase.firestore.persistentMultipleTabManager
+            // does not exist anywhere in the *compat* build (verified against
+            // both firebase-firestore-compat.js 9.22.0, the version this app
+            // loads, and the current 11.x compat build) — only the modular
+            // `firebase/firestore` ESM package exports it. Referencing it
+            // threw a TypeError before db.settings() was ever reached, so a
+            // try/catch there silently fell back to the default in-memory
+            // cache on every load, while a comment right above it claimed
+            // multi-tab persistence was active. It never was.
+            //
+            // The modern cache-config API (persistentLocalCache /
+            // persistentMultipleTabManager / FirestoreSettings.cache) is
+            // genuinely unavailable to a page built on the compat CDN
+            // bundles this app loads (firebase-app-compat.js /
+            // firebase-firestore-compat.js — see firebase-loader.js's script
+            // loading above). It is a modular-SDK-only API, and the compat
+            // and modular CDN bundles each carry their own private component
+            // registry (no shared globalThis/Symbol.for registration was
+            // found in either bundle), so loading the modular
+            // firebase-firestore.js ESM alongside these compat scripts to
+            // reach it would NOT actually attach to the same Firestore
+            // instance compat's db.collection()/doc() calls use — every
+            // helper below (firebaseCollection, firebaseDoc, etc.) is
+            // compat-only surface. Getting off this warning for real needs a
+            // full migration of this app off the compat SDK, which is a
+            // separate, much larger project (see TODO.md), not something
+            // fixable with a different settings() call shape.
+            //
+            // Until then: leaving persistence off avoids both the freeze bug
+            // above AND the deprecation warning (compat's only working
+            // persistence APIs, enableIndexedDbPersistence() and
+            // enableMultiTabIndexedDbPersistence(), both still print the
+            // "will be deprecated" warning when called — there's no
+            // warning-free way to turn persistence on in compat). This is
+            // also what has actually been running in production since the
+            // broken migration above landed (the try/catch masked it), and
+            // it was the config in place for the 2026 LAN event.
 
             // Expose Firestore helpers to window
             window.firebaseDB = db;
