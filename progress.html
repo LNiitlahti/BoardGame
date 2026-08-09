@@ -54,10 +54,36 @@
   <p>Independent reviewer checked both merged fixes together: no shared code paths, no interaction, both match existing file conventions, both degrade gracefully for pre-existing tournament data.</p>
 </div>
 
-<div class="round">Round 2 — visual/UX pieces (screenshot-graded)</div>
-<div class="piece"><span class="status pending">pending</span><h2>P4 — Admin click-to-pick contested hex</h2></div>
-<div class="piece"><span class="status pending">pending</span><h2>P5 — view.html spell-window banner</h2></div>
-<div class="piece"><span class="status pending">pending</span><h2>P6 — Referral code bulk-generate</h2></div>
+<div class="round">Round 2 — visual/UX pieces — done</div>
+
+<div class="piece" id="p4">
+  <span class="status done">fixed, merged to main</span>
+  <h2>P4 — Admin click-to-pick contested hex</h2>
+  <p>The challenge-hex picker was a raw-coordinate dropdown ("Side Heart (q2r-4) — Tiimi 2"). Winner adds a "Pick on Board" mode: hides the challenge modal, highlights eligible heart hexes on the live board, click writes into the same <code>#challengeHexSelect</code> field the dropdown already used (kept as fallback). Winner correctly reapplies highlight classes after every board re-render — needed because a live Firestore update rebuilds all hex DOM elements from scratch, which would otherwise silently drop the highlight mid-pick during a live event.</p>
+  <p class="meta">admin.js / admin.html / admin.css · commit dc41865 · needs real Firestore auth to screenshot — not yet verified on a live screen</p>
+</div>
+
+<div class="piece" id="p5">
+  <span class="status done">already implemented (no action needed)</span>
+  <h2>P5 — view.html spell-window banner</h2>
+  <p>Both independent builders found this already fully built on main (phase-manager.js's <code>spell_window_1..4</code>, display-manager.js's <code>_renderSpellWindowSlide()</code>, same full-screen-takeover mechanism as BREAK). Confirmed with a real screenshot below via the dev-preview harness at 1920×1080.</p>
+  <img src="progress-screenshots/p5-spell-window-1920x1080.png" alt="view.html SPELLS WINDOW banner, 1920x1080, showing 5 teams and 2 logged spell casts">
+  <p class="meta">Real, credential-free screenshot via dev/view-preview.html's "Spell Window (mid-queue, mixed log)" scenario. Note: content is top-anchored with a large empty lower two-thirds at 1920×1080 — worth a look for a future polish pass, not a functional gap.</p>
+</div>
+
+<div class="piece" id="p6">
+  <span class="status done">fixed, merged to main</span>
+  <h2>P6 — Referral code bulk-generate</h2>
+  <p>Bulk-generate modal: paste N player names (or leave blank for N unlabeled codes), get back one labeled code per name, copied together. Winner correctly pre-labels via the existing <code>assignedName</code> field; the losing candidate had used <code>assignedTo</code>, which is UID-typed and checked by firestore.rules against <code>request.auth.uid</code> — would have been a real schema-semantics bug. Also added "Copy All Unused URLs."</p>
+  <p class="meta">home.html · commit 5e20c99 · needs real Firestore auth to screenshot — not yet verified on a live screen</p>
+</div>
+
+<div class="piece">
+  <span class="status done">no blocking issues, 1 new item flagged</span>
+  <h2>Round 2 cross-surface review</h2>
+  <p>Independent reviewer confirmed both merged features are correct in isolation and don't interact (disjoint files/collections). Verified the P4 highlight-reapplication claim by tracing renderBoard()'s call path from Firestore's onSnapshot down. Verified P6 never touches the UID-typed assignedTo field.</p>
+  <p>Surfaced an unrelated pre-existing bug while checking: login.html's registration write sets 5 fields on a referralCodes doc, but firestore.rules restricts the diff to just 2 (used, assignedTo) — if the real (non-temp) ruleset is deployed, marking a code used at registration may fail. Logged to TODO.md; not fixed this round (needs the user's call on which ruleset is actually live, an open question that predates this pass).</p>
+</div>
 
 <div class="round">Round 3+ — large/cross-cutting (scoped later)</div>
 <div class="piece"><span class="status pending">pending</span><h2>Mobile/iPad admin touch support</h2></div>
