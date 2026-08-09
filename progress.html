@@ -99,12 +99,18 @@
 <div class="sub" style="margin-bottom:12px">User decision: tap-to-select as the primary interaction, drag-and-drop kept working as a backup — multiple ways to do the same thing, intuitive and responsive. Two waves: establish the pattern on one site, then apply it to the rest.</div>
 
 <div class="piece" id="p8">
-  <span class="status running">running</span>
+  <span class="status done">fixed, merged to main, harsh-critic clean</span>
   <h2>P8 — Dual-mode interaction pattern + seating order</h2>
-  <p>Building a reusable tap-to-select/tap-to-place pattern that coexists with the existing native HTML5 drag-and-drop (not a replacement — both paths stay live), proven first on the simplest site (seating order, admin.js ~1322-1370). Also folding in the iPad-landscape CSS breakpoint gap (admin.css's 900px/1200px breakpoints skip ~1024-1194px logical width).</p>
+  <p>Built <code>setupTapToSelect()</code> in admin.js — event-delegated, takes an external AbortController signal (plugs into the existing per-render cleanup lifecycle), an <code>isValidTarget</code> guard for asymmetric source/target validity. Applied to the seating-order modal: tap a seat to arm it, tap another to swap (via the same <code>swapSeatingPositions()</code> the native drag-and-drop already uses). Native HTML5 drag-and-drop is untouched and still fully works — both paths coexist. Also scoped a new iPad-landscape (901-1194px) CSS breakpoint.</p>
+  <p>First-pass critic (pre-harsh-critic-policy) flagged 2 real gaps: armed state didn't cancel on an outside-container click (e.g. modal close button), and the new media query lacked a min-width, relying on cascade order. Both fixed in a dedicated fix round; a genuinely adversarial critic traced the actual DOM/event order (container's own handler fires and clears state before the new outside-click listener could ever see a valid tap) and reported clean — zero remaining gaps.</p>
+  <p class="meta">admin.js / admin.css / admin.html · commits 39af6c1, 9b84f12 · needs real Firestore auth + a touch device to visually verify — not yet verified on a live screen</p>
 </div>
 
-<div class="piece"><span class="status pending">pending</span><h2>P9 — Apply pattern to remaining 3 DnD sites</h2><p>Team/player assignment, match-side drop zones, queue reordering — once P8's pattern is merged.</p></div>
+<div class="piece" id="p9">
+  <span class="status running">running</span>
+  <h2>P9 — Apply pattern to remaining 3 DnD sites</h2>
+  <p>Team/player assignment, match-side drop zones, queue reordering — using P8's now-proven <code>setupTapToSelect()</code> pattern, with the same harsh-critic + fix-until-clean process per site.</p>
+</div>
 
 <div class="piece">
   <span class="status blocked">needs your input before an autonomous build</span>
