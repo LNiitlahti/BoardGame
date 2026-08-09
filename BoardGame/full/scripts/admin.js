@@ -878,6 +878,7 @@ function renderTeamsList() {
                  draggable="true"
                  data-team-id="${team.id}"
                  data-player-index="${idx}"
+                 title="Drag to add this player, or tap this and a side (either one first)"
                  ondragstart="dragPlayer(event, ${team.id}, ${idx})"
                  ondragend="dragEnd(event)">
                 <span class="player-drag-handle">${ICON_SVGS.gripVertical}</span>
@@ -1452,7 +1453,7 @@ function buildSeatItemHTML(seatNum, playerNum, info) {
     const name = info ? escapeHtml(info.name) : 'Player ' + playerNum;
     const color = info ? info.teamColor : '#666666';
 
-    return `<div class="seating-item" draggable="true" data-seat="${seatNum}">
+    return `<div class="seating-item" draggable="true" data-seat="${seatNum}" title="Drag to swap seats, or tap this and another seat">
         <span class="seating-drag-handle">&#9776;</span>
         <span class="seating-seat-num">${seatNum}</span>
         <span class="seating-team-dot" style="background: ${color}"></span>
@@ -4376,7 +4377,7 @@ function renderMatchQueue() {
                      ondragleave="leaveQueueDrop(event)"
                      ondrop="dropQueueItem(event, ${game.id})"
                      ondragend="endQueueDrag(event)">
-                    <span class="drag-handle">${isOngoing ? ICON_SVGS.play : ICON_SVGS.menu}</span>
+                    <span class="drag-handle" title="${isOngoing ? 'Ongoing matches can\'t be reordered' : 'Drag to reorder, or tap this handle and another to swap'}">${isOngoing ? ICON_SVGS.play : ICON_SVGS.menu}</span>
                     <div class="game-info">
                         <div class="game-type-row">
                             <div class="game-type"><span class="break-badge">BREAK</span>${breakDef.emoji} ${breakDef.label}</div>
@@ -4448,7 +4449,7 @@ function renderMatchQueue() {
                  ondragleave="leaveQueueDrop(event)"
                  ondrop="dropQueueItem(event, ${game.id})"
                  ondragend="endQueueDrag(event)">
-                <span class="drag-handle">${isOngoing ? ICON_SVGS.play : ICON_SVGS.menu}</span>
+                <span class="drag-handle" title="${isOngoing ? 'Ongoing matches can\'t be reordered' : 'Drag to reorder, or tap this handle and another to swap'}">${isOngoing ? ICON_SVGS.play : ICON_SVGS.menu}</span>
                 <div class="game-info">
                     <div class="game-type-row">
                         <div class="game-type">${tagBadge}${challengeBadge}${matchNumber}${gameName}${playType ? ' (' + playType + ')' : ''}</div>
