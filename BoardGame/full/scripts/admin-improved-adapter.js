@@ -30,6 +30,7 @@
     let _actionLogger = null;
     let _phaseManager = null;
     let _undoManager = null;
+    let _backupManager = null;
     let _initialized = false;
     let _primaryAction = null;
     let _broadcastOpen = false;
@@ -186,6 +187,25 @@
             resolveDiscordChannelName: (slot, sideId) =>
                 typeof resolveDiscordChannelName === 'function' ? resolveDiscordChannelName(slot, sideId) : null
         });
+
+        // BackupManager — round-boundary snapshots that replay.html uses as
+        // keyframes. god.html has always wired this via _onRoundStartSpells;
+        // admin.html never did, so every admin-run tournament replayed in
+        // "no round-boundary backups" degraded mode. The hook fires on
+        // advancing into scoring_vp with roundNumber > 0 (phase-manager.js).
+        // Spells are physical on admin.html, so unlike god.html there are no
+        // digital conditions to expire here — the backup is the whole job.
+        if (typeof BackupManager !== 'undefined') {
+            _backupManager = new BackupManager(gameState, {
+                saveCallback: (btn) => saveGameState(btn),
+                logActionCallback: logAction,
+                uiManager: _uiShim,
+                refreshCallback: () => {
+                    if (typeof updateDisplay === 'function') updateDisplay();
+                }
+            });
+            _phaseManager._onRoundStartSpells = () => _backupManager.autoBackup();
+        }
 
         // Wire pending hex count (used by phase requirements)
         _phaseManager._getPendingHexCount = () => (pendingHexWins || []).length;

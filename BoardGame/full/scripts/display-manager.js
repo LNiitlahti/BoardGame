@@ -1258,6 +1258,19 @@ class DisplayManager {
             return gameData.displayOverride.mode;
         }
 
+        // A team at/over the win target IS the end of the game — celebrate
+        // without requiring the phase loop to formally enter tournament_end
+        // (in normal play nobody ever advances the phase there). Derived,
+        // not latched: if the admin raises winCondition back above the
+        // leader, this turns itself off and the phase-driven display
+        // resumes — the game loop keeps going. A manual displayOverride
+        // (checked above) still beats this in both directions.
+        const target = gameData.winCondition;
+        if (typeof target === 'number' && target > 0 &&
+            (gameData.teams || []).some(t => this._getTeamTotalPoints(t) >= target)) {
+            return 'tournament_end';
+        }
+
         const phaseName = gameData.currentPhase?.name;
         if (phaseName && DISPLAY_MODES[phaseName]?.slide) {
             return phaseName;

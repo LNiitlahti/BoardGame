@@ -148,6 +148,16 @@ class ReplayEngine {
      * Build timeline: map backups to sequence numbers and compute round boundaries.
      */
     _buildTimeline() {
+        // Reconstruct the win target AT TOURNAMENT START. The tournament doc
+        // only holds the final value; if the admin changed it mid-game, the
+        // first win_condition_changed entry carries the original in
+        // previousValue.
+        const firstWinChange = this._actions.find(a => a.actionType === 'win_condition_changed');
+        this._initialWinCondition =
+            firstWinChange?.payload?.previousValue
+            ?? this._tournamentDoc?.winCondition
+            ?? 50;
+
         // Map each backup to its nearest action sequence number
         for (const backup of this._backups) {
             backup.mappedSeq = this._findSequenceForBackup(backup);
@@ -459,10 +469,39 @@ class ReplayEngine {
             }
         }
 
+        this._deriveEndStatus(state);
+
         // Cache the result
         this._cacheState(targetIndex, state);
 
         return this._deepClone(state);
+    }
+
+    /**
+     * The tournament's "ended" state is DERIVED, never latched. The phase
+     * loop has no formal end in normal play — the game is over when either
+     *   (a) the admin manually forces the winner celebration onto view.html
+     *       (displayOverride.mode === 'tournament_end'), or
+     *   (b) a team is at/over the CURRENT win target, or
+     *   (c) the phase system actually reached tournament_end.
+     * Recomputed from scratch at every reconstructed frame so that raising
+     * the win target back above the leader un-ends the game — the live loop
+     * keeps going in that case, and the replay must agree.
+     */
+    _deriveEndStatus(state) {
+        if (!state) return;
+
+        const target = state.winCondition;
+        const targetReached = typeof target === 'number' && target > 0 &&
+            (state.teams || []).some(t => (t.points || 0) >= target);
+        const celebrationForced = state.displayOverride?.mode === 'tournament_end';
+        const endPhaseReached = state.currentPhase?.name === 'tournament_end';
+
+        if (targetReached || celebrationForced || endPhaseReached) {
+            state.status = 'finished';
+        } else if (state.status === 'finished') {
+            state.status = 'playing';
+        }
     }
 
     /**
@@ -536,6 +575,7 @@ class ReplayEngine {
 
         return {
             teams: seededTeams,
+            winCondition: this._initialWinCondition ?? this._tournamentDoc?.winCondition ?? 50,
             board: {},
             heartHexControl: {},
             rooms: [],
@@ -680,6 +720,20 @@ class ReplayEngine {
                 state.gameQueue = (state.gameQueue || []).filter(m =>
                     m.status === 'ongoing' || m.status === 'completed'
                 );
+                break;
+            case 'win_condition_changed':
+                // Must be replayed, not just described: whether the game
+                // counts as ended is derived from points vs the target AT
+                // THAT MOMENT (see _deriveEndStatus).
+                if (typeof p.newValue === 'number') {
+                    state.winCondition = p.newValue;
+                }
+                break;
+            case 'display_override_set':
+                // god.html forcing view.html to a slide. mode
+                // 'tournament_end' is the manual winner celebration — one of
+                // the two signals that the tournament is over.
+                state.displayOverride = p.mode ? { mode: p.mode } : null;
                 break;
 
             // Spell

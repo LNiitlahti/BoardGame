@@ -1427,6 +1427,7 @@ class GodApp {
 
         // Display controls (Phase 3)
         window.setDisplayOverride = async (mode) => {
+            const previousMode = app.gameState.displayOverride?.mode || null;
             if (!mode) {
                 app.gameState.displayOverride = null;
             } else {
@@ -1434,14 +1435,24 @@ class GodApp {
                 app.gameState.displayOverride.mode = mode;
             }
             await app.saveGameState();
+            // Logged so the replay can see it: forcing 'tournament_end'
+            // (Winner Celebration) is one of the signals ReplayEngine treats
+            // as the tournament's end.
+            app.actionLogger?.logAction('display_override_set', 'admin', {
+                mode: mode || null, previousMode
+            }, { displayOverride: previousMode ? { mode: previousMode } : null });
             app.ui?.showStatus(mode ? `Display forced to: ${mode}` : 'Display set to auto', 'success');
         };
 
         window.clearDisplayOverride = async () => {
+            const previousMode = app.gameState.displayOverride?.mode || null;
             app.gameState.displayOverride = null;
             const modeSelect = document.getElementById('displayModeOverride');
             if (modeSelect) modeSelect.value = '';
             await app.saveGameState();
+            app.actionLogger?.logAction('display_override_set', 'admin', {
+                mode: null, previousMode
+            }, { displayOverride: previousMode ? { mode: previousMode } : null });
             app.ui?.showStatus('Display override cleared.', 'success');
         };
 

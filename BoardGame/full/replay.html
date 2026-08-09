@@ -167,6 +167,10 @@
                     <span class="info-label">Games Played</span>
                     <span class="info-value" id="infoGamesPlayed">0</span>
                 </div>
+                <div class="info-row">
+                    <span class="info-label">Status</span>
+                    <span class="info-value" id="infoStatus">--</span>
+                </div>
             </div>
         </div>
 
@@ -274,6 +278,40 @@
                 }`;
             })
             .join('\n');
+    }
+
+    /**
+     * Plate colours come from `--team-N-alpha` CSS vars; replay.css only
+     * carries fallback values (the old hardcoded palette), so without this
+     * the board ignored the colours configured in Firebase. Fed from the
+     * RECONSTRUCTED state, not the final doc, because team_color_changed
+     * is a replayable action — colours can differ mid-timeline.
+     */
+    const LEGACY_TEAM_COLOR_MAP = {
+        red: '#de392c', blue: '#2278a3', green: '#2e9158',
+        orange: '#f7ba32', yellow: '#f7ba32', amber: '#f7ba32',
+        purple: '#a855f7', pink: '#ec4899', teal: '#14b8a6',
+        cyan: '#06b6d4', lime: '#84cc16', indigo: '#6366f1'
+    };
+
+    function teamHexColor(color) {
+        if (!color) return null;
+        if (color.startsWith('#')) return color;
+        return LEGACY_TEAM_COLOR_MAP[color.toLowerCase()] || null;
+    }
+
+    function applyTeamColorVars(teams) {
+        const root = document.documentElement;
+        (teams || []).forEach(team => {
+            const hexColor = teamHexColor(team.color);
+            if (!hexColor) return;
+            root.style.setProperty(`--team-${team.id}-color`, hexColor);
+            const hex = hexColor.replace('#', '');
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            root.style.setProperty(`--team-${team.id}-alpha`, `rgba(${r}, ${g}, ${b}, 1)`);
+        });
     }
 
     /**
@@ -432,6 +470,7 @@
     function onReplayStateChanged(state, action, progress) {
         // Update board
         if (boardRenderer && state) {
+            applyTeamColorVars(state.teams);
             boardRenderer.render({
                 board: state.board || {},
                 rooms: state.rooms || [],
@@ -479,7 +518,7 @@
         panel.innerHTML = sorted.map((team, i) => `
             <div class="standings-row">
                 <span class="standings-rank">#${i + 1}</span>
-                <span class="standings-color" style="background:${team.color || '#888'}"></span>
+                <span class="standings-color" style="background:${teamHexColor(team.color) || '#888'}"></span>
                 <span class="standings-name">${escapeHtml(team.name || 'Team ' + team.id)}</span>
                 <span class="standings-points">${team.points || 0}pts</span>
                 <span class="standings-record">${team.gamesWon || 0}W ${team.gamesLost || 0}L</span>
@@ -514,6 +553,17 @@
 
         document.getElementById('infoGamesPlayed').textContent =
             state?.gamesPlayed || 0;
+
+        // Derived by ReplayEngine._deriveEndStatus: "Finished" when the win
+        // target was reached or the winner celebration was forced onto
+        // view.html — and back to "Playing" if the admin then raised the
+        // target, because the live game loop keeps going in that case.
+        const status = state?.status || '--';
+        document.getElementById('infoStatus').textContent =
+            status === 'finished' ? 'Finished'
+            : status === 'playing' ? 'Playing'
+            : status === 'setup' ? 'Setup'
+            : status;
     }
 
     // ===== Transport Controls =====

@@ -412,6 +412,14 @@ class ActionLogger {
                 return `${teamName(p.teamId)}: ${p.oldPlayerName || '?'} swapped out for ${p.newPlayerName || '?'}`;
             case 'player_renamed':
                 return `Player renamed: ${p.oldName || '?'} → ${p.newName || '?'}`;
+            case 'win_condition_changed':
+                return `Win condition changed: ${p.previousValue ?? '?'} → ${p.newValue ?? '?'} points`;
+            case 'display_override_set':
+                return p.mode === 'tournament_end'
+                    ? 'Winner celebration forced onto view screen'
+                    : p.mode
+                        ? `View screen forced to: ${p.mode}`
+                        : 'View screen returned to auto';
             case 'seating_changed':
                 return `Seating order changed`;
             case 'seating_reset':
