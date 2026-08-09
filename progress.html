@@ -87,10 +87,12 @@
 
 <div class="round">Round 3 — large/cross-cutting</div>
 
-<div class="piece">
-  <span class="status running">running</span>
+<div class="piece" id="p7">
+  <span class="status blocked">built, blocked on a rules deploy you need to approve</span>
   <h2>P7 — Season-wide statistics page</h2>
-  <p>seasons/{id}.tournamentIds[] exists but is purely organizational — nothing reads it downstream. Adding a season-standings view that aggregates each linked tournament's results. Well-scoped, additive, no schema risk — proceeding autonomously.</p>
+  <p>New full/season-stats.html aggregates team standings across every tournament linked to a season. Since teams have no persistent id across tournaments, matching is by team name — winner explicitly guards against merging two <em>different</em> teams that share a name within the <em>same</em> tournament (kept as separate rows + a warning banner); the losing candidate silently summed them, a real correctness bug the critic caught by reading both aggregation implementations directly.</p>
+  <p><strong>Not usable live yet:</strong> both builders independently discovered the <code>seasons/{id}</code> Firestore collection has no rule block at all — default-deny, so this page (and the pre-existing season list on god.html) will hit permission-denied in production. Fix is documented (exact rule block) in <code>docs/architecture/firestore-rules.md</code> §4b and <code>TODO.md</code>, not applied — firestore.rules is gitignored/hand-deployed and touches production auth, so this needs your decision, not an autonomous edit.</p>
+  <p class="meta">season-stats.html / season-stats.js / team-standings.js · commit 357e721 · rules fix commit 8f899f0 (docs only)</p>
 </div>
 
 <div class="piece">
