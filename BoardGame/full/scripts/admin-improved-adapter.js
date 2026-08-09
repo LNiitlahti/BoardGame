@@ -1261,7 +1261,7 @@
         pendingHex.forEach(win => {
             const matchLabel = win.matchNumber ? `#${win.matchNumber}` : '';
             win.teamIds.forEach((teamId, idx) => {
-                const teamName = win.teamNames[idx] || `Team ${teamId}`;
+                const teamName = win.teamNames?.[idx] || `Team ${teamId}`;
                 const team = gameState?.teams?.find(t => String(t.id) === String(teamId));
                 const color = team?.color || 'var(--accent-warning)';
                 html += `<span class="flow-action-item action-pending" title="Match ${matchLabel}: ${teamName} needs to place a hex plate">` +

@@ -78,6 +78,7 @@ class ResultManager {
      * handler does `Object.assign(this.gameState, newData)` into.
      */
     get _pendingHexWins() {
+        if (!this._gameState) return [];
         if (!this._gameState.pendingHexWins) this._gameState.pendingHexWins = [];
         return this._gameState.pendingHexWins;
     }
@@ -769,7 +770,7 @@ class ResultManager {
 
             // Build colored team names
             const coloredTeams = win.teamIds.map((teamId, idx) => {
-                const teamName = win.teamNames[idx] || `Team ${teamId}`;
+                const teamName = win.teamNames?.[idx] || `Team ${teamId}`;
                 const team = this._gameState?.teams?.find(t => String(t.id) === String(teamId));
                 const color = team?.color || this._teams.getTeamColor(teamId) || 'var(--accent-primary)';
                 return `<span class="pending-hex-team" style="color: ${color}; border-left-color: ${color}">${teamName}</span>`;

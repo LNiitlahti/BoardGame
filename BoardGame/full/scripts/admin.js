@@ -234,7 +234,11 @@ Object.defineProperty(window, 'pendingHexWins', {
         return gameState.pendingHexWins;
     },
     set(value) {
-        if (gameState) gameState.pendingHexWins = value;
+        if (gameState) {
+            gameState.pendingHexWins = value;
+        } else {
+            console.warn('pendingHexWins set while gameState is not initialized; value discarded.');
+        }
     }
 });
 
