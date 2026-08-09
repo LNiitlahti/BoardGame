@@ -90,6 +90,9 @@ class UndoManager {
                     changes.push({ field: 'gamesPlayed', from: this._gameState.gamesPlayed, to: prev.gamesPlayed });
                 }
                 warnings.push('Match will be moved back to ongoing status');
+                if ((this._gameState.pendingHexWins || []).some(win => String(win.matchNumber) === String(p.matchNumber))) {
+                    warnings.push('Pending hex-placement reminder for this match will be removed');
+                }
                 break;
             }
             case 'match_result_corrected': {
@@ -252,6 +255,25 @@ class UndoManager {
                 // these two — harmless no-op delete when they were never set.
                 delete queueEntry.adminConfirmed;
                 delete queueEntry.adminConfirmedAt;
+            }
+        }
+
+        // Retract the pendingHexWins reminder that confirmResult() queued
+        // for the winning team(s) — otherwise it lingers after undo,
+        // reminding the admin to place a hex for a match that's no longer
+        // confirmed. Challenge matches never push an entry, so this is a
+        // harmless no-op filter for them. Matched by matchNumber (as
+        // recorded in the action-log payload), not team/side, since a
+        // corrected re-confirmation could have changed the winning side.
+        if (Array.isArray(gs.pendingHexWins) && p.matchNumber !== undefined) {
+            const beforeCount = gs.pendingHexWins.length;
+            gs.pendingHexWins = gs.pendingHexWins.filter(
+                win => String(win.matchNumber) !== String(p.matchNumber)
+            );
+            if (gs.pendingHexWins.length !== beforeCount &&
+                typeof window !== 'undefined' &&
+                typeof window.updatePendingHexNotification === 'function') {
+                window.updatePendingHexNotification();
             }
         }
     }
