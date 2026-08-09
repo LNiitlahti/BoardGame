@@ -1817,7 +1817,7 @@
         // Get current domain
         const protocol = window.location.protocol;
         const host = window.location.host;
-        const referralUrl = `${protocol}//${host}/BoardGame/login.html?referralCode=${code}`;
+        const referralUrl = `${protocol}//${host}/login.html?referralCode=${code}`;
 
         // Copy to clipboard
         await navigator.clipboard.writeText(referralUrl);
@@ -1842,7 +1842,7 @@
         // Fallback - show the URL in a prompt
         const protocol = window.location.protocol;
         const host = window.location.host;
-        const referralUrl = `${protocol}//${host}/BoardGame/login.html?referralCode=${code}`;
+        const referralUrl = `${protocol}//${host}/login.html?referralCode=${code}`;
 
         prompt('Copy this referral URL:', referralUrl);
       }

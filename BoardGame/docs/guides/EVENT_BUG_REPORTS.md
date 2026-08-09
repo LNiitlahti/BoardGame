@@ -68,6 +68,12 @@ Rosters get filled out to the match's format (e.g. 5v5) using players from teams
 **Suggested direction:** A "generate N codes" bulk action, plus letting the existing `assignedTo`/`assignedEmail` fields be filled in *at generation time* (e.g. paste a list of intended player names/emails, get one labeled code per name back) so codes are self-tracking instead of relying on the admin's memory.
 **Status:** Not yet implemented.
 
+### [x] Referral code URLs included an incorrect `/BoardGame/` path segment
+**Reported:** At the event, referral URLs copied from god's code-generation UI didn't work as-is — had to manually edit the URL to remove `/BoardGame` before it would load.
+**Confirmed in code:** `copyReferralUrl()` (`full/home.html:1820`, plus its clipboard-failure fallback at `home.html:1845`) hardcoded `` `${protocol}//${host}/BoardGame/login.html?referralCode=${code}` ``, but the site is served from the domain root — no other URL construction anywhere else in `full/` includes a `/BoardGame` segment.
+**Fix:** Dropped the hardcoded `/BoardGame` segment from both URL templates; referral links now point to `${protocol}//${host}/login.html?referralCode=${code}`.
+**Status:** Fixed, not yet verified live.
+
 ### [ ] Discord bot should confirm its actions by posting a status message to a channel
 **Reported:** It would help if the Discord bot posted a message to a specific channel confirming what it did (e.g. that it moved players) — that channel should be configurable from the Discord section in `god.html`.
 **Confirmed in code:**
