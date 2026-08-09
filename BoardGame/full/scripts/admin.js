@@ -4326,7 +4326,7 @@ function renderMatchQueue() {
                 <div class="queue-item ${isOngoing ? 'ongoing' : ''} break"
                      draggable="${!isOngoing}"
                      data-queue-id="${game.id}"
-                     onclick="openQuickConfirm(${game.id})"
+                     onclick="if (!event.target.closest('.drag-handle')) openQuickConfirm(${game.id})"
                      ondragstart="dragQueueItem(event, ${game.id})"
                      ondragover="allowQueueDrop(event)"
                      ondragleave="leaveQueueDrop(event)"
@@ -4398,7 +4398,7 @@ function renderMatchQueue() {
             <div class="queue-item ${isOngoing ? 'ongoing' : ''} ${isChallenge ? 'challenge' : ''}${isFutureRound(game) ? ' future-round' : ''}"
                  draggable="${!isOngoing}"
                  data-queue-id="${game.id}"
-                 onclick="openQuickConfirm(${game.id})"
+                 onclick="if (!event.target.closest('.drag-handle')) openQuickConfirm(${game.id})"
                  ondragstart="dragQueueItem(event, ${game.id})"
                  ondragover="allowQueueDrop(event)"
                  ondragleave="leaveQueueDrop(event)"
@@ -4420,6 +4420,56 @@ function renderMatchQueue() {
             </div>
         `;
     }).join('');
+
+    setupQueueTapToSelect();
+}
+
+/**
+ * Set up the tap-to-select alternate path for match-queue reordering.
+ * Sits alongside the native HTML5 drag-and-drop above (dragQueueItem /
+ * allowQueueDrop / dropQueueItem) — not a replacement — for devices where
+ * native drag events never fire (iOS/iPadOS Safari).
+ *
+ * The tap target is deliberately scoped to the `.drag-handle` icon, not the
+ * whole `.queue-item` card: the card itself already has a click handler
+ * (openQuickConfirm) that opens the result-confirm modal, so treating the
+ * entire card as tappable-to-arm would fire both interactions on every tap.
+ * The handle is the natural, unambiguous control here — it already reads as
+ * "the grab point" for reordering (native drag also grabs from anywhere on
+ * the card, but this is the icon that visually signals it). Tapping
+ * elsewhere on a card keeps its existing behaviour untouched (see the
+ * `event.target.closest('.drag-handle')` guard on each card's onclick).
+ *
+ * Ongoing matches can't be reordered (mirrors `draggable="${!isOngoing}"`
+ * on the native path), so their handles are excluded from the selector
+ * entirely via `:not(.ongoing)` rather than duplicating that guard inside
+ * a callback.
+ */
+let _queueTapAbort = null;
+
+function setupQueueTapToSelect() {
+    if (_queueTapAbort) _queueTapAbort.abort();
+    _queueTapAbort = new AbortController();
+    const signal = _queueTapAbort.signal;
+
+    const container = document.getElementById('matchQueue');
+    const getQueueId = (handleEl) => {
+        const item = handleEl.closest('.queue-item');
+        return item ? parseInt(item.dataset.queueId, 10) : null;
+    };
+
+    setupTapToSelect({
+        container,
+        itemSelector: '.queue-item:not(.ongoing) .drag-handle',
+        getKey: getQueueId,
+        onSelect: (sourceEl, targetEl) => {
+            const draggedId = getQueueId(sourceEl);
+            const targetId = getQueueId(targetEl);
+            reorderQueueItems(draggedId, targetId);
+        },
+        selectedClass: 'tap-armed',
+        signal,
+    });
 }
 
 /**
@@ -4488,13 +4538,26 @@ async function dropQueueItem(event, targetId) {
     event.currentTarget.classList.remove('drag-over');
 
     if (draggedQueueId === targetId) return;
+    await reorderQueueItems(draggedQueueId, targetId);
+}
+
+/**
+ * Move `draggedId`'s queue entry to sit at `targetId`'s position among the
+ * pending (reorderable) games, preserving ongoing/completed games untouched.
+ * Shared by both interaction paths on the match queue: native drag-and-drop
+ * (dropQueueItem) and the tap-to-select alternate path
+ * (setupQueueTapToSelect) — one reorder implementation, two ways to trigger
+ * it.
+ */
+async function reorderQueueItems(draggedId, targetId) {
+    if (draggedId === targetId || draggedId === null || targetId === null) return;
 
     const queue = gameState.gameQueue || [];
     const ongoingGames = queue.filter(g => g.status === 'ongoing');
     const pendingGames = queue.filter(g => g.status === 'pending' || g.status === undefined || g.status === 'queued');
     const completedGames = queue.filter(g => g.status === 'completed');
 
-    const draggedIndex = pendingGames.findIndex(g => g.id === draggedQueueId);
+    const draggedIndex = pendingGames.findIndex(g => g.id === draggedId);
     const targetIndex = pendingGames.findIndex(g => g.id === targetId);
 
     if (draggedIndex === -1 || targetIndex === -1) return;

@@ -1229,6 +1229,22 @@ h1, h2, h3, h4, h5, h6 {
 
 .queue-item .drag-handle { color: var(--text-dim); cursor: grab; }
 
+/* Tap-to-select "armed" state: the queue item waiting for a destination
+   tap. Same blue accent as .seating-item.tap-armed so the interaction
+   reads as one consistent visual language across sites. The class lands
+   on the handle icon itself (that's the tappable element here — see
+   setupQueueTapToSelect's JSDoc for why), and :has() lights up the whole
+   card so the "this one is armed" signal isn't just a tiny icon. */
+.queue-item .drag-handle.tap-armed {
+    color: #4da3ff;
+}
+
+.queue-item:has(.drag-handle.tap-armed) {
+    border-color: #4da3ff;
+    background: rgba(77,163,255,0.12);
+    box-shadow: 0 0 0 2px rgba(77,163,255,0.35);
+}
+
 .queue-item .game-info {
     flex: 1;
     font-size: 12px;
