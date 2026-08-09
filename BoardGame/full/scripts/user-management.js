@@ -613,10 +613,16 @@ function renderTeamAssignmentSlots() {
 
         const teamFull = players.length >= 2;
 
-        // Only show "Assign" if team has fewer than 2 players AND a user is selected
+        // Only show "Assign" if team has fewer than 2 players AND a user is selected.
+        // Deliberately styled unlike the per-slot "Use here" button below (different
+        // color family + icon + explicit "NEW SLOT" wording) since this button ADDS
+        // a brand-new roster slot, while "Use here" fills/swaps an existing one —
+        // a misclick between them at a live event creates an extra slot instead of
+        // just relinking a player.
         const assignBtnHtml = (selectedUserForAssignment && !teamFull)
-            ? `<button onclick="assignSelectedUserToTeam(${team.id})" class="btn-small primary" style="margin-top: 8px; width: 100%;">
-                   + Assign ${escapeHtml(selectedUserForAssignment.displayName)}
+            ? `<button onclick="assignSelectedUserToTeam(${team.id})"
+                      style="margin-top: 8px; width: 100%; background: #0ea5e9; color: white; border: none; border-radius: 4px; padding: 6px 10px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">
+                   ➕ New slot: ${escapeHtml(selectedUserForAssignment.displayName)}
                </button>`
             : '';
 
@@ -632,13 +638,15 @@ function renderTeamAssignmentSlots() {
                         const borderColor = isPlaceholder ? '#f59e0b' : '#10b981';
                         const bgColor = isPlaceholder ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)';
 
-                        // "Use {name} here" links a placeholder or swaps an already-linked
+                        // "Fill/Swap {name} here" links a placeholder or swaps an already-linked
                         // slot for whoever is currently selected in the user picker —
-                        // replacePlayerWithUser() decides which underneath.
+                        // replacePlayerWithUser() decides which underneath. Icon + wording
+                        // deliberately call out "this slot" (an existing one) to contrast
+                        // with the "New slot" button below, which creates a fresh slot instead.
                         const useBtnHtml = selectedUserForAssignment
                             ? `<button onclick="replacePlayerWithUser(${team.id}, '${player.playerId}')"
-                                      style="background: ${isPlaceholder ? '#10b981' : '#d97706'}; color: white; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem;">
-                                  Use ${escapeHtml(selectedUserForAssignment.displayName)} here
+                                      style="background: ${isPlaceholder ? '#10b981' : '#d97706'}; color: white; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">
+                                  ${isPlaceholder ? '↳ Fill this slot:' : '⇄ Swap this slot to:'} ${escapeHtml(selectedUserForAssignment.displayName)}
                               </button>`
                             : '';
 
