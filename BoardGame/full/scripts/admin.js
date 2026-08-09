@@ -377,6 +377,11 @@ document.addEventListener('firebase-ready', async function() {
             // Monitor Firebase connection status
             initConnectionMonitor();
 
+            // Tap-to-select alternative to native drag-and-drop for team/player
+            // match-side assignment (delegated on a static container, so this
+            // only needs to run once -- see setupMatchAssignmentTapToSelect doc).
+            setupMatchAssignmentTapToSelect();
+
             // Tournament context comes from the navbar switcher: URL param first,
             // falling back to the shared storage contract it maintains.
             const tournamentId = resolveTournamentId({
@@ -865,6 +870,8 @@ function renderTeamsList() {
         const playerItems = players.map((p, idx) => `
             <div class="player-item"
                  draggable="true"
+                 data-team-id="${team.id}"
+                 data-player-index="${idx}"
                  ondragstart="dragPlayer(event, ${team.id}, ${idx})"
                  ondragend="dragEnd(event)">
                 <span class="player-drag-handle">${ICON_SVGS.gripVertical}</span>
@@ -879,9 +886,10 @@ function renderTeamsList() {
             <div class="team-card" style="--team-color: ${teamColor}">
                 <div class="team-header"
                      draggable="true"
+                     data-team-id="${team.id}"
                      ondragstart="dragTeam(event, ${team.id})"
                      ondragend="dragEnd(event)"
-                     title="Drag to add entire team">
+                     title="Drag to add entire team, or tap to add and then tap a side">
                     <span class="team-name" style="color: ${teamColor}">${team.name || 'Team ' + team.id}</span>
                     <span class="team-wins">${team.gamesWon || 0} wins</span>
                 </div>
@@ -2153,60 +2161,146 @@ function dropToSide(event, sideIndex) {
         const data = JSON.parse(event.dataTransfer.getData('application/json'));
 
         if (data.type === 'team') {
-            const team = gameState?.teams?.find(t => t.id === data.teamId);
-            if (!team) return;
-
-            // Check if team is already on this side
-            const alreadyOnThisSide = manualGameSetup.sides[sideIndex].some(p => p.originalTeamId === team.id);
-            if (alreadyOnThisSide) {
-                showStatus('Team already on this side', 'warning');
-                return;
-            }
-
-            // Add all players from the team
-            const players = (team.players || []).map(p => ({
-                id: p.id || p.uid,
-                name: p.name,
-                originalTeamId: team.id,
-                originalTeamName: team.name,
-                originalTeamColor: team.color || getTeamColor(team.id)
-            }));
-
-            manualGameSetup.sides[sideIndex].push(...players);
-            renderMatchCreationZones();
+            assignTeamToSide(data.teamId, sideIndex);
         } else if (data.type === 'player') {
-            // Single player drop
-            const player = data.player;
-            if (!player) return;
-
-            // Check if player is already on this side
-            const alreadyOnSide = manualGameSetup.sides[sideIndex].some(
-                p => p.name === player.name && p.originalTeamId === player.originalTeamId
-            );
-
-            if (alreadyOnSide) {
-                showStatus('Player already on this side', 'warning');
-                return;
-            }
-
-            // Remove player from any other side
-            manualGameSetup.sides.forEach((side, idx) => {
-                if (idx !== sideIndex) {
-                    const existingIndex = side.findIndex(
-                        p => p.name === player.name && p.originalTeamId === player.originalTeamId
-                    );
-                    if (existingIndex !== -1) {
-                        side.splice(existingIndex, 1);
-                    }
-                }
-            });
-
-            manualGameSetup.sides[sideIndex].push(player);
-            renderMatchCreationZones();
+            assignPlayerToSide(data.player, sideIndex);
         }
     } catch (error) {
         console.error('Drop error:', error);
     }
+}
+
+/**
+ * Add an entire team's players to a match side. Shared by the native
+ * drag-and-drop drop handler (dropToSide) and the tap-to-select path
+ * (setupMatchAssignmentTapToSelect) -- both interaction methods perform
+ * the exact same assignment.
+ * @param {number|string} teamId
+ * @param {number} sideIndex
+ */
+function assignTeamToSide(teamId, sideIndex) {
+    const team = gameState?.teams?.find(t => t.id === teamId);
+    if (!team) return;
+
+    // Check if team is already on this side
+    const alreadyOnThisSide = manualGameSetup.sides[sideIndex].some(p => p.originalTeamId === team.id);
+    if (alreadyOnThisSide) {
+        showStatus('Team already on this side', 'warning');
+        return;
+    }
+
+    // Add all players from the team
+    const players = (team.players || []).map(p => ({
+        id: p.id || p.uid,
+        name: p.name,
+        originalTeamId: team.id,
+        originalTeamName: team.name,
+        originalTeamColor: team.color || getTeamColor(team.id)
+    }));
+
+    manualGameSetup.sides[sideIndex].push(...players);
+    renderMatchCreationZones();
+}
+
+/**
+ * Add a single player to a match side, removing them from any other side
+ * first. Shared by the native drag-and-drop drop handler (dropToSide) and
+ * the tap-to-select path (setupMatchAssignmentTapToSelect).
+ * @param {Object} player
+ * @param {number} sideIndex
+ */
+function assignPlayerToSide(player, sideIndex) {
+    if (!player) return;
+
+    // Check if player is already on this side
+    const alreadyOnSide = manualGameSetup.sides[sideIndex].some(
+        p => p.name === player.name && p.originalTeamId === player.originalTeamId
+    );
+
+    if (alreadyOnSide) {
+        showStatus('Player already on this side', 'warning');
+        return;
+    }
+
+    // Remove player from any other side
+    manualGameSetup.sides.forEach((side, idx) => {
+        if (idx !== sideIndex) {
+            const existingIndex = side.findIndex(
+                p => p.name === player.name && p.originalTeamId === player.originalTeamId
+            );
+            if (existingIndex !== -1) {
+                side.splice(existingIndex, 1);
+            }
+        }
+    });
+
+    manualGameSetup.sides[sideIndex].push(player);
+    renderMatchCreationZones();
+}
+
+/**
+ * Tap-to-select path for match-side assignment (mouse click OR touch tap),
+ * for devices where native HTML5 drag-and-drop above never fires (iOS/
+ * iPadOS Safari). Sits alongside the existing drag-and-drop, not instead of
+ * it -- tap a team header or player item to arm it, then tap a side's
+ * drop-zone to complete the same assignment dropToSide would perform.
+ *
+ * Delegated on `.admin-layout`, the stable ancestor of both the teams list
+ * (#teamsList) and the sides container (#sidesContainer). Both of those are
+ * rebuilt via innerHTML on every render, but the delegated listener lives on
+ * their unchanging parent, so -- unlike setupSeatingDragDrop(), which has to
+ * re-run after every render of a modal that's opened fresh each time -- this
+ * only needs to be set up once, at page init.
+ */
+let _matchAssignTapAbort = null;
+
+function setupMatchAssignmentTapToSelect() {
+    const container = document.querySelector('.admin-layout');
+    if (!container) return;
+
+    if (_matchAssignTapAbort) _matchAssignTapAbort.abort();
+    _matchAssignTapAbort = new AbortController();
+    const signal = _matchAssignTapAbort.signal;
+
+    setupTapToSelect({
+        container,
+        itemSelector: '.team-header, .player-item, .drop-zone',
+        getKey: (el) => {
+            if (el.classList.contains('drop-zone')) return `side:${el.dataset.sideIndex}`;
+            if (el.classList.contains('player-item')) return `player:${el.dataset.teamId}:${el.dataset.playerIndex}`;
+            return `team:${el.dataset.teamId}`;
+        },
+        isValidTarget: (targetEl, sourceEl) => {
+            // Only a team/player source armed against a side drop-zone target
+            // is a valid placement -- matches what native drag-and-drop
+            // accepts (drop-zones are the only ondrop targets).
+            const sourceIsUnit = sourceEl.classList.contains('team-header') || sourceEl.classList.contains('player-item');
+            const targetIsDropZone = targetEl.classList.contains('drop-zone');
+            return sourceIsUnit && targetIsDropZone;
+        },
+        onSelect: (sourceEl, targetEl) => {
+            const sideIndex = parseInt(targetEl.dataset.sideIndex, 10);
+            if (sourceEl.classList.contains('team-header')) {
+                const teamId = parseInt(sourceEl.dataset.teamId, 10);
+                assignTeamToSide(teamId, sideIndex);
+            } else if (sourceEl.classList.contains('player-item')) {
+                const teamId = parseInt(sourceEl.dataset.teamId, 10);
+                const playerIndex = parseInt(sourceEl.dataset.playerIndex, 10);
+                const team = gameState?.teams?.find(t => t.id === teamId);
+                const player = team?.players?.[playerIndex];
+                if (!player) return;
+                assignPlayerToSide({
+                    id: player.id || player.uid,
+                    name: player.name,
+                    originalTeamId: teamId,
+                    originalTeamName: team.name,
+                    originalTeamColor: team.color || getTeamColor(teamId)
+                }, sideIndex);
+            }
+        },
+        selectedClass: 'tap-armed',
+        signal,
+    });
 }
 
 function renderMatchCreationZones() {
@@ -2227,10 +2321,12 @@ function renderMatchCreationZones() {
 
         return `
             <div class="drop-zone ${hasPlayers ? 'has-players' : ''}" id="side${idx}Zone"
+                 data-side-index="${idx}"
                  ondrop="dropToSide(event, ${idx})"
                  ondragover="allowDrop(event)"
-                 ondragleave="dragLeave(event)">
-                <span class="placeholder">Drop Team/Player ${label}</span>
+                 ondragleave="dragLeave(event)"
+                 title="Drop a team/player, or tap an armed team/player then tap here">
+                <span class="placeholder">Drop or Tap Team/Player ${label}</span>
                 <div class="side-players">${playersHtml}</div>
             </div>
             ${idx < manualGameSetup.sides.length - 1 ? '<div class="vs-divider">VS</div>' : ''}
