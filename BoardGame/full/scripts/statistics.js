@@ -373,15 +373,11 @@ function renderStandings() {
         return;
     }
 
-    // Sort by `points`, then by wins as tiebreaker. `points` already includes
-    // the +1 per match win as well as heart-hex income — do NOT add gamesWon
-    // into the total or every win counts twice (it stays a tiebreaker only).
-    const sortedTeams = [...gameState.teams].sort((a, b) => {
-        const totalA = (a.points || 0);
-        const totalB = (b.points || 0);
-        if (totalB !== totalA) return totalB - totalA;
-        return (b.gamesWon || 0) - (a.gamesWon || 0);
-    });
+    // Row math (points/wins/losses/win-rate split) lives in the shared
+    // computeTeamStandings() helper — full/season-stats.js reuses the exact
+    // same function to aggregate across a season's tournaments, so this
+    // table and the season-wide one can never silently disagree.
+    const rows = computeTeamStandings(gameState);
 
     let html = `
         <table>
@@ -400,37 +396,25 @@ function renderStandings() {
             <tbody>
     `;
 
-    sortedTeams.forEach((team, index) => {
+    rows.forEach((row, index) => {
         const rank = index + 1;
         const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
-
-        // `points` is the whole score (wins + heart income). Derive the
-        // split — each win is +1 — instead of summing two sources, which
-        // counted every win twice.
-        const totalPts = team.points || 0;
-        const victoryPts = Math.min(team.gamesWon || 0, totalPts);
-        const hexPts = Math.max(0, totalPts - victoryPts);
-        const losses = team.gamesLost || 0;
-        const played = team.gamesPlayed || (victoryPts + losses);
-        const winRate = played > 0 ? ((victoryPts / played) * 100).toFixed(0) : 0;
+        const winRate = row.winRate.toFixed(0);
         const winRateClass = winRate >= 60 ? 'high' : winRate >= 40 ? 'medium' : 'low';
-
-        // Count hexes
-        const hexCount = Object.values(gameState.board || {}).filter(t => t === team.id).length;
 
         html += `
             <tr>
                 <td class="rank ${rankClass}">${rank}</td>
                 <td class="team-name">
-                    <span class="team-color-dot" style="background: ${team.color || '#666'}"></span>
-                    ${team.name || 'Team ' + team.id}
+                    <span class="team-color-dot" style="background: ${row.color}"></span>
+                    ${row.name}
                 </td>
-                <td class="points"><strong>${totalPts}</strong></td>
-                <td class="points">${victoryPts}</td>
-                <td class="points">${hexPts}</td>
-                <td class="record">${victoryPts}-${losses}</td>
+                <td class="points"><strong>${row.totalPts}</strong></td>
+                <td class="points">${row.victoryPts}</td>
+                <td class="points">${row.hexPts}</td>
+                <td class="record">${row.victoryPts}-${row.losses}</td>
                 <td class="win-rate ${winRateClass}">${winRate}%</td>
-                <td>${hexCount}</td>
+                <td>${row.hexCount}</td>
             </tr>
         `;
     });

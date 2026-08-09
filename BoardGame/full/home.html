@@ -926,6 +926,7 @@
       <div class="action-buttons" style="flex-wrap: wrap; margin-top: 12px;">
         <button class="btn-small btn-secondary" onclick="goToPage('../rulebook.html')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v16"/><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"/></svg> Rulebook</button>
         <button class="btn-small btn-secondary" onclick="goToPage('statistics.html')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> Statistics</button>
+        <button class="btn-small btn-secondary" onclick="goToSeasonStats()"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10"/><path d="M17 4v8a5 5 0 0 1-10 0V4"/><path d="M17 4h3a2 2 0 0 1 2 2 5 5 0 0 1-5 5"/><path d="M7 4H4a2 2 0 0 0-2 2 5 5 0 0 0 5 5"/></svg> Season Stats</button>
         <button class="btn-small btn-secondary" onclick="goToOnboarding()"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/></svg> Player Onboarding</button>
       </div>
 
@@ -954,6 +955,7 @@
     let currentUser = null;
     let userRole = null;
     let currentActiveTournament = sessionStorage.getItem('currentTournamentId') || localStorage.getItem('currentTournamentId') || null;
+    let currentSeasonId = null; // set by loadSeasonStats(), consumed by goToSeasonStats()
     let referralCodesCache = []; // last-loaded referral codes, used by "Copy all unused"
 
     // Wait for Firebase
@@ -1229,6 +1231,8 @@
           }
         }
 
+        currentSeasonId = season?.id || null;
+
         if (!season || !season.tournamentIds?.length) return;
 
         // Load tournament docs for the season
@@ -1297,12 +1301,14 @@
     }
 
     window.goToSeasonStats = function() {
-      // Navigate to statistics page
-      const tid = currentActiveTournament;
-      if (tid) {
-        window.location.href = `statistics.html?tournamentId=${tid}`;
+      // Navigate to the season-wide standings page for whichever season
+      // loadSeasonStats() found (active season, else most recent). If no
+      // season exists yet, season-stats.html falls back to its own season
+      // picker rather than a hard error.
+      if (currentSeasonId) {
+        window.location.href = `season-stats.html?seasonId=${currentSeasonId}`;
       } else {
-        window.location.href = 'statistics.html';
+        window.location.href = 'season-stats.html';
       }
     };
 
