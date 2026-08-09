@@ -107,10 +107,14 @@
 </div>
 
 <div class="piece" id="p9">
-  <span class="status running">running</span>
+  <span class="status done">fixed, merged to main, harsh-critic clean</span>
   <h2>P9 — Apply pattern to remaining 3 DnD sites</h2>
-  <p>Team/player assignment, match-side drop zones, queue reordering — using P8's now-proven <code>setupTapToSelect()</code> pattern, with the same harsh-critic + fix-until-clean process per site. Note: "team/player assignment" and "match-side drop zones" turned out to be one interaction site, not two — a piece-decomposition mistake caught during merge (both competing implementations independently touched the same functions). Ported the one real fix the redundant candidate found (a tap-to-select/click-bubbling bug on the remove-player button) rather than merging duplicate work.</p>
+  <p>Team/player↔side assignment and match-queue reordering — using P8's proven <code>setupTapToSelect()</code> pattern. "Team/player assignment" and "match-side drop zones" turned out to be one interaction site, not two — a piece-decomposition mistake caught during merge (both competing implementations independently touched the same functions). Ported the one real fix the redundant candidate found (a tap-to-select/click-bubbling bug on the remove-player button) rather than merging duplicate work.</p>
+  <p>Went through 2 fix rounds: round 1 fixed 6/7 flagged gaps (reverse tap-order support, exact CSS parity with the seating precedent, discoverability hints, queue code dedup) but introduced a toast that fired on ordinary "changed my mind" re-arms, not just genuine mistakes — caught by the harsh critic. Fixed directly and independently re-verified. A final cross-surface pass across all 4 sites then found 3 of 5 tappable element types were still missing in-UI discoverability hints — fixed; all 5 now have one, all <code>.tap-armed</code> CSS is byte-identical across sites, and every tap path calls the same function the native drag-and-drop path uses.</p>
+  <p class="meta">admin.js / admin.css · commits ac8a94d, 13099bb, 62da8ef, 85442e8, 6e5ee33, d2abf5d · scope: admin.html only — god.html has its own separate untouched drag-and-drop (team-manager.js, match-queue-manager.js) · needs a real touch device to visually verify</p>
 </div>
+
+<div class="round">Round 4 complete</div>
 
 <div class="round">Round 5 — video export (queued, after round 4 wraps)</div>
 <div class="piece" id="p10">
