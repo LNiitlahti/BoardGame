@@ -95,11 +95,16 @@
   <p class="meta">season-stats.html / season-stats.js / team-standings.js · commit 357e721 · rules fix commit 8f899f0 (docs only)</p>
 </div>
 
-<div class="piece">
-  <span class="status blocked">needs your input before an autonomous build</span>
-  <h2>Mobile/iPad admin touch support</h2>
-  <p>Blocker isn't layout, it's 4 separate native-HTML5-drag-and-drop interactions (seating order, team/player assignment, match-side drop zones, queue reordering) that don't fire at all on iOS/iPadOS Safari. Real scope is "replace 4 DnD interactions with a touch-compatible pattern," not a CSS pass — too large/risky to guess a UX pattern for without your steer on tap-to-select vs. a pointer-events DnD library, and which interaction to prioritize first.</p>
+<div class="round">Round 4 — mobile/iPad admin touch support</div>
+<div class="sub" style="margin-bottom:12px">User decision: tap-to-select as the primary interaction, drag-and-drop kept working as a backup — multiple ways to do the same thing, intuitive and responsive. Two waves: establish the pattern on one site, then apply it to the rest.</div>
+
+<div class="piece" id="p8">
+  <span class="status running">running</span>
+  <h2>P8 — Dual-mode interaction pattern + seating order</h2>
+  <p>Building a reusable tap-to-select/tap-to-place pattern that coexists with the existing native HTML5 drag-and-drop (not a replacement — both paths stay live), proven first on the simplest site (seating order, admin.js ~1322-1370). Also folding in the iPad-landscape CSS breakpoint gap (admin.css's 900px/1200px breakpoints skip ~1024-1194px logical width).</p>
 </div>
+
+<div class="piece"><span class="status pending">pending</span><h2>P9 — Apply pattern to remaining 3 DnD sites</h2><p>Team/player assignment, match-side drop zones, queue reordering — once P8's pattern is merged.</p></div>
 
 <div class="piece">
   <span class="status blocked">needs your input before an autonomous build</span>
