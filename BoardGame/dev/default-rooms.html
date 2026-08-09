@@ -517,9 +517,26 @@
 
         async function saveToFirebase() {
             try {
+                // config/defaultRooms is ONE doc shared across every tournament
+                // (setup.html, god.html, admin.html all read/write it) - confirm
+                // before silently clobbering whatever was last saved there.
+                const existingDoc = await window.firebaseDB.collection('config').doc('defaultRooms').get();
+                if (existingDoc.exists && existingDoc.data().rooms?.length) {
+                    const existing = existingDoc.data();
+                    const savedAt = existing.updatedAt ? new Date(existing.updatedAt).toLocaleString() : 'unknown time';
+                    const savedBy = existing.updatedBy || 'unknown';
+                    const confirmed = confirm(
+                        `The shared default room layout (used by ALL tournaments) currently has ${existing.rooms.length} rooms, ` +
+                        `last saved by "${savedBy}" (${savedAt}).\n\n` +
+                        `This will PERMANENTLY overwrite it with the current layout (${rooms.length} rooms).\n\n` +
+                        `Continue?`
+                    );
+                    if (!confirmed) return;
+                }
                 await window.firebaseDB.collection('config').doc('defaultRooms').set({
                     rooms: [...rooms],
-                    updatedAt: new Date().toISOString()
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: 'dev/default-rooms.html'
                 });
                 showStatus('Saved ' + rooms.length + ' rooms to Firebase', 'success');
             } catch (e) {

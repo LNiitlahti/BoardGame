@@ -1193,9 +1193,37 @@
             renderRoomBoard();
         }
 
+        /**
+         * Saves the current room layout as the shared Firestore default —
+         * but config/defaultRooms is ONE doc shared across every tournament,
+         * so this would silently clobber whatever another (possibly
+         * throwaway/test) tournament saved there, with no way to tell who
+         * or when. Before overwriting, show the admin what's currently
+         * saved (room count, saved-by, saved-at) and require an explicit
+         * confirmation. Also stamps this save with the tournamentId field
+         * so the *next* admin gets that same visibility.
+         */
         async function saveDefaultRoomsSetup() {
             try {
-                await saveDefaultRoomsDoc(db, rooms);
+                const existing = await loadDefaultRoomsMeta(db);
+                const tournamentIdField = document.getElementById('tournamentId');
+                const savedBy = (tournamentIdField && tournamentIdField.value.trim()) || 'setup.html (turnausta ei vielä nimetty)';
+
+                if (existing) {
+                    const savedAt = existing.updatedAt
+                        ? new Date(existing.updatedAt).toLocaleString('fi-FI')
+                        : 'tuntematon ajankohta';
+                    const savedByPrev = existing.updatedBy || 'tuntematon';
+                    const confirmed = confirm(
+                        `Jaettu oletushuonepohja (käytössä KAIKISSA turnauksissa) sisältää tällä hetkellä ${existing.rooms.length} huonetta.\n` +
+                        `Sen tallensi viimeksi: "${savedByPrev}" (${savedAt}).\n\n` +
+                        `Tämä YLIKIRJOITTAA sen pysyvästi nykyisellä pohjalla (${rooms.length} huonetta, tallentaja "${savedBy}").\n\n` +
+                        `Haluatko varmasti jatkaa?`
+                    );
+                    if (!confirmed) return;
+                }
+
+                await saveDefaultRoomsDoc(db, rooms, savedBy);
                 alert(`Tallennettu ${rooms.length} huonetta oletukseksi.`);
             } catch (error) {
                 console.error('Error saving default rooms:', error);

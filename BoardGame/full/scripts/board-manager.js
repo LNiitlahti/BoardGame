@@ -293,7 +293,23 @@ class BoardManager {
     async saveDefaultRooms() {
         const rooms = this._gameState.rooms || [];
         try {
-            await saveDefaultRoomsDoc(window.firebaseDB, rooms);
+            // config/defaultRooms is ONE doc shared across every tournament -
+            // confirm before silently clobbering whatever another tournament
+            // (possibly a throwaway/test one) last saved there.
+            const existing = await loadDefaultRoomsMeta(window.firebaseDB);
+            const savedBy = this._gameState.tournamentId || 'god.html (tuntematon turnaus)';
+            if (existing) {
+                const savedAt = existing.updatedAt ? new Date(existing.updatedAt).toLocaleString() : 'unknown time';
+                const savedByPrev = existing.updatedBy || 'unknown';
+                const confirmed = confirm(
+                    `The shared default room layout (used by ALL tournaments) currently has ${existing.rooms.length} rooms, ` +
+                    `last saved by "${savedByPrev}" (${savedAt}).\n\n` +
+                    `This will PERMANENTLY overwrite it with the current layout (${rooms.length} rooms, saved by "${savedBy}").\n\n` +
+                    `Continue?`
+                );
+                if (!confirmed) return;
+            }
+            await saveDefaultRoomsDoc(window.firebaseDB, rooms, savedBy);
             this._ui.showStatus(`Saved ${rooms.length} default rooms`, 'success');
         } catch (error) {
             console.error('Error saving default rooms:', error);
