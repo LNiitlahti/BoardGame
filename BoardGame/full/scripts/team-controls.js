@@ -1137,7 +1137,11 @@ function applyHexImages(enabled) {
  */
 function renderCurrentMatch() {
     const container = document.getElementById('currentMatchDisplay');
-    const matchesSource = gameData.gameQueue || gameData.selectedGames || [];
+    // Scope to matches involving the viewing player's own team -- otherwise
+    // this panel shows whichever match happens to be "current" tournament-
+    // wide, regardless of who is playing it (same class of bug fixed for
+    // "Your Next Match" via renderMatchCardsWithDiscord()/_matchInvolvesUs()).
+    const matchesSource = (gameData.gameQueue || gameData.selectedGames || []).filter(_matchInvolvesUs);
 
     if (matchesSource.length === 0) {
         container.innerHTML = '<div class="empty-state">No matches scheduled</div>';
@@ -1359,8 +1363,11 @@ function renderUpcomingMatches() {
         return;
     }
 
-    // Filter: not completed, not current
+    // Filter: not completed, not current, and involving the viewing
+    // player's own team (same scoping as "Your Next Match"/renderCurrentMatch
+    // -- otherwise this list shows every team's upcoming matches).
     const displayMatches = matchesData.filter(match => {
+        if (!_matchInvolvesUs(match)) return false;
         if (match.status === 'completed') return false;
         const matchId = match.game || match.gameNumber;
         if (window.currentDisplayedMatchId && matchId === window.currentDisplayedMatchId) return false;
@@ -1437,12 +1444,42 @@ function _historyPlayerChip(playerId) {
 }
 
 /**
+ * Check if a gameHistory entry involves this player or their team. History
+ * entries store player registry IDs directly on winningPlayerIds/
+ * losingPlayerIds (see result-manager.js), not the teams/sides shape
+ * _matchInvolvesUs() expects, so this is a separate (but analogous) check.
+ * Legacy entries with only winner/loser name strings are matched by name.
+ */
+function _historyInvolvesUs(event) {
+    const ids = [...(event.winningPlayerIds || []), ...(event.losingPlayerIds || [])];
+    if (ids.length) {
+        return ids.some(id =>
+            (currentUser?.uid && id === currentUser.uid) ||
+            (teamData?.players?.some(tp => tp.uid === id || tp.id === id))
+        );
+    }
+    const names = [
+        ...(Array.isArray(event.winner) ? event.winner : [event.winner]),
+        ...(Array.isArray(event.loser) ? event.loser : [event.loser])
+    ].filter(Boolean);
+    if (names.length) {
+        return names.some(name => teamData?.players?.some(tp => tp.name === name));
+    }
+    // No player info to match against (e.g. generic text events) -- don't
+    // hide these, just leave them unscoped.
+    return true;
+}
+
+/**
  * Render recent events: match results with winners/losers, round,
- * duration and relative time.
+ * duration and relative time. Scoped to the viewing player's own team so
+ * "Recent Events" reads as "your team's recent matches", not a
+ * tournament-wide firehose (generic non-match events pass through unscoped).
  */
 function renderRecentEvents() {
     const container = document.getElementById('recentEventsList');
-    const events = gameData.gameHistory?.length ? gameData.gameHistory : (gameData.events || []);
+    const events = (gameData.gameHistory?.length ? gameData.gameHistory : (gameData.events || []))
+        .filter(_historyInvolvesUs);
 
     if (events.length === 0) {
         container.innerHTML = '<p class="empty-state-inline">No recent events</p>';
