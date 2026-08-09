@@ -2315,7 +2315,7 @@ function renderMatchCreationZones() {
         const playersHtml = side.map((p, playerIdx) => `
             <div class="dropped-player" style="--team-color: ${p.originalTeamColor || 'var(--text-secondary)'}">
                 <span>${escapeHtml(p.name)} (${escapeHtml(p.originalTeamName || 'Unknown')})</span>
-                <button class="remove-btn" onclick="removeFromSide(${idx}, ${playerIdx})">x</button>
+                <button class="remove-btn" onclick="removeFromSide(${idx}, ${playerIdx}, event)">x</button>
             </div>
         `).join('');
 
@@ -2368,7 +2368,11 @@ function getCalculatedPlayType() {
     return manualGameSetup.sides.map(s => s.length).join('v');
 }
 
-function removeFromSide(sideIndex, playerIndex) {
+function removeFromSide(sideIndex, playerIndex, event) {
+    // Stop the click from bubbling up to the tap-to-select delegated
+    // listener on .admin-layout, which would otherwise treat it as a tap
+    // on the enclosing .drop-zone and arm it as a (nonsensical) source.
+    event?.stopPropagation();
     manualGameSetup.sides[sideIndex].splice(playerIndex, 1);
     renderMatchCreationZones();
 }
