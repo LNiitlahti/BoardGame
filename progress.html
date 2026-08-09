@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>full/ hardening — progress</title>
+<style>
+  :root { color-scheme: dark light; }
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 720px; margin: 0 auto; padding: 16px; line-height: 1.5; background: #0b0d10; color: #e8eaed; }
+  h1 { font-size: 1.3rem; margin-bottom: 4px; }
+  .sub { color: #9aa0a6; font-size: .85rem; margin-bottom: 20px; }
+  .piece { border: 1px solid #2a2e33; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+  .piece h2 { font-size: 1rem; margin: 0 0 6px; }
+  .status { display: inline-block; font-size: .75rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; margin-bottom: 8px; }
+  .pending { background: #3c3f42; color: #cfd2d6; }
+  .running { background: #3a3410; color: #f2d675; }
+  .done { background: #113a1e; color: #7ee29b; }
+  .blocked { background: #3a1414; color: #f28d8d; }
+  p { margin: 6px 0; font-size: .9rem; }
+  .meta { color: #9aa0a6; font-size: .78rem; }
+  img { max-width: 100%; border-radius: 6px; margin-top: 6px; }
+  .round { font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; color: #7aa2f7; margin: 22px 0 8px; }
+</style>
+</head>
+<body>
+<h1>full/ hardening — live progress</h1>
+<div class="sub">Builder/critic swarm closing known gaps in <code>full/</code> (TODO.md + EVENT_BUG_REPORTS.md) before general polish. Updated as rounds complete.</div>
+
+<div class="round">Round 1 — logic pieces (test-gradable) — done</div>
+
+<div class="piece" id="p1">
+  <span class="status done">fixed, merged to main</span>
+  <h2>P1 — Discord challenge-slot channel wiring</h2>
+  <p>Challenge matches never had a <code>slotChannels['challenge']</code> entry, so every Discord move silently failed. Two competing fixes built in isolated worktrees; critic blind-picked the winner (near-identical fixes, winner reused the shared test fixture instead of duplicating it). Merged, 15/15 tests pass. Existing tournaments without a <code>challenge</code> key degrade gracefully (no throw).</p>
+  <p class="meta">discord-panel.js setup UI + saveSetup() · commit 7b45268 · not yet verified on a live screen</p>
+</div>
+
+<div class="piece" id="p2">
+  <span class="status done">fixed, merged to main</span>
+  <h2>P2 — team.html match-list team-scoping</h2>
+  <p>"Current Match", "Upcoming Matches" and "Recent Events" showed every team's matches, not just the viewer's. Winner reused the existing <code>_matchInvolvesUs()</code> helper and added a stricter analogous helper for history events. Known edge case: a gameHistory entry with no player IDs at all falls back to "show unscoped" (same permissive default the existing helper already used) — flagged for a live spot-check, not a regression.</p>
+  <p class="meta">team-controls.js renderCurrentMatch() / renderUpcomingMatches() / renderRecentEvents() · commit e412621 · not yet verified on a live screen</p>
+</div>
+
+<div class="piece" id="p3">
+  <span class="status done">already fixed (no action needed)</span>
+  <h2>P3 — Role-label mismatch</h2>
+  <p>Both independent builders investigated and found this was already resolved by an earlier commit (7831e1b) — navbar.js and profile.html both already derive the label from <code>isPlayer === true</code>, set at team-assignment time. No code change made.</p>
+</div>
+
+<div class="piece">
+  <span class="status done">no issues found</span>
+  <h2>Round 1 cross-surface review</h2>
+  <p>Independent reviewer checked both merged fixes together: no shared code paths, no interaction, both match existing file conventions, both degrade gracefully for pre-existing tournament data.</p>
+</div>
+
+<div class="round">Round 2 — visual/UX pieces (screenshot-graded)</div>
+<div class="piece"><span class="status pending">pending</span><h2>P4 — Admin click-to-pick contested hex</h2></div>
+<div class="piece"><span class="status pending">pending</span><h2>P5 — view.html spell-window banner</h2></div>
+<div class="piece"><span class="status pending">pending</span><h2>P6 — Referral code bulk-generate</h2></div>
+
+<div class="round">Round 3+ — large/cross-cutting (scoped later)</div>
+<div class="piece"><span class="status pending">pending</span><h2>Mobile/iPad admin touch support</h2></div>
+<div class="piece"><span class="status pending">pending</span><h2>Challenge concurrency (2-slot model)</h2></div>
+<div class="piece"><span class="status pending">pending</span><h2>Season-wide statistics</h2></div>
+
+</body>
+</html>
