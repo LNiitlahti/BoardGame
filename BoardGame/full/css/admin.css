@@ -2358,6 +2358,69 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
     font-family: 'Quantico', sans-serif;
 }
 
+.challenge-hex-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.challenge-hex-input-row select {
+    flex: 1;
+    min-width: 0;
+}
+
+.challenge-hex-input-row .btn-small {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* Challenge hex "pick on board" mode -----------------------------------
+   startChallengeHexPickMode() (admin.js) hides the challenge modal and
+   tags every eligible heart hex with .challenge-hex-candidate; clicking
+   one adds .challenge-hex-picked until the pick is confirmed. */
+.challenge-hex-pick-banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 14px;
+    margin-bottom: 8px;
+    background: rgba(212, 175, 55, 0.12);
+    border: 1px solid var(--gold, #d4af37);
+    border-radius: var(--radius-md);
+    color: var(--gold, #d4af37);
+    font-family: 'Quantico', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+body.challenge-hex-picking .challenge-hex-pick-banner {
+    display: flex;
+}
+
+.board-hex.challenge-hex-candidate {
+    cursor: pointer;
+    box-shadow: 0 0 0 3px var(--gold, #d4af37), 0 0 16px 4px rgba(212, 175, 55, 0.6);
+    animation: challenge-hex-pulse 1.4s ease-in-out infinite;
+    z-index: 6;
+}
+
+.board-hex.challenge-hex-candidate:hover {
+    box-shadow: 0 0 0 4px #fff, 0 0 20px 6px rgba(255, 255, 255, 0.85);
+    animation-play-state: paused;
+}
+
+.board-hex.challenge-hex-picked {
+    box-shadow: 0 0 0 4px var(--danger, #d84040), 0 0 22px 8px rgba(216, 64, 64, 0.75) !important;
+    animation: none;
+    z-index: 7;
+}
+
+@keyframes challenge-hex-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px var(--gold, #d4af37), 0 0 16px 4px rgba(212, 175, 55, 0.6); }
+    50%      { box-shadow: 0 0 0 3px var(--gold, #d4af37), 0 0 26px 10px rgba(212, 175, 55, 0.3); }
+}
+
 .challenge-setup-actions {
     display: flex;
     gap: 12px;

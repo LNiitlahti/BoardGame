@@ -1703,9 +1703,29 @@ function renderBoard() {
         // Add click handler
         hex.onclick = () => handleHexClick(coord);
     });
+
+    // render() above rebuilds every hex element from scratch, so any
+    // classes applyChallengeHexPickHighlights() painted on are gone —
+    // repaint them if the admin is mid-pick when a re-render happens.
+    if (_challengeHexPickActive) {
+        applyChallengeHexPickHighlights();
+    }
 }
 
 function handleHexClick(coord) {
+    // While picking the challenge's contested hex directly on the board,
+    // intercept every hex click here instead of opening the normal
+    // team-assignment picker below: only eligible heart hexes (the same
+    // set listed in #challengeHexSelect) complete the pick.
+    if (_challengeHexPickActive) {
+        if (_challengeHexPickEligibleCoords.includes(coord)) {
+            completeChallengeHexPick(coord);
+        } else {
+            showStatus('That hex is not one of the contested heart hexes', 'warning');
+        }
+        return;
+    }
+
     selectedHexCoord = coord;
 
     const currentOwner = gameState?.board?.[coord];
@@ -2383,6 +2403,108 @@ function updateChallengeHexPicker() {
         ).join('');
 }
 
+// =============================================================================
+// CHALLENGE HEX "PICK ON BOARD" MODE
+// =============================================================================
+// Lets the admin click a heart hex directly on the live board instead of
+// reading coord strings out of the #challengeHexSelect dropdown built by
+// updateChallengeHexPicker() above. This writes into that SAME <select>,
+// so confirmChallengeSetup()'s read of challengeHexSelect.value (further
+// below) needs no changes, and the text-dropdown flow keeps working
+// unchanged for anyone who never uses picking mode.
+
+let _challengeHexPickActive = false;
+let _challengeHexPickEligibleCoords = [];
+
+/**
+ * Enter pick-on-board mode: hide the challenge modal so the live board
+ * underneath becomes visible/clickable, then highlight every heart hex
+ * that's a valid contested-hex choice (the same coords already listed as
+ * <option>s in #challengeHexSelect).
+ */
+function startChallengeHexPickMode() {
+    const hexSelect = document.getElementById('challengeHexSelect');
+    if (!hexSelect || _challengeHexPickActive) return;
+
+    _challengeHexPickEligibleCoords = Array.from(hexSelect.options)
+        .map(o => o.value)
+        .filter(Boolean);
+
+    if (_challengeHexPickEligibleCoords.length === 0) {
+        showStatus('No contested heart hexes available to pick', 'warning');
+        return;
+    }
+
+    _challengeHexPickActive = true;
+    document.getElementById('challengeSetupModal')?.classList.remove('active');
+    document.body.classList.add('challenge-hex-picking');
+
+    applyChallengeHexPickHighlights();
+    document.addEventListener('keydown', _challengeHexPickKeyHandler);
+}
+
+function _challengeHexPickKeyHandler(e) {
+    if (e.key === 'Escape') cancelChallengeHexPickMode();
+}
+
+/**
+ * Paint candidate/picked classes onto the live #hexBoard hexes for every
+ * eligible coord. Called when picking mode starts, and again from
+ * renderBoard() after every re-render while picking mode is active (see
+ * renderBoard() above), since render() rebuilds hex elements from scratch
+ * and would otherwise silently wipe the highlighting.
+ */
+function applyChallengeHexPickHighlights() {
+    const selectedCoord = document.getElementById('challengeHexSelect')?.value || null;
+
+    document.querySelectorAll('.board-hex.challenge-hex-candidate, .board-hex.challenge-hex-picked')
+        .forEach(hex => hex.classList.remove('challenge-hex-candidate', 'challenge-hex-picked'));
+
+    _challengeHexPickEligibleCoords.forEach(coord => {
+        const hex = document.querySelector(`#hexBoard [data-coord="${coord}"]`);
+        if (!hex) return;
+        hex.classList.add('challenge-hex-candidate');
+        if (coord === selectedCoord) hex.classList.add('challenge-hex-picked');
+    });
+}
+
+/**
+ * Finish picking: write the clicked coord into #challengeHexSelect (the
+ * exact field confirmChallengeSetup() reads), then leave pick mode.
+ */
+function completeChallengeHexPick(coord) {
+    const hexSelect = document.getElementById('challengeHexSelect');
+    if (hexSelect) hexSelect.value = coord;
+    exitChallengeHexPickMode();
+    showStatus(`Contested hex set to ${coord}`, 'success');
+}
+
+/**
+ * Cancel picking without changing the current #challengeHexSelect value.
+ */
+function cancelChallengeHexPickMode() {
+    exitChallengeHexPickMode();
+}
+
+/**
+ * Leave pick-on-board mode: strip highlight classes, drop the Escape
+ * listener, and bring the challenge modal back so the admin can finish
+ * (or keep editing) the challenge.
+ */
+function exitChallengeHexPickMode() {
+    if (!_challengeHexPickActive) return;
+
+    document.querySelectorAll('.board-hex.challenge-hex-candidate, .board-hex.challenge-hex-picked')
+        .forEach(hex => hex.classList.remove('challenge-hex-candidate', 'challenge-hex-picked'));
+    document.removeEventListener('keydown', _challengeHexPickKeyHandler);
+    document.body.classList.remove('challenge-hex-picking');
+
+    _challengeHexPickActive = false;
+    _challengeHexPickEligibleCoords = [];
+
+    document.getElementById('challengeSetupModal')?.classList.add('active');
+}
+
 /**
  * Update select border color based on selected team
  */
@@ -2404,6 +2526,17 @@ function updateChallengeSelectColor(selectId) {
  * Close the challenge setup modal
  */
 function closeChallengeSetupModal() {
+    // Defensive: pick mode normally hides this modal itself, but if it's
+    // somehow still open (or being closed) mid-pick, tear down the board
+    // highlighting instead of leaving stray highlights/listeners behind.
+    if (_challengeHexPickActive) {
+        document.querySelectorAll('.board-hex.challenge-hex-candidate, .board-hex.challenge-hex-picked')
+            .forEach(hex => hex.classList.remove('challenge-hex-candidate', 'challenge-hex-picked'));
+        document.removeEventListener('keydown', _challengeHexPickKeyHandler);
+        document.body.classList.remove('challenge-hex-picking');
+        _challengeHexPickActive = false;
+        _challengeHexPickEligibleCoords = [];
+    }
     document.getElementById('challengeSetupModal').classList.remove('active');
 }
 

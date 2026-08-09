@@ -243,6 +243,11 @@
                         <button class="effect-btn active" data-effect="rooms" title="Show Rooms">Rooms</button>
                         <button class="effect-btn active" data-effect="heart-images" title="Heart Images">Hearts</button>
                     </div>
+                    <!-- Shown only while picking the challenge's contested hex directly on the board -->
+                    <div class="challenge-hex-pick-banner" id="challengeHexPickBanner">
+                        <span>Click a heart hex below to set it as the contested hex</span>
+                        <button type="button" class="btn-small secondary" onclick="cancelChallengeHexPickMode()">Cancel (Esc)</button>
+                    </div>
                     <div id="hexBoard"></div>
                 </section>
 
@@ -473,9 +478,12 @@
             <!-- Contested Hex Picker -->
             <div class="challenge-hex-field" id="challengeHexField" style="display: none;">
                 <label>Contested hex:</label>
-                <select id="challengeHexSelect" class="team-color-select">
-                    <option value="">— No specific hex —</option>
-                </select>
+                <div class="challenge-hex-input-row">
+                    <select id="challengeHexSelect" class="team-color-select">
+                        <option value="">— No specific hex —</option>
+                    </select>
+                    <button type="button" class="btn-small secondary" onclick="startChallengeHexPickMode()" title="Click the contested hex directly on the board instead of using the dropdown">Pick on Board</button>
+                </div>
                 <p class="modal-hint" style="margin-top: 4px;">Points for this hex are frozen until the challenge is resolved.</p>
             </div>
 
