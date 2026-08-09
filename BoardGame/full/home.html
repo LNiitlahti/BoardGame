@@ -452,6 +452,33 @@
       border-top: 1px solid rgba(255,255,255,0.06);
     }
     .modal-footer-stats { font-size: 0.85rem; color: #9aa1ad; margin-bottom: 12px; }
+    .modal-footer .action-buttons { justify-content: center; margin-bottom: 12px; }
+
+    /* ── Bulk-generate form ── */
+    .modal-form-label {
+      display: block;
+      font-size: 0.85rem;
+      color: #e8d8a8;
+      margin-bottom: 6px;
+      font-family: 'Quantico', sans-serif;
+    }
+    .modal-form-hint { font-size: 0.78rem; color: #9aa1ad; margin: 6px 0 18px; line-height: 1.5; }
+    .modal-form textarea, .modal-form input[type="number"] {
+      width: 100%;
+      background: rgba(10,11,16,0.6);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      color: #e8d8a8;
+      font-family: 'Quantico', sans-serif;
+      padding: 10px 12px;
+      box-sizing: border-box;
+    }
+    .modal-form textarea { min-height: 140px; resize: vertical; font-family: 'Courier New', monospace; }
+    .modal-form textarea:focus, .modal-form input[type="number"]:focus {
+      outline: none; border-color: rgba(200,179,126,0.5);
+    }
+    .modal-form input[type="number"] { max-width: 100px; }
+    .modal-form-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 
     /* ── Notice banner ── */
     .home-notice {
@@ -648,7 +675,33 @@
       <div id="referralCodesContent"></div>
       <div class="modal-footer">
         <div class="modal-footer-stats" id="modalFooterStats"></div>
-        <button class="btn-small btn-primary" onclick="closeReferralCodesModal()">Close</button>
+        <div class="action-buttons">
+          <button class="btn-small btn-primary" onclick="copyAllUnusedUrls()">Copy All Unused URLs</button>
+          <button class="btn-small btn-secondary" onclick="closeReferralCodesModal()">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk Generate Referral Codes Modal -->
+  <div id="bulkGenerateModal" class="custom-modal-overlay" onclick="closeBulkGenerateModal(event)">
+    <div class="custom-modal" onclick="event.stopPropagation()" style="max-width: 520px;">
+      <h2><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg> Bulk Generate Codes</h2>
+      <div class="modal-form">
+        <label class="modal-form-label" for="bulkGenerateNames">Player names (one per line)</label>
+        <textarea id="bulkGenerateNames" placeholder="Matti Meikäläinen&#10;Liisa Virtanen&#10;..."></textarea>
+        <p class="modal-form-hint">One referral code is created per name, pre-labeled with that name. Leave this blank to generate unlabeled codes instead.</p>
+        <div class="modal-form-row">
+          <label class="modal-form-label" for="bulkGenerateBlankCount" style="margin-bottom: 0; white-space: nowrap;">Blank codes (if names left empty):</label>
+          <input type="number" id="bulkGenerateBlankCount" value="1" min="1" max="100">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="modal-footer-stats" id="bulkGenerateStatus"></div>
+        <div class="action-buttons">
+          <button class="btn-small btn-primary" id="bulkGenerateSubmitBtn" onclick="submitBulkGenerate()">Generate Codes</button>
+          <button class="btn-small btn-secondary" onclick="closeBulkGenerateModal()">Cancel</button>
+        </div>
       </div>
     </div>
   </div>
@@ -762,6 +815,7 @@
           <div class="stat-label"><span id="usedReferralCodes">0</span> used, <span id="unusedReferralCodes">0</span> available</div>
           <div class="action-buttons">
             <button class="btn-small btn-primary" onclick="generateReferralCode()">Generate Code</button>
+            <button class="btn-small btn-primary" onclick="openBulkGenerateModal()">Bulk Generate</button>
             <button class="btn-small btn-secondary" onclick="viewReferralCodes()">View All</button>
           </div>
         </div>
@@ -900,6 +954,7 @@
     let currentUser = null;
     let userRole = null;
     let currentActiveTournament = sessionStorage.getItem('currentTournamentId') || localStorage.getItem('currentTournamentId') || null;
+    let referralCodesCache = []; // last-loaded referral codes, used by "Copy all unused"
 
     // Wait for Firebase
     document.addEventListener('firebase-ready', async function() {
@@ -1636,10 +1691,18 @@
     };
 
     // Referral code management (God mode only)
-    window.generateReferralCode = async function() {
-      try {
-        // Generate a random 8-character alphanumeric code
-        const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Excluding similar chars (0,O,1,I)
+
+    // Core creation routine shared by the single-generate and bulk-generate flows.
+    // Writes exactly one referralCodes/{code} doc using the existing schema shape
+    // (see login.html's registration flow for the fields filled in once a code is claimed:
+    // used, assignedTo (uid), assignedEmail, assignedName, usedAt). At creation time we can
+    // only pre-fill the intended recipient's name, so we reuse the existing `assignedName`
+    // field for that — no new fields are introduced.
+    async function createReferralCode(assignedName = null) {
+      const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Excluding similar chars (0,O,1,I)
+      const maxAttempts = 20;
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
         let code = '';
         for (let i = 0; i < 8; i++) {
           code += characters.charAt(Math.floor(Math.random() * characters.length));
@@ -1648,8 +1711,7 @@
         // Check if code already exists
         const existingCode = await db.collection('referralCodes').doc(code).get();
         if (existingCode.exists) {
-          errorHandler.showWarning('Code collision detected. Please try again.');
-          return;
+          continue; // collision — try another random code
         }
 
         // Create the referral code document
@@ -1660,8 +1722,34 @@
           createdBy: currentUser.uid,
           assignedTo: null,
           assignedEmail: null,
-          assignedAt: null
+          assignedAt: null,
+          assignedName: assignedName || null
         });
+
+        return code;
+      }
+
+      throw new Error('Could not generate a unique referral code after multiple attempts.');
+    }
+
+    // Builds the shareable registration URL for a given code. Single source of truth
+    // for the URL shape — used by both the single-copy and copy-all-unused flows.
+    function buildReferralUrl(code) {
+      const protocol = window.location.protocol;
+      const host = window.location.host;
+      return `${protocol}//${host}/login.html?referralCode=${code}`;
+    }
+
+    // Minimal HTML-escaping for free-typed names rendered into the codes modal.
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    window.generateReferralCode = async function() {
+      try {
+        const code = await createReferralCode(null);
 
         errorHandler.showSuccess(`Referral code created: ${code}`);
 
@@ -1677,6 +1765,96 @@
       } catch (error) {
         console.error('[Home] Error generating referral code:', error);
         errorHandler.handleFirebaseError(error, 'generateReferralCode');
+      }
+    };
+
+    // ── Bulk generate ──
+    window.openBulkGenerateModal = function() {
+      document.getElementById('bulkGenerateNames').value = '';
+      document.getElementById('bulkGenerateBlankCount').value = '1';
+      document.getElementById('bulkGenerateStatus').textContent = '';
+      const btn = document.getElementById('bulkGenerateSubmitBtn');
+      btn.disabled = false;
+      btn.textContent = 'Generate Codes';
+      document.getElementById('bulkGenerateModal').classList.add('active');
+    };
+
+    window.closeBulkGenerateModal = function(event) {
+      if (!event || event.target.classList.contains('custom-modal-overlay')) {
+        document.getElementById('bulkGenerateModal').classList.remove('active');
+      }
+    };
+
+    window.submitBulkGenerate = async function() {
+      const rawNames = document.getElementById('bulkGenerateNames').value;
+      // One name per line; blank/whitespace-only lines are dropped.
+      const names = rawNames
+        .split('\n')
+        .map(n => n.trim())
+        .filter(n => n.length > 0);
+
+      let count, labels;
+      if (names.length > 0) {
+        count = names.length;
+        labels = names;
+      } else {
+        // Blank/whitespace-only textarea — fall back to N unlabeled codes.
+        const blankCount = parseInt(document.getElementById('bulkGenerateBlankCount').value, 10);
+        count = Number.isFinite(blankCount) && blankCount > 0 ? Math.min(blankCount, 100) : 1;
+        labels = new Array(count).fill(null);
+      }
+
+      const btn = document.getElementById('bulkGenerateSubmitBtn');
+      const statusEl = document.getElementById('bulkGenerateStatus');
+      btn.disabled = true;
+
+      const createdCodes = [];
+      try {
+        for (let i = 0; i < labels.length; i++) {
+          btn.textContent = `Generating ${i + 1} of ${count}...`;
+          statusEl.textContent = `Created ${createdCodes.length} of ${count} code${count === 1 ? '' : 's'}...`;
+          const code = await createReferralCode(labels[i]);
+          createdCodes.push({ code, assignedName: labels[i] });
+        }
+
+        // Copy all newly created URLs at once — this is the payoff of bulk-generating:
+        // one clipboard action gets every labeled link ready to hand out.
+        const text = createdCodes
+          .map(c => c.assignedName ? `${c.assignedName}: ${buildReferralUrl(c.code)}` : buildReferralUrl(c.code))
+          .join('\n');
+        let copied = false;
+        if (navigator.clipboard) {
+          try {
+            await navigator.clipboard.writeText(text);
+            copied = true;
+          } catch (clipboardError) {
+            console.warn('[Home] Clipboard copy failed for bulk-generated codes:', clipboardError);
+          }
+        }
+
+        errorHandler.showSuccess(
+          `Created ${createdCodes.length} referral code${createdCodes.length === 1 ? '' : 's'}` +
+          (copied ? ' — URLs copied to clipboard!' : '.')
+        );
+        if (!copied) {
+          prompt('Copy these referral URLs:', text);
+        }
+
+        window.closeBulkGenerateModal();
+        await loadGodData();
+        // If the codes list is currently open, refresh it so the new codes show up.
+        if (document.getElementById('referralCodesModal').classList.contains('active')) {
+          await viewReferralCodes();
+        }
+
+      } catch (error) {
+        console.error('[Home] Error bulk-generating referral codes:', error);
+        statusEl.textContent = `Failed after creating ${createdCodes.length} of ${count} code(s).`;
+        errorHandler.handleFirebaseError(error, 'submitBulkGenerate');
+        await loadGodData();
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate Codes';
       }
     };
 
@@ -1737,6 +1915,9 @@
         message += '\n═'.repeat(60) + '\n';
         message += `Total: ${codes.length} | Available: ${unusedCodes.length} | Used: ${usedCodes.length}`;
 
+        // Cache for copyAllUnusedUrls()
+        referralCodesCache = codes;
+
         // Show custom modal instead of alert
         showReferralCodesModal(codes);
 
@@ -1759,6 +1940,7 @@
         html += '<h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> Available Codes <span style="font-size: 0.75rem; opacity: 0.7; font-weight: normal;">(Click to copy URL)</span></h3>';
         unusedCodes.forEach(c => {
           const createdDate = c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Unknown';
+          const forLine = c.assignedName ? `For: <strong>${escapeHtml(c.assignedName)}</strong><br>` : '';
           html += `
             <div class="code-item clickable-code" onclick="copyReferralUrl('${c.code}')" style="cursor: pointer;" title="Click to copy referral URL">
               <div class="code-item-header">
@@ -1766,7 +1948,7 @@
                 <span class="code-status available">Available</span>
               </div>
               <div class="code-details">
-                Created: ${createdDate}<br>
+                ${forLine}Created: ${createdDate}<br>
                 <span style="color: #c8b37e; font-size: 0.8rem;">Click to copy URL</span>
               </div>
             </div>
@@ -1781,7 +1963,7 @@
         html += '<h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg> Used Codes</h3>';
         usedCodes.forEach(c => {
           const usedDate = c.usedAt ? new Date(c.usedAt).toLocaleDateString() : 'No date';
-          const userName = c.assignedName || c.assignedEmail || 'Unknown';
+          const userName = escapeHtml(c.assignedName || c.assignedEmail || 'Unknown');
           const createdDate = c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Unknown';
           html += `
             <div class="code-item">
@@ -1813,12 +1995,8 @@
 
     // Copy referral URL to clipboard
     window.copyReferralUrl = async function(code) {
+      const referralUrl = buildReferralUrl(code);
       try {
-        // Get current domain
-        const protocol = window.location.protocol;
-        const host = window.location.host;
-        const referralUrl = `${protocol}//${host}/login.html?referralCode=${code}`;
-
         // Copy to clipboard
         await navigator.clipboard.writeText(referralUrl);
 
@@ -1840,11 +2018,31 @@
         console.error('[Home] Error copying referral URL:', error);
 
         // Fallback - show the URL in a prompt
-        const protocol = window.location.protocol;
-        const host = window.location.host;
-        const referralUrl = `${protocol}//${host}/login.html?referralCode=${code}`;
-
         prompt('Copy this referral URL:', referralUrl);
+      }
+    };
+
+    // Copy every currently-unused code's referral URL in one go (one line per code,
+    // prefixed with the assigned name when the code was pre-labeled). Reuses
+    // buildReferralUrl() and the codes list already loaded by viewReferralCodes().
+    window.copyAllUnusedUrls = async function() {
+      const unusedCodes = referralCodesCache.filter(c => !c.used);
+
+      if (unusedCodes.length === 0) {
+        errorHandler.showInfo('No available codes to copy.');
+        return;
+      }
+
+      const text = unusedCodes
+        .map(c => c.assignedName ? `${c.assignedName}: ${buildReferralUrl(c.code)}` : buildReferralUrl(c.code))
+        .join('\n');
+
+      try {
+        await navigator.clipboard.writeText(text);
+        errorHandler.showSuccess(`Copied ${unusedCodes.length} referral URL${unusedCodes.length === 1 ? '' : 's'} to clipboard!`);
+      } catch (error) {
+        console.error('[Home] Error copying all referral URLs:', error);
+        prompt('Copy these referral URLs:', text);
       }
     };
 
