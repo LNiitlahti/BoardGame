@@ -523,15 +523,11 @@
                         <input type="number" id="totalMatches" value="72" min="1" max="500">
                     </div>
                     <div class="setting-row">
-                        <label>Use rotating orders (3 cycles):</label>
+                        <label>Use rotating orders (varied game sequences):</label>
                         <input type="checkbox" id="useRotatingOrders" checked style="width: auto;">
                     </div>
-                    <div class="info-box" style="margin-top: 10px; font-size: 0.7rem;">
-                        <strong>Rotating Orders:</strong><br>
-                        <strong>1:</strong> Predecessor → AoE4 → OW2 → CS2 → WC3 → COD<br>
-                        <strong>2:</strong> CS2 → WC3 → AoE4 → COD → Predecessor → OW2<br>
-                        <strong>3:</strong> AoE4 → Predecessor → COD → WC3 → OW2 → CS2<br>
-                        <em>Each game 3x, then next. After 24 matches → next order (split games count as 2).</em>
+                    <div class="info-box" style="margin-top: 10px; font-size: 0.7rem;" id="rotatingOrdersInfo">
+                        <!-- Rendered by renderRotatingOrdersInfo() -->
                     </div>
                 </div>
 
@@ -706,10 +702,71 @@
         // no tournamentId, the fetch fails, or the tournament has no selected games.
         // Everything stays manually editable afterward either way.
 
+        function shuffleArray(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        /**
+         * Build one rotation per game, each a genuinely DIFFERENT permutation of
+         * the same entry objects (shared refs, so repeat-count edits apply to every
+         * rotation) — like the hand-crafted default orders, instead of plain cyclic
+         * shifts, which keep the same game-after-game pattern all night.
+         *
+         * Constraints over the whole cycling sequence (…rot1 → rot2 → … → rotN → rot1…):
+         *  - every rotation starts with a different game
+         *  - no seam repeat: a rotation never starts with the game the previous one
+         *    ended with (that would merge two blocks into one double-length run)
+         *  - consecutive rotations share at most one same-position game
+         * Falls back to cyclic shifts if the constraints can't be met (tiny pools,
+         * duplicate game rows).
+         */
+        function buildVariedRotations(order) {
+            const n = order.length;
+            const cyclicShifts = () => order.map((_, i) => [...order.slice(i), ...order.slice(0, i)]);
+            if (n < 3) return cyclicShifts();
+
+            for (let attempt = 0; attempt < 100; attempt++) {
+                const rotations = [order.slice()];
+                let ok = true;
+                for (let k = 1; k < n && ok; k++) {
+                    const prev = rotations[k - 1];
+                    let placed = false;
+                    for (let tries = 0; tries < 200 && !placed; tries++) {
+                        const cand = shuffleArray(order.slice());
+                        if (rotations.some(r => r[0].game === cand[0].game)) continue;   // distinct starters
+                        if (cand[0].game === prev[prev.length - 1].game) continue;        // seam repeat
+                        const samePos = cand.filter((e, i) => e.game === prev[i].game).length;
+                        if (samePos > 1) continue;                                        // too similar
+                        rotations.push(cand);
+                        placed = true;
+                    }
+                    if (!placed) ok = false;
+                }
+                if (!ok) continue;
+                const last = rotations[rotations.length - 1];
+                if (last[last.length - 1].game === rotations[0][0].game) continue;        // wrap seam
+                return rotations;
+            }
+            return cyclicShifts();
+        }
+
         function buildOrdersFromGameIds(gameIds) {
             const order = gameIds.map(id => ({ game: id, repeatCount: 3 }));
-            const rotations = order.map((_, i) => [...order.slice(i), ...order.slice(0, i)]);
-            return { order, rotations };
+            return { order, rotations: buildVariedRotations(order) };
+        }
+
+        /**
+         * Keep ROTATING_ORDERS in sync with the edited gameOrder list. Without
+         * this, add/remove/game edits only changed the visible list while
+         * generation (with rotating orders on) kept using stale rotations —
+         * e.g. a removed game silently stayed in the schedule.
+         */
+        function rebuildRotationsFromOrder() {
+            ROTATING_ORDERS = buildVariedRotations(gameOrder);
         }
 
         async function loadGamesFromTournament(tournamentId) {
@@ -752,7 +809,25 @@
             renderGameOrderList();
         });
 
+        function renderRotatingOrdersInfo() {
+            const box = document.getElementById('rotatingOrdersInfo');
+            if (!box) return;
+            const orderLines = ROTATING_ORDERS.map((rot, i) => {
+                const seq = rot.map(e => {
+                    const name = GAMES[e.game]?.name || e.game;
+                    return e.repeatCount === 1 ? name : `${name} ×${e.repeatCount}`;
+                }).join(' → ');
+                return `<strong>${i + 1}:</strong> ${seq}`;
+            }).join('<br>');
+            box.innerHTML = `
+                <strong>Rotating Orders (${ROTATING_ORDERS.length} varied sequences):</strong><br>
+                ${orderLines}<br>
+                <em>Each game runs its repeat count, then the next; after a full pass the next order starts (split games produce 2 match records per play).</em>
+            `;
+        }
+
         function renderGameOrderList() {
+            renderRotatingOrdersInfo();
             const container = document.getElementById('gameOrderList');
             container.innerHTML = gameOrder.map((item, idx) => {
                 const game = GAMES[item.game];
@@ -780,6 +855,7 @@
 
         function addGameToOrder() {
             gameOrder.push({ game: 'cs2', repeatCount: 3 });
+            rebuildRotationsFromOrder();
             renderGameOrderList();
         }
 
@@ -789,11 +865,24 @@
                 return;
             }
             gameOrder.splice(idx, 1);
+            rebuildRotationsFromOrder();
             renderGameOrderList();
         }
 
         function updateGameOrder(idx, field, value) {
             gameOrder[idx][field] = value;
+            if (field === 'game') {
+                // Sequence changed — reshuffle rotations.
+                rebuildRotationsFromOrder();
+            } else if (field === 'repeatCount') {
+                // Sync into every rotation by game id: tournament-loaded
+                // rotations share entry objects (no-op there), but the
+                // hardcoded defaults don't — without this the edit would
+                // silently apply to rotation 1 only.
+                ROTATING_ORDERS.forEach(rot => rot.forEach(e => {
+                    if (e.game === gameOrder[idx].game) e.repeatCount = value;
+                }));
+            }
             renderGameOrderList(); // Re-render to update format badge
         }
 
@@ -1154,39 +1243,37 @@
                 return;
             }
 
-            let lines = [];
-            let currentOrder = 0;
-            let matchesInOrder = 0;
-
-            lines.push('=== 60 MATCHES WITH ROTATING GAME ORDERS ===');
-            lines.push('');
-
-            generatedMatches.forEach((match, idx) => {
-                // Check if we're starting a new rotation order
-                if (match.rotationOrder !== currentOrder) {
-                    currentOrder = match.rotationOrder;
-                    const orderStart = (currentOrder - 1) * 18 + 1;
-                    const orderEnd = Math.min(currentOrder * 18, generatedMatches.length);
-                    lines.push('');
-                    lines.push(`--- ORDER ${currentOrder} (Matches ${orderStart}-${orderEnd}) ---`);
-
-                    // Show which order is being used
-                    const orderGames = ROTATING_ORDERS[currentOrder - 1];
-                    const orderStr = orderGames.map(g => {
-                        const name = GAMES[g.game]?.name || g.game;
-                        // Abbreviate long names
-                        if (name === 'Age of Empires IV') return 'AoE4';
-                        if (name === 'Overwatch 2') return 'OW2';
-                        if (name === 'Warcraft 3') return 'WC3';
-                        return name;
-                    }).join(' → ');
-                    lines.push(`Order: ${orderStr}`);
-                    lines.push('');
-                    matchesInOrder = 0;
+            // Group consecutive matches into rotation-order sections. Group on
+            // CHANGE of rotationOrder (not value): once the rotation cycle wraps,
+            // the same order number legitimately appears again in a later pass.
+            const sections = [];
+            generatedMatches.forEach(match => {
+                const last = sections[sections.length - 1];
+                if (!last || match.rotationOrder !== last.order) {
+                    sections.push({ order: match.rotationOrder, matches: [match] });
+                } else {
+                    last.matches.push(match);
                 }
+            });
 
-                const gameName = GAMES[match.game]?.name || match.game;
-                lines.push(`${String(match.matchNumber).padStart(2, ' ')}. ${gameName}`);
+            let lines = [];
+            lines.push(`=== ${generatedMatches.length} MATCHES WITH ROTATING GAME ORDERS ===`);
+
+            sections.forEach(section => {
+                const first = section.matches[0].matchNumber;
+                const lastNum = section.matches[section.matches.length - 1].matchNumber;
+                lines.push('');
+                lines.push(`--- ORDER ${section.order} (Matches ${first}-${lastNum}) ---`);
+
+                const orderGames = ROTATING_ORDERS[section.order - 1];
+                if (orderGames) {
+                    lines.push(`Order: ${orderGames.map(g => GAMES[g.game]?.name || g.game).join(' → ')}`);
+                }
+                lines.push('');
+                section.matches.forEach(match => {
+                    const gameName = GAMES[match.game]?.name || match.game;
+                    lines.push(`${String(match.matchNumber).padStart(2, ' ')}. ${gameName}`);
+                });
             });
 
             lines.push('');

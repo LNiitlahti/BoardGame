@@ -414,6 +414,11 @@
             <p class="modal-warning">Kept: completed match history, currently <strong>live</strong> matches, and matches scheduled for <strong>future rounds</strong>.</p>
             <p class="modal-danger">YOU CANNOT REVERT THIS! PROCEED WITH CAUTION!</p>
 
+            <label class="modal-warning" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                <input type="checkbox" id="clearFutureRounds" onchange="updateClearQueuePreview()">
+                Also remove <strong>future-round</strong> scheduled matches (the imported schedule)
+            </label>
+
             <div class="clear-queue-preview" id="clearQueuePreview">
                 <!-- Match count preview rendered here -->
             </div>
