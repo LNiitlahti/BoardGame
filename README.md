@@ -30,6 +30,8 @@ At a LAN tournament, an admin queues matches from a central dashboard. Teams pla
 
 **Statistics & Export** — Win rates, player leaderboards, match history charts, and JSON export for post-event analysis.
 
+**Discord Voice Automation** — Configurable per-slot voice channels move players into the right lobby automatically when a match starts, no manual channel-herding needed.
+
 ## How a Tournament Works
 
 ```
@@ -112,7 +114,7 @@ For detailed instructions, see the [Setup Guide](BoardGame/docs/guides/SETUP_GUI
 
 ## Project Status
 
-This project is in **active development**. The lightweight version ran its first live LAN event successfully in February 2026 and proved the concept. Since then, a full-featured version with the OOP module stack (phases, spells, undo/backup, replay, ceremony, and player-facing pages) plus a guided admin flow has taken over as the primary version.
+This project is in **active development**, currently at **v1.0.1-alpha**. The lightweight version ran its first live LAN event successfully in February 2026 and proved the concept. Since then, a full-featured version with the OOP module stack (phases, spells, undo/backup, replay, ceremony, and player-facing pages) plus a guided admin flow has taken over as the primary version — it ran its first live LAN event in August 2026, mostly successfully, with remaining rough edges tracked in `docs/guides/EVENT_BUG_REPORTS.md`.
 
 | Version | Status |
 |---------|--------|
