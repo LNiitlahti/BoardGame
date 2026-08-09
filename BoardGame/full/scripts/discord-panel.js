@@ -126,6 +126,7 @@ const DiscordPanel = {
         const slots = config.slotChannels || {};
         const slot1 = slots['1'] || [];
         const slot2 = slots['2'] || [];
+        const slotChallenge = slots['challenge'] || [];
 
         const noChannels = this._channels.length === 0
             ? `<p style="color: var(--text-tertiary); font-size: 0.85rem;">
@@ -156,6 +157,8 @@ const DiscordPanel = {
                 ${field('Match 1 — side B', 'discordSlot1B', slot1[1])}
                 ${field('Match 2 — side A', 'discordSlot2A', slot2[0])}
                 ${field('Match 2 — side B', 'discordSlot2B', slot2[1])}
+                ${field('Challenge — side A', 'discordSlotChallengeA', slotChallenge[0])}
+                ${field('Challenge — side B', 'discordSlotChallengeB', slotChallenge[1])}
             </div>
             <div style="display:flex; gap:10px;">
                 <button class="btn primary" onclick="DiscordPanel.saveSetup()">Save setup</button>
@@ -184,7 +187,8 @@ const DiscordPanel = {
             waitingRoomChannelId: value('discordWaitingRoom'),
             slotChannels: {
                 '1': [value('discordSlot1A'), value('discordSlot1B')],
-                '2': [value('discordSlot2A'), value('discordSlot2B')]
+                '2': [value('discordSlot2A'), value('discordSlot2B')],
+                'challenge': [value('discordSlotChallengeA'), value('discordSlotChallengeB')]
             }
         };
 

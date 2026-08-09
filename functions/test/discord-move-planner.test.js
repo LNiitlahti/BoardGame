@@ -4,7 +4,7 @@ const { planMoves, isCommandCurrent } = require('../lib/discord-move-planner');
 
 const CONFIG = {
     waitingRoomChannelId: 'chWait',
-    slotChannels: { '1': ['chAlpha', 'chBravo'], '2': ['chCharlie', 'chDelta'] }
+    slotChannels: { '1': ['chAlpha', 'chBravo'], '2': ['chCharlie', 'chDelta'], challenge: ['chEcho', 'chFoxtrot'] }
 };
 
 const TEAMS = [
@@ -37,6 +37,15 @@ test('slot 2 uses the second channel pair', () => {
         match: MATCH, teams: TEAMS, slot: '2', direction: 'pull', links: LINKS, config: CONFIG
     });
     assert.deepStrictEqual([...new Set(moves.map(m => m.channelId))], ['chCharlie', 'chDelta']);
+});
+
+test('challenge slot uses its own configured channel pair', () => {
+    const { moves } = planMoves({
+        match: MATCH, teams: TEAMS, slot: 'challenge', direction: 'pull', links: LINKS, config: CONFIG
+    });
+    assert.deepStrictEqual(moves.map(m => [m.discordUserId, m.channelId]), [
+        ['dA', 'chEcho'], ['dB', 'chEcho'], ['dC', 'chFoxtrot']
+    ]);
 });
 
 test('return sends everyone to the waiting room regardless of side', () => {
