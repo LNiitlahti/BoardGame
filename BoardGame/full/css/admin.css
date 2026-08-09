@@ -501,9 +501,9 @@ h1, h2, h3, h4, h5, h6 {
    (see below) so armed/waiting-for-target reads identically across every
    tap-to-select interaction site. */
 .team-header.tap-armed {
-    border-radius: var(--radius-sm);
-    box-shadow: 0 0 0 2px rgba(77,163,255,0.35);
+    border-color: #4da3ff;
     background: rgba(77,163,255,0.12);
+    box-shadow: 0 0 0 2px rgba(77,163,255,0.35);
 }
 
 .team-name {
@@ -582,8 +582,9 @@ h1, h2, h3, h4, h5, h6 {
 /* Tap-to-select "armed" state -- see .team-header.tap-armed for the shared
    visual language across tap-to-select interaction sites. */
 .player-item.tap-armed {
-    box-shadow: 0 0 0 2px rgba(77,163,255,0.35);
+    border-color: #4da3ff;
     background: rgba(77,163,255,0.12);
+    box-shadow: 0 0 0 2px rgba(77,163,255,0.35);
 }
 
 .player-drag-handle {
@@ -857,13 +858,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Tap-to-select "armed" state -- see .team-header.tap-armed for the shared
-   visual language across tap-to-select interaction sites. A drop-zone only
-   ever becomes the *target* of a valid placement in normal use, but it can
-   be tapped first (arming it) before the source/target rule re-arms to
-   whatever's tapped next, so it needs its own visible armed state too. */
+   visual language across tap-to-select interaction sites. A drop-zone can be
+   the first or second tap (either order is a valid placement -- see
+   setupMatchAssignmentTapToSelect's isValidTarget), so it needs its own
+   visible armed state too. */
 .drop-zone.tap-armed {
     border-color: #4da3ff;
-    border-style: solid;
     background: rgba(77,163,255,0.12);
     box-shadow: 0 0 0 2px rgba(77,163,255,0.35);
 }

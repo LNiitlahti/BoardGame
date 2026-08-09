@@ -45,6 +45,10 @@
  *   optional guard; return false to reject a candidate target (e.g. a
  *   locked seat). When rejected, the tapped element is armed instead
  *   (matches the natural "I meant to pick this one" expectation).
+ * @param {(targetEl: Element, sourceEl: Element) => void} [options.onInvalidTarget] -
+ *   optional callback fired right before the re-arm described above, so a
+ *   call site can surface a brief toast/status message explaining why the
+ *   tap didn't complete anything (e.g. "tap a team/player then a side").
  * @param {string} [options.selectedClass='tap-armed'] - CSS class toggled
  *   on the currently armed item for visual feedback.
  * @param {AbortSignal} [options.signal] - forwarded to addEventListener so
@@ -58,6 +62,7 @@ function setupTapToSelect(options) {
         getKey,
         onSelect,
         isValidTarget,
+        onInvalidTarget,
         selectedClass = 'tap-armed',
         signal,
     } = options;
@@ -100,6 +105,7 @@ function setupTapToSelect(options) {
         // Tapped a different item while one is armed -> attempt placement.
         if (typeof isValidTarget === 'function' && !isValidTarget(itemEl, armedEl)) {
             // Invalid target: re-arm to the newly tapped item instead of a no-op.
+            if (typeof onInvalidTarget === 'function') onInvalidTarget(itemEl, armedEl);
             clearSelection();
             arm(itemEl);
             return;
@@ -889,7 +895,7 @@ function renderTeamsList() {
                      data-team-id="${team.id}"
                      ondragstart="dragTeam(event, ${team.id})"
                      ondragend="dragEnd(event)"
-                     title="Drag to add entire team, or tap to add and then tap a side">
+                     title="Drag to add entire team, or tap this and a side (either one first)">
                     <span class="team-name" style="color: ${teamColor}">${team.name || 'Team ' + team.id}</span>
                     <span class="team-wins">${team.gamesWon || 0} wins</span>
                 </div>
@@ -2251,6 +2257,14 @@ function assignPlayerToSide(player, sideIndex) {
  * their unchanging parent, so -- unlike setupSeatingDragDrop(), which has to
  * re-run after every render of a modal that's opened fresh each time -- this
  * only needs to be set up once, at page init.
+ *
+ * Either tap order works, the way native drag-and-drop's "drag FROM a
+ * source TO a target" doesn't actually care which element the interaction
+ * conceptually starts from -- only that one end is a team/player and the
+ * other is a side. isValidTarget below judges the (armed, tapped) pair by
+ * TYPE, not by which one happened to be armed first, so tapping a drop-zone
+ * first is a legitimate arm (it's the other tap, the team/player, that
+ * completes it) rather than a dead end.
  */
 let _matchAssignTapAbort = null;
 
@@ -2271,21 +2285,30 @@ function setupMatchAssignmentTapToSelect() {
             return `team:${el.dataset.teamId}`;
         },
         isValidTarget: (targetEl, sourceEl) => {
-            // Only a team/player source armed against a side drop-zone target
-            // is a valid placement -- matches what native drag-and-drop
-            // accepts (drop-zones are the only ondrop targets).
-            const sourceIsUnit = sourceEl.classList.contains('team-header') || sourceEl.classList.contains('player-item');
-            const targetIsDropZone = targetEl.classList.contains('drop-zone');
-            return sourceIsUnit && targetIsDropZone;
+            // A valid pair is one team/player + one drop-zone, in EITHER
+            // order -- judge both taps by type, not by which one happened to
+            // be armed first, so tapping a drop-zone first is a real arm
+            // (waiting for a team/player) rather than a guaranteed dead end.
+            const isUnit = (el) => el.classList.contains('team-header') || el.classList.contains('player-item');
+            const isDropZone = (el) => el.classList.contains('drop-zone');
+            return (isUnit(sourceEl) && isDropZone(targetEl)) || (isDropZone(sourceEl) && isUnit(targetEl));
+        },
+        onInvalidTarget: () => {
+            showStatus('Tap a team/player and a match side (either one first) to assign', 'warning');
         },
         onSelect: (sourceEl, targetEl) => {
-            const sideIndex = parseInt(targetEl.dataset.sideIndex, 10);
-            if (sourceEl.classList.contains('team-header')) {
-                const teamId = parseInt(sourceEl.dataset.teamId, 10);
+            // Either tap could have been the drop-zone or the team/player --
+            // figure out which is which rather than assuming sourceEl is
+            // always the unit (see isValidTarget above).
+            const zoneEl = sourceEl.classList.contains('drop-zone') ? sourceEl : targetEl;
+            const unitEl = zoneEl === sourceEl ? targetEl : sourceEl;
+            const sideIndex = parseInt(zoneEl.dataset.sideIndex, 10);
+            if (unitEl.classList.contains('team-header')) {
+                const teamId = parseInt(unitEl.dataset.teamId, 10);
                 assignTeamToSide(teamId, sideIndex);
-            } else if (sourceEl.classList.contains('player-item')) {
-                const teamId = parseInt(sourceEl.dataset.teamId, 10);
-                const playerIndex = parseInt(sourceEl.dataset.playerIndex, 10);
+            } else if (unitEl.classList.contains('player-item')) {
+                const teamId = parseInt(unitEl.dataset.teamId, 10);
+                const playerIndex = parseInt(unitEl.dataset.playerIndex, 10);
                 const team = gameState?.teams?.find(t => t.id === teamId);
                 const player = team?.players?.[playerIndex];
                 if (!player) return;
@@ -2325,7 +2348,7 @@ function renderMatchCreationZones() {
                  ondrop="dropToSide(event, ${idx})"
                  ondragover="allowDrop(event)"
                  ondragleave="dragLeave(event)"
-                 title="Drop a team/player, or tap an armed team/player then tap here">
+                 title="Drop a team/player, or tap this and a team/player (either one first)">
                 <span class="placeholder">Drop or Tap Team/Player ${label}</span>
                 <div class="side-players">${playersHtml}</div>
             </div>
@@ -4281,6 +4304,19 @@ function closeAutoMatchModal() {
 // MATCH QUEUE
 // =============================================================================
 
+/**
+ * Shared onclick handler for both queue-item template branches (break and
+ * regular match). The card itself opens the quick-confirm modal on tap, but
+ * a tap on the drag-handle is reserved for the tap-to-select reorder path
+ * (setupQueueTapToSelect) and native drag, so it must not also open the
+ * modal. Previously this guard was duplicated inline in each branch's
+ * onclick attribute; centralized here so there's one place to fix it.
+ */
+function handleQueueItemClick(event, queueId) {
+    if (event.target.closest('.drag-handle')) return;
+    openQuickConfirm(queueId);
+}
+
 function renderMatchQueue() {
     const container = document.getElementById('matchQueue');
     const countEl = document.getElementById('queueCount');
@@ -4312,6 +4348,11 @@ function renderMatchQueue() {
 
     if (allToRender.length === 0) {
         container.innerHTML = '<p class="queue-empty">No matches in queue</p>';
+        // Re-run the tap-to-select listener lifecycle (abort + recreate)
+        // here too, same as the non-empty path below -- keeps the abort
+        // controller in sync with what's actually in the DOM even though an
+        // empty queue has nothing to arm today.
+        setupQueueTapToSelect();
         return;
     }
 
@@ -4326,7 +4367,7 @@ function renderMatchQueue() {
                 <div class="queue-item ${isOngoing ? 'ongoing' : ''} break"
                      draggable="${!isOngoing}"
                      data-queue-id="${game.id}"
-                     onclick="if (!event.target.closest('.drag-handle')) openQuickConfirm(${game.id})"
+                     onclick="handleQueueItemClick(event, ${game.id})"
                      ondragstart="dragQueueItem(event, ${game.id})"
                      ondragover="allowQueueDrop(event)"
                      ondragleave="leaveQueueDrop(event)"
@@ -4398,7 +4439,7 @@ function renderMatchQueue() {
             <div class="queue-item ${isOngoing ? 'ongoing' : ''} ${isChallenge ? 'challenge' : ''}${isFutureRound(game) ? ' future-round' : ''}"
                  draggable="${!isOngoing}"
                  data-queue-id="${game.id}"
-                 onclick="if (!event.target.closest('.drag-handle')) openQuickConfirm(${game.id})"
+                 onclick="handleQueueItemClick(event, ${game.id})"
                  ondragstart="dragQueueItem(event, ${game.id})"
                  ondragover="allowQueueDrop(event)"
                  ondragleave="leaveQueueDrop(event)"
@@ -4438,12 +4479,13 @@ function renderMatchQueue() {
  * "the grab point" for reordering (native drag also grabs from anywhere on
  * the card, but this is the icon that visually signals it). Tapping
  * elsewhere on a card keeps its existing behaviour untouched (see the
- * `event.target.closest('.drag-handle')` guard on each card's onclick).
+ * shared handleQueueItemClick() guard used by each card's onclick).
  *
  * Ongoing matches can't be reordered (mirrors `draggable="${!isOngoing}"`
- * on the native path), so their handles are excluded from the selector
- * entirely via `:not(.ongoing)` rather than duplicating that guard inside
- * a callback.
+ * on the native path). Their handles are excluded from the itemSelector
+ * string via `:not(.ongoing)`, and isValidTarget re-checks the same
+ * exclusion as a second layer, so a future change to the selector or DOM
+ * structure can't silently break the guard.
  */
 let _queueTapAbort = null;
 
@@ -4458,10 +4500,22 @@ function setupQueueTapToSelect() {
         return item ? parseInt(item.dataset.queueId, 10) : null;
     };
 
+    // Ongoing matches are excluded from reordering primarily via the
+    // ':not(.ongoing)' clause in itemSelector below, matching the native
+    // drag path's `draggable="${!isOngoing}"`. isValidTarget re-checks the
+    // same exclusion as a second layer of defense -- if the selector string
+    // or DOM structure ever drifts, this still refuses to complete a
+    // placement involving an ongoing match instead of silently allowing it.
+    const isReorderable = (handleEl) => {
+        const item = handleEl.closest('.queue-item');
+        return !!item && !item.classList.contains('ongoing');
+    };
+
     setupTapToSelect({
         container,
         itemSelector: '.queue-item:not(.ongoing) .drag-handle',
         getKey: getQueueId,
+        isValidTarget: (targetEl, sourceEl) => isReorderable(targetEl) && isReorderable(sourceEl),
         onSelect: (sourceEl, targetEl) => {
             const draggedId = getQueueId(sourceEl);
             const targetId = getQueueId(targetEl);
