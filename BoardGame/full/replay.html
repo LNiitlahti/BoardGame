@@ -732,8 +732,33 @@
     // user-stopped-sharing mid-capture, manual Stop, recorder error) funnels
     // through finishVideoExport() so the UI/speed always get restored.
     let videoExportState = null;
+    let videoExportStatusHideTimer = null; // pending fade-out timeout, so overlapping exports can't stray
 
     const VIDEO_EXPORT_SPEED = 5; // fast but still watchable default
+
+    function scheduleVideoExportStatusHide(delayMs) {
+        if (videoExportStatusHideTimer) clearTimeout(videoExportStatusHideTimer);
+        videoExportStatusHideTimer = setTimeout(() => showVideoExportStatus(false), delayMs);
+    }
+
+    // If the admin navigates away or closes the tab mid-export, stop the
+    // in-flight recorder and shared-screen tracks so nothing keeps running
+    // (or leaking a live screen share) after the page is gone. Saving the
+    // partial video isn't reliably possible on unload, so this is cleanup
+    // only — no finalize/download attempt.
+    function teardownVideoExportOnUnload() {
+        if (!videoExportState?.active) return;
+        try {
+            const recorder = videoExportState.mediaRecorder;
+            if (recorder && recorder.state !== 'inactive') recorder.stop();
+        } catch (err) {
+            console.warn('Error stopping recorder on unload:', err);
+        }
+        videoExportState.stream?.getTracks().forEach(t => t.stop());
+        videoExportState.active = false;
+    }
+    window.addEventListener('beforeunload', teardownVideoExportOnUnload);
+    window.addEventListener('pagehide', teardownVideoExportOnUnload);
 
     function pickVideoMimeType() {
         if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
@@ -745,10 +770,10 @@
         if (!replayEngine || replayEngine.totalActions === 0) return;
         if (videoExportState?.active) return; // export already running
 
-        if (!navigator.mediaDevices?.getDisplayMedia) {
-            setVideoExportText('Screen recording is not supported in this browser.');
+        if (!navigator.mediaDevices?.getDisplayMedia || !window.MediaRecorder) {
+            setVideoExportText('Screen recording is not supported in this browser (missing screen capture or video recording support).');
             showVideoExportStatus(true);
-            setTimeout(() => showVideoExportStatus(false), 4000);
+            scheduleVideoExportStatusHide(4000);
             return;
         }
 
@@ -757,6 +782,8 @@
         replayEngine.pause();
         updatePlayButton();
         const originalSpeed = replayEngine.speed;
+        const originalAction = replayEngine.currentAction;
+        const originalSequenceNumber = originalAction ? originalAction.sequenceNumber : replayEngine.minSequenceNumber;
 
         let stream;
         try {
@@ -769,7 +796,7 @@
             console.warn('Screen share not granted:', err);
             setVideoExportText('Video export cancelled — screen sharing was not granted.');
             showVideoExportStatus(true);
-            setTimeout(() => showVideoExportStatus(false), 3500);
+            scheduleVideoExportStatusHide(3500);
             return;
         }
 
@@ -782,7 +809,7 @@
             stream.getTracks().forEach(t => t.stop());
             setVideoExportText('Recording could not be started on this browser.');
             showVideoExportStatus(true);
-            setTimeout(() => showVideoExportStatus(false), 4000);
+            scheduleVideoExportStatusHide(4000);
             return;
         }
 
@@ -790,7 +817,13 @@
         mediaRecorder.ondataavailable = (e) => {
             if (e.data && e.data.size > 0) chunks.push(e.data);
         };
-        mediaRecorder.onstop = () => finalizeVideoExport(mimeType);
+        mediaRecorder.onstop = () => {
+            // Only stop the tracks once the recorder has actually flushed its
+            // buffered data (onstop fired) — stopping them right after calling
+            // .stop() risks tearing the stream down before it's fully done.
+            videoExportState?.stream?.getTracks().forEach(t => t.stop());
+            finalizeVideoExport(mimeType);
+        };
         mediaRecorder.onerror = (e) => {
             console.error('MediaRecorder error:', e);
             if (videoExportState) videoExportState.stoppedReason = 'A recording error occurred.';
@@ -803,6 +836,7 @@
             chunks,
             mimeType,
             originalSpeed,
+            originalSequenceNumber,
             active: true,
             seenPlaying: false,       // becomes true once play() has actually started stepping
             startTime: Date.now(),
@@ -888,14 +922,15 @@
 
         const recorder = videoExportState.mediaRecorder;
         if (recorder && recorder.state !== 'inactive') {
+            // Tracks are stopped inside onstop, once the recorder has fully
+            // flushed its buffered data (see onstop handler above).
             recorder.stop(); // -> onstop -> finalizeVideoExport()
         } else {
-            // Recorder never got going — finalize directly so the UI doesn't
-            // get stuck waiting for an onstop that will never fire.
+            // Recorder never got going — no onstop will fire, so stop the
+            // tracks and finalize directly instead of waiting forever.
+            videoExportState.stream?.getTracks().forEach(t => t.stop());
             finalizeVideoExport(videoExportState.mimeType);
         }
-
-        videoExportState.stream?.getTracks().forEach(t => t.stop());
     }
 
     function cancelVideoExport() {
@@ -931,11 +966,16 @@
             btn.textContent = 'Export Video';
         }
 
-        // Restore the speed the user had selected before export started, and
-        // leave playback paused rather than mid-fast-forward.
-        if (replayEngine) setSpeed(videoExportState?.originalSpeed || 1);
+        // Restore the speed and scrub position the user had before export
+        // started, and leave playback paused rather than mid-fast-forward.
+        if (replayEngine) {
+            setSpeed(videoExportState?.originalSpeed || 1);
+            if (videoExportState?.originalSequenceNumber !== undefined) {
+                replayEngine.seekToAction(videoExportState.originalSequenceNumber);
+            }
+        }
 
-        setTimeout(() => showVideoExportStatus(false), 4000);
+        scheduleVideoExportStatusHide(4000);
 
         videoExportState = null;
     }
