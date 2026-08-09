@@ -109,7 +109,14 @@
 <div class="piece" id="p9">
   <span class="status running">running</span>
   <h2>P9 — Apply pattern to remaining 3 DnD sites</h2>
-  <p>Team/player assignment, match-side drop zones, queue reordering — using P8's now-proven <code>setupTapToSelect()</code> pattern, with the same harsh-critic + fix-until-clean process per site.</p>
+  <p>Team/player assignment, match-side drop zones, queue reordering — using P8's now-proven <code>setupTapToSelect()</code> pattern, with the same harsh-critic + fix-until-clean process per site. Note: "team/player assignment" and "match-side drop zones" turned out to be one interaction site, not two — a piece-decomposition mistake caught during merge (both competing implementations independently touched the same functions). Ported the one real fix the redundant candidate found (a tap-to-select/click-bubbling bug on the remove-player button) rather than merging duplicate work.</p>
+</div>
+
+<div class="round">Round 5 — video export (queued, after round 4 wraps)</div>
+<div class="piece" id="p10">
+  <span class="status pending">scoped, not started</span>
+  <h2>P10 — Export tournament replay as video</h2>
+  <p>User request: after a tournament finishes, export its replay as a video file so players can relive the story. Scoped: source is the full scrubbable replay (replay.html/replay-engine.js), not the separate one-shot cinematic outro on view.html (different, DOM/CSS-animated subsystem, no shared code). Capture via the browser's screen/tab-share picker (<code>getDisplayMedia()</code> + <code>MediaRecorder</code>) — client-side, zero new dependencies. User confirmed the one-time capture-permission prompt per export is an acceptable trade-off over rearchitecting replay.html onto Canvas for direct <code>captureStream()</code>.</p>
 </div>
 
 <div class="piece">
