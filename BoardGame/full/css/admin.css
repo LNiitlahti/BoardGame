@@ -3031,7 +3031,7 @@ body.effect-hex-images .hex-label { z-index: 1; }
    desktop layout. Give it its own tier: tighter side columns and reduced
    padding/type scale so nothing overlaps or gets clipped, without going
    all the way to the 900px single-column collapse. */
-@media (max-width: 1194px) {
+@media (max-width: 1194px) and (min-width: 901px) {
     .admin-layout {
         grid-template-columns: 170px 1fr 250px;
         gap: 10px;

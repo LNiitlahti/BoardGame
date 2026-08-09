@@ -110,6 +110,16 @@ function setupTapToSelect(options) {
         onSelect(sourceEl, itemEl);
     }, { signal });
 
+    // Clicking completely outside the container (e.g. a modal close button,
+    // or the modal backdrop) leaves no chance for the container's own click
+    // listener above to fire, so the armed visual state would otherwise
+    // linger until the next full re-render. Catch those here.
+    document.addEventListener('click', (e) => {
+        if (!armedEl) return;
+        if (container.contains(e.target)) return;
+        clearSelection();
+    }, { signal });
+
     return {
         clear: clearSelection,
         get armedKey() { return armedEl ? getKey(armedEl) : null; },
