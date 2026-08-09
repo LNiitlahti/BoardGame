@@ -8,6 +8,115 @@
  */
 
 // =============================================================================
+// TAP-TO-SELECT INTERACTION HELPER
+// =============================================================================
+/**
+ * Generic tap-to-select / tap-to-place interaction, meant to sit ALONGSIDE
+ * existing native HTML5 drag-and-drop on the same elements (not replace it).
+ * Native drag events (dragstart/dragover/drop) never fire on iOS/iPadOS
+ * Safari, so admins on a tablet had no way to reorder/reassign anything.
+ * This gives a second path that works identically for mouse clicks and
+ * touch taps: tap an item to "arm" it, tap a destination item to complete
+ * the move, tap the armed item again (or empty space) to cancel.
+ *
+ * Reusable across interaction sites (seating order, team/player assignment,
+ * match-side drop zones, match-queue reordering) — each call site supplies
+ * its own container/selector/key/callback, no shared DOM assumptions.
+ *
+ * Uses event delegation on `container` (one click listener, not one per
+ * item), so it survives re-renders that replace item elements as long as
+ * setupTapToSelect() is called again after each re-render — same lifecycle
+ * as the native drag-and-drop setup functions already in this file. Pass an
+ * AbortController `signal` (same one used for the drag/drop listeners on a
+ * re-render) so both interaction paths get cleaned up together.
+ *
+ * @param {Object} options
+ * @param {Element} options.container - scopes the delegated click listener;
+ *   also used as the "empty space" boundary (a click outside any item, but
+ *   still inside this container's page area, cancels the current selection).
+ * @param {string} options.itemSelector - CSS selector (relative to
+ *   container) for tappable/droppable item elements.
+ * @param {(el: Element) => *} options.getKey - returns a comparable
+ *   identifier for an item element (e.g. seat number, player id).
+ * @param {(sourceEl: Element, targetEl: Element) => void} options.onSelect -
+ *   called once a source item is armed and a *different*, valid target item
+ *   is tapped. Perform the actual swap/move/assignment here.
+ * @param {(targetEl: Element, sourceEl: Element) => boolean} [options.isValidTarget] -
+ *   optional guard; return false to reject a candidate target (e.g. a
+ *   locked seat). When rejected, the tapped element is armed instead
+ *   (matches the natural "I meant to pick this one" expectation).
+ * @param {string} [options.selectedClass='tap-armed'] - CSS class toggled
+ *   on the currently armed item for visual feedback.
+ * @param {AbortSignal} [options.signal] - forwarded to addEventListener so
+ *   the listener is cleaned up alongside other listeners on re-render.
+ * @returns {{ clear: () => void, get armedKey(): * }}
+ */
+function setupTapToSelect(options) {
+    const {
+        container,
+        itemSelector,
+        getKey,
+        onSelect,
+        isValidTarget,
+        selectedClass = 'tap-armed',
+        signal,
+    } = options;
+
+    if (!container) return { clear() {}, get armedKey() { return null; } };
+
+    let armedEl = null;
+
+    function clearSelection() {
+        if (armedEl) armedEl.classList.remove(selectedClass);
+        armedEl = null;
+    }
+
+    function arm(el) {
+        armedEl = el;
+        armedEl.classList.add(selectedClass);
+    }
+
+    container.addEventListener('click', (e) => {
+        const itemEl = e.target.closest(itemSelector);
+
+        // Tapped empty space (no item under the tap) -> cancel any selection.
+        if (!itemEl || !container.contains(itemEl)) {
+            clearSelection();
+            return;
+        }
+
+        // Nothing armed yet -> arm this item.
+        if (!armedEl) {
+            arm(itemEl);
+            return;
+        }
+
+        // Tapped the already-armed item again -> cancel.
+        if (armedEl === itemEl) {
+            clearSelection();
+            return;
+        }
+
+        // Tapped a different item while one is armed -> attempt placement.
+        if (typeof isValidTarget === 'function' && !isValidTarget(itemEl, armedEl)) {
+            // Invalid target: re-arm to the newly tapped item instead of a no-op.
+            clearSelection();
+            arm(itemEl);
+            return;
+        }
+
+        const sourceEl = armedEl;
+        clearSelection();
+        onSelect(sourceEl, itemEl);
+    }, { signal });
+
+    return {
+        clear: clearSelection,
+        get armedKey() { return armedEl ? getKey(armedEl) : null; },
+    };
+}
+
+// =============================================================================
 // GLOBAL STATE
 // =============================================================================
 
@@ -1375,6 +1484,24 @@ function setupSeatingDragDrop() {
                 swapSeatingPositions(draggedSeat, targetSeat);
             }
         }, { signal });
+    });
+
+    // Tap-to-select path (mouse click OR touch tap), for devices where
+    // native HTML5 drag-and-drop above never fires (iOS/iPadOS Safari).
+    // Delegated on the shared wrapper so it works across both walls and
+    // survives the per-render listener churn via the same abort signal.
+    const seatingColumns = document.querySelector('.seating-columns');
+    setupTapToSelect({
+        container: seatingColumns,
+        itemSelector: '.seating-item',
+        getKey: (el) => parseInt(el.dataset.seat),
+        onSelect: (sourceEl, targetEl) => {
+            const sourceSeat = parseInt(sourceEl.dataset.seat);
+            const targetSeat = parseInt(targetEl.dataset.seat);
+            swapSeatingPositions(sourceSeat, targetSeat);
+        },
+        selectedClass: 'tap-armed',
+        signal,
     });
 }
 

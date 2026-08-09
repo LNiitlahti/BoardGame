@@ -2793,6 +2793,15 @@ body.challenge-hex-picking .challenge-hex-pick-banner {
     background: rgba(200,179,126,0.08);
 }
 
+/* Tap-to-select "armed" state: the seat waiting for a destination tap.
+   Visually distinct from .drag-over (native drag hover) so it's obvious
+   which interaction path produced the highlight. */
+.seating-item.tap-armed {
+    border-color: #4da3ff;
+    background: rgba(77,163,255,0.12);
+    box-shadow: 0 0 0 2px rgba(77,163,255,0.35);
+}
+
 .seating-drag-handle {
     color: var(--text-dim);
     cursor: grab;
@@ -3015,6 +3024,28 @@ body.effect-hex-images .hex-label { z-index: 1; }
 
     .stat-badges { gap: 10px; }
     .stat-value { font-size: 18px; }
+}
+
+/* iPad landscape (~1024-1194px logical width) falls between the 1200px and
+   900px tiers above and gets squeezed into an overly-narrow 3-column
+   desktop layout. Give it its own tier: tighter side columns and reduced
+   padding/type scale so nothing overlaps or gets clipped, without going
+   all the way to the 900px single-column collapse. */
+@media (max-width: 1194px) {
+    .admin-layout {
+        grid-template-columns: 170px 1fr 250px;
+        gap: 10px;
+    }
+
+    .teams-column,
+    .queue-column,
+    .queue-panel {
+        padding: 10px;
+    }
+
+    .stat-badges { gap: 6px; }
+    .stat-value { font-size: 16px; }
+    .stat-badge { padding: 6px 8px; }
 }
 
 @media (max-width: 900px) {
