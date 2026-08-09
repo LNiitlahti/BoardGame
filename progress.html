@@ -85,10 +85,25 @@
   <p>Surfaced an unrelated pre-existing bug while checking: login.html's registration write sets 5 fields on a referralCodes doc, but firestore.rules restricts the diff to just 2 (used, assignedTo) — if the real (non-temp) ruleset is deployed, marking a code used at registration may fail. Logged to TODO.md; not fixed this round (needs the user's call on which ruleset is actually live, an open question that predates this pass).</p>
 </div>
 
-<div class="round">Round 3+ — large/cross-cutting (scoped later)</div>
-<div class="piece"><span class="status pending">pending</span><h2>Mobile/iPad admin touch support</h2></div>
-<div class="piece"><span class="status pending">pending</span><h2>Challenge concurrency (2-slot model)</h2></div>
-<div class="piece"><span class="status pending">pending</span><h2>Season-wide statistics</h2></div>
+<div class="round">Round 3 — large/cross-cutting</div>
+
+<div class="piece">
+  <span class="status running">running</span>
+  <h2>P7 — Season-wide statistics page</h2>
+  <p>seasons/{id}.tournamentIds[] exists but is purely organizational — nothing reads it downstream. Adding a season-standings view that aggregates each linked tournament's results. Well-scoped, additive, no schema risk — proceeding autonomously.</p>
+</div>
+
+<div class="piece">
+  <span class="status blocked">needs your input before an autonomous build</span>
+  <h2>Mobile/iPad admin touch support</h2>
+  <p>Blocker isn't layout, it's 4 separate native-HTML5-drag-and-drop interactions (seating order, team/player assignment, match-side drop zones, queue reordering) that don't fire at all on iOS/iPadOS Safari. Real scope is "replace 4 DnD interactions with a touch-compatible pattern," not a CSS pass — too large/risky to guess a UX pattern for without your steer on tap-to-select vs. a pointer-events DnD library, and which interaction to prioritize first.</p>
+</div>
+
+<div class="piece">
+  <span class="status blocked">needs your input before an autonomous build</span>
+  <h2>Challenge concurrency (2-slot model) + multi-hex bundling</h2>
+  <p>Concurrency and the bipartite-split resolution mechanic are decided (see TODO.md 2026-08-09 entries), but the odd-cycle validation policy and the "challenge filler game" scope are explicitly not fully thought out yet per your own notes — implementing this now would mean a swarm guessing at open game-design questions in a live-tournament system. Recommend scoping this one with you directly before building.</p>
+</div>
 
 </body>
 </html>
