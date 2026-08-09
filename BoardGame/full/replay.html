@@ -748,6 +748,12 @@
     // only — no finalize/download attempt.
     function teardownVideoExportOnUnload() {
         if (!videoExportState?.active) return;
+        if (videoExportState.pollTimer) clearInterval(videoExportState.pollTimer);
+        try {
+            replayEngine?.pause();
+        } catch (err) {
+            console.warn('Error pausing replay on unload:', err);
+        }
         try {
             const recorder = videoExportState.mediaRecorder;
             if (recorder && recorder.state !== 'inactive') recorder.stop();
@@ -769,6 +775,15 @@
     async function exportVideo() {
         if (!replayEngine || replayEngine.totalActions === 0) return;
         if (videoExportState?.active) return; // export already running
+
+        // A previous export's fade-out timer could still be pending (e.g. the
+        // admin clicked Export Video again within a few seconds of the last
+        // one finishing) -- clear it now so it can't fire mid-way through
+        // THIS export and hide its live status/progress text.
+        if (videoExportStatusHideTimer) {
+            clearTimeout(videoExportStatusHideTimer);
+            videoExportStatusHideTimer = null;
+        }
 
         if (!navigator.mediaDevices?.getDisplayMedia || !window.MediaRecorder) {
             setVideoExportText('Screen recording is not supported in this browser (missing screen capture or video recording support).');
