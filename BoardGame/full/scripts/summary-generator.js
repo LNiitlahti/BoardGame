@@ -99,9 +99,15 @@ class SummaryGenerator {
             const hearts = this._finalState.heartHexControl || {};
             const heartCount = Object.values(hearts).filter(tid => String(tid) === String(team.id)).length;
 
-            // Count spells cast
+            // Count spells cast. Two action types are in use: spell_cast is
+            // god.html's digital casting flow; spell_used_manual is the
+            // admin.html spell-log bar, finalized into the action log by
+            // _clearSpellPhaseState() when the window closes. Spells are
+            // physical-at-the-table by default, so counting only spell_cast
+            // showed 0 spells for every admin-run tournament.
             const spellsCast = this._actions.filter(a =>
-                a.actionType === 'spell_cast' && String(a.payload?.teamId) === String(team.id)
+                (a.actionType === 'spell_cast' || a.actionType === 'spell_used_manual') &&
+                String(a.payload?.teamId) === String(team.id)
             ).length;
 
             // Points history (per-round points)
@@ -222,7 +228,16 @@ class SummaryGenerator {
 
             const matchesPlayed = roundActions.filter(a => a.actionType === 'match_result_confirmed').length;
             const hexesPlaced = roundActions.filter(a => a.actionType === 'plate_placed').length;
-            const spellsCast = roundActions.filter(a => a.actionType === 'spell_cast').length;
+            // spell_used_manual entries are written when the spell WINDOW
+            // closes, so their top-level roundNumber can be stamped after a
+            // phase jump (setPhaseDirect finalizes late); the payload carries
+            // the round the window actually belonged to. spell_cast is logged
+            // in the moment, so the top-level stamp is fine there.
+            const spellsCast = this._actions.filter(a =>
+                (a.actionType === 'spell_cast' && a.roundNumber === round) ||
+                (a.actionType === 'spell_used_manual' &&
+                 (a.payload?.roundNumber ?? a.roundNumber) === round)
+            ).length;
 
             // Points awarded this round
             const pointsAction = roundActions.find(a => a.actionType === 'points_awarded');
