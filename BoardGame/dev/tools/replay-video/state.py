@@ -115,3 +115,36 @@ def apply_action(state, action):
         }
 
     return None
+
+
+class TileChangeTracker:
+    """Tracks the last `capacity` tile-change events for the recency glow.
+    Re-changing an already-tracked coord refreshes it to most-recent instead
+    of adding a duplicate entry.
+    """
+
+    def __init__(self, capacity=10):
+        self.capacity = capacity
+        self._order = []  # most-recent first
+
+    def record(self, coord):
+        if coord in self._order:
+            self._order.remove(coord)
+        self._order.insert(0, coord)
+        self._order = self._order[:self.capacity]
+
+    def record_many(self, coords):
+        for coord in coords:
+            self.record(coord)
+
+    def brightness_for(self, coord, brightness_max, brightness_min):
+        """Brightness boost factor for `coord`'s position in the recency
+        window (index 0 = brightness_max), or 0.0 if it isn't tracked.
+        """
+        if coord not in self._order:
+            return 0.0
+        index = self._order.index(coord)
+        if self.capacity <= 1:
+            return brightness_max
+        fraction = index / (self.capacity - 1)
+        return brightness_max - fraction * (brightness_max - brightness_min)
