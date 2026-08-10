@@ -1750,6 +1750,27 @@ function renderGameCatalog() {
 }
 
 /**
+ * Persist a selectedGames addition via arrayUnion + a dotted-path
+ * gameDefinitions write in one targeted update, instead of a whole-object
+ * saveGameState() -- see docs/superpowers/specs/2026-08-10-atomic-array-writes-design.md.
+ * arrayUnion needs no local read, so there's nothing for a concurrent
+ * snapshot to race against. Local gameState is still mutated by the
+ * callers for immediate re-render; this is purely how the write persists.
+ */
+async function _persistSelectedGameAdd(gameId, gameDefEntry, triggerBtn) {
+    const stopLoading = (typeof btnLoading === 'function' && triggerBtn) ? btnLoading(triggerBtn) : null;
+    try {
+        const tournamentRef = window.firebaseDB.collection('tournaments').doc(currentTournamentId);
+        await tournamentRef.update({
+            selectedGames: firebase.firestore.FieldValue.arrayUnion(gameId),
+            [`gameDefinitions.${gameId}`]: gameDefEntry
+        });
+    } finally {
+        if (stopLoading) stopLoading();
+    }
+}
+
+/**
  * Add a game from GAMES_CONFIG catalog to the tournament
  */
 async function addCatalogGameToTournament(gameId) {
@@ -1773,7 +1794,7 @@ async function addCatalogGameToTournament(gameId) {
 
     // Add to gameDefinitions
     if (!gameState.gameDefinitions) gameState.gameDefinitions = {};
-    gameState.gameDefinitions[gameId] = {
+    const gameDefEntry = {
         name: game.name,
         shortName: game.shortName || game.name,
         format: game.format,
@@ -1782,8 +1803,9 @@ async function addCatalogGameToTournament(gameId) {
         splitFormat: game.splitFormat || false,
         custom: false
     };
+    gameState.gameDefinitions[gameId] = gameDefEntry;
 
-    await saveGameState();
+    await _persistSelectedGameAdd(gameId, gameDefEntry);
     reinitializeMatchGenerator();
     updateDisplay();
     renderGameManagerList();
@@ -1825,7 +1847,7 @@ async function addCustomGameToTournament(triggerBtn) {
 
     // Add to gameDefinitions
     if (!gameState.gameDefinitions) gameState.gameDefinitions = {};
-    gameState.gameDefinitions[id] = {
+    const gameDefEntry = {
         name,
         shortName,
         format,
@@ -1834,8 +1856,9 @@ async function addCustomGameToTournament(triggerBtn) {
         splitFormat: format === '3v3+2v2',
         custom: true
     };
+    gameState.gameDefinitions[id] = gameDefEntry;
 
-    await saveGameState(triggerBtn);
+    await _persistSelectedGameAdd(id, gameDefEntry, triggerBtn);
     reinitializeMatchGenerator();
     updateDisplay();
     renderGameManagerList();
@@ -1872,7 +1895,12 @@ async function removeGameFromTournament(gameId) {
 
     // Keep gameDefinitions entry for historical matches display
 
-    await saveGameState();
+    // arrayRemove needs no local read -- nothing for a concurrent snapshot
+    // to race against. See docs/superpowers/specs/2026-08-10-atomic-array-writes-design.md.
+    const tournamentRef = window.firebaseDB.collection('tournaments').doc(currentTournamentId);
+    await tournamentRef.update({
+        selectedGames: firebase.firestore.FieldValue.arrayRemove(gameId)
+    });
     reinitializeMatchGenerator();
     updateDisplay();
     renderGameManagerList();
@@ -2171,13 +2199,22 @@ async function toggleRoomHex(coord) {
 
     const roomIndex = gameState.rooms.indexOf(coord);
 
+    // arrayUnion/arrayRemove need no local read of the server value --
+    // nothing for a concurrent snapshot to race against. Local gameState
+    // is still mutated below for the immediate boardModule/render update;
+    // this is purely how the write persists. See
+    // docs/superpowers/specs/2026-08-10-atomic-array-writes-design.md.
+    const tournamentRef = window.firebaseDB.collection('tournaments').doc(currentTournamentId);
+
     if (roomIndex >= 0) {
         // Remove from rooms
         gameState.rooms.splice(roomIndex, 1);
+        await tournamentRef.update({ rooms: firebase.firestore.FieldValue.arrayRemove(coord) });
         showStatus(`Removed room: ${coord}`, 'info');
     } else {
         // Add to rooms
         gameState.rooms.push(coord);
+        await tournamentRef.update({ rooms: firebase.firestore.FieldValue.arrayUnion(coord) });
         showStatus(`Added room: ${coord}`, 'success');
     }
 
@@ -2185,7 +2222,6 @@ async function toggleRoomHex(coord) {
     boardModule.setRoomHexes(gameState.rooms);
 
     closeTeamPicker();
-    await saveGameState();
     renderBoard();
 }
 
@@ -2943,8 +2979,18 @@ function closeChallengeSetupModal() {
     if (bundlePreview) bundlePreview.textContent = '';
 }
 
-/** Pseudo-slot ids for the 4 concurrently-runnable challenges — mirrors phase-manager.js's CHALLENGE_SLOT_IDS. */
-const CHALLENGE_SLOT_IDS = ['challenge1', 'challenge2', 'challenge3', 'challenge4'];
+/**
+ * Pseudo-slot ids for the 4 concurrently-runnable challenges — mirrors
+ * phase-manager.js's own same-valued CHALLENGE_SLOT_IDS. Named differently
+ * on purpose: classic (non-module) <script> tags share ONE global lexical
+ * scope for top-level const/let/class across the whole page, and admin.html
+ * loads both this file and phase-manager.js — an identical top-level const
+ * name in both caused phase-manager.js to throw "Identifier
+ * 'CHALLENGE_SLOT_IDS' has already been declared" and silently abort its
+ * entire script (including its `window.PhaseManager = PhaseManager` export)
+ * every time admin.js's declaration ran first.
+ */
+const ADMIN_CHALLENGE_SLOT_IDS = ['challenge1', 'challenge2', 'challenge3', 'challenge4'];
 
 /**
  * First challenge slot (1-4) not currently occupied by a non-completed
@@ -2969,7 +3015,7 @@ function getNextFreeChallengeSlot() {
             (m.roundNumber === undefined || m.roundNumber === roundNumber))
             .map(m => m.slot === 'challenge' ? 'challenge1' : m.slot)
     );
-    return CHALLENGE_SLOT_IDS.find(id => !usedSlots.has(id)) || null;
+    return ADMIN_CHALLENGE_SLOT_IDS.find(id => !usedSlots.has(id)) || null;
 }
 
 /**
@@ -4010,13 +4056,13 @@ function _populateEditMatchSlotOptions(game) {
     if (!slotSelect) return;
 
     if (game.isChallenge) {
-        slotSelect.innerHTML = CHALLENGE_SLOT_IDS
+        slotSelect.innerHTML = ADMIN_CHALLENGE_SLOT_IDS
             .map((id, i) => `<option value="${id}">Challenge ${i + 1}</option>`)
             .join('');
         // A legacy flat 'challenge' tag aliases onto challenge1 (matches
         // phase-manager.js's _slotTagMatches) — reflect that in the UI too.
         const current = game.slot === 'challenge' ? 'challenge1' : game.slot;
-        if (CHALLENGE_SLOT_IDS.includes(current)) slotSelect.value = current;
+        if (ADMIN_CHALLENGE_SLOT_IDS.includes(current)) slotSelect.value = current;
         if (hint) hint.textContent = 'Controls which of the 4 concurrent challenge slots this entry runs in';
     } else {
         slotSelect.innerHTML = '<option value="1">Match 1</option><option value="2">Match 2</option>';
@@ -4337,7 +4383,7 @@ async function saveMatchEdits(triggerBtn) {
         if (match.isChallenge === true) {
             // Re-tag which of the 4 concurrent challenge slots this
             // challenge runs in (see _populateEditMatchSlotOptions).
-            if (slotSelect && CHALLENGE_SLOT_IDS.includes(slotSelect.value)) {
+            if (slotSelect && ADMIN_CHALLENGE_SLOT_IDS.includes(slotSelect.value)) {
                 match.slot = slotSelect.value;
             }
         } else if (slotSelect && (slotSelect.value === '1' || slotSelect.value === '2')) {
@@ -5133,19 +5179,45 @@ async function removeFromQueue(gameId) {
  * Deliberately dismiss a pending hex placement (team absent / declined).
  * The alternative — force-advancing past the gate — leaves the win queued
  * forever, where it re-gates a future round's placement phase.
- * pendingHexWins is the accessor over gameState.pendingHexWins, so
- * mutations here persist via saveGameState().
+ * pendingHexWins is the accessor over gameState.pendingHexWins.
+ *
+ * Same shape as adjustTeamPoints()'s transaction (bug #5a) -- a
+ * whole-object saveGameState() here can race the real-time snapshot
+ * listener's in-place Object.assign and silently drop the waive. The
+ * transaction re-reads pendingHexWins fresh immediately before writing.
+ * See docs/superpowers/specs/2026-08-10-atomic-array-writes-design.md.
  */
 async function waivePendingHexWin(matchNumber, teamId) {
-    const win = (pendingHexWins || []).find(w => w.matchNumber === matchNumber);
-    if (!win) return;
-    const idx = (win.teamIds || []).findIndex(id => String(id) === String(teamId));
-    if (idx === -1) return;
-    const teamName = (win.teamNames && win.teamNames[idx]) || `Team ${teamId}`;
-    win.teamIds.splice(idx, 1);
-    if (win.teamNames) win.teamNames.splice(idx, 1);
-    pendingHexWins = pendingHexWins.filter(w => w.teamIds.length > 0);
-    await saveGameState();
+    if (!currentTournamentId) return;
+
+    const tournamentRef = window.firebaseDB.collection('tournaments').doc(currentTournamentId);
+    let updatedWins = null;
+    let teamName = `Team ${teamId}`;
+    let found = false;
+    try {
+        await window.firebaseDB.runTransaction(async (transaction) => {
+            const doc = await transaction.get(tournamentRef);
+            const wins = (doc.data() || {}).pendingHexWins || [];
+            const win = wins.find(w => w.matchNumber === matchNumber);
+            if (!win) return;
+            const idx = (win.teamIds || []).findIndex(id => String(id) === String(teamId));
+            if (idx === -1) return;
+            teamName = (win.teamNames && win.teamNames[idx]) || teamName;
+            win.teamIds.splice(idx, 1);
+            if (win.teamNames) win.teamNames.splice(idx, 1);
+            const filtered = wins.filter(w => w.teamIds.length > 0);
+            transaction.update(tournamentRef, { pendingHexWins: filtered });
+            updatedWins = filtered;
+            found = true;
+        });
+    } catch (error) {
+        console.error('Error waiving pending hex win:', error);
+        showStatus('Error saving to Firebase', 'error');
+        return;
+    }
+
+    if (!found) return;
+    gameState.pendingHexWins = updatedWins;
     logEvent('hex_win_waived', {
         matchNumber, teamId, teamName,
         message: `Hex placement waived for ${teamName} (match #${matchNumber})`
@@ -5864,13 +5936,14 @@ async function confirmResult(winnerIndex) {
             return team?.name || `Team ${teamId}`;
         });
 
-        pendingHexWins.push({
+        const newPendingWin = {
             matchNumber: confirmedMatchNumber,
             teamNames: pendingHexTeamNames.length > 0 ? pendingHexTeamNames : [`Team ${SIDE_LABELS[winnerIndex]}`],
             teamIds: pendingHexTeamIds.length > 0 ? pendingHexTeamIds : winningTeamIds,
             isChallenge: false,
             timestamp: new Date().toISOString()
-        });
+        };
+        pendingHexWins.push(newPendingWin);
 
         // Show persistent reminder
         updatePendingHexNotification();
@@ -5881,7 +5954,17 @@ async function confirmResult(winnerIndex) {
         // some unrelated future save happens to catch it. The earlier
         // `await saveGameState()` above runs BEFORE this push, so this is a
         // deliberate second write, not a duplicate.
-        await saveGameState();
+        //
+        // arrayUnion, not saveGameState() -- a whole-object merge write here
+        // raced against the real-time snapshot listener's in-place
+        // Object.assign(gameState, ...) could silently clobber this push if
+        // a concurrent snapshot landed mid-write (see
+        // docs/superpowers/specs/2026-08-10-atomic-array-writes-design.md).
+        // arrayUnion needs no local read, so there's nothing to race.
+        const tournamentRef = window.firebaseDB.collection('tournaments').doc(currentTournamentId);
+        await tournamentRef.update({
+            pendingHexWins: firebase.firestore.FieldValue.arrayUnion(newPendingWin)
+        });
     }
 }
 
@@ -6425,33 +6508,57 @@ function updatePendingHexNotification() {
  * Only removes ONE notification per call (the oldest one for this team).
  */
 async function clearPendingHexWin(teamId) {
-    let changed = false;
+    if (!currentTournamentId) return;
 
-    // Find the FIRST (oldest) pending hex win that includes this team
-    // Only remove from one entry per hex placed
-    for (let i = 0; i < pendingHexWins.length; i++) {
-        const win = pendingHexWins[i];
-        const idx = win.teamIds.findIndex(id => String(id) === String(teamId));
-        if (idx !== -1) {
-            win.teamIds.splice(idx, 1);
-            // Also remove the corresponding team name
-            if (win.teamNames && win.teamNames[idx] !== undefined) {
-                win.teamNames.splice(idx, 1);
+    // Same shape as adjustTeamPoints()'s transaction (bug #5a) -- a
+    // whole-object saveGameState() here can race the real-time snapshot
+    // listener's in-place Object.assign and silently drop the clear. The
+    // transaction re-reads pendingHexWins fresh immediately before writing,
+    // and computes the splice/filter against THAT value, not the
+    // possibly-stale local array. See
+    // docs/superpowers/specs/2026-08-10-atomic-array-writes-design.md.
+    const tournamentRef = window.firebaseDB.collection('tournaments').doc(currentTournamentId);
+    let updatedWins = null;
+    let changed = false;
+    try {
+        await window.firebaseDB.runTransaction(async (transaction) => {
+            const doc = await transaction.get(tournamentRef);
+            const wins = (doc.data() || {}).pendingHexWins || [];
+            changed = false;
+
+            // Find the FIRST (oldest) pending hex win that includes this team
+            // Only remove from one entry per hex placed
+            for (let i = 0; i < wins.length; i++) {
+                const win = wins[i];
+                const idx = win.teamIds.findIndex(id => String(id) === String(teamId));
+                if (idx !== -1) {
+                    win.teamIds.splice(idx, 1);
+                    // Also remove the corresponding team name
+                    if (win.teamNames && win.teamNames[idx] !== undefined) {
+                        win.teamNames.splice(idx, 1);
+                    }
+                    changed = true;
+                    break; // Only remove from the first matching entry
+                }
             }
-            changed = true;
-            break; // Only remove from the first matching entry
-        }
+
+            // Remove entries where all teams have placed their hexes
+            const beforeCount = wins.length;
+            const filtered = wins.filter(win => win.teamIds.length > 0);
+            changed = changed || filtered.length !== beforeCount;
+
+            transaction.update(tournamentRef, { pendingHexWins: filtered });
+            updatedWins = filtered;
+        });
+    } catch (error) {
+        console.error('Error clearing pending hex win:', error);
+        showStatus('Error saving to Firebase', 'error');
+        return;
     }
 
-    // Remove entries where all teams have placed their hexes
-    const beforeCount = pendingHexWins.length;
-    pendingHexWins = pendingHexWins.filter(win => win.teamIds.length > 0);
-
-    if (changed || pendingHexWins.length !== beforeCount) {
-        updatePendingHexNotification();
-        // Persist the clear — see the persistence note on the pendingHexWins
-        // accessor near the top of this file.
-        await saveGameState();
+    if (updatedWins !== null) {
+        gameState.pendingHexWins = updatedWins;
+        if (changed) updatePendingHexNotification();
     }
 }
 
@@ -6581,3 +6688,25 @@ Object.entries(modalDismissMap).forEach(([id, closeFn]) => {
         });
     }
 });
+
+// =============================================================================
+// TEST-ONLY EXPORTS
+// =============================================================================
+// admin.js has no module export surface (it's a plain <script>, and its
+// gameState/currentTournamentId/boardModule state is private to this file's
+// scope) -- these exist purely so dev/tests/*.test.js can reach the
+// pendingHexWins/selectedGames/rooms atomic-write functions covered by
+// docs/superpowers/specs/2026-08-10-atomic-array-writes-design.md. Never
+// called from real app code; harmless if they were (they only touch this
+// file's own already-private state).
+if (typeof window !== 'undefined') {
+    window.clearPendingHexWin = clearPendingHexWin;
+    window.toggleRoomHex = toggleRoomHex;
+    window.addCatalogGameToTournament = addCatalogGameToTournament;
+    window.removeGameFromTournament = removeGameFromTournament;
+    window.__setAdminTestState = function (overrides) {
+        if ('gameState' in overrides) gameState = overrides.gameState;
+        if ('currentTournamentId' in overrides) currentTournamentId = overrides.currentTournamentId;
+        if ('boardModule' in overrides) boardModule = overrides.boardModule;
+    };
+}

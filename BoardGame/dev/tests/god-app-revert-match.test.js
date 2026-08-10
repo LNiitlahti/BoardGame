@@ -21,6 +21,7 @@
  */
 const test = require('node:test');
 const assert = require('node:assert');
+const { makeFakeFirebaseDB } = require('./_firestore-transaction-stub');
 
 global.window = global.window || {};
 global.ICON_SVGS = global.ICON_SVGS || new Proxy({}, { get: () => '' });
@@ -98,21 +99,10 @@ function makeApp(gameState, { actions = [], firestoreUpdateSpy = null } = {}) {
         logActionCallback: () => {}
     });
 
-    // Always stub firebaseDB (even with a no-op spy) so _markAsUndone's
-    // write doesn't hit "Cannot read properties of undefined" noise in
-    // tests that don't care about the exact call shape.
-    const spy = firestoreUpdateSpy || (() => {});
-    global.window.firebaseDB = {
-        collection: () => ({
-            doc: () => ({
-                collection: () => ({
-                    doc: (id) => ({
-                        update: (data) => spy(id, data)
-                    })
-                })
-            })
-        })
-    };
+    // Stubs both the runTransaction() shape executeUndo() now needs (see
+    // docs/superpowers/specs/2026-08-10-atomic-array-writes-design.md) and
+    // the actionLog collection().doc().update() chain _markAsUndone() uses.
+    global.window.firebaseDB = makeFakeFirebaseDB(gameState, { actionLogUpdateSpy: firestoreUpdateSpy });
 
     return app;
 }
@@ -287,6 +277,7 @@ test('reverting a points_awarded entry via UndoManager pops the matching pointsH
         actionLogger: null, uiManager: null, teamManager: null,
         saveCallback: async () => {}, logActionCallback: () => {}
     });
+    global.window.firebaseDB = makeFakeFirebaseDB(gs);
 
     const { canUndo } = undo.canUndo(entry);
     assert.strictEqual(canUndo, true);

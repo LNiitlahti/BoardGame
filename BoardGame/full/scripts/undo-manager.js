@@ -9,7 +9,11 @@ const UNDOABLE_TYPES = new Set([
     'plate_placed', 'plate_removed',
     'match_result_confirmed', 'match_started', 'match_removed',
     'points_awarded', 'points_corrected',
-    'match_result_corrected', 'match_details_edited'
+    'match_result_corrected', 'match_details_edited',
+    'spell_board_effect', 'spell_tiles_placed', 'spell_tiles_repositioned',
+    'spell_hearts_transferred', 'spell_effect_charges_added', 'spell_cards_taken',
+    'spell_forced_redraw', 'spell_tiles_captured', 'spell_marked_tiles_relocated',
+    'spell_blind_swap'
 ]);
 
 class UndoManager {
@@ -161,43 +165,119 @@ class UndoManager {
             return false;
         }
 
-        const gs = this._gameState;
         const prev = entry.previousState;
         const p = entry.payload || {};
 
-        try {
-            switch (entry.actionType) {
-                case 'match_result_confirmed':
-                    this._undoMatchResult(gs, prev, p);
-                    break;
-                case 'match_result_corrected':
-                    this._undoResultCorrection(gs, prev, p);
-                    break;
-                case 'plate_placed':
-                    this._undoPlatePlaced(gs, prev, p);
-                    break;
-                case 'plate_removed':
-                    this._undoPlateRemoved(gs, prev, p);
-                    break;
-                case 'points_awarded':
-                case 'points_corrected':
-                    this._undoPointsChange(gs, prev, p);
-                    break;
-                case 'match_started':
-                    this._undoMatchStarted(gs, prev, p);
-                    break;
-                case 'match_removed':
-                    this._undoMatchRemoved(gs, prev, p);
-                    break;
-                case 'match_details_edited':
-                    this._undoMatchEdited(gs, prev, p);
-                    break;
-                default:
-                    this._ui?.showStatus('Undo not implemented for this action type', 'warning');
-                    return false;
-            }
+        // Every _undo* handler below is a pure, synchronous mutation of
+        // whatever `gs` object it's handed -- none of them touch Firestore,
+        // the DOM, or anything else non-idempotent (the one exception,
+        // window.updatePendingHexNotification() inside _undoMatchResult's
+        // pendingHexWins branch, is a UI refresh call, moved below so it
+        // fires exactly once regardless of transaction retries). That
+        // makes it safe to run the whole dispatch against a transaction-
+        // scoped fresh read instead of the shared, long-lived
+        // this._gameState -- closing the same race class documented in
+        // docs/superpowers/specs/2026-08-10-atomic-array-writes-design.md,
+        // for every undoable action type at once instead of leaving this
+        // one field's revert (which was previously bundled into the same
+        // whole-object this._save() as everything else) still exposed.
+        const tournamentRef = window.firebaseDB.collection('tournaments').doc(this._gameState.tournamentId);
+        let freshState = null;
+        let pendingHexNotificationChanged = false;
+        let unimplementedType = false;
 
-            await this._save();
+        try {
+            await window.firebaseDB.runTransaction(async (transaction) => {
+                const doc = await transaction.get(tournamentRef);
+                const gs = doc.data() || {};
+                const beforePendingHexCount = (gs.pendingHexWins || []).length;
+
+                switch (entry.actionType) {
+                    case 'match_result_confirmed':
+                        this._undoMatchResult(gs, prev, p);
+                        break;
+                    case 'match_result_corrected':
+                        this._undoResultCorrection(gs, prev, p);
+                        break;
+                    case 'plate_placed':
+                        this._undoPlatePlaced(gs, prev, p);
+                        break;
+                    case 'plate_removed':
+                        this._undoPlateRemoved(gs, prev, p);
+                        break;
+                    case 'points_awarded':
+                    case 'points_corrected':
+                        this._undoPointsChange(gs, prev, p);
+                        break;
+                    case 'match_started':
+                        this._undoMatchStarted(gs, prev, p);
+                        break;
+                    case 'match_removed':
+                        this._undoMatchRemoved(gs, prev, p);
+                        break;
+                    case 'match_details_edited':
+                        this._undoMatchEdited(gs, prev, p);
+                        break;
+                    case 'spell_board_effect':
+                        this._undoSpellBoardEffect(gs, prev, p);
+                        break;
+                    case 'spell_tiles_placed':
+                        this._undoSpellTilesPlaced(gs, prev, p);
+                        break;
+                    case 'spell_tiles_repositioned':
+                        this._undoSpellTilesRepositioned(gs, prev, p);
+                        break;
+                    case 'spell_hearts_transferred':
+                        this._undoSpellHeartsTransferred(gs, prev, p);
+                        break;
+                    case 'spell_effect_charges_added':
+                        this._undoSpellEffectChargesAdded(gs, prev, p);
+                        break;
+                    case 'spell_cards_taken':
+                        this._undoSpellCardsTaken(gs, prev, p);
+                        break;
+                    case 'spell_forced_redraw':
+                        this._undoSpellForcedRedraw(gs, prev, p);
+                        break;
+                    case 'spell_tiles_captured':
+                        this._undoSpellTilesCaptured(gs, prev, p);
+                        break;
+                    case 'spell_marked_tiles_relocated':
+                        this._undoSpellMarkedTilesRelocated(gs, prev, p);
+                        break;
+                    case 'spell_blind_swap':
+                        this._undoSpellBlindSwap(gs, prev, p);
+                        break;
+                    default:
+                        unimplementedType = true;
+                        return;
+                }
+
+                pendingHexNotificationChanged = (gs.pendingHexWins || []).length !== beforePendingHexCount;
+                // JSON round-trip drops any stray `undefined` values the
+                // same way saveGameState()'s removeUndefined() does --
+                // Firestore rejects documents containing them.
+                const cleaned = JSON.parse(JSON.stringify(gs));
+                transaction.update(tournamentRef, cleaned);
+                freshState = cleaned;
+            });
+        } catch (error) {
+            console.error('Error executing undo:', error);
+            this._ui?.showStatus('Error executing undo', 'error');
+            return false;
+        }
+
+        if (unimplementedType) {
+            this._ui?.showStatus('Undo not implemented for this action type', 'warning');
+            return false;
+        }
+
+        try {
+            Object.assign(this._gameState, freshState);
+            if (pendingHexNotificationChanged && typeof window !== 'undefined' &&
+                typeof window.updatePendingHexNotification === 'function') {
+                window.updatePendingHexNotification();
+            }
 
             // Mark the original entry as undone in Firestore
             await this._markAsUndone(entry);
@@ -266,15 +346,12 @@ class UndoManager {
         // recorded in the action-log payload), not team/side, since a
         // corrected re-confirmation could have changed the winning side.
         if (Array.isArray(gs.pendingHexWins) && p.matchNumber !== undefined) {
-            const beforeCount = gs.pendingHexWins.length;
+            // Notification refresh, if the count changed, now happens once
+            // in executeUndo() after the transaction commits -- not here,
+            // where a transaction retry could fire it more than once.
             gs.pendingHexWins = gs.pendingHexWins.filter(
                 win => String(win.matchNumber) !== String(p.matchNumber)
             );
-            if (gs.pendingHexWins.length !== beforeCount &&
-                typeof window !== 'undefined' &&
-                typeof window.updatePendingHexNotification === 'function') {
-                window.updatePendingHexNotification();
-            }
         }
     }
 
@@ -335,6 +412,226 @@ class UndoManager {
         if (p.hexCoord && prev.board) {
             gs.board = gs.board || {};
             gs.board[p.hexCoord] = prev.board[p.hexCoord];
+        }
+    }
+
+    /**
+     * Reverts an extra_placement spell effect (Knowledge from the Deep,
+     * Taikuuden nälkä / sarja2-k4, Katalyyttiavain / sarja2-k5 — see
+     * spell-engine.js's _handleExtraPlacement). Removes every tile the
+     * spell placed, restores any tile it destroyed on landing (destroy_occupied
+     * restriction), and returns a discarded card (if any) to the caster's hand.
+     */
+    _undoSpellTilesPlaced(gs, prev, p) {
+        const placed = prev.placed || p.placed || [];
+        gs.board = gs.board || {};
+        for (const coord of placed) {
+            delete gs.board[coord];
+        }
+
+        const destroyed = prev.destroyed || p.destroyed || [];
+        for (const tile of destroyed) {
+            gs.board[tile.coord] = tile.teamId;
+            if (tile.wasHeart) {
+                gs.heartHexControl = gs.heartHexControl || {};
+                gs.heartHexControl[tile.coord] = tile.teamId;
+            }
+        }
+
+        const discarded = prev.discarded || p.discarded;
+        const teamId = p.castByTeamId;
+        if (discarded && teamId !== undefined) {
+            const pile = gs.spellPiles?.[String(teamId)];
+            if (pile) {
+                const idx = (pile.usedPile || []).lastIndexOf(discarded);
+                if (idx >= 0) pile.usedPile.splice(idx, 1);
+                pile.hand = pile.hand || [];
+                pile.hand.push(discarded);
+            }
+        }
+    }
+
+    /**
+     * Reverts a reposition spell effect (Parempi reitti / sarja3-k3, and any
+     * card sharing that shape — see spell-engine.js's _handleReposition):
+     * moves each repositioned tile back from its `to` hex to its `from` hex,
+     * restoring heart control at `from` if it was a heart hex.
+     */
+    _undoSpellTilesRepositioned(gs, prev, p) {
+        const applied = prev.applied || p.applied || [];
+        gs.board = gs.board || {};
+        for (const move of applied) {
+            delete gs.board[move.to];
+            gs.board[move.from] = p.castByTeamId;
+            if (move.wasHeart) {
+                gs.heartHexControl = gs.heartHexControl || {};
+                gs.heartHexControl[move.from] = p.castByTeamId;
+            }
+        }
+    }
+
+    /**
+     * Reverts a first_heart_roll outcome-6 heart transfer (Kaikki alkoi
+     * kivestä / sarja3-k6 — see spell-engine.js's _handleFirstHeartRoll):
+     * restores each transferred side-heart to its previous owner.
+     */
+    _undoSpellHeartsTransferred(gs, prev, p) {
+        const transferred = prev.transferred || p.transferred || [];
+        gs.heartHexControl = gs.heartHexControl || {};
+        for (const t of transferred) {
+            gs.heartHexControl[t.coord] = t.previousOwner;
+        }
+    }
+
+    /**
+     * Reverts addChargesToEffect() (used by sarja3-k6's outcome 3 to buff
+     * an active Taitava vastaisku counter) — restores usesRemaining to its
+     * value before the bump.
+     */
+    _undoSpellEffectChargesAdded(gs, prev, p) {
+        const effect = (gs.activeEffects || []).find(e => e.id === p.effectId);
+        if (effect && prev.usesRemaining !== undefined) {
+            effect.usesRemaining = prev.usesRemaining;
+        }
+    }
+
+    /**
+     * Reverts a conditional_card_grab spell effect (Magian keskittymä /
+     * sarja4-k5 — see spell-engine.js's _handleConditionalCardGrab): removes
+     * each taken card from the caster's hand and returns it to its original
+     * team's source pile (hand/usedPile/drawPile).
+     */
+    _undoSpellCardsTaken(gs, prev, p) {
+        const taken = prev.taken || p.taken || [];
+        const casterTeamId = p.castByTeamId;
+        const casterPile = gs.spellPiles?.[String(casterTeamId)];
+
+        for (const t of taken) {
+            if (casterPile?.hand) {
+                const idx = casterPile.hand.lastIndexOf(t.spellId);
+                if (idx >= 0) casterPile.hand.splice(idx, 1);
+            }
+            const originPile = gs.spellPiles?.[String(t.teamId)];
+            if (originPile) {
+                originPile[t.source] = originPile[t.source] || [];
+                originPile[t.source].push(t.spellId);
+            }
+        }
+    }
+
+    /**
+     * Reverts a force_redraw spell effect (Vaihtoon / sarja6-k4 — see
+     * spell-engine.js's _handleForceRedraw). Restores the target team's
+     * entire spell pile (hand/drawPile/usedPile) to its exact pre-shuffle
+     * snapshot rather than trying to reverse the shuffle itself.
+     */
+    _undoSpellForcedRedraw(gs, prev, p) {
+        const targetTeamId = prev.targetTeamId ?? p.targetTeamId;
+        if (targetTeamId === undefined) return;
+        gs.spellPiles = gs.spellPiles || {};
+        gs.spellPiles[String(targetTeamId)] = {
+            hand: prev.handBefore || [],
+            drawPile: prev.drawPileBefore || [],
+            usedPile: prev.usedPileBefore || []
+        };
+    }
+
+    /**
+     * Reverts a temporary_capture spell effect (Epävakaa todellisuus / N.3
+     * named card — see spell-engine.js's _handleTemporaryCapture): restores
+     * each captured tile to its previous owner. Only meaningful while the
+     * capture is still active — once expireConditions() has already
+     * deleted the tiles from the board entirely, that deletion is its own
+     * separate, independently-undoable 'spell_board_effect' entry.
+     */
+    _undoSpellTilesCaptured(gs, prev, p) {
+        const captured = prev.captured || p.captured || [];
+        gs.board = gs.board || {};
+        for (const cap of captured) {
+            gs.board[cap.coord] = cap.previousOwner;
+            if (cap.wasHeart) {
+                gs.heartHexControl = gs.heartHexControl || {};
+                gs.heartHexControl[cap.coord] = cap.previousOwner;
+            }
+        }
+    }
+
+    /**
+     * Reverts resolveMarkedRelocation() (Vettähän se vain oli / N.2 named
+     * card): moves each relocated tile back to its origin hex under its
+     * original owner, and restores anything destroyed on landing.
+     */
+    _undoSpellMarkedTilesRelocated(gs, prev, p) {
+        const applied = prev.applied || p.applied || [];
+        gs.board = gs.board || {};
+        for (const move of applied) {
+            delete gs.board[move.to];
+            gs.board[move.from] = move.owner;
+            if (move.wasHeart) {
+                gs.heartHexControl = gs.heartHexControl || {};
+                gs.heartHexControl[move.from] = move.owner;
+            }
+        }
+
+        const destroyed = prev.destroyed || p.destroyed || [];
+        for (const tile of destroyed) {
+            gs.board[tile.coord] = tile.teamId;
+            if (tile.wasHeart) {
+                gs.heartHexControl = gs.heartHexControl || {};
+                gs.heartHexControl[tile.coord] = tile.teamId;
+            }
+        }
+    }
+
+    /**
+     * Reverts a blind_card_swap (Tuhoa suunnitelmat / N.7 named card — see
+     * spell-engine.js's _handleBlindCardSwap): puts each swapped card back
+     * at its original index in its original hand, for both the teamA/teamB
+     * swap and the optional caster swap.
+     */
+    _undoSpellBlindSwap(gs, prev, p) {
+        // Reverse in the opposite order they were applied in — the caster
+        // swap happens AFTER the teamA/teamB swap during casting (see
+        // spell-engine.js's _handleBlindCardSwap), and when withTeamId is
+        // the same team as teamAId/teamBId, both swaps touch the same pile.
+        // Undoing teamASwap first would get immediately overwritten by
+        // undoing casterSwap second (or vice versa, if done in cast order).
+        const casterSwap = prev.casterSwap || p.casterSwap;
+        if (casterSwap) {
+            const casterPile = gs.spellPiles?.[String(casterSwap.casterTeamId)];
+            const targetPile = gs.spellPiles?.[String(casterSwap.withTeamId)];
+            if (casterPile?.hand) casterPile.hand[casterSwap.casterIdx] = casterSwap.casterGave;
+            if (targetPile?.hand) targetPile.hand[casterSwap.targetIdx] = casterSwap.casterGot;
+        }
+
+        const teamASwap = prev.teamASwap || p.teamASwap;
+        if (teamASwap) {
+            const pileA = gs.spellPiles?.[String(teamASwap.teamAId)];
+            const pileB = gs.spellPiles?.[String(teamASwap.teamBId)];
+            if (pileA?.hand) pileA.hand[teamASwap.idxA] = teamASwap.cardA;
+            if (pileB?.hand) pileB.hand[teamASwap.idxB] = teamASwap.cardB;
+        }
+    }
+
+    /**
+     * Reverts a destroy_adjacent spell effect (Get Away From Me, Calculated
+     * Aggression, and any card sharing that effect shape — see
+     * spell-engine.js's _handleDestroyAdjacent). previousState.destroyedTiles
+     * is an array of { coord, teamId, wasHeart } captured at destroy time;
+     * restoring each entry re-places the tile (and heart control, if it was
+     * one) exactly as it stood before the spell fired.
+     */
+    _undoSpellBoardEffect(gs, prev, p) {
+        const destroyedTiles = prev.destroyedTiles || p.destroyedTiles || [];
+        if (!destroyedTiles.length) return;
+
+        gs.board = gs.board || {};
+        for (const tile of destroyedTiles) {
+            gs.board[tile.coord] = tile.teamId;
+            if (tile.wasHeart) {
+                gs.heartHexControl = gs.heartHexControl || {};
+                gs.heartHexControl[tile.coord] = tile.teamId;
+            }
         }
     }
 

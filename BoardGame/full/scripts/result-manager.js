@@ -743,13 +743,14 @@ class ResultManager {
                 return team?.name || `Team ${teamId}`;
             });
 
-            this._pendingHexWins.push({
+            const newPendingWin = {
                 matchNumber: confirmedMatchNumber,
                 teamNames: pendingHexTeamNames.length > 0 ? pendingHexTeamNames : [`Team ${SIDE_LABELS_RM[winnerIndex]}`],
                 teamIds: pendingHexTeamIds.length > 0 ? pendingHexTeamIds : winningTeamIds,
                 isChallenge: false,
                 timestamp: new Date().toISOString()
-            });
+            };
+            this._pendingHexWins.push(newPendingWin);
 
             // Show persistent reminder
             this.updatePendingHexNotification();
@@ -759,7 +760,16 @@ class ResultManager {
             // pending win would only ever live in memory (see the
             // _pendingHexWins accessor doc above for why that's the actual
             // gate-bypass bug, not just a cosmetic notification gap).
-            await this._save();
+            //
+            // arrayUnion, not this._save() (a whole-object merge write) --
+            // see docs/superpowers/specs/2026-08-10-atomic-array-writes-design.md
+            // for why a whole-object save here races the real-time snapshot
+            // listener's in-place Object.assign. arrayUnion needs no local
+            // read, so there's nothing to race.
+            const tournamentRef = window.firebaseDB.collection('tournaments').doc(this._gameState.tournamentId);
+            await tournamentRef.update({
+                pendingHexWins: firebase.firestore.FieldValue.arrayUnion(newPendingWin)
+            });
         }
 
         this._onPhaseChanged();
@@ -837,34 +847,60 @@ class ResultManager {
      * @param {string|number} teamId
      */
     async clearPendingHexWin(teamId) {
-        let changed = false;
+        const tournamentId = this._gameState?.tournamentId;
+        if (!tournamentId) return;
 
-        // Find the FIRST (oldest) pending hex win that includes this team
-        // Only remove from one entry per hex placed
-        for (let i = 0; i < this._pendingHexWins.length; i++) {
-            const win = this._pendingHexWins[i];
-            const idx = win.teamIds.findIndex(id => String(id) === String(teamId));
-            if (idx !== -1) {
-                win.teamIds.splice(idx, 1);
-                // Also remove the corresponding team name
-                if (win.teamNames && win.teamNames[idx] !== undefined) {
-                    win.teamNames.splice(idx, 1);
+        // Same shape as admin.js's adjustTeamPoints() transaction (bug
+        // #5a) -- a whole-object this._save() here can race the real-time
+        // snapshot listener's in-place field replacement and silently
+        // drop the clear. The transaction re-reads pendingHexWins fresh
+        // immediately before writing. See
+        // docs/superpowers/specs/2026-08-10-atomic-array-writes-design.md.
+        const tournamentRef = window.firebaseDB.collection('tournaments').doc(tournamentId);
+        let updatedWins = null;
+        let changed = false;
+        try {
+            await window.firebaseDB.runTransaction(async (transaction) => {
+                const doc = await transaction.get(tournamentRef);
+                const wins = (doc.data() || {}).pendingHexWins || [];
+                changed = false;
+
+                // Find the FIRST (oldest) pending hex win that includes this team
+                // Only remove from one entry per hex placed
+                for (let i = 0; i < wins.length; i++) {
+                    const win = wins[i];
+                    const idx = win.teamIds.findIndex(id => String(id) === String(teamId));
+                    if (idx !== -1) {
+                        win.teamIds.splice(idx, 1);
+                        // Also remove the corresponding team name
+                        if (win.teamNames && win.teamNames[idx] !== undefined) {
+                            win.teamNames.splice(idx, 1);
+                        }
+                        changed = true;
+                        break; // Only remove from the first matching entry
+                    }
                 }
-                changed = true;
-                break; // Only remove from the first matching entry
-            }
+
+                // Remove entries where all teams have placed their hexes
+                const beforeCount = wins.length;
+                const filtered = wins.filter(win => win.teamIds.length > 0);
+                changed = changed || filtered.length !== beforeCount;
+
+                transaction.update(tournamentRef, { pendingHexWins: filtered });
+                updatedWins = filtered;
+            });
+        } catch (error) {
+            console.error('Error clearing pending hex win:', error);
+            this._ui.showStatus('Error saving to Firebase', 'error');
+            return;
         }
 
-        // Remove entries where all teams have placed their hexes
-        const beforeCount = this._pendingHexWins.length;
-        this._pendingHexWins = this._pendingHexWins.filter(win => win.teamIds.length > 0);
-
-        if (changed || this._pendingHexWins.length !== beforeCount) {
-            this.updatePendingHexNotification();
-            this._onPhaseChanged();
-            // Persist the clear \u2014 see the persistence note on the
-            // _pendingHexWins accessor above.
-            await this._save();
+        if (updatedWins !== null) {
+            this._pendingHexWins = updatedWins;
+            if (changed) {
+                this.updatePendingHexNotification();
+                this._onPhaseChanged();
+            }
         }
     }
 

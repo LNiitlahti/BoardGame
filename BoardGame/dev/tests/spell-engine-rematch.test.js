@@ -13,6 +13,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const { makeFakeFirebaseDB } = require('./_firestore-transaction-stub');
 
 global.window = global.window || {};
 global.ICON_SVGS = global.ICON_SVGS || new Proxy({}, { get: () => '' });
@@ -227,6 +228,7 @@ test('a full rematch revert leaves teams, gameHistory, pointsHistory and the que
         saveCallback: async () => {},
         logActionCallback: () => {}
     });
+    global.window.firebaseDB = makeFakeFirebaseDB(gs);
 
     const revertMatchByGameId = async (gameId) => {
         // Mirrors god-app.js's _revertMatchByGameId: look up the matching
