@@ -998,4 +998,75 @@ body.effect-hex-images .board-hex::before {
     z-index: 5;
 }
 
+/* ==========================================================================
+   RESPONSIVE — no mobile breakpoint existed at all before this. The fixed
+   60/40 board/sidebar split squeezed the Action Log to ~137px at 375px
+   width, and with .action-seq/.action-badge/.action-time all flex-shrink:0
+   on one un-wrapped row, .action-desc was left ~9px wide -- word-break:
+   break-word then wrapped every single character onto its own line.
+   ========================================================================== */
+@media (max-width: 700px) {
+    body {
+        /* The fixed board/sidebar split relied on the page never scrolling;
+           stacking them vertically needs a scrollable fallback instead of
+           a hard 100vh/overflow:hidden, since header + timeline + controls
+           + board + full-width log no longer fit one screen. */
+        height: auto;
+        min-height: 100vh;
+        overflow-y: auto;
+    }
+
+    .replay-container {
+        height: auto;
+        min-height: calc(100vh - 60px);
+    }
+
+    .replay-main {
+        flex-direction: column;
+        overflow: visible;
+    }
+
+    .board-panel {
+        flex: none;
+        height: 60vh;
+        min-height: 320px;
+    }
+
+    .replay-sidebar {
+        flex: none;
+        border-left: none;
+        border-top: 1px solid var(--border-color, rgba(200,179,126,0.12));
+        min-height: 40vh;
+    }
+
+    /* seq + badge + time on one line, description on its own full-width
+       line beneath -- instead of squeezing description into whatever
+       sliver is left on a single un-wrapped row. */
+    .action-entry {
+        flex-wrap: wrap;
+    }
+
+    .action-desc {
+        flex-basis: 100%;
+        margin-top: 2px;
+    }
+
+    .replay-header .tournament-name {
+        max-width: 55%;
+        white-space: normal;
+    }
+
+    /* min-height, not a fixed square -- .play-btn carries a "Play"/"Pause"
+       text label, not just an icon, and would clip inside a 44x44 box. */
+    .replay-controls .transport-btn {
+        min-height: 40px;
+        padding: 10px 14px;
+    }
+
+    .speed-btn {
+        min-height: 40px;
+        padding: 8px 10px;
+    }
+}
+
 body.effect-hex-images .hex-label { z-index: 1; }
