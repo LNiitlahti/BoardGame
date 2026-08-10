@@ -133,6 +133,15 @@
   <p class="meta">commits cbc6f89, ac7367b, bd3bc4e, b2efdbb, 7411512, daa5abf, 4844a18</p>
 </div>
 
+<div class="round">Round 7 — bigger features — done</div>
+<div class="piece">
+  <span class="status done">6/6 resolved, merged, harsh-critic clean</span>
+  <h2>Bigger features</h2>
+  <p>Phase-manager slot cards now show choose-winner buttons directly once votes are in, leading side highlighted. Discord channel-name bug on team.html was already fixed on main (confirmed by 2 independent investigations, no action needed). Discord bot now posts a status message after each move-command batch, naming the real destination channel(s) — full test suite 88/88 passing. Manual spell-cast logging added, independent of spell-window phase gating. Heart-hex challenge eligibility is now genuinely adjacency-triggered per the game's actual rules (was previously "any opponent heart hex, always" — that behavior now correctly belongs only to its one exception spell). team.html's "Your Next Match" panel is now above Teammates with a real conditional highlight for pending actions.</p>
+  <p>One builder's agent run failed mid-task (spell logging) — rather than discard its real commit unreviewed, ran a dedicated harsh comparison against the actual diff and confirmed it had extended the wrong mechanism (never wrote the required <code>spell_cast</code> type). The other candidate's commit was merged instead.</p>
+  <p class="meta">commits 809d43f, 6a117c5, 0caab1e, ab37eeb, 1f28fb7, f944cd8, 9a2546a (docs)</p>
+</div>
+
 <div class="piece">
   <span class="status blocked">needs your input before an autonomous build</span>
   <h2>Challenge concurrency (2-slot model) + multi-hex bundling</h2>
