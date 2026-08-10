@@ -160,6 +160,14 @@ const DiscordPanel = {
                 ${field('Challenge — side A', 'discordSlotChallengeA', slotChallenge[0])}
                 ${field('Challenge — side B', 'discordSlotChallengeB', slotChallenge[1])}
             </div>
+            <div style="margin-bottom:12px;">
+                <label style="display:block; font-size:0.8rem; color:var(--text-tertiary); margin-bottom:4px;">
+                    Status channel <span style="opacity:0.7;">(bot posts "moved players to…" reports here — text channel only, leave unset to disable)</span>
+                </label>
+                <input type="text" id="discordStatusChannelId" value="${this._escape(config.statusChannelId || '')}"
+                       placeholder="e.g. 1520510940724854999 — a TEXT channel id, not one of the voice channels above"
+                       style="width:100%; padding:8px; background:rgba(11,13,16,0.6); border:1px solid rgba(255,255,255,0.08); border-radius:6px; color:white;">
+            </div>
             <div style="display:flex; gap:10px;">
                 <button class="btn primary" onclick="DiscordPanel.saveSetup()">Save setup</button>
                 <button class="btn secondary" onclick="DiscordPanel.refreshChannels()">Refresh channels</button>
@@ -185,6 +193,7 @@ const DiscordPanel = {
             enabled: this._config?.enabled === true,
             guildId,
             waitingRoomChannelId: value('discordWaitingRoom'),
+            statusChannelId: value('discordStatusChannelId'),
             slotChannels: {
                 '1': [value('discordSlot1A'), value('discordSlot1B')],
                 '2': [value('discordSlot2A'), value('discordSlot2B')],

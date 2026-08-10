@@ -71,6 +71,17 @@ function createFirestoreDb(firestore) {
 
                 async writeChannelCache(data) {
                     await ref.collection('discordConfig').doc('channelCache').set(data);
+                },
+
+                /**
+                 * Cached channel list, for naming channels in the status
+                 * message ("moved players to ALPHA/BRAVO" instead of raw
+                 * ids). Best-effort only — a missing cache just falls back
+                 * to ids, so this never blocks a move.
+                 */
+                async getChannelCache() {
+                    const snap = await ref.collection('discordConfig').doc('channelCache').get();
+                    return snap.exists ? (snap.data().channels || []) : [];
                 }
             };
         },

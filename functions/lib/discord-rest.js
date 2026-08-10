@@ -159,7 +159,44 @@ function createDiscordRest({ token, fetchImpl = fetch }) {
         };
     }
 
-    return { moveMember, listGuildMembers, listGuildChannels };
+    /**
+     * Post a status message to a text channel — used for the bot's own
+     * activity reports ("moved players to ALPHA/BRAVO"), never for voice
+     * moves. Shares the same outcome vocabulary as the other calls so
+     * callers don't need a second way to interpret a Discord response.
+     */
+    async function sendMessage({ channelId, content }) {
+        let res;
+        try {
+            res = await request('POST', `/channels/${channelId}/messages`, { content });
+        } catch (err) {
+            return { outcome: 'error', error: String(err && err.message ? err.message : err) };
+        }
+
+        if (res.status === 200) return { outcome: 'sent' };
+
+        const body = await readJson(res);
+
+        if (res.status === 429) {
+            const retryAfter = Number(body && body.retry_after);
+            return {
+                outcome: 'rate_limited',
+                retryAfterMs: Math.ceil((Number.isFinite(retryAfter) ? retryAfter : 1) * 1000)
+            };
+        }
+        if (res.status === 403) {
+            return { outcome: 'forbidden', error: (body && body.message) || 'Missing Permissions' };
+        }
+        if (res.status === 404) {
+            return { outcome: 'not_found', error: (body && body.message) || 'Unknown Channel' };
+        }
+        return {
+            outcome: 'error',
+            error: `HTTP ${res.status}: ${(body && body.message) || 'unknown error'}`
+        };
+    }
+
+    return { moveMember, listGuildMembers, listGuildChannels, sendMessage };
 }
 
 module.exports = { createDiscordRest };

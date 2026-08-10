@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { handleCommand, RETRY_DELAYS_MS } = require('../lib/command-handler');
+const { handleCommand, RETRY_DELAYS_MS, buildStatusMessage } = require('../lib/command-handler');
 
 const CONFIG = {
     enabled: true,
@@ -425,4 +425,144 @@ test('refresh-members is blocked when no config exists at all', async () => {
     assert.strictEqual(result.reason, 'disabled');
     assert.strictEqual(db.configWrites.length, 0);
     assert.strictEqual(rest.calls.length, 0);
+});
+
+// ── Status channel reporting ────────────────────────────────────────────
+
+/**
+ * fakeDb + fakeRest extended with the status-message surface
+ * (getChannelCache / sendMessage), which older fakes above intentionally
+ * predate — command-handler must work with or without them.
+ */
+function fakeDbWithChannelCache(opts, channels = []) {
+    const db = fakeDb(opts);
+    return {
+        ...db,
+        tournament(tid) {
+            const t = db.tournament(tid);
+            return { ...t, async getChannelCache() { return channels; } };
+        }
+    };
+}
+
+function fakeRestWithSend(moveResults, sendResults = []) {
+    const rest = fakeRest(moveResults);
+    const sentMessages = [];
+    return {
+        ...rest,
+        sentMessages,
+        async sendMessage(args) {
+            sentMessages.push(args);
+            const next = sendResults.shift();
+            return next || { outcome: 'sent' };
+        }
+    };
+}
+
+test('a status channel gets a success message after a pull completes', async () => {
+    const db = fakeDbWithChannelCache(
+        {
+            config: { ...CONFIG, statusChannelId: 'statusCh' },
+            links: { uidA: { discordUserId: 'dA' }, uidB: { discordUserId: 'dB' } }
+        },
+        [{ channelId: 'chAlpha', name: 'ALPHA' }, { channelId: 'chBravo', name: 'BRAVO' }]
+    );
+    const rest = fakeRestWithSend([{ outcome: 'moved' }, { outcome: 'moved' }]);
+    await handleCommand({
+        db, rest, sleep: noSleep,
+        tournamentId: 't1',
+        command: { type: 'pull', slot: '1', matchId: 'm1' }
+    });
+    assert.strictEqual(rest.sentMessages.length, 1);
+    assert.strictEqual(rest.sentMessages[0].channelId, 'statusCh');
+    assert.match(rest.sentMessages[0].content, /ALPHA/);
+    assert.match(rest.sentMessages[0].content, /complete/i);
+});
+
+test('no status channel configured means no message is sent', async () => {
+    const db = fakeDbWithChannelCache(
+        { links: { uidA: { discordUserId: 'dA' } } }
+    );
+    const rest = fakeRestWithSend([{ outcome: 'moved' }]);
+    await handleCommand({
+        db, rest, sleep: noSleep,
+        tournamentId: 't1',
+        command: { type: 'pull', slot: '1', matchId: 'm1' }
+    });
+    assert.strictEqual(rest.sentMessages.length, 0);
+});
+
+test('a failed status send does not fail the overall command', async () => {
+    const db = fakeDbWithChannelCache({
+        config: { ...CONFIG, statusChannelId: 'statusCh' },
+        links: { uidA: { discordUserId: 'dA' } }
+    });
+    const rest = fakeRestWithSend([{ outcome: 'moved' }]);
+    rest.sendMessage = async () => { throw new Error('discord is down'); };
+    const result = await handleCommand({
+        db, rest, sleep: noSleep,
+        tournamentId: 't1',
+        command: { type: 'pull', slot: '1', matchId: 'm1' }
+    });
+    assert.strictEqual(result.status, 'done');
+});
+
+test('older db/rest fakes without getChannelCache/sendMessage do not break the command', async () => {
+    const db = fakeDb({
+        config: { ...CONFIG, statusChannelId: 'statusCh' },
+        links: { uidA: { discordUserId: 'dA' } }
+    });
+    const rest = fakeRest([{ outcome: 'moved' }]); // no sendMessage method
+    const result = await handleCommand({
+        db, rest, sleep: noSleep,
+        tournamentId: 't1',
+        command: { type: 'pull', slot: '1', matchId: 'm1' }
+    });
+    assert.strictEqual(result.status, 'done');
+});
+
+test('buildStatusMessage: all moved is a success summary naming destination channels', () => {
+    const msg = buildStatusMessage({
+        command: { type: 'pull', slot: '1' },
+        results: [
+            { uid: 'a', outcome: 'moved', channelId: 'c1' },
+            { uid: 'b', outcome: 'moved', channelId: 'c2' }
+        ],
+        channelsById: { c1: 'ALPHA', c2: 'BRAVO' }
+    });
+    assert.match(msg, /ALPHA/);
+    assert.match(msg, /BRAVO/);
+    assert.match(msg, /complete/i);
+});
+
+test('buildStatusMessage: partial success reports both counts', () => {
+    const msg = buildStatusMessage({
+        command: { type: 'pull', slot: '1' },
+        results: [
+            { uid: 'a', outcome: 'moved', channelId: 'c1' },
+            { uid: 'b', outcome: 'unlinked' }
+        ],
+        channelsById: { c1: 'ALPHA' }
+    });
+    assert.match(msg, /partial/i);
+    assert.match(msg, /1\/2/);
+});
+
+test('buildStatusMessage: zero moved is a failure summary', () => {
+    const msg = buildStatusMessage({
+        command: { type: 'return', slot: 'challenge' },
+        results: [{ uid: 'a', outcome: 'forbidden' }],
+        channelsById: {}
+    });
+    assert.match(msg, /failed/i);
+    assert.match(msg, /forbidden/);
+});
+
+test('buildStatusMessage: falls back to the raw channel id when the cache has no name', () => {
+    const msg = buildStatusMessage({
+        command: { type: 'pull', slot: '1' },
+        results: [{ uid: 'a', outcome: 'moved', channelId: 'rawId123' }],
+        channelsById: {}
+    });
+    assert.match(msg, /rawId123/);
 });

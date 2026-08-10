@@ -28,6 +28,60 @@ const TERMINAL_OUTCOMES = new Set([
     'moved', 'unlinked', 'no_channel', 'forbidden', 'not_in_guild'
 ]);
 
+/**
+ * Human label for a slot, matching the wording used elsewhere in the panel.
+ */
+function slotLabel(slot) {
+    if (String(slot) === 'challenge') return 'the challenge match';
+    return `match ${slot}`;
+}
+
+/**
+ * Channel name for a status message, falling back to the raw id when the
+ * cache has nothing for it (stale cache, or a channel that was never
+ * refreshed) — a readable message beats a blocked one.
+ */
+function channelLabel(channelId, channelsById) {
+    if (!channelId) return 'unknown channel';
+    return (channelsById && channelsById[channelId]) || channelId;
+}
+
+/**
+ * Turn one command's results into the text posted to the status channel.
+ * Summarises success/partial/failure rather than listing every player —
+ * the channel is for a human glancing at what the bot just did, not a log.
+ */
+function buildStatusMessage({ command, results, channelsById }) {
+    const verb = command.type === 'return' ? 'Return' : 'Pull';
+    const label = slotLabel(command.slot);
+
+    const moved = results.filter(r => r.outcome === 'moved');
+    const notMoved = results.filter(r => r.outcome !== 'moved');
+    const total = results.length;
+
+    const destinations = [...new Set(moved.map(r => channelLabel(r.channelId, channelsById)))];
+    const destText = destinations.length > 0 ? ` to ${destinations.join('/')}` : '';
+
+    if (total === 0) {
+        return `ℹ️ ${verb} — ${label}: nobody to move.`;
+    }
+    if (moved.length === total) {
+        return `✅ ${verb} complete — moved ${moved.length} player(s)${destText} (${label}).`;
+    }
+    if (moved.length === 0) {
+        return `❌ ${verb} failed — 0 of ${total} player(s) moved (${label}). Reasons: ${summariseOutcomes(notMoved)}.`;
+    }
+    return `⚠️ ${verb} partial — moved ${moved.length}/${total} player(s)${destText} (${label}). ` +
+        `${notMoved.length} not moved: ${summariseOutcomes(notMoved)}.`;
+}
+
+/** Count of each non-"moved" outcome, e.g. "2 unlinked, 1 forbidden". */
+function summariseOutcomes(items) {
+    const counts = {};
+    items.forEach(i => { counts[i.outcome] = (counts[i.outcome] || 0) + 1; });
+    return Object.entries(counts).map(([outcome, n]) => `${n} ${outcome}`).join(', ') || 'none';
+}
+
 async function handleCommand({ db, rest, sleep, tournamentId, command }) {
     const tournament = db.tournament(tournamentId);
 
@@ -161,7 +215,37 @@ async function handleCommand({ db, rest, sleep, tournamentId, command }) {
         await sleep(wait);
     }
 
+    await postStatusMessage({ tournament, rest, config, command, results });
+
     return { status: 'done', results };
 }
 
-module.exports = { handleCommand, RETRY_DELAYS_MS, TERMINAL_OUTCOMES };
+/**
+ * Best-effort status report after a pull/return batch finishes. Never
+ * throws into the caller: a status-message failure is a nice-to-have going
+ * missing, not a reason to mark the whole move command as failed (players
+ * were already moved or not — this only narrates it).
+ *
+ * Guarded with typeof checks because both `rest` and the `tournament`
+ * adapter are plain objects in tests, and older fakes predate
+ * sendMessage/getChannelCache.
+ */
+async function postStatusMessage({ tournament, rest, config, command, results }) {
+    if (!config.statusChannelId) return;
+    if (typeof rest.sendMessage !== 'function') return;
+
+    try {
+        const channels = typeof tournament.getChannelCache === 'function'
+            ? await tournament.getChannelCache()
+            : [];
+        const channelsById = {};
+        (channels || []).forEach(c => { channelsById[c.channelId] = c.name; });
+
+        const content = buildStatusMessage({ command, results, channelsById });
+        await rest.sendMessage({ channelId: config.statusChannelId, content });
+    } catch (err) {
+        console.error('[Discord] Status message failed', err);
+    }
+}
+
+module.exports = { handleCommand, RETRY_DELAYS_MS, TERMINAL_OUTCOMES, buildStatusMessage };

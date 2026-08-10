@@ -153,3 +153,46 @@ test('listGuildChannels handles a thrown network error', async () => {
     assert.strictEqual(result.outcome, 'error');
     assert.match(result.error, /ECONNRESET/);
 });
+
+test('sendMessage: 200 is sent', async () => {
+    const { rest, calls } = restWith([{ status: 200, body: { id: 'msg1' } }]);
+    const result = await rest.sendMessage({ channelId: 'c1', content: 'hello' });
+    assert.deepStrictEqual(result, { outcome: 'sent' });
+    assert.strictEqual(calls[0].url, 'https://discord.com/api/v10/channels/c1/messages');
+    assert.strictEqual(calls[0].options.method, 'POST');
+    assert.strictEqual(calls[0].options.headers.Authorization, 'Bot tok');
+    assert.deepStrictEqual(JSON.parse(calls[0].options.body), { content: 'hello' });
+});
+
+test('sendMessage: 403 is forbidden', async () => {
+    const { rest } = restWith([{ status: 403, body: { message: 'Missing Permissions' } }]);
+    const result = await rest.sendMessage({ channelId: 'c1', content: 'hi' });
+    assert.strictEqual(result.outcome, 'forbidden');
+});
+
+test('sendMessage: 404 is not_found', async () => {
+    const { rest } = restWith([{ status: 404, body: { message: 'Unknown Channel' } }]);
+    const result = await rest.sendMessage({ channelId: 'c1', content: 'hi' });
+    assert.strictEqual(result.outcome, 'not_found');
+});
+
+test('sendMessage: 429 reports retry_after in milliseconds', async () => {
+    const { rest } = restWith([{ status: 429, body: { retry_after: 2 } }]);
+    const result = await rest.sendMessage({ channelId: 'c1', content: 'hi' });
+    assert.strictEqual(result.outcome, 'rate_limited');
+    assert.strictEqual(result.retryAfterMs, 2000);
+});
+
+test('sendMessage: a thrown network error becomes an error outcome', async () => {
+    const { rest } = restWith([new Error('ECONNRESET')]);
+    const result = await rest.sendMessage({ channelId: 'c1', content: 'hi' });
+    assert.strictEqual(result.outcome, 'error');
+    assert.match(result.error, /ECONNRESET/);
+});
+
+test('sendMessage: any other status is a generic error', async () => {
+    const { rest } = restWith([{ status: 500, body: { message: 'Internal Server Error' } }]);
+    const result = await rest.sendMessage({ channelId: 'c1', content: 'hi' });
+    assert.strictEqual(result.outcome, 'error');
+    assert.match(result.error, /Internal Server Error/);
+});
