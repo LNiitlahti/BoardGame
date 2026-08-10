@@ -44,3 +44,15 @@ def test_record_many_records_each_coord_in_order():
     tracker = TileChangeTracker(capacity=10)
     tracker.record_many(['a', 'b'])
     assert tracker.brightness_for('b', 0.5, 0.1) == pytest.approx(0.5)
+
+
+def test_capacity_one_always_returns_max_brightness_for_the_tracked_coord():
+    tracker = TileChangeTracker(capacity=1)
+    tracker.record('a')
+    assert tracker.brightness_for('a', 0.5, 0.1) == pytest.approx(0.5)
+
+
+def test_capacity_zero_tracks_nothing_and_never_raises():
+    tracker = TileChangeTracker(capacity=0)
+    tracker.record('a')
+    assert tracker.brightness_for('a', 0.5, 0.1) == 0.0
