@@ -136,6 +136,7 @@
             <button class="btn secondary" onclick="openSummary()">Summary</button>
             <button class="btn secondary" onclick="exportJSON()">Export JSON</button>
             <button class="btn secondary" onclick="exportCSV()">Export CSV</button>
+            <button class="btn secondary" onclick="exportVideoData()">Export Video Data</button>
             <button class="btn secondary" id="exportVideoBtn" onclick="exportVideo()">Export Video</button>
         </div>
     </div>
@@ -721,6 +722,40 @@
 
     function exportCSV() {
         if (actionExport) actionExport.exportCSV();
+    }
+
+    /**
+     * Bundles everything the local replay-video Python tool needs — the
+     * final tournament doc, backup snapshots (with mappedSeq already
+     * computed by ReplayEngine._buildTimeline()), and the full action log —
+     * into one downloadable JSON file. See BoardGame/dev/tools/replay-video/.
+     */
+    function exportVideoData() {
+        if (!replayEngine) return;
+
+        const bundle = {
+            tournamentDoc: replayEngine.tournamentDoc,
+            backups: replayEngine.backups.map(cleanTimestampsForExport),
+            actions: replayEngine.actions.map(cleanTimestampsForExport)
+        };
+
+        downloadFile(
+            JSON.stringify(bundle, null, 2),
+            `tournament-video-${tournamentId}-${Date.now()}.json`,
+            'application/json'
+        );
+    }
+
+    /**
+     * Firestore Timestamp objects (.toDate()) aren't JSON-serializable as-is —
+     * same conversion ActionExport._cleanEntry() already does for exportJSON().
+     */
+    function cleanTimestampsForExport(entry) {
+        const clean = { ...entry };
+        if (clean.timestamp?.toDate) clean.timestamp = clean.timestamp.toDate().toISOString();
+        if (clean.undoneAt?.toDate) clean.undoneAt = clean.undoneAt.toDate().toISOString();
+        if (clean.createdAt?.toDate) clean.createdAt = clean.createdAt.toDate().toISOString();
+        return clean;
     }
 
     // ===== Video Export =====
