@@ -27,9 +27,46 @@
 <div class="sub">Builder/critic swarm closing known gaps in <code>full/</code> (TODO.md + EVENT_BUG_REPORTS.md) before general polish. Updated as rounds complete.</div>
 
 <div class="piece" style="border-color:#7aa2f7">
-  <span class="status done">11 rounds, 68 local commits, backlog exhausted of autonomous-safe work</span>
+  <span class="status done">16 rounds, local commits, all decided items shipped except multi-hex bundling</span>
   <h2>Session status</h2>
   <p>Every EVENT_BUG_REPORTS.md item is either fixed or a standing exception (needs your call, or can't be repro'd without the reporter). TODO.md's remaining open items are all either standing exceptions, need a human at real hardware/a real event, or are genuinely low-priority speculative notes with no concrete repro. Nothing autonomous-safe is left undone — see the round-by-round detail below, and the chat for a full written summary.</p>
+</div>
+
+<div class="round">Rounds 12–14 — post-decision follow-ups (user decisions) — done</div>
+
+<div class="piece">
+  <span class="status done">fixed, merged to main</span>
+  <h2>God.html roster correction before confirming a result</h2>
+  <p>admin.html already had a "live edit" override letting an admin correct a match's roster after it started but before confirming a result; god.html's <code>match-creation-manager.js</code> still hard-blocked it. Mirrored the fix, resolving the standing "mid-match roster swap credit" product question — the real scenario was never a mid-match swap, just a start-time entry mistake needing correction.</p>
+  <p class="meta">match-creation-manager.js, match-queue-manager.js · 254/254 tests</p>
+</div>
+
+<div class="piece">
+  <span class="status done">built end-to-end, merged to main</span>
+  <h2>Drink counter, break-screen leaderboard, performance report</h2>
+  <p>Executed the pre-existing full implementation plan: a tap-to-log button on team.html (soft drink / beer, deliberately alcohol-generic, never touches scoring), a "Most Drinks" leaderboard on the break screen (public, per your decision), and a Drinks &amp; Performance tab on statistics.html. Firestore rules whitelist updated locally for the new field.</p>
+  <p class="meta">drink-counter.js (pure, unit tested) + team-controls.js + display-manager.js + statistics.js · 265/265 tests · Puppeteer-verified visually</p>
+</div>
+
+<div class="piece">
+  <span class="status done">builder/critic swarm, harsh-critic clean, merged to main</span>
+  <h2>Round 12A — 4 concurrent challenge slots</h2>
+  <p>challenge_game upgraded from a flat single-challenge phase to 4 independent pseudo-slots (challenge1-4), mirroring matches_in_progress' existing per-slot machinery end to end: phase-manager.js's slot sub-phase tracking, Discord channel resolution (with backward-compat aliasing for tournaments configured before this shipped), and management UI across admin.html, admin_improved.html, and god.html. Two independent builders, harsh critic picked a winner and found 5 real gaps (including admin_improved.html being missed entirely), all closed in one fix pass.</p>
+  <p class="meta">phase-manager.js, admin.js, admin-improved-adapter.js, discord-panel.js, discord-move-planner.js · 282/282 + 103/103 tests · multi-hex bundling (Round 12B) not yet built</p>
+</div>
+
+<div class="piece">
+  <span class="status done">builder/critic swarm, harsh-critic clean, merged to main</span>
+  <h2>Round 13 — the Rematch spell</h2>
+  <p>Built the previously-nonexistent "Rematch"/"Uusinta" spell: a full revert of a confirmed match's result (points, hex claims) back to pre-confirmation, replayable and re-confirmable from scratch. Deliberately delegates to the existing UndoManager revert path via an injected callback rather than a parallel hand-rolled revert, specifically to avoid the pointsHistory-desync bug class found earlier this session. First critic pass found 6 gaps (chiefly: not actually end-to-end reachable, and the real revert path untested) — all closed in the fix round.</p>
+  <p class="meta">spells.json, spell-engine.js, god-app.js, team-controls.js · 289/289 tests</p>
+</div>
+
+<div class="piece">
+  <span class="status done">fixed, merged to main</span>
+  <h2>Queue "NEXT" badge, per-slot for challenges</h2>
+  <p>Round 12A's 4-slot challenges exposed a gap in the admin queue's existing NEXT-badge logic: it still picked one flat candidate, so with more than one challenge slot open only one of up to 4 waiting slots ever got badged. Made it per-slot, reusing Round 12A's own slot-scoped helper. Investigated the "match queue doesn't feel natural" report's narrowed complaints (reordering, starting matches) and found the underlying capabilities already exist — this badge gap was the one real, concrete issue.</p>
+  <p class="meta">admin-improved-adapter.js · 306/306 tests</p>
 </div>
 
 <div class="round">Round 1 — logic pieces (test-gradable) — done</div>
