@@ -394,11 +394,7 @@ function renderPhaseBanner() {
     // Discord + confirm the game lobby" guidance instead of the old static
     // "A challenge game is being played." string.
     if (phaseName === 'challenge_game') {
-        const queue = gameData.gameQueue || [];
-        const myChallenge = queue.find(m =>
-            m.isChallenge === true && m.status !== 'completed' &&
-            _belongsToCurrentRound(m) && _matchInvolvesUs(m)
-        );
+        const myChallenge = _getMyActiveChallenge();
 
         if (myChallenge) {
             const lobbyActive = gameData.currentPhase?.challengeLobbyState === 'lobby';
@@ -1635,7 +1631,15 @@ function _getMyActiveSlot() {
  */
 function _getMyActiveChallenge() {
     const queue = gameData?.gameQueue || [];
-    return queue.find(m => m.isChallenge === true && m.status !== 'completed' && _matchInvolvesUs(m)) || null;
+    // _belongsToCurrentRound() guard is required, not optional -- see
+    // _getMyActiveSlot()'s docstring for the 2026-08-03 live-event bug this
+    // exact omission caused there (a never-completed entry kept matching
+    // "my active match" forever, across rounds). Without it here, a
+    // stuck/abandoned challenge from a prior round would pop this panel
+    // indefinitely in every later phase where the player has no active
+    // normal-slot match.
+    return queue.find(m => m.isChallenge === true && m.status !== 'completed' &&
+        _belongsToCurrentRound(m) && _matchInvolvesUs(m)) || null;
 }
 
 /**
