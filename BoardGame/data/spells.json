@@ -253,6 +253,22 @@
         "trigger": "opponent_event_draw",
         "action": "cancel_and_discard"
       }
+    },
+    {
+      "id": "rematch",
+      "name": "Uusinta",
+      "nameEn": "Rematch",
+      "type": "reversal",
+      "rarity": "rare",
+      "description": "Pelatkaa minkä tahansa vahvistetun ottelun tuloksen jälkeen. Valitkaa kyseinen ottelu: sen tulos peruutetaan kokonaan – annetut voittopisteet ja laattojen valtaukset perutaan – ja ottelu palautetaan pelattavaksi alusta, ikään kuin sitä ei olisi koskaan pelattu. Tuomari vahvistaa uuden tuloksen normaalisti.",
+      "descriptionEn": "Play after any confirmed match result. Choose that match: its result is fully reverted – any awarded victory points and hex/tile claims are undone – and the match is put back into a replayable, unconfirmed state as if it never happened. The admin then confirms a brand new result through the normal flow.",
+      "timing": "post-game",
+      "targetType": "match",
+      "effect": {
+        "type": "rematch",
+        "target": "confirmed_match",
+        "action": "full_revert"
+      }
     }
   ]
 }

@@ -895,7 +895,7 @@ function renderActiveConditions() {
 
 /** Check if spell requires target selection */
 function requiresTarget(spell) {
-    const targetTypes = ['opponent-card', 'opponent-team', 'opponent-player', 'board', 'adjacent-enemies'];
+    const targetTypes = ['opponent-card', 'opponent-team', 'opponent-player', 'board', 'adjacent-enemies', 'match'];
     return targetTypes.includes(spell.targetType);
 }
 
@@ -935,8 +935,75 @@ async function getSpellTarget(spell) {
     if (targetType === 'opponent-player') {
         return _pickTargetPlayer(spell);
     }
+    if (targetType === 'match') {
+        return _pickTargetMatch(spell);
+    }
     // Other types: return empty (board, self, adjacent handled automatically)
     return {};
+}
+
+/**
+ * Show modal to pick a confirmed match this team was involved in (Rematch).
+ * Only the actual revert is admin-side (executed via SpellEngine on
+ * god.html, wired to UndoManager) — this just records WHICH match the
+ * casting team wants reverted, most-recent first.
+ */
+function _pickTargetMatch(spell) {
+    return new Promise((resolve) => {
+        const history = gameData?.gameHistory || [];
+        const relevant = history.filter(h =>
+            (h.winningTeamIds || []).some(id => String(id) === String(currentTeamId)) ||
+            (h.losingTeamIds || []).some(id => String(id) === String(currentTeamId))
+        ).slice(-10).reverse();
+
+        const modal = document.createElement('div');
+        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:10001;';
+
+        if (relevant.length === 0) {
+            modal.innerHTML = `
+                <div style="background: var(--bg-panel, rgba(20, 22, 30, 0.95)); padding: 25px; border-radius: 12px; max-width: 450px; width: 90%; color: white; border: 2px solid rgba(168,85,247,0.4);">
+                    <h3 style="color: #a855f7; margin-top: 0;">Select Match to Rematch</h3>
+                    <p style="color: #9aa1ad;">No completed matches found for your team.</p>
+                    <button class="btn secondary" id="noMatchCancelBtn" style="width: 100%; margin-top: 10px;">Close</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            modal.querySelector('#noMatchCancelBtn').onclick = () => { modal.remove(); resolve(null); };
+            modal.addEventListener('click', (e) => { if (e.target === modal) { modal.remove(); resolve(null); } });
+            return;
+        }
+
+        modal.innerHTML = `
+            <div style="background: var(--bg-panel, rgba(20, 22, 30, 0.95)); padding: 25px; border-radius: 12px; max-width: 450px; width: 90%; color: white; border: 2px solid rgba(168,85,247,0.4);">
+                <h3 style="color: #a855f7; margin-top: 0;">Select Match to Rematch</h3>
+                <div id="targetMatchList" style="display: flex; flex-direction: column; gap: 8px; margin: 15px 0; max-height: 300px; overflow-y: auto;">
+                    ${relevant.map(h => {
+                        const won = (h.winningTeamIds || []).some(id => String(id) === String(currentTeamId));
+                        return `
+                        <button class="btn secondary target-match-btn" data-game-id="${_escapeHtmlSafe(String(h.queuedGameId ?? ''))}" data-match-number="${h.matchNumber ?? ''}"
+                                style="text-align: left; border-left: 4px solid ${won ? '#22c55e' : '#ef4444'};">
+                            Match ${h.matchNumber ?? '?'} &mdash; ${_escapeHtmlSafe(h.game || 'game')} (${won ? 'won' : 'lost'})
+                        </button>
+                    `; }).join('')}
+                </div>
+                <button class="btn secondary" id="targetMatchCancelBtn" style="width: 100%; margin-top: 10px;">Cancel</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        modal.querySelectorAll('.target-match-btn').forEach(btn => {
+            btn.onclick = () => {
+                modal.remove();
+                resolve({
+                    gameId: btn.dataset.gameId,
+                    matchNumber: btn.dataset.matchNumber ? parseInt(btn.dataset.matchNumber) : null
+                });
+            };
+        });
+
+        modal.querySelector('#targetMatchCancelBtn').onclick = () => { modal.remove(); resolve(null); };
+        modal.addEventListener('click', (e) => { if (e.target === modal) { modal.remove(); resolve(null); } });
+    });
 }
 
 /** Show modal to pick a target team */

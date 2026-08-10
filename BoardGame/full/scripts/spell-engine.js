@@ -27,6 +27,12 @@ class SpellEngine {
      * @param {Function}      [deps.logActionCallback]     - (type, cat, payload, prev) => void
      * @param {Function}      [deps.onPhaseRequirementsChanged] - () => void
      * @param {Function}      [deps.onDisplayRefresh]     - () => void
+     * @param {Function}      [deps.revertMatchByGameId]  - (gameId) => {success, error?} | Promise<{success, error?}>
+     *   Reverts a confirmed match's result (points/hex claims/queue status)
+     *   back to its pre-confirmation state, reusing the same undo mechanism
+     *   as "Undo Last Action" (see undo-manager.js). Only wired on pages
+     *   that also construct an UndoManager (currently god.html only) — see
+     *   _handleRematch(), which fails cleanly when this isn't provided.
      */
     constructor(gameState, {
         uiManager,
@@ -35,7 +41,8 @@ class SpellEngine {
         saveCallback,
         logActionCallback,
         onPhaseRequirementsChanged,
-        onDisplayRefresh
+        onDisplayRefresh,
+        revertMatchByGameId
     }) {
         this._gameState = gameState;
         this._ui = uiManager;
@@ -45,6 +52,7 @@ class SpellEngine {
         this._logAction = logActionCallback || (() => {});
         this._onPhaseChanged = onPhaseRequirementsChanged || (() => {});
         this._refresh = onDisplayRefresh || (() => {});
+        this._revertMatch = typeof revertMatchByGameId === 'function' ? revertMatchByGameId : null;
 
         /** @type {Object[]} Spell definitions from Firestore spellCards collection */
         this._spellDefs = [];
@@ -522,6 +530,8 @@ class SpellEngine {
                 return this._createActiveEffect(def, castByTeamId, targetData, 'special');
             case 'counter':
                 return this._createActiveEffect(def, castByTeamId, targetData, 'reactive');
+            case 'rematch':
+                return this._handleRematch(def, castByTeamId, targetData);
             default:
                 return this._createActiveEffect(def, castByTeamId, targetData, 'condition');
         }
@@ -593,6 +603,60 @@ class SpellEngine {
     }
 
     /**
+     * Handle rematch — fully reverts a confirmed match's result (points,
+     * hex claims, queue status) and puts it back into a replayable state.
+     *
+     * Does NOT reimplement any revert logic itself: it delegates to the
+     * injected deps.revertMatchByGameId callback, which (on the page(s)
+     * where it's wired) runs the exact same undo path "Undo Last Action"
+     * uses for a 'match_result_confirmed' log entry (see undo-manager.js).
+     * This keeps SpellEngine free of any direct UndoManager/action-log
+     * knowledge, consistent with the rest of this file's DI pattern.
+     *
+     * @param {Object} def          Spell definition
+     * @param {number|string} castByTeamId
+     * @param {Object} targetData   Expects { gameId } — the queue-entry /
+     *   match id (matchId) of the confirmed match to revert. Also accepts
+     *   { matchId } as an alias.
+     * @returns {Object|Promise<Object>} result — a Promise when the
+     *   callback itself returns one (reverting a match requires an async
+     *   Firestore/action-log lookup on the pages where this is wired), a
+     *   plain object otherwise. Callers must be prepared to `await` the
+     *   return value of executeSpellEffect('rematch', ...).
+     */
+    _handleRematch(def, castByTeamId, targetData) {
+        const gameId = targetData?.gameId ?? targetData?.matchId;
+        if (gameId === undefined || gameId === null || gameId === '') {
+            return { success: false, error: 'No match selected for rematch' };
+        }
+
+        if (!this._revertMatch) {
+            return {
+                success: false,
+                error: 'Rematch is not available on this page (no revert capability wired)'
+            };
+        }
+
+        const finish = (result) => {
+            if (result && result.success) {
+                this._logAction('spell_rematch_triggered', 'spell', {
+                    spellId: def.id, castByTeamId, gameId
+                }, { note: 'Match result reverted via Rematch spell' });
+
+                this._createActiveEffect(def, castByTeamId, targetData, 'special');
+                return { success: true, gameId };
+            }
+            return { success: false, error: result?.error || 'Rematch failed: could not revert match' };
+        };
+
+        const outcome = this._revertMatch(gameId);
+        if (outcome && typeof outcome.then === 'function') {
+            return outcome.then(finish);
+        }
+        return finish(outcome);
+    }
+
+    /**
      * Create an active effect entry (covers Type B conditions and tracked buffs).
      * @returns {Object} result with effectId
      */
@@ -660,6 +724,11 @@ class SpellEngine {
             return `${casterName}: next room hex draw = double cards`;
         }
 
+        if (effectType === 'rematch') {
+            const matchLabel = targetData?.matchNumber ? `Match ${targetData.matchNumber}` : 'the match';
+            return `${casterName} reverted ${matchLabel} for a rematch`;
+        }
+
         // Generic fallback
         return `${casterName} cast ${def.nameEn || def.name}`;
     }
@@ -681,7 +750,8 @@ class SpellEngine {
             extra_placement: ICON_SVGS.puzzle,
             silence: ICON_SVGS.volumeX,
             bet: ICON_SVGS.coins,
-            counter: ICON_SVGS.shield
+            counter: ICON_SVGS.shield,
+            rematch: ICON_SVGS.undo2
         };
         return icons[type] || ICON_SVGS.wandSparkles;
     }

@@ -169,7 +169,8 @@ class GodApp {
                 saveCallback: save,
                 logActionCallback: logAction,
                 onPhaseRequirementsChanged: onPhaseChanged,
-                onDisplayRefresh: refresh
+                onDisplayRefresh: refresh,
+                revertMatchByGameId: (gameId) => this._revertMatchByGameId(gameId)
             });
         }
 
@@ -594,6 +595,49 @@ class GodApp {
 
         const channel = this._discordChannelCache.find(c => String(c.channelId) === String(channelId));
         return channel?.name || null;
+    }
+
+    /**
+     * Revert a confirmed match's result by gameId (== queue-entry / matchId).
+     * Backs the Rematch spell (spell-engine.js's _handleRematch, wired in
+     * via the revertMatchByGameId dep). Reuses the SAME mechanism as
+     * "Undo Last Action" (undo-manager.js) instead of re-implementing any
+     * revert logic here: find the entry, confirm it's undoable, run
+     * UndoManager.executeUndo() on it. That's what leaves pointsHistory /
+     * gameHistory / the queue entry's status consistent (see the
+     * pointsHistory-desync fix documented in undo-manager.js).
+     *
+     * @param {string|number} gameId - matchId of the confirmed match to revert
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async _revertMatchByGameId(gameId) {
+        if (!this.actionLogger || !this.undo) {
+            return { success: false, error: 'Undo system is not available on this page' };
+        }
+
+        const { entries } = await this.actionLogger.getActions({
+            actionType: 'match_result_confirmed',
+            limit: 50
+        });
+
+        const entry = (entries || []).find(e =>
+            !e.undone && String(e.payload?.matchId) === String(gameId)
+        );
+
+        if (!entry) {
+            return { success: false, error: 'No confirmed result found for that match (already reverted, or too old)' };
+        }
+
+        const { canUndo, reason } = this.undo.canUndo(entry);
+        if (!canUndo) {
+            return { success: false, error: reason || 'That match result cannot be reverted' };
+        }
+
+        const ok = await this.undo.executeUndo(entry);
+        if (!ok) {
+            return { success: false, error: 'Reverting the match failed' };
+        }
+        return { success: true };
     }
 
     // ------------------------------------------------------------------
