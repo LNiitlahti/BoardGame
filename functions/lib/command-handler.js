@@ -208,10 +208,22 @@ function pickTemplate(category) {
  * template pool — the channel is for a human glancing at what the bot just
  * did (and reads a little personality while they're at it), not a log.
  */
+// A TD skimming the status channel mid-event needs to tell success from
+// failure at a glance, before reading any prose -- the persona's flavor
+// text alone isn't enough for that (severity isn't reliably inferable from
+// tone). Same categories buildStatusMessage/computeStatusContext use.
+const STATUS_SEVERITY_EMOJI = {
+    success: '✅',   // white_check_mark
+    partial: '⚠️', // warning
+    failure: '❌',   // x
+    noop: 'ℹ️',    // information_source
+};
+
 function buildStatusMessage({ command, results, channelsById }) {
     const ctx = computeStatusContext({ command, results, channelsById });
     const template = pickTemplate(ctx.category);
-    return template.render(ctx);
+    const emoji = STATUS_SEVERITY_EMOJI[ctx.category] || '';
+    return emoji ? `${emoji} ${template.render(ctx)}` : template.render(ctx);
 }
 
 async function handleCommand({ db, rest, sleep, tournamentId, command }) {
