@@ -148,3 +148,35 @@ class TileChangeTracker:
             return brightness_max
         fraction = index / (self.capacity - 1)
         return brightness_max - fraction * (brightness_max - brightness_min)
+
+
+class SpellToastQueue:
+    """Queues spell-cast toasts so overlapping casts play back-to-back
+    instead of visually stacking. Toasts play in request order; each one
+    starts no earlier than its own requested_at, and no earlier than the
+    previous toast's end.
+    """
+
+    def __init__(self, duration_seconds=2.0):
+        self.duration_seconds = duration_seconds
+        self._queued = []  # [{teamName, spellName, requested_at}], in add() order
+
+    def add(self, team_name, spell_name, requested_at):
+        self._queued.append({
+            'teamName': team_name,
+            'spellName': spell_name,
+            'requested_at': requested_at,
+        })
+
+    def active_toast_at(self, t):
+        """The toast active at timeline time `t` (seconds), with its own
+        `elapsed` time since it started, or None if nothing is showing.
+        """
+        start = 0.0
+        for toast in self._queued:
+            start = max(start, toast['requested_at'])
+            end = start + self.duration_seconds
+            if start <= t < end:
+                return {**toast, 'elapsed': t - start}
+            start = end
+        return None
