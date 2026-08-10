@@ -2233,9 +2233,10 @@ class SpellEngine {
         const timing = def.timing;
         const currentRound = this._gameState.currentPhase?.roundNumber || 0;
 
-        if (def.effect?.type === 'permanent_buff') return null; // Permanent
-        if (def.effect?.type === 'counter') return null;        // Until used
-        if (def.effect?.type === 'streak_bonus') return null;   // Until streak breaks
+        if (def.effect?.type === 'permanent_buff') return null;   // Permanent
+        if (def.effect?.type === 'counter') return null;          // Until used
+        if (def.effect?.type === 'streak_bonus') return null;     // Until streak breaks
+        if (def.effect?.type === 'charged_removal') return null;  // Until usesRemaining <= 0
 
         // Most effects expire after next round
         if (timing === 'pre-game' || timing === 'post-game' || timing === 'placement') {
