@@ -575,6 +575,79 @@
   flex-shrink: 0;
 }
 
+/* Choose-winner buttons shown directly on a live slot card once player
+   votes are in — reuses quickConfirmResult(), same action as the full
+   result-confirm modal's "Team X Wins" buttons, so the TD can resolve
+   the match from the flow panel in one click. The side currently ahead
+   in the vote count flashes so voting progress is visible at a glance. */
+.live-match-votes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed var(--border-soft, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-sm, 6px);
+}
+
+.live-match-votes-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent-steel, #8f98a6);
+}
+
+.live-vote-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.1));
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary, #f7f0e3);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.live-vote-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.live-vote-count {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-tertiary, rgba(247, 240, 227, 0.6));
+}
+
+.live-vote-btn.leading-vote {
+  border-color: #5dd39e;
+  background: rgba(93, 211, 158, 0.1);
+  font-weight: 700;
+  animation: liveVoteLeadingPulse 1.4s ease-in-out infinite;
+}
+
+.live-vote-btn.leading-vote .live-vote-count {
+  color: #5dd39e;
+}
+
+@keyframes liveVoteLeadingPulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(93, 211, 158, 0.4); }
+  50% { box-shadow: 0 0 0 3px rgba(93, 211, 158, 0.85); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-vote-btn.leading-vote {
+    animation: none;
+    box-shadow: 0 0 0 2px rgba(93, 211, 158, 0.7);
+  }
+}
+
 /* Match details + per-player lobby readiness inside slot cards
    (rendered by PhaseManager.renderSlotDetailsHtml on both god.html's
    slot panels and admin.html's flow cards) */

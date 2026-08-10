@@ -775,6 +775,51 @@
         if (fn) fn();
     };
 
+    /**
+     * When a live match already has player votes in, render a choose-winner
+     * button per side directly on the slot card — reusing the exact same
+     * quickConfirmResult(gameId, idx) action the full result-confirm modal's
+     * "Team X Wins" buttons call — so the TD can resolve straight from the
+     * flow panel without an extra click into the card first. The side
+     * currently leading the vote gets a "leading" class (flashing border,
+     * see phase-indicator.css) so voting progress is visible at a glance.
+     * Returns '' when nobody has voted yet (existing "Confirm Game Result"
+     * button remains the only way in, unchanged).
+     */
+    function _liveMatchVoteButtonsHtml(game) {
+        const votes = game.votes || [];
+        if (votes.length === 0) return '';
+
+        const sides = game.teams || game.sides || [];
+        const counts = {};
+        votes.forEach(v => { counts[v.result] = (counts[v.result] || 0) + 1; });
+        const total = votes.length;
+        const maxCount = Math.max(...Object.values(counts));
+        const leaders = Object.keys(counts).filter(r => counts[r] === maxCount);
+        const isTie = leaders.length > 1;
+
+        const buttonsHtml = sides.map((side, idx) => {
+            const label = SIDE_LABELS[idx] || (idx + 1);
+            const names = getMatchTeamPlayers(side).map(p => p.name).filter(Boolean).join(', ') || `Team ${label}`;
+            const count = counts[`side_${idx}_won`] || 0;
+            const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+            const isLeading = !isTie && count === maxCount && count > 0;
+            return `
+                <button class="btn-small live-vote-btn${isLeading ? ' leading-vote' : ''}"
+                        onclick="event.stopPropagation(); quickConfirmResult(${game.id}, ${idx})"
+                        title="Record ${_esc(names)} as the winner">
+                    ${isLeading ? ICON_SVGS.check + ' ' : ''}${_esc(label)}: ${_esc(names)}
+                    <span class="live-vote-count">${count}/${total}${count > 0 ? ` &middot; ${pct}%` : ''}</span>
+                </button>`;
+        }).join('');
+
+        return `
+            <div class="live-match-votes">
+                <div class="live-match-votes-title">Player votes &middot; ${total} in</div>
+                ${buttonsHtml}
+            </div>`;
+    }
+
     function _renderMatchSlotCards(phase) {
         let container = document.getElementById('matchSlotCards');
         const panel = document.getElementById('flowPanel');
@@ -826,6 +871,7 @@
                     const matchup = (game.teams || game.sides || [])
                         .map(side => getMatchTeamPlayers(side).map(p => p.name).filter(Boolean).join(', ') || 'TBD')
                         .join(' vs ');
+                    const voteButtonsHtml = _liveMatchVoteButtonsHtml(game);
                     return `
                         <div class="live-match-card">
                             <div class="live-match-info">
@@ -833,7 +879,8 @@
                                 <span class="live-match-players">${_esc(matchup)}</span>
                             </div>
                             <button class="btn-small primary" onclick="event.stopPropagation(); openQuickConfirm(${game.id})">${ICON_SVGS.check} Confirm Game Result</button>
-                        </div>`;
+                        </div>
+                        ${voteButtonsHtml}`;
                 }).join('')
                 : '';
 
