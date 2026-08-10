@@ -122,7 +122,15 @@
   <h2>P10 — Export tournament replay as video</h2>
   <p>New "Export Video" button on replay.html: rewinds to the start, prompts the browser's screen/tab-share picker (<code>getDisplayMedia()</code>), records via <code>MediaRecorder</code> while driving the replay at 5x speed, and downloads a .webm on completion — zero new dependencies. Went through 2 real critique rounds: round 1 caught a disqualifying bug in the losing candidate (a full-screen progress overlay that would have recorded a black screen instead of the actual replay board — exactly what adversarial review exists to catch), and a follow-up fix round caught its own regression (a stale status-bar timer from one export could hide a subsequent export's live progress) that a broken/placeholder critic result initially missed — re-verified independently before merging.</p>
   <p>Correctly distinguishes playback-just-started from playback-actually-finished (polls for <code>isPlaying</code>'s true→false transition, not the synchronous true right after calling <code>play()</code>), handles the user cancelling the picker or stopping screen-share mid-capture from the browser's own UI, restores the admin's original scrub position and speed on every exit path, and cleans up on page unload.</p>
-  <p class="meta">replay.html · commits b971325, 1aaab2d, cf82c13 · needs a real screen-share to visually verify — not yet verified live</p>
+  <p class="meta">replay.html · commits b971325, 1aaab2d, cf82c13 · needs a real screen-share to visually verify — not yet verified live. Note: getDisplayMedia() requires a secure context (https or localhost) and has poor-to-no mobile browser support — this is a desktop admin feature.</p>
+</div>
+
+<div class="round">Round 6 — TODO.md backlog sweep, part 1 — done</div>
+<div class="piece">
+  <span class="status done">6/6 fixed, merged, harsh-critic clean</span>
+  <h2>Small independent fixes</h2>
+  <p>Firestore deprecation warning (root-caused as a silently-broken prior "fix" — the compat SDK build this app loads doesn't have the modern cache APIs at all, verified by downloading and grepping the real bundle; multi-tab persistence was never actually active). "Use here" vs "+Assign" button clarity (plus a caught-and-fixed unsafe-tooltip regression). Duplicate display name disambiguation. config/defaultRooms silent-overwrite fix (a 4th write site the losing candidate missed was the deciding factor; attribution now uses authenticated identity, not free text). Undo now retracts the pendingHexWins reminder it queued. 3 small defense-in-depth guards.</p>
+  <p class="meta">commits cbc6f89, ac7367b, bd3bc4e, b2efdbb, 7411512, daa5abf, 4844a18</p>
 </div>
 
 <div class="piece">
