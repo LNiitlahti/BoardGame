@@ -42,3 +42,16 @@ def test_render_frame_with_an_active_toast_does_not_raise():
     toast = {'teamName': 'Red Team', 'spellName': 'Fireball', 'elapsed': 0.5}
     image = render_frame(state, tracker, toast, DEFAULT_CONFIG)
     assert image.size == (DEFAULT_CONFIG['width'], DEFAULT_CONFIG['height'])
+
+
+def test_render_frame_does_not_crash_with_many_teams_at_small_resolution():
+    small_config = dict(DEFAULT_CONFIG)
+    small_config['width'] = 640
+    small_config['height'] = 360
+    state = {
+        'board': {},
+        'teams': [{'id': i, 'name': f'Team {i}', 'color': '#888888', 'points': i} for i in range(20)],
+    }
+    tracker = TileChangeTracker(capacity=10)
+    image = render_frame(state, tracker, None, small_config)
+    assert image.size == (640, 360)

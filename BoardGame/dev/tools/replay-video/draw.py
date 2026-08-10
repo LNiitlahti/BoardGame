@@ -87,7 +87,9 @@ def _draw_score_bar(draw, rows, width, top, height):
     row_height = height / len(rows)
     for i, row in enumerate(rows):
         y = top + i * row_height
-        draw.rectangle([20, y + 4, 40, y + row_height - 4], fill=row['color'])
+        swatch_top = y + 4
+        swatch_bottom = max(swatch_top, y + row_height - 4)
+        draw.rectangle([20, swatch_top, 40, swatch_bottom], fill=row['color'])
         draw.text((50, y + row_height / 2 - 8), f"{row['name']}  {row['points']}pts", fill='#ffffff')
 
 
@@ -105,8 +107,9 @@ def _draw_spell_toast(draw, toast, width, duration_seconds):
 
     text = f"{toast['teamName']} — {toast['spellName']}"
     box_gray = round(20 * alpha)
+    text_gray = round(255 * alpha)
     draw.rectangle(
         [width / 2 - 220, 20, width / 2 + 220, 70],
         fill=(box_gray, box_gray, box_gray),
     )
-    draw.text((width / 2 - 200, 35), text, fill='#ffffff')
+    draw.text((width / 2 - 200, 35), text, fill=(text_gray, text_gray, text_gray))
