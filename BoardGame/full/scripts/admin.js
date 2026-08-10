@@ -2681,6 +2681,9 @@ async function completeBreak(breakId) {
             breakLabel: breakEntry.breakLabel,
             message: `${breakEntry.breakEmoji || ''} ${breakEntry.breakLabel} completed`
         });
+        window.logAction?.('break_completed', 'admin', {
+            breakId, breakType: breakEntry.breakType, breakLabel: breakEntry.breakLabel
+        });
 
         showStatus(`${breakEntry.breakLabel} completed!`, 'success');
         closeResultConfirm();
@@ -3689,7 +3692,8 @@ async function confirmClearQueue(triggerBtn) {
     // pending clutter", not "destroy the tournament".
     const keep = clearQueueKeepPredicate(removeFuture);
 
-    const removedCount = (gameState.gameQueue || []).filter(g => !keep(g)).length;
+    const removedEntries = (gameState.gameQueue || []).filter(g => !keep(g));
+    const removedCount = removedEntries.length;
     gameState.gameQueue = (gameState.gameQueue || []).filter(keep);
 
     await saveGameState(triggerBtn);
@@ -3700,6 +3704,10 @@ async function confirmClearQueue(triggerBtn) {
         futureRoundsRemoved: removeFuture,
         message: `Cleared ${removedCount} matches from queue (live${removeFuture ? '' : ' + future rounds'} kept)`
     });
+    window.logAction?.('queue_cleared', 'match', {
+        matchesRemoved: removedCount, futureRoundsRemoved: removeFuture,
+        removedMatchIds: removedEntries.map(g => g.id)
+    }, { removedEntries: JSON.parse(JSON.stringify(removedEntries)) });
 
     showStatus(`Cleared ${removedCount} match${removedCount !== 1 ? 'es' : ''} — live matches and future rounds kept`, 'success');
 }
@@ -4818,6 +4826,9 @@ async function waivePendingHexWin(matchNumber, teamId) {
         matchNumber, teamId, teamName,
         message: `Hex placement waived for ${teamName} (match #${matchNumber})`
     });
+    window.logAction?.('hex_win_waived', 'board', {
+        matchNumber, teamId, teamName
+    });
     showStatus(`Hex placement waived for ${teamName}.`, 'info');
     if (typeof updatePendingHexNotification === 'function') updatePendingHexNotification();
     if (typeof updateDisplay === 'function') updateDisplay();
@@ -5766,6 +5777,12 @@ async function confirmAdvanceRound(triggerBtn) {
     }
     closeNextRoundModal();
 
+    // Snapshot team points before payout so this legacy advance is
+    // undo/audit-trail eligible the same way the phase-flow's
+    // 'points_awarded' entries are (see phase-manager.js).
+    const _prevRound = gameState.currentRound || 0;
+    const _prevTeamPoints = (gameState.teams || []).map(t => ({ id: t.id, points: t.points || 0 }));
+
     // Award points BEFORE advancing round
     const pointsAwarded = awardRoundPoints();
 
@@ -5799,6 +5816,9 @@ async function confirmAdvanceRound(triggerBtn) {
         pointsAwarded: pointsAwarded,
         message: `Round ${gameState.currentRound} started`
     });
+    window.logAction?.('round_advance', 'points', {
+        round: gameState.currentRound, previousRound: _prevRound, pointsAwarded
+    }, { round: _prevRound, teamPoints: _prevTeamPoints });
 
     showStatus(`Round ${gameState.currentRound} started! Points: ${pointsMessage}`, 'success');
 }
