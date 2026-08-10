@@ -122,6 +122,7 @@ class GodApp {
             teamManager: this.teams,
             queueManager: this.queue,
             boardManager: this.board,
+            boardModule: this._boardModule,
             saveCallback: save,
             logEventCallback: log,
             logActionCallback: logAction,
@@ -349,6 +350,9 @@ class GodApp {
         }
         if (this.stats) {
             this.stats._boardModule = this._boardModule;
+        }
+        if (this.result) {
+            this.result._boardModule = this._boardModule;
         }
 
         if (this.ui) {

@@ -33,16 +33,20 @@ class ResultManager {
      * @param {TeamManager}        deps.teamManager
      * @param {MatchQueueManager}  deps.queueManager
      * @param {BoardManager}       deps.boardManager
+     * @param {BoardModule}        [deps.boardModule]      - Hex type lookups (bundled-challenge hex transfer).
+     *                                                        Mirrors StatsManager's constructor dependency rather
+     *                                                        than relying on the ambient window.boardModule getter.
      * @param {Function}           deps.saveCallback      - () => Promise<void>
      * @param {Function}           deps.logEventCallback   - (type, data) => void (legacy)
      * @param {Function}           [deps.logActionCallback] - (actionType, category, payload, previousState) => void
      */
-    constructor(gameState, { uiManager, teamManager, queueManager, boardManager, saveCallback, logEventCallback, logActionCallback, onPhaseRequirementsChanged }) {
+    constructor(gameState, { uiManager, teamManager, queueManager, boardManager, boardModule, saveCallback, logEventCallback, logActionCallback, onPhaseRequirementsChanged }) {
         this._gameState = gameState;
         this._ui = uiManager;
         this._teams = teamManager;
         this._queue = queueManager;
         this._board = boardManager;
+        this._boardModule = boardModule || null;
         this._save = saveCallback;
         this._logEvent = logEventCallback || (() => {});
         this._logAction = logActionCallback || (() => {});
@@ -543,9 +547,14 @@ class ResultManager {
                     this._gameState.board[o.hexCoord] = o.newOwnerTeamId;
 
                     const matches = o.hexCoord.match(/q(-?\d+)r(-?\d+)/);
-                    if (matches && window.boardModule) {
+                    // Prefer the boardModule injected at construction (mirrors
+                    // StatsManager); fall back to the ambient window.boardModule
+                    // getter (god-app.js._wireGlobalFunctions()) only if this
+                    // ResultManager instance wasn't given one explicitly.
+                    const bm = this._boardModule || (typeof window !== 'undefined' ? window.boardModule : null);
+                    if (matches && bm) {
                         const [, q, r] = matches;
-                        const hexType = window.boardModule.getHexType(parseInt(q), parseInt(r));
+                        const hexType = bm.getHexType(parseInt(q), parseInt(r));
                         if (hexType === 'side-heart' || hexType === 'mountain-heart') {
                             this._gameState.heartHexControl[o.hexCoord] = o.newOwnerTeamId;
                         }
