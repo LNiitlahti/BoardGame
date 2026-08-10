@@ -718,14 +718,14 @@ function renderFriendsChecklist(playerMapping, forPlayerId, containerId) {
 
         html += `
             <div class="friend-card ${isChecked ? 'checked' : ''}">
-                <div class="friend-card-header">
+                <label class="friend-card-header">
                     <input type="checkbox"
                            ${isChecked ? 'checked' : ''}
                            onchange="${isEditMode ? `toggleFriendStatusEdit('${otherId}')` : `toggleFriendStatus('${otherId}')`}">
                     <span class="team-dot" style="background: ${info.teamColor}"></span>
                     <span class="player-name">${info.name}</span>
                     <span class="team-name">${info.teamName}</span>
-                </div>
+                </label>
                 <div class="friend-platform-ids">
                     ${platformIdsHtml}
                 </div>
