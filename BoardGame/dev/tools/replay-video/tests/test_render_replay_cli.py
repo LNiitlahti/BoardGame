@@ -1,3 +1,5 @@
+import pytest
+
 from render_replay import parse_args, overrides_from_args
 
 
@@ -48,3 +50,36 @@ def test_overrides_from_args_omits_width_height_when_no_resolution_flag():
     overrides = overrides_from_args(args)
     assert 'width' not in overrides
     assert 'height' not in overrides
+
+
+def test_overrides_from_args_rejects_resolution_with_no_x():
+    args = parse_args(['bundle.json', 'out.mp4', '--resolution', '1920'])
+    with pytest.raises(SystemExit, match='WIDTHxHEIGHT'):
+        overrides_from_args(args)
+
+
+def test_overrides_from_args_rejects_resolution_with_extra_x():
+    args = parse_args(['bundle.json', 'out.mp4', '--resolution', '1920x1080x60'])
+    with pytest.raises(SystemExit, match='WIDTHxHEIGHT'):
+        overrides_from_args(args)
+
+
+def test_overrides_from_args_rejects_resolution_with_non_numeric_parts():
+    args = parse_args(['bundle.json', 'out.mp4', '--resolution', '1920xabc'])
+    with pytest.raises(SystemExit, match='WIDTHxHEIGHT'):
+        overrides_from_args(args)
+
+
+def test_overrides_from_args_maps_all_renamed_flags_to_correct_config_keys():
+    args = parse_args([
+        'bundle.json', 'out.mp4',
+        '--recency-count', '5',
+        '--recency-brightness-max', '0.6',
+        '--recency-brightness-min', '0.05',
+        '--toast-duration', '1.5',
+    ])
+    overrides = overrides_from_args(args)
+    assert overrides['recency_tile_count'] == 5
+    assert overrides['recency_brightness_max'] == 0.6
+    assert overrides['recency_brightness_min'] == 0.05
+    assert overrides['spell_toast_duration_seconds'] == 1.5
