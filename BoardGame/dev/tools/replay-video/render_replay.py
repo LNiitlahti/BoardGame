@@ -57,8 +57,15 @@ def main(argv=None):
     config_path = args.config or os.path.join(script_dir, 'config.json')
     config = apply_overrides(load_config(config_path), overrides_from_args(args))
 
-    with open(args.bundle, 'r', encoding='utf-8') as f:
-        bundle = json.load(f)
+    try:
+        with open(args.bundle, 'r', encoding='utf-8') as f:
+            bundle = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: bundle file not found: {args.bundle}", file=sys.stderr)
+        return 1
+    except json.JSONDecodeError as e:
+        print(f"Error: {args.bundle} is not valid JSON: {e}", file=sys.stderr)
+        return 1
 
     try:
         encoder = VideoEncoder(config['width'], config['height'], config['fps'], args.output)
@@ -71,23 +78,25 @@ def main(argv=None):
     frames_per_action = max(1, round(config['seconds_per_action'] * config['fps']))
 
     frame_index = 0
-    for action, state, effect in iter_frames_state(bundle):
-        if effect:
-            if effect.get('tile_changes'):
-                tile_tracker.record_many(effect['tile_changes'])
-            if effect.get('toast'):
-                toast = effect['toast']
-                requested_at = frame_index / config['fps']
-                toast_queue.add(toast['teamName'], toast['spellName'], requested_at)
+    try:
+        for action, state, effect in iter_frames_state(bundle):
+            if effect:
+                if effect.get('tile_changes'):
+                    tile_tracker.record_many(effect['tile_changes'])
+                if effect.get('toast'):
+                    toast = effect['toast']
+                    requested_at = frame_index / config['fps']
+                    toast_queue.add(toast['teamName'], toast['spellName'], requested_at)
 
-        for _ in range(frames_per_action):
-            t = frame_index / config['fps']
-            active_toast = toast_queue.active_toast_at(t)
-            image = render_frame(state, tile_tracker, active_toast, config)
-            encoder.write_frame(image)
-            frame_index += 1
+            for _ in range(frames_per_action):
+                t = frame_index / config['fps']
+                active_toast = toast_queue.active_toast_at(t)
+                image = render_frame(state, tile_tracker, active_toast, config)
+                encoder.write_frame(image)
+                frame_index += 1
+    finally:
+        encoder.close()
 
-    encoder.close()
     print(f"Wrote {args.output} ({frame_index} frames, {frame_index / config['fps']:.1f}s)")
     return 0
 

@@ -54,3 +54,49 @@ def test_main_reports_a_clean_error_when_ffmpeg_is_unavailable(monkeypatch, caps
     exit_code = render_replay.main([FIXTURE_PATH, str(tmp_path / 'out.mp4')])
     assert exit_code == 1
     assert 'ffmpeg' in capsys.readouterr().err
+
+
+def test_main_reports_a_clean_error_when_bundle_file_is_missing(capsys, tmp_path):
+    exit_code = render_replay.main(['/no/such/bundle.json', str(tmp_path / 'out.mp4')])
+    assert exit_code == 1
+    assert 'not found' in capsys.readouterr().err
+
+
+def test_main_reports_a_clean_error_when_bundle_is_malformed_json(capsys, tmp_path):
+    bad_bundle = tmp_path / 'bad.json'
+    bad_bundle.write_text('{not valid json,,,')
+    exit_code = render_replay.main([str(bad_bundle), str(tmp_path / 'out.mp4')])
+    assert exit_code == 1
+    assert 'not valid JSON' in capsys.readouterr().err
+
+
+def test_main_closes_the_encoder_even_when_rendering_raises(monkeypatch, tmp_path):
+    class CrashingEncoder:
+        instances = []
+
+        def __init__(self, width, height, fps, output_path):
+            self.closed = False
+            CrashingEncoder.instances.append(self)
+            self.write_count = 0
+
+        def write_frame(self, pil_image):
+            self.write_count += 1
+            if self.write_count == 3:
+                raise RuntimeError('simulated ffmpeg crash')
+
+        def close(self):
+            self.closed = True
+
+    CrashingEncoder.instances = []
+    monkeypatch.setattr(render_replay, 'VideoEncoder', CrashingEncoder)
+
+    output_path = str(tmp_path / 'out.mp4')
+    try:
+        render_replay.main([
+            FIXTURE_PATH, output_path,
+            '--fps', '10', '--seconds-per-action', '1.0', '--resolution', '320x240',
+        ])
+    except RuntimeError:
+        pass
+
+    assert CrashingEncoder.instances[0].closed is True
