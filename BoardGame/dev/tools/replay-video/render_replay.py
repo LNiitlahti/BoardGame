@@ -3,6 +3,14 @@
 "Export Video Data" button) into an mp4 video. See README.md for usage.
 """
 import argparse
+import json
+import sys
+import os
+
+from config import load_config, apply_overrides
+from state import iter_frames_state, TileChangeTracker, SpellToastQueue
+from draw import render_frame
+from encode import VideoEncoder, FFmpegNotFoundError
 
 
 def parse_args(argv=None):
@@ -41,3 +49,48 @@ def overrides_from_args(args):
         overrides['width'] = int(parts[0])
         overrides['height'] = int(parts[1])
     return overrides
+
+
+def main(argv=None):
+    args = parse_args(argv)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = args.config or os.path.join(script_dir, 'config.json')
+    config = apply_overrides(load_config(config_path), overrides_from_args(args))
+
+    with open(args.bundle, 'r', encoding='utf-8') as f:
+        bundle = json.load(f)
+
+    try:
+        encoder = VideoEncoder(config['width'], config['height'], config['fps'], args.output)
+    except FFmpegNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    tile_tracker = TileChangeTracker(capacity=config['recency_tile_count'])
+    toast_queue = SpellToastQueue(duration_seconds=config['spell_toast_duration_seconds'])
+    frames_per_action = max(1, round(config['seconds_per_action'] * config['fps']))
+
+    frame_index = 0
+    for action, state, effect in iter_frames_state(bundle):
+        if effect:
+            if effect.get('tile_changes'):
+                tile_tracker.record_many(effect['tile_changes'])
+            if effect.get('toast'):
+                toast = effect['toast']
+                requested_at = frame_index / config['fps']
+                toast_queue.add(toast['teamName'], toast['spellName'], requested_at)
+
+        for _ in range(frames_per_action):
+            t = frame_index / config['fps']
+            active_toast = toast_queue.active_toast_at(t)
+            image = render_frame(state, tile_tracker, active_toast, config)
+            encoder.write_frame(image)
+            frame_index += 1
+
+    encoder.close()
+    print(f"Wrote {args.output} ({frame_index} frames, {frame_index / config['fps']:.1f}s)")
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
