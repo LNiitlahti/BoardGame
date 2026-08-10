@@ -2446,6 +2446,23 @@ body.spell-hex-picking .challenge-hex-pick-banner#spellHexPickBanner {
     display: flex;
 }
 
+/* Spell phase admin controls (Turn: Team Name + Skip Turn / End Spell
+   Phase) — mirrors god-modern.css's #spellPhaseAdminControls, rendered by
+   SpellEngine.renderSpellPhaseControls() into the Flow Panel. */
+#spellPhaseAdminControls {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 10px;
+    font-size: 0.85rem;
+    color: #a855f7;
+}
+
+#spellPhaseAdminControls .btn-small {
+    font-size: 0.7rem;
+    padding: 4px 10px;
+}
+
 .board-hex.challenge-hex-candidate {
     cursor: pointer;
     box-shadow: 0 0 0 3px var(--gold, #d4af37), 0 0 16px 4px rgba(212, 175, 55, 0.6);

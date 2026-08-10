@@ -1714,6 +1714,19 @@
         // Spell window controls (Begin Spells + Loop)
         _renderSpellWindowControls(phase);
 
+        // Spell phase turn indicator + Skip Turn / End Spell Phase —
+        // mirrors god-app.js's updateDisplay() (checkTurnAdvancement()
+        // detects a team.html direct write and advances currentTeamIndex;
+        // renderSpellPhaseControls() draws "Turn: <Team> (done/total)" plus
+        // the admin override buttons into #spellPhaseAdminControls). Was
+        // never wired on admin.html — its container didn't exist in the
+        // markup either, so this whole panel was previously a no-op on
+        // both pages, not just this one.
+        if (_spellEngine && gameState.spellPhase?.isActive) {
+            _spellEngine.checkTurnAdvancement();
+            _spellEngine.renderSpellPhaseControls();
+        }
+
         // Break interval badge
         if (breakBadge) {
             const bs = gameState.breakSettings;
@@ -2485,6 +2498,12 @@
     window.beginSpells = async () => {
         _phaseManager?.beginSpells();
     };
+
+    // Mirrors god-app.js's skipSpellTurn/forceEndSpellPhase globals — the
+    // buttons rendered by SpellEngine.renderSpellPhaseControls() call these
+    // by name via inline onclick, same as on god.html.
+    window.skipSpellTurn = (teamId) => _spellEngine?.skipTeamTurn(teamId);
+    window.forceEndSpellPhase = () => _spellEngine?.forceEndSpellPhase();
 
     window.loopBack = async () => {
         _phaseManager?.loopBack();
