@@ -219,6 +219,29 @@ test('migratePhaseIfNeeded derives challenge1 from the old flat challengeLobbySt
     });
 });
 
+test('migratePhaseIfNeeded derives challenge1 "setup" from a pending challenge in the current round (no lobby, no ongoing)', () => {
+    const gs = {
+        currentPhase: { name: 'challenge_game', roundNumber: 4, startedAt: 'x' },
+        gameQueue: [challengeEntry(424, 'challenge', { status: 'pending', roundNumber: 4 })]
+    };
+    const pm = makePM(gs);
+    const migrated = pm.migratePhaseIfNeeded();
+    assert.strictEqual(migrated, true);
+    assert.strictEqual(gs.currentPhase.slots.challenge1, 'setup');
+});
+
+test('migratePhaseIfNeeded ignores a stale prior-round pending challenge when deriving sub1', () => {
+    const gs = {
+        currentPhase: { name: 'challenge_game', roundNumber: 4, startedAt: 'x', challengeLobbyState: 'lobby' },
+        // Even though a pending entry exists, it's from round 2 — the
+        // 'lobby' challengeLobbyState (this round's real signal) should win.
+        gameQueue: [challengeEntry(425, 'challenge', { status: 'pending', roundNumber: 2 })]
+    };
+    const pm = makePM(gs);
+    pm.migratePhaseIfNeeded();
+    assert.strictEqual(gs.currentPhase.slots.challenge1, 'lobby');
+});
+
 test('migratePhaseIfNeeded is a no-op once .slots already exists', () => {
     const gs = baseGameState();
     const pm = makePM(gs);
@@ -229,7 +252,34 @@ test('migratePhaseIfNeeded is a no-op once .slots already exists', () => {
 test('migratePhaseIfNeeded maps an ongoing legacy challenge match to "playing"', () => {
     const gs = {
         currentPhase: { name: 'challenge_game', roundNumber: 2, startedAt: 'x' },
-        gameQueue: [challengeEntry(421, 'challenge', { status: 'ongoing' })]
+        // roundNumber must match the phase's current round: this entry
+        // represents THIS round's own ongoing challenge, not a stale
+        // leftover from a different round (see the round-scoping test
+        // below, which covers the stale-entry case).
+        gameQueue: [challengeEntry(421, 'challenge', { status: 'ongoing', roundNumber: 2 })]
+    };
+    const pm = makePM(gs);
+    pm.migratePhaseIfNeeded();
+    assert.strictEqual(gs.currentPhase.slots.challenge1, 'playing');
+});
+
+test('migratePhaseIfNeeded ignores a stale prior-round ongoing challenge entry (round-scoped, mirrors getSlotRequirements)', () => {
+    const gs = {
+        currentPhase: { name: 'challenge_game', roundNumber: 5, startedAt: 'x' },
+        // Leftover ongoing entry from round 3 that was never cleaned out of
+        // the queue must NOT make a fresh round 5 challenge_game look like
+        // it already has a challenge playing.
+        gameQueue: [challengeEntry(422, 'challenge', { status: 'ongoing', roundNumber: 3 })]
+    };
+    const pm = makePM(gs);
+    pm.migratePhaseIfNeeded();
+    assert.strictEqual(gs.currentPhase.slots.challenge1, 'setup');
+});
+
+test('migratePhaseIfNeeded still honors an untagged (roundNumber undefined) ongoing challenge entry', () => {
+    const gs = {
+        currentPhase: { name: 'challenge_game', roundNumber: 5, startedAt: 'x' },
+        gameQueue: [challengeEntry(423, 'challenge', { status: 'ongoing', roundNumber: undefined })]
     };
     const pm = makePM(gs);
     pm.migratePhaseIfNeeded();

@@ -254,9 +254,22 @@ class PhaseManager {
         // losing an in-flight challenge's progress.
         if (oldName === 'challenge_game' && !gs.currentPhase.slots) {
             const queue = gs.gameQueue || [];
-            const hasOngoingChallenge = queue.some(m => m.isChallenge === true && m.status === 'ongoing');
+            const currentRoundNumber = gs.currentPhase?.roundNumber;
+            // Narrow to THIS round's challenges before deriving sub1, same
+            // round-scoping policy as getSlotRequirements'/belongsToSlot's
+            // (undefined roundNumber counts as "could be this round";
+            // anything explicitly tagged for a different round doesn't) —
+            // otherwise a stale prior-round challenge entry that was never
+            // cleaned up out of the queue could make a fresh round_N
+            // challenge_game look like it already has an ongoing/pending
+            // challenge when it doesn't.
+            const belongsToCurrentRound = m => m.roundNumber === undefined ||
+                currentRoundNumber === undefined || m.roundNumber === currentRoundNumber;
+            const hasOngoingChallenge = queue.some(m => m.isChallenge === true && m.status === 'ongoing' &&
+                belongsToCurrentRound(m));
             const hasPendingChallenge = queue.some(m => m.isChallenge === true &&
-                (m.status === 'pending' || m.status === undefined || m.status === 'queued'));
+                (m.status === 'pending' || m.status === undefined || m.status === 'queued') &&
+                belongsToCurrentRound(m));
             let sub1 = 'setup';
             if (hasOngoingChallenge) {
                 sub1 = 'playing';

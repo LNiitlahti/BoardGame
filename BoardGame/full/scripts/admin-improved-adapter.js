@@ -94,6 +94,18 @@
     /** Which Match slot new queue entries get tagged with (admin-selected — see _renderMatchSlotCards) */
     let _targetSlot = 1;
 
+    // Pseudo-slot ids for the 4 concurrently-runnable challenges — mirrors
+    // phase-manager.js's own CHALLENGE_SLOT_IDS (and admin.js's copy, used
+    // by getNextFreeChallengeSlot/confirmChallengeSetup, which already
+    // auto-assigns every new challenge to a free one of these at creation
+    // time — no admin-selected "target slot" needed here, unlike matches).
+    const CHALLENGE_SLOT_IDS = ['challenge1', 'challenge2', 'challenge3', 'challenge4'];
+
+    /** Human label for a challenge pseudo-slot id, e.g. "Challenge 3". */
+    function _challengeSlotLabel(slotId) {
+        return `Challenge ${String(slotId).slice('challenge'.length)}`;
+    }
+
     // ── Minimal UIManager shim (PhaseManager only uses showStatus) ──
 
     const _uiShim = {
@@ -248,24 +260,23 @@
                     }];
                 }
 
-                // Only challenge matches gate this phase
+                // Gate this phase on ALL 4 challenge slots (mirrors
+                // matches_in_progress's bothSlotsDone() gate) rather than a
+                // flat "any pending/ongoing challenge anywhere" scan —
+                // matches phase-manager.js's own allChallengeSlotsDone()
+                // policy (an untouched slot never blocks; a used one must
+                // reach 'done').
                 case 'challenge_game': {
-                    const ongoingCh = _ongoingChallengeMatches();
-                    const pendingCh = _pendingChallengeMatches();
-                    const completedCh = queue.some(m => !m.isBreak && m.isChallenge === true && m.status === 'completed');
-                    const reqs = [];
-                    if (ongoingCh.length > 0) {
-                        reqs.push({ label: `${ongoingCh.length} challenge${ongoingCh.length !== 1 ? 's' : ''} still playing`, met: false });
-                    }
-                    if (pendingCh.length > 0) {
-                        reqs.push({ label: `${pendingCh.length} challenge${pendingCh.length !== 1 ? 's' : ''} not started`, met: false });
-                    }
-                    if (reqs.length === 0) {
-                        reqs.push(completedCh
+                    if (_phaseManager.allChallengeSlotsDone()) {
+                        const completedCh = queue.some(m => !m.isBreak && m.isChallenge === true && m.status === 'completed');
+                        return [completedCh
                             ? { label: 'All challenge results confirmed', met: true }
-                            : { label: 'No challenge games — continue', met: true });
+                            : { label: 'No challenge games — continue', met: true }];
                     }
-                    return reqs;
+                    return CHALLENGE_SLOT_IDS
+                        .filter(id => _phaseManager.getSlotSubPhase(id) !== 'done')
+                        .filter(id => _phaseManager.getSlotSubPhase(id) !== 'setup' || _phaseManager.getSlotMatchDetails(id).length > 0)
+                        .map(id => ({ label: `${_challengeSlotLabel(id)}: ${_phaseManager.getSlotSubPhase(id)}`, met: false }));
                 }
 
                 // matches_in_progress: Match 1 / Match 2 requirements are now
@@ -393,6 +404,30 @@
 
     function _ongoingChallengeMatches() {
         return _queueOngoingMatches().filter(m => m.isChallenge === true);
+    }
+
+    /**
+     * Full queue entries belonging to one of the 4 challenge slots — built
+     * from PhaseManager's own getSlotMatchDetails(slotId), so this reuses
+     * the exact same slot-tag/alias/round-scoping policy as everything else
+     * (_slotTagMatches, the 'challenge' legacy alias onto challenge1, etc.)
+     * instead of re-implementing it locally. getSlotMatchDetails excludes
+     * completed matches by design, which is exactly what "pending/ongoing
+     * for this slot" needs.
+     */
+    function _challengeSlotQueueEntries(slotId) {
+        const details = _phaseManager.getSlotMatchDetails(slotId);
+        const byId = new Map((gameState.gameQueue || []).map(m => [m.id, m]));
+        return details.map(d => byId.get(d.id)).filter(Boolean);
+    }
+
+    function _pendingChallengeSlotMatches(slotId) {
+        return _challengeSlotQueueEntries(slotId).filter(m =>
+            m.status === 'pending' || m.status === undefined || m.status === 'queued');
+    }
+
+    function _ongoingChallengeSlotMatches(slotId) {
+        return _challengeSlotQueueEntries(slotId).filter(m => m.status === 'ongoing');
     }
 
     /**
@@ -554,7 +589,16 @@
             if (entry.isBreak) return;
             if (entry.roundNumber === undefined && !beforeIds.has(entry.id)) {
                 entry.roundNumber = roundNumber;
-                entry.slot = entry.isChallenge ? 'challenge' : slot;
+                // A challenge reaching this path at all is unusual —
+                // confirmChallengeSetup already stamps .slot/.roundNumber
+                // itself via admin.js's getNextFreeChallengeSlot(), so it
+                // never has roundNumber === undefined by the time this
+                // runs. Still, fall back to the same free-slot lookup
+                // (rather than the flat legacy 'challenge' alias) for any
+                // other path that might create an isChallenge entry.
+                entry.slot = entry.isChallenge
+                    ? (typeof getNextFreeChallengeSlot === 'function' ? (getNextFreeChallengeSlot() || 'challenge1') : 'challenge1')
+                    : slot;
                 changed = true;
             }
         });
@@ -580,6 +624,7 @@
         if (newEntries.length === 0) return;
 
         let slotCursor = 1;
+        let challengeSlotCursor = 0; // index into CHALLENGE_SLOT_IDS, wraps mod 4
         let roundCursor = (gameState.currentPhase?.roundNumber || 0) + 1;
         const handled = new Set();
 
@@ -587,7 +632,14 @@
             if (handled.has(entry.id) || entry.roundNumber !== undefined) return;
 
             entry.roundNumber = roundCursor;
-            entry.slot = entry.isChallenge ? 'challenge' : slotCursor;
+            // Imported challenges get spread across the 4 concurrent
+            // challenge slots (challenge1-4), same scheme confirmChallengeSetup
+            // uses at creation time — a flat 'challenge' tag here would
+            // collapse every imported challenge onto the single legacy alias
+            // slot instead of letting them run independently.
+            entry.slot = entry.isChallenge
+                ? CHALLENGE_SLOT_IDS[challengeSlotCursor % CHALLENGE_SLOT_IDS.length]
+                : slotCursor;
             handled.add(entry.id);
 
             // A linked split-format pair (3v3+2v2 playing simultaneously) is
@@ -601,7 +653,9 @@
                 }
             }
 
-            if (!entry.isChallenge) {
+            if (entry.isChallenge) {
+                challengeSlotCursor++;
+            } else {
                 slotCursor = slotCursor === 1 ? 2 : 1;
                 if (slotCursor === 1) roundCursor++;
             }
@@ -674,6 +728,7 @@
         // alive across live Firestore updates and _restoreFlowPanelDOM rebuilds.
         _renderSpellLogBar();
         _renderMatchSlotCards(phase);
+        _renderChallengeSlotCards(phase);
     }
 
     // ── Match Slot Cards (Match 1 / Match 2 progress independently) ──
@@ -908,6 +963,168 @@
                     ${liveMatchesHtml}
                     ${btnHtml}
                     <button class="btn-small secondary" onclick="forceAdvanceSlot(${slot})" title="Force advance (skip requirements)" ${isDone ? 'style="display:none"' : ''}>${ICON_SVGS.triangleAlert} Force Advance</button>
+                </div>`;
+        }).join('');
+    }
+
+    // ── Challenge Slot Cards (up to 4 challenges progress independently) ──
+    //
+    // Same shape as _computeSlotStep/_renderMatchSlotCards above, generalized
+    // to CHALLENGE_SLOT_IDS. Challenges have no admin-picked "target slot"
+    // (confirmChallengeSetup already auto-assigns the first free one at
+    // creation — see admin.js's getNextFreeChallengeSlot), so there's no
+    // "Set Target" button here, and no auto-generate action (challenges are
+    // always created via the ⚔ Challenge button's modal).
+
+    /** Compute the guided step for ONE challenge slot. */
+    function _computeChallengeSlotStep(slotId) {
+        const sub = _phaseManager.getSlotSubPhase(slotId);
+        const pendingSlot = _pendingChallengeSlotMatches(slotId);
+        const ongoingSlot = _ongoingChallengeSlotMatches(slotId);
+        const n = slotId.slice('challenge'.length);
+
+        if (sub === 'done') {
+            return { text: 'Complete.', primary: null };
+        }
+
+        if (sub === 'setup') {
+            if (pendingSlot.length === 0) {
+                return {
+                    text: `No challenge queued for ${_challengeSlotLabel(slotId)} yet — create one with the ⚔ Challenge button.`,
+                    primary: null
+                };
+            }
+            return {
+                text: `${pendingSlot.length} challenge${pendingSlot.length !== 1 ? 's' : ''} queued.`,
+                primary: { label: 'Open Lobby ▶', action: () => window.advanceSlot(slotId) }
+            };
+        }
+
+        if (sub === 'lobby') {
+            return {
+                text: 'Waiting for players to ready up (auto-advances when done).',
+                primary: {
+                    label: 'Force Ready',
+                    action: () => _openFlowConfirm({
+                        title: `Force Challenge ${n} Ready?`,
+                        bodyHtml: '<p>All players are marked ready <strong>without</strong> confirming Discord or the game lobby, and the challenge moves straight to playing. There is no un-ready.</p>',
+                        confirmLabel: 'Force Ready',
+                        danger: true,
+                        onConfirm: () => window.forceAllReady(slotId)
+                    })
+                }
+            };
+        }
+
+        // playing
+        const available = _excludeLiveConflicts(pendingSlot);
+        if (available.length > 0) {
+            const next = available[0];
+            const label = _matchShortLabel(next);
+            const liveNote = ongoingSlot.length > 0 ? `${ongoingSlot.length} live · ` : '';
+            return {
+                text: `${liveNote}Next up: ${_esc(label)}.`,
+                primary: { label: `▶ Start ${label}`, action: () => window.startMatch(next.id) }
+            };
+        }
+        if (ongoingSlot.length > 0) {
+            return {
+                text: `${ongoingSlot.length} challenge${ongoingSlot.length !== 1 ? 's' : ''} live — click its card to record the result.`,
+                primary: null
+            };
+        }
+        if (pendingSlot.length > 0) {
+            return {
+                text: `${pendingSlot.length} challenge${pendingSlot.length !== 1 ? 's' : ''} queued, but all share a player with a live match — resolve that match first.`,
+                primary: null
+            };
+        }
+        return {
+            text: 'Result confirmed.',
+            primary: { label: `Mark ${_challengeSlotLabel(slotId)} Done ▶`, action: () => window.advanceSlot(slotId) }
+        };
+    }
+
+    /** Holds the live closure for each challenge slot's primary button. */
+    const _challengeSlotPrimaryActions = { challenge1: null, challenge2: null, challenge3: null, challenge4: null };
+    window.runChallengeSlotPrimaryAction = (slotId) => {
+        const fn = _challengeSlotPrimaryActions[slotId];
+        if (fn) fn();
+    };
+
+    function _renderChallengeSlotCards(phase) {
+        let container = document.getElementById('challengeSlotCards');
+        const panel = document.getElementById('flowPanel');
+        if (phase !== 'challenge_game') {
+            if (container) container.style.display = 'none';
+            CHALLENGE_SLOT_IDS.forEach(id => { _challengeSlotPrimaryActions[id] = null; });
+            return;
+        }
+        if (!container && panel) {
+            container = document.createElement('div');
+            container.id = 'challengeSlotCards';
+            container.className = 'match-slot-panels';
+            panel.appendChild(container);
+        }
+        if (!container) return;
+
+        // Only show slots that are actually in use this challenge_game
+        // entry (0-4 concurrent challenges is legitimate — unlike Match
+        // 1/2, an untouched challenge slot isn't "waiting for setup", it's
+        // just not being used this round).
+        const used = CHALLENGE_SLOT_IDS.filter(id =>
+            _phaseManager.getSlotSubPhase(id) !== 'setup' || _phaseManager.getSlotMatchDetails(id).length > 0);
+        if (used.length === 0) {
+            container.style.display = 'none';
+            return;
+        }
+        container.style.display = '';
+
+        container.innerHTML = used.map(slotId => {
+            const sub = _phaseManager.getSlotSubPhase(slotId);
+            const step = _computeChallengeSlotStep(slotId);
+            const isDone = sub === 'done';
+
+            _challengeSlotPrimaryActions[slotId] = step.primary && !step.primary.disabled ? step.primary.action : null;
+            const btnHtml = step.primary
+                ? `<button class="btn-small primary" ${step.primary.disabled ? 'disabled' : ''} onclick="runChallengeSlotPrimaryAction('${slotId}')">${_esc(step.primary.label)}</button>`
+                : '';
+
+            const liveMatchesHtml = sub === 'playing'
+                ? _ongoingChallengeSlotMatches(slotId).map(game => {
+                    const gameName = (typeof getGameDisplayName === 'function')
+                        ? getGameDisplayName(game.game || game.gameType) : (game.game || 'Match');
+                    const matchup = (game.teams || game.sides || [])
+                        .map(side => getMatchTeamPlayers(side).map(p => p.name).filter(Boolean).join(', ') || 'TBD')
+                        .join(' vs ');
+                    const voteButtonsHtml = _liveMatchVoteButtonsHtml(game);
+                    return `
+                        <div class="live-match-card">
+                            <div class="live-match-info">
+                                <span class="live-match-game">${_esc(game.matchNumber ? '#' + game.matchNumber + ' ' : '')}${_esc(gameName)}</span>
+                                <span class="live-match-players">${_esc(matchup)}</span>
+                            </div>
+                            <button class="btn-small primary" onclick="event.stopPropagation(); openQuickConfirm(${game.id})">${ICON_SVGS.check} Confirm Game Result</button>
+                        </div>
+                        ${voteButtonsHtml}`;
+                }).join('')
+                : '';
+
+            const detailsHtml = (sub === 'setup' || sub === 'lobby')
+                ? _phaseManager.renderSlotDetailsHtml(slotId, { players: sub === 'lobby' })
+                : '';
+
+            return `
+                <div class="match-slot-panel${isDone ? ' slot-done' : ''}">
+                    <div class="match-slot-header">
+                        <span class="match-slot-icon">${ICON_SVGS.swords}</span>
+                        <span class="match-slot-name">${_esc(_challengeSlotLabel(slotId))} — ${_esc(sub)}</span>
+                    </div>
+                    <div class="match-slot-guidance">${_esc(step.text)}</div>
+                    ${detailsHtml}
+                    ${liveMatchesHtml}
+                    ${btnHtml}
+                    <button class="btn-small secondary" onclick="forceAdvanceSlot('${slotId}')" title="Force advance (skip requirements)" ${isDone ? 'style="display:none"' : ''}>${ICON_SVGS.triangleAlert} Force Advance</button>
                 </div>`;
         }).join('');
     }
@@ -1160,59 +1377,45 @@
                 };
             }
 
+            // Up to 4 challenges progress independently now (mirrors
+            // matches_in_progress's Match 1/2 slots — see phase-manager.js's
+            // CHALLENGE_SLOT_IDS) — no single "the" primary action for this
+            // phase, each challenge slot gets its own card + action button,
+            // rendered by _renderChallengeSlotCards(). This just supplies
+            // the guidance text and the Continue button, which only enables
+            // once PhaseManager reports every used slot done (see
+            // phase-manager.js allChallengeSlotsDone()). The OLD flat
+            // single-challenge machinery (isChallengeLobbyActive/
+            // getChallengeLobbyState/openChallengeLobby/forceAllChallengeReady)
+            // is intentionally no longer driven from here — it stays working
+            // for any other caller, but this guided view now goes through
+            // the same generic per-slot machinery Match 1/2 already use.
             case 'challenge_game': {
-                const ongoingCh = _ongoingChallengeMatches();
-                const pendingCh = _pendingChallengeMatches();
-                const queueCg = gs.gameQueue || [];
-
-                if (ongoingCh.length > 0) {
+                const used = CHALLENGE_SLOT_IDS.filter(id =>
+                    _phaseManager.getSlotSubPhase(id) !== 'setup' || _phaseManager.getSlotMatchDetails(id).length > 0);
+                const allDone = _phaseManager.allChallengeSlotsDone();
+                if (used.length === 0) {
                     return {
-                        text: 'Challenge game live — click the match card to record the result.' +
-                              (pendingCh.length > 0 ? ` <strong>${pendingCh.length}</strong> more challenge${pendingCh.length !== 1 ? 's' : ''} waiting.` : ''),
-                        primary: { label: 'Waiting for result…', action: null, disabled: true },
+                        text: 'Challenges are optional — create one if a team requests a heart-hex dispute (⚔ button). Otherwise continue and the challenge step is skipped this round.',
+                        primary: {
+                            label: 'Continue — No Challenges ▶',
+                            action: () => _openFlowConfirm({
+                                title: 'Skip Challenge Games?',
+                                bodyHtml: '<p>No team has a challenge in flight?</p><p>Continues past the challenge game step for this round.</p>',
+                                confirmLabel: 'Skip — No Challenges ' + ICON_SVGS.play,
+                                onConfirm: advance
+                            })
+                        },
                         primaryIsAdvance: true
                     };
                 }
-                if (pendingCh.length > 0) {
-                    const next = pendingCh[0];
-                    const label = _matchShortLabel(next);
-                    // Challenges now get the same ready-check step as the
-                    // two planned matches, instead of going straight from
-                    // queued to playing.
-                    if (_phaseManager.isChallengeLobbyActive()) {
-                        return {
-                            text: `Waiting for players to ready up for <strong>${_esc(label)}</strong> (auto-advances when done).` +
-                                _phaseManager.renderSlotDetailsHtml('challenge', { players: true }),
-                            primary: {
-                                label: 'Force Ready',
-                                action: () => _openFlowConfirm({
-                                    title: 'Force Challenge Ready?',
-                                    bodyHtml: '<p>All challenge players are marked ready <strong>without</strong> confirming Discord or the game lobby. There is no un-ready.</p>',
-                                    confirmLabel: 'Force Ready',
-                                    danger: true,
-                                    onConfirm: () => window.forceAllChallengeReady()
-                                })
-                            },
-                            primaryIsAdvance: false
-                        };
-                    }
-                    if (_phaseManager.getChallengeLobbyState() === 'ready') {
-                        return {
-                            text: `Next challenge: <strong>${_esc(label)}</strong>. Challenges play one at a time, before other board changes.`,
-                            primary: { label: `▶ Start ${label}`, action: () => window.startMatch(next.id) },
-                            primaryIsAdvance: false
-                        };
-                    }
-                    return {
-                        text: `Next challenge: <strong>${_esc(label)}</strong>.`,
-                        primary: { label: 'Open Lobby ▶', action: () => window.openChallengeLobby() },
-                        primaryIsAdvance: false
-                    };
-                }
-                const completedCh = queueCg.some(m => !m.isBreak && m.isChallenge === true && m.status === 'completed');
+                const summaries = used.map(id =>
+                    `${_esc(_challengeSlotLabel(id))}: ${_phaseManager.getSlotSubPhase(id)}`);
                 return {
-                    text: completedCh ? 'All challenge results confirmed.' : 'No challenge games pending.',
-                    primary: { label: 'Continue ▶', action: advance },
+                    text: allDone
+                        ? 'All challenge slots complete.'
+                        : `${summaries.join(' · ')} — see the challenge cards below.`,
+                    primary: allDone ? { label: 'Continue ▶', action: advance } : null,
                     primaryIsAdvance: true
                 };
             }
@@ -2051,7 +2254,8 @@
         // live: an accidental click cleared an in-progress Match 2.
         const reqs = _phaseManager.getSlotRequirements(slot) || [];
         const unmet = reqs.filter(r => !r.met).map(r => r.label);
-        const lines = [`Force-advance Match ${slot} to its next stage, skipping its requirements?`];
+        const slotName = CHALLENGE_SLOT_IDS.includes(slot) ? _challengeSlotLabel(slot) : `Match ${slot}`;
+        const lines = [`Force-advance ${slotName} to its next stage, skipping its requirements?`];
         if (unmet.length > 0) {
             lines.push('', 'Currently unmet:', ...unmet.map(l => `• ${l}`));
         }
@@ -2898,14 +3102,14 @@
         const numEl = document.getElementById('editMatchNumber');
         if (numEl) numEl.textContent = (game.matchNumber ? `#${game.matchNumber}` : '') + ' — LIVE';
 
-        // Round/slot retag fields (hidden for challenges — mirrors the
-        // stock openEditMatchModal population in admin.js)
+        // Round/slot retag fields — mirrors the stock openEditMatchModal
+        // population in admin.js (always shown; challenges retag among
+        // their own 4 slots via _populateEditMatchSlotOptions).
         const tagRow = document.getElementById('editMatchTagRow');
-        if (tagRow) tagRow.style.display = game.isChallenge ? 'none' : 'flex';
+        if (tagRow) tagRow.style.display = 'flex';
         const roundInput = document.getElementById('editMatchRoundInput');
         if (roundInput) roundInput.value = game.roundNumber !== undefined ? game.roundNumber : '';
-        const slotSelect = document.getElementById('editMatchSlotSelect');
-        if (slotSelect && (game.slot === 1 || game.slot === 2)) slotSelect.value = String(game.slot);
+        _populateEditMatchSlotOptions(game);
 
         populateEditGameTypeDropdown();
         renderEditMatchModal();
