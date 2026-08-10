@@ -890,14 +890,54 @@
         padding: 0 12px;
     }
 
-    .navbar-brand-name {
-        font-size: 0.9rem;
-        letter-spacing: 2px;
+    /* The brand wordmark alone (logo + "BOARDGAME" text + its letter-
+       spacing) measured ~160px -- half a 320px screen's width, before
+       the user section or toggle even start. Icon-only below this
+       breakpoint, matching a very common responsive nav pattern. */
+    .navbar-brand-text {
+        display: none;
+    }
+
+    .navbar-container {
+        gap: 10px;
     }
 
     .navbar-role-badge {
         font-size: 0.65rem;
         padding: 3px 8px;
+    }
+
+    /* Even with the username/status-label already hidden at 900px, the
+       status button + connection dot + avatar + role badge + Exit button
+       + mobile-toggle together still don't fit a 375px (or narrower)
+       screen -- the toggle button itself measured off-screen. Drop the
+       two least essential pieces (the connection dot and role badge --
+       both duplicated by more prominent UI elsewhere) and tighten the
+       gap so the toggle stays reachable. */
+    .navbar-user {
+        gap: 4px;
+    }
+
+    .navbar-connection-status,
+    .navbar-role-badge {
+        display: none;
+    }
+
+    .navbar-avatar {
+        width: 22px;
+        height: 22px;
+    }
+
+    .navbar-status-btn {
+        padding: 5px 6px;
+    }
+
+    .navbar-logout-btn {
+        padding: 5px 7px;
+    }
+
+    .navbar-mobile-toggle {
+        padding: 6px;
     }
 }
 
