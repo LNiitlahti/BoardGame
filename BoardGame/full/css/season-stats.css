@@ -109,3 +109,92 @@
 .tournament-status-pill.active    { background: rgba(0,224,128,0.12); color: #00e080; }
 .tournament-status-pill.setup,
 .tournament-status-pill.upcoming  { background: rgba(245,158,11,0.15); color: #f59e0b; }
+
+/* ============================================================
+   TOURNAMENT FILTER — client-side recompute of every card below
+   ============================================================ */
+.tournament-filter-card {
+    margin-bottom: 16px;
+}
+
+.tournament-filter-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.btn.small {
+    padding: 6px 12px;
+    font-size: 0.72rem;
+}
+
+.tournament-filter-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.tournament-filter-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: rgba(200,179,126,0.04);
+    border: 1px solid var(--border-faint);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    user-select: none;
+}
+
+.tournament-filter-item:hover {
+    border-color: var(--border-gold);
+    color: var(--text-bright);
+}
+
+.tournament-filter-item.checked {
+    border-color: var(--gold);
+    background: rgba(200,179,126,0.1);
+    color: var(--text-bright);
+}
+
+.tournament-filter-item input {
+    accent-color: var(--gold);
+    cursor: pointer;
+}
+
+.tournament-filter-item .tf-date {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+}
+
+/* Season insights + player leaderboard/synergy reuse statistics.css's
+   .summary-stats / .leaderboard-* / .teammate-synergy-* language directly —
+   only the season-page-specific grid placement lives here. */
+.season-insights-card .summary-stats {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.player-grid {
+    margin-top: 16px;
+    grid-template-columns: 1.2fr 1fr;
+}
+
+.player-leaderboard-card,
+.season-synergy-card {
+    align-self: start;
+}
+
+.card-subtitle {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    margin: -10px 0 12px;
+}
+
+@media (max-width: 900px) {
+    .player-grid {
+        grid-template-columns: 1fr;
+    }
+}

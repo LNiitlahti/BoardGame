@@ -81,6 +81,19 @@
 
         <div id="seasonWarnings" class="season-warnings" style="display:none;"></div>
 
+        <!-- Tournament Filter: pure client-side, recomputes every table/card
+             below from the already-loaded currentTournaments array. -->
+        <section class="stats-card tournament-filter-card">
+            <h3>Filter Tournaments</h3>
+            <div class="tournament-filter-toolbar">
+                <button class="btn secondary small" onclick="setAllTournamentFilters(true)">Select all</button>
+                <button class="btn secondary small" onclick="setAllTournamentFilters(false)">Clear all</button>
+            </div>
+            <div class="tournament-filter-list" id="tournamentFilterList">
+                <p class="no-data">Select a season to filter its tournaments</p>
+            </div>
+        </section>
+
         <div class="overview-grid">
             <!-- Season Standings -->
             <section class="stats-card standings-card season-standings-card">
@@ -113,11 +126,44 @@
                 </div>
             </section>
 
+            <!-- Season Insights: MVP / most active / streak / most improved -->
+            <section class="stats-card season-insights-card">
+                <h3>Season Insights</h3>
+                <div class="summary-stats" id="seasonInsightsStats">
+                    <p class="no-data">Select a season to view insights</p>
+                </div>
+            </section>
+
             <!-- Per-Tournament Breakdown -->
             <section class="stats-card tournament-breakdown-card">
                 <h3>Tournaments In This Season</h3>
                 <div class="tournament-breakdown-table" id="tournamentBreakdownTable">
                     <p class="no-data">Select a season to view its tournaments</p>
+                </div>
+            </section>
+        </div>
+
+        <div class="overview-grid player-grid">
+            <!-- Player Leaderboard -->
+            <section class="stats-card player-leaderboard-card">
+                <h3>Player Leaderboard</h3>
+                <div class="leaderboard-tabs">
+                    <button class="leaderboard-tab active" data-leaderboard="wins" onclick="switchSeasonLeaderboard('wins')">Most Wins</button>
+                    <button class="leaderboard-tab" data-leaderboard="winrate" onclick="switchSeasonLeaderboard('winrate')">Win Rate</button>
+                    <button class="leaderboard-tab" data-leaderboard="games" onclick="switchSeasonLeaderboard('games')">Most Games</button>
+                    <button class="leaderboard-tab" data-leaderboard="streak" onclick="switchSeasonLeaderboard('streak')">Best Streak</button>
+                </div>
+                <div class="leaderboard-content" id="seasonLeaderboardContent">
+                    <p class="no-data">Select a season to view player stats</p>
+                </div>
+            </section>
+
+            <!-- Best Teammates -->
+            <section class="stats-card teammate-synergy-card season-synergy-card">
+                <h3>Best Teammates</h3>
+                <p class="card-subtitle" id="synergySubtitle"></p>
+                <div class="teammate-synergy-content" id="seasonSynergyContent">
+                    <p class="no-data">Select a season to view teammate synergy</p>
                 </div>
             </section>
         </div>
