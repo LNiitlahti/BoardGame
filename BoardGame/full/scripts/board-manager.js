@@ -297,7 +297,9 @@ class BoardManager {
             // confirm before silently clobbering whatever another tournament
             // (possibly a throwaway/test one) last saved there.
             const existing = await loadDefaultRoomsMeta(window.firebaseDB);
-            const savedBy = this._gameState.tournamentId || 'god.html (tuntematon turnaus)';
+            const tournamentLabel = this._gameState.tournamentId || 'tuntematon turnaus';
+            const authIdentity = firebase.auth().currentUser?.email || firebase.auth().currentUser?.uid;
+            const savedBy = authIdentity ? `${authIdentity} (${tournamentLabel})` : `god.html (${tournamentLabel})`;
             if (existing) {
                 const savedAt = existing.updatedAt ? new Date(existing.updatedAt).toLocaleString() : 'unknown time';
                 const savedByPrev = existing.updatedBy || 'unknown';

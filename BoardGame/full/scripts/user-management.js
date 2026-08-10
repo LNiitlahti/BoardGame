@@ -166,6 +166,16 @@ function escapeHtml(text) {
 }
 
 /**
+ * Escape text for safe use inside a double-quoted HTML attribute (e.g.
+ * title="..."). escapeHtml() alone is NOT safe here -- it round-trips
+ * through innerHTML, which doesn't escape double quotes, so untrusted text
+ * containing a `"` would break out of the attribute.
+ */
+function escapeAttr(text) {
+    return escapeHtml(text).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/**
  * Calls one of the Admin SDK-backed user management functions.
  *
  * Delete, disable/enable and create cannot be done from the browser: the
@@ -621,6 +631,7 @@ function renderTeamAssignmentSlots() {
         // just relinking a player.
         const assignBtnHtml = (selectedUserForAssignment && !teamFull)
             ? `<button onclick="assignSelectedUserToTeam(${team.id})"
+                      title="Adds a brand-new roster slot for ${escapeAttr(selectedUserForAssignment.displayName)} on this team"
                       style="margin-top: 8px; width: 100%; background: #0ea5e9; color: white; border: none; border-radius: 4px; padding: 6px 10px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">
                    ➕ New slot: ${escapeHtml(selectedUserForAssignment.displayName)}
                </button>`
@@ -645,6 +656,7 @@ function renderTeamAssignmentSlots() {
                         // with the "New slot" button below, which creates a fresh slot instead.
                         const useBtnHtml = selectedUserForAssignment
                             ? `<button onclick="replacePlayerWithUser(${team.id}, '${player.playerId}')"
+                                      title="${isPlaceholder ? 'Fills this existing empty slot with' : 'Swaps this already-linked slot to'} ${escapeAttr(selectedUserForAssignment.displayName)} -- does not add a new slot"
                                       style="background: ${isPlaceholder ? '#10b981' : '#d97706'}; color: white; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">
                                   ${isPlaceholder ? '↳ Fill this slot:' : '⇄ Swap this slot to:'} ${escapeHtml(selectedUserForAssignment.displayName)}
                               </button>`

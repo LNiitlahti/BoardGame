@@ -1207,7 +1207,9 @@
             try {
                 const existing = await loadDefaultRoomsMeta(db);
                 const tournamentIdField = document.getElementById('tournamentId');
-                const savedBy = (tournamentIdField && tournamentIdField.value.trim()) || 'setup.html (turnausta ei vielä nimetty)';
+                const tournamentLabel = (tournamentIdField && tournamentIdField.value.trim()) || 'turnausta ei vielä nimetty';
+                const authIdentity = firebase.auth().currentUser?.email || firebase.auth().currentUser?.uid;
+                const savedBy = authIdentity ? `${authIdentity} (${tournamentLabel})` : `setup.html (${tournamentLabel})`;
 
                 if (existing) {
                     const savedAt = existing.updatedAt

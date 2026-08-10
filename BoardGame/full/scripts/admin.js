@@ -2147,7 +2147,9 @@ async function saveDefaultRooms() {
         // confirm before silently clobbering whatever another tournament
         // (possibly a throwaway/test one) last saved there.
         const existing = await loadDefaultRoomsMeta(window.firebaseDB);
-        const savedBy = currentTournamentId || 'admin.html (tuntematon turnaus)';
+        const tournamentLabel = currentTournamentId || 'tuntematon turnaus';
+        const authIdentity = firebase.auth().currentUser?.email || firebase.auth().currentUser?.uid;
+        const savedBy = authIdentity ? `${authIdentity} (${tournamentLabel})` : `admin.html (${tournamentLabel})`;
         if (existing) {
             const savedAt = existing.updatedAt ? new Date(existing.updatedAt).toLocaleString() : 'unknown time';
             const savedByPrev = existing.updatedBy || 'unknown';
