@@ -2975,12 +2975,16 @@ function exitChallengeHexPickMode() {
 let _spellHexPickActive = false;
 let _spellHexPickEligibleCoords = [];
 let _spellHexPickOnComplete = null;
+let _spellHexPickOnCancel = null;
 
 /**
  * Enter pick-on-board mode for a spell field. `bannerText` is shown in the
- * banner; `onComplete(coord)` fires when an eligible hex is clicked.
+ * banner; `onComplete(coord)` fires when an eligible hex is clicked;
+ * `onCancel()` (optional) fires when the picker is dismissed without a pick
+ * (e.g. Escape) so callers can restore whatever UI they hid to make room
+ * for the board takeover.
  */
-function startSpellHexPickMode(eligibleCoords, bannerText, onComplete) {
+function startSpellHexPickMode(eligibleCoords, bannerText, onComplete, onCancel) {
     if (_spellHexPickActive) exitSpellHexPickMode();
 
     _spellHexPickEligibleCoords = eligibleCoords || [];
@@ -2991,6 +2995,7 @@ function startSpellHexPickMode(eligibleCoords, bannerText, onComplete) {
 
     _spellHexPickActive = true;
     _spellHexPickOnComplete = onComplete;
+    _spellHexPickOnCancel = onCancel;
     document.getElementById('spellHexPickBannerText').textContent = bannerText;
     document.body.classList.add('spell-hex-picking');
 
@@ -3019,7 +3024,9 @@ function completeSpellHexPick(coord) {
 }
 
 function cancelSpellHexPickMode() {
+    const callback = _spellHexPickOnCancel;
     exitSpellHexPickMode();
+    if (typeof callback === 'function') callback();
 }
 
 function exitSpellHexPickMode() {
@@ -3033,6 +3040,7 @@ function exitSpellHexPickMode() {
     _spellHexPickActive = false;
     _spellHexPickEligibleCoords = [];
     _spellHexPickOnComplete = null;
+    _spellHexPickOnCancel = null;
 }
 window.cancelSpellHexPickMode = cancelSpellHexPickMode;
 

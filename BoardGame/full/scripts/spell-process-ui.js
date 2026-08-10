@@ -55,16 +55,21 @@
         const body = document.getElementById('spellProcessBody');
         const submitBtn = document.getElementById('spellProcessSubmitBtn');
         const effectType = _processEntry.def.effect?.type;
-        const fields = window.SPELL_PROCESS_FIELDS[effectType];
 
-        if (!fields) {
+        // Only extra_placement is actually wired up in this modal. Other
+        // entries may exist in SPELL_PROCESS_FIELDS (populated incrementally
+        // by other tasks) but that doesn't mean this modal knows how to
+        // render/submit them yet — gate on the effect type explicitly so we
+        // don't fall through to an empty body with a live Submit button.
+        if (effectType !== 'extra_placement') {
             body.innerHTML = `<p>This effect type ("${effectType}") isn't wired into the admin.html Process modal yet. Use god.html's spell UI as the emergency override for this card.</p>`;
             submitBtn.style.display = 'none';
             return;
         }
         submitBtn.style.display = '';
 
-        if (effectType === 'extra_placement') {
+        {
+            const fields = window.SPELL_PROCESS_FIELDS[effectType];
             const coordsField = fields.coords;
             const count = window.resolveFieldCount(coordsField, _processEntry.def);
             const picked = _formState.coords || [];
@@ -84,6 +89,11 @@
                     _formState.coords = [...picked, coord];
                     document.getElementById('spellProcessModal').classList.add('active');
                     renderSpellProcessBody();
+                }, () => {
+                    // Escape/cancel: restore the modal with whatever hexes
+                    // were already picked rather than discarding progress.
+                    document.getElementById('spellProcessModal').classList.add('active');
+                    renderSpellProcessBody();
                 });
             }
         }
@@ -93,15 +103,13 @@
         const engine = window.spellEngine;
         if (!_processEntry || !engine) return;
         const effectType = _processEntry.def.effect?.type;
-        const fields = window.SPELL_PROCESS_FIELDS[effectType];
-        if (!fields) return;
+        if (effectType !== 'extra_placement') return;
 
-        if (effectType === 'extra_placement') {
-            const count = window.resolveFieldCount(fields.coords, _processEntry.def);
-            if ((_formState.coords || []).length < count) {
-                showStatus(`Pick all ${count} hexes before submitting`, 'warning');
-                return;
-            }
+        const fields = window.SPELL_PROCESS_FIELDS[effectType];
+        const count = window.resolveFieldCount(fields.coords, _processEntry.def);
+        if ((_formState.coords || []).length < count) {
+            showStatus(`Pick all ${count} hexes before submitting`, 'warning');
+            return;
         }
 
         // processPendingSpellCast(timestamp) takes no targetData argument —
