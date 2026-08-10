@@ -2730,6 +2730,10 @@ class SpellEngine {
                     </div>
                     <button class="btn-small danger" onclick="removeActiveEffect('${eff.id}')"
                             style="font-size: 0.7rem;">Remove</button>
+                    ${this.getSpellDef(eff.spellId)?.effect?.type === 'charged_removal' && eff.usesRemaining > 0 ? `
+                        <button class="btn-small primary" onclick="spendChargedRemoval('${eff.id}')"
+                                style="font-size: 0.7rem;">Spend charge (${eff.usesRemaining} left)</button>
+                    ` : ''}
                 </div>
             `;
         }).join('');

@@ -130,4 +130,35 @@
         });
     }
     window.submitSpellProcessModal = submitSpellProcessModal;
+
+    // ── Active Effects panel: "Spend charge" (charged_removal) ─────────────
+    // Independent entry point into the same board-takeover picking mode used
+    // above, triggered from renderActiveEffectsAdmin()'s per-effect button
+    // rather than the Process modal. No modal is open here, so unlike the
+    // extra_placement flow above there's nothing to hide/restore — an
+    // onCancel callback is intentionally omitted: exitSpellHexPickMode()
+    // (called by both completeSpellHexPick and cancelSpellHexPickMode)
+    // already clears the highlight classes, banner, and picking state on its
+    // own, so an Escape with no pick simply leaves the admin UI as it was.
+    function spendChargedRemoval(effectId) {
+        const engine = window.spellEngine;
+        const effect = (engine._gameState.activeEffects || []).find(e => e.id === effectId);
+        if (!effect) return;
+
+        const valid = (Object.entries(engine._gameState.board || {}))
+            .filter(([, owner]) => String(owner) !== String(effect.castByTeamId))
+            .map(([coord]) => coord);
+
+        startSpellHexPickMode(valid, 'Pick the tile to remove', (coord) => {
+            const result = engine.useChargedRemoval(effectId, coord);
+            if (result.success) {
+                showStatus(`Tile removed. ${result.usesRemaining} charge(s) left.`, 'success');
+            } else {
+                showStatus(`Could not remove tile: ${result.error}`, 'error');
+            }
+            engine.renderActiveEffectsAdmin();
+            if (typeof renderBoard === 'function') renderBoard();
+        });
+    }
+    window.spendChargedRemoval = spendChargedRemoval;
 })();
