@@ -2932,6 +2932,15 @@ function closeChallengeSetupModal() {
         _challengeHexPickEligibleCoords = [];
     }
     document.getElementById('challengeSetupModal').classList.remove('active');
+
+    // Reset bundle-builder UI so reopening the modal starts fresh rather
+    // than showing stale rows/preview text from a previous attempt.
+    const bundleSection = document.getElementById('challengeBundleSection');
+    if (bundleSection) bundleSection.style.display = 'none';
+    const bundleRows = document.getElementById('challengeBundleRows');
+    if (bundleRows) bundleRows.innerHTML = '';
+    const bundlePreview = document.getElementById('challengeBundlePreview');
+    if (bundlePreview) bundlePreview.textContent = '';
 }
 
 /** Pseudo-slot ids for the 4 concurrently-runnable challenges — mirrors phase-manager.js's CHALLENGE_SLOT_IDS. */
@@ -3084,6 +3093,213 @@ async function confirmChallengeSetup(triggerBtn) {
     await saveGameState(triggerBtn);
     clearMatchSetup();
     showStatus(`⚔️ CHALLENGE #${matchNumber}: ${sideANames} vs ${sideBNames} (${disputeLabel})`, 'success');
+}
+
+// =============================================================================
+// MULTI-HEX CHALLENGE BUNDLING (Round 12B)
+// =============================================================================
+// Separate, UNRELATED hex disputes (different challenger, different
+// defender, different hex — not necessarily the same two teams) can be
+// bundled into and resolved by ONE challenge game, if the admin decides to
+// combine them. See docs/guides/EVENT_BUG_REPORTS.md ("Challenge matches
+// can't run concurrently...") for the full design and worked example, and
+// shared/scripts/challenge-bundle.js for the pure bipartition/roster-fill/
+// resolution logic this UI calls into. This is fully additive and opt-in —
+// the single-dispute flow above (confirmChallengeSetup) is untouched and
+// remains the default path.
+
+let _challengeBundleRowSeq = 0;
+
+/**
+ * Show/hide the bundle-builder section within the (already-open) challenge
+ * setup modal. Seeds two empty dispute rows the first time it's opened.
+ */
+function toggleChallengeBundleMode() {
+    const section = document.getElementById('challengeBundleSection');
+    if (!section) return;
+    const isOpening = section.style.display === 'none';
+    section.style.display = isOpening ? '' : 'none';
+    if (isOpening && document.getElementById('challengeBundleRows').children.length === 0) {
+        addChallengeBundleRow();
+        addChallengeBundleRow();
+    }
+}
+
+function _bundleTeamOptionsHtml() {
+    return (gameState?.teams || []).map(t => {
+        return `<option value="${t.id}">${t.name || 'Team ' + t.id}</option>`;
+    }).join('');
+}
+
+/**
+ * Add one dispute row (challenger team, defender team, contested hex) to
+ * the bundle builder.
+ */
+function addChallengeBundleRow() {
+    const rowsEl = document.getElementById('challengeBundleRows');
+    if (!rowsEl) return;
+    const rowId = `bundleRow${_challengeBundleRowSeq++}`;
+    const row = document.createElement('div');
+    row.className = 'challenge-bundle-row';
+    row.id = rowId;
+    row.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:6px; flex-wrap:wrap;';
+    row.innerHTML = `
+        <select class="team-color-select bundle-challenger" onchange="updateChallengeBundleHexOptions('${rowId}')">${_bundleTeamOptionsHtml()}</select>
+        <span style="font-size:0.8rem; color: var(--text-tertiary);">challenges</span>
+        <select class="team-color-select bundle-defender" onchange="updateChallengeBundleHexOptions('${rowId}')">${_bundleTeamOptionsHtml()}</select>
+        <span style="font-size:0.8rem; color: var(--text-tertiary);">on</span>
+        <select class="team-color-select bundle-hex"></select>
+        <button type="button" class="btn-small secondary" onclick="removeChallengeBundleRow('${rowId}')" title="Remove this dispute">✕</button>
+    `;
+    rowsEl.appendChild(row);
+    updateChallengeBundleHexOptions(rowId);
+}
+
+function removeChallengeBundleRow(rowId) {
+    document.getElementById(rowId)?.remove();
+}
+
+/**
+ * Repopulate a bundle row's hex dropdown with the heart hexes currently
+ * held by that row's selected defender team.
+ */
+function updateChallengeBundleHexOptions(rowId) {
+    const row = document.getElementById(rowId);
+    if (!row) return;
+    const defenderSelect = row.querySelector('.bundle-defender');
+    const hexSelect = row.querySelector('.bundle-hex');
+    if (!defenderSelect || !hexSelect) return;
+
+    const defenderId = defenderSelect.value;
+    const heartHexes = Object.entries(gameState?.heartHexControl || {})
+        .filter(([, ownerId]) => String(ownerId) === String(defenderId))
+        .map(([coord]) => coord);
+
+    const prevValue = hexSelect.value;
+    hexSelect.innerHTML = heartHexes.length === 0
+        ? '<option value="">— No hearts held —</option>'
+        : heartHexes.map(coord => `<option value="${coord}">${coord}</option>`).join('');
+    if (heartHexes.includes(prevValue)) hexSelect.value = prevValue;
+}
+
+/**
+ * Read the current bundle-builder rows into ChallengeBundle's dispute
+ * shape. Rows with no hex selected (e.g. defender owns no hearts) are
+ * dropped rather than sent through as invalid.
+ */
+function _collectChallengeBundleDisputes() {
+    return Array.from(document.querySelectorAll('#challengeBundleRows .challenge-bundle-row'))
+        .map(row => {
+            const challengerRaw = row.querySelector('.bundle-challenger')?.value;
+            const defenderRaw = row.querySelector('.bundle-defender')?.value;
+            const hexCoord = row.querySelector('.bundle-hex')?.value;
+            return {
+                challengerTeamId: parseInt(challengerRaw) || challengerRaw,
+                defenderTeamId: parseInt(defenderRaw) || defenderRaw,
+                hexCoord
+            };
+        })
+        .filter(d => d.hexCoord);
+}
+
+/**
+ * Validate + bipartition + fill roster for the current bundle rows, and
+ * create the resulting queue entry in the first free challenge slot.
+ * Mirrors confirmChallengeSetup()'s queue-insertion/Discord/save sequence,
+ * but the "teams" (rosters) come from ChallengeBundle.buildChallengeBundle()
+ * instead of the general manual player-assignment UI, since bundled
+ * rosters are auto-filled from the bipartition + uninvolved teams.
+ */
+async function confirmChallengeBundleSetup(triggerBtn) {
+    const previewEl = document.getElementById('challengeBundlePreview');
+    const disputes = _collectChallengeBundleDisputes();
+    const format = document.getElementById('challengeBundleFormat')?.value || '3v3';
+
+    if (disputes.length < 2) {
+        const msg = 'Bundling needs at least 2 disputes — use the single-dispute flow above for just one.';
+        if (previewEl) { previewEl.textContent = msg; previewEl.style.color = 'var(--accent-warning, #f7ba32)'; }
+        showStatus(msg, 'warning');
+        return;
+    }
+
+    const result = window.ChallengeBundle.buildChallengeBundle({
+        disputes,
+        allTeams: gameState.teams || [],
+        format
+    });
+
+    if (result.error) {
+        if (previewEl) { previewEl.textContent = result.error.message; previewEl.style.color = 'var(--accent-danger)'; }
+        showStatus(result.error.message, 'error');
+        return;
+    }
+
+    const assignedChallengeSlot = getNextFreeChallengeSlot();
+    if (!assignedChallengeSlot) {
+        showStatus('All 4 challenge slots are already in use — resolve one before adding another.', 'warning');
+        return;
+    }
+
+    closeChallengeSetupModal();
+
+    const matchNumber = getNextMatchNumber();
+    const getTeamName = (id) => {
+        const team = gameState.teams.find(t => String(t.id) === String(id));
+        return team?.name || `Team ${id}`;
+    };
+
+    const teams = [
+        { id: 'TEAM_A', playerIds: result.sideAPlayers.map(p => p.id).filter(Boolean) },
+        { id: 'TEAM_B', playerIds: result.sideBPlayers.map(p => p.id).filter(Boolean) }
+    ];
+
+    const queueEntry = {
+        id: Date.now(),
+        matchNumber: matchNumber,
+        game: document.getElementById('gameType').value,
+        playType: format,
+        teams: teams,
+        status: 'pending',
+        isChallenge: true,
+        // Bundle-specific fields — additive, never present on a normal
+        // single-hex challenge. See resolveBundledChallengeResult() in
+        // confirmResult() below for how these get consumed on confirm.
+        isBundle: true,
+        bundleDisputes: result.disputes,
+        bundleSideA: result.sideA,
+        bundleSideB: result.sideB,
+        bundleSplitTeamIds: result.splitTeamIds,
+        // Single-hex field left null for bundles (multiple hexes live in
+        // bundleDisputes instead) — keeps every reader of challengeHexCoord
+        // elsewhere (display-manager.js, board-module.js contested-hex set)
+        // safely no-op-ing on a bundle rather than showing a wrong single hex.
+        challengeHexCoord: null,
+        slot: assignedChallengeSlot,
+        roundNumber: gameState.currentPhase?.roundNumber,
+        disputingSideA: result.sideA,
+        disputingSideB: result.sideB,
+        disputingTeamIds: [...result.sideA, ...result.sideB],
+        createdAt: new Date().toISOString()
+    };
+
+    gameState.gameQueue = gameState.gameQueue || [];
+    const queue = gameState.gameQueue;
+    const ongoingCount = queue.filter(g => g.status === 'ongoing').length;
+    const firstPendingIndex = queue.findIndex(g =>
+        g.status === 'pending' || g.status === undefined || g.status === 'queued'
+    );
+    const insertIndex = firstPendingIndex === -1 ? ongoingCount : firstPendingIndex + 1;
+
+    assignDiscordAndLobby([queueEntry]);
+    queue.splice(insertIndex, 0, queueEntry);
+
+    await saveGameState(triggerBtn);
+    clearMatchSetup();
+
+    const disputeSummary = result.disputes
+        .map(d => `${getTeamName(d.challengerTeamId)} vs ${getTeamName(d.defenderTeamId)} (${d.hexCoord})`)
+        .join(', ');
+    showStatus(`⚔️ BUNDLED CHALLENGE #${matchNumber}: ${result.disputes.length} disputes — ${disputeSummary}`, 'success');
 }
 
 /**
@@ -5415,6 +5631,41 @@ async function confirmResult(winnerIndex) {
         heartControlSnapshot: { ...(gameState.heartHexControl || {}) },
         challengeHexCoord: selectedQueuedGame.challengeHexCoord || null
     };
+
+    // Bundled challenge (Round 12B): apply the bipartition outcome to
+    // every dispute in the bundle from this ONE game result. Winner side
+    // is determined by winnerIndex the same way as any other challenge —
+    // bundle queue entries always have exactly 2 teams, TEAM_A at index 0
+    // (bundleSideA) and TEAM_B at index 1 (bundleSideB), built by
+    // confirmChallengeBundleSetup() above. Additive on gameHistory: a
+    // normal (non-bundled) challenge's entry is completely unaffected,
+    // since bundleDisputes is only ever set here when isBundle is true.
+    if (selectedQueuedGame.isBundle && Array.isArray(selectedQueuedGame.bundleDisputes)) {
+        const winningSide = winnerIndex === 0 ? 'A' : 'B';
+        const outcomes = window.ChallengeBundle.resolveBundleDisputes({
+            disputes: selectedQueuedGame.bundleDisputes,
+            sideA: selectedQueuedGame.bundleSideA || [],
+            sideB: selectedQueuedGame.bundleSideB || [],
+            winningSide
+        });
+
+        gameState.board = gameState.board || {};
+        gameState.heartHexControl = gameState.heartHexControl || {};
+        outcomes.forEach(o => {
+            if (o.outcome === 'challenger_won') {
+                // Transfer: place the challenger's tile, replacing the
+                // defender's — same board/heartHexControl writes
+                // assignTeamToHex() makes for a manual single-hex award.
+                gameState.board[o.hexCoord] = o.newOwnerTeamId;
+                gameState.heartHexControl[o.hexCoord] = o.newOwnerTeamId;
+            }
+            // 'defender_won' -> hex stays with the defender, no board
+            // mutation needed (they already own it).
+        });
+
+        historyEntry.bundleDisputes = outcomes;
+        historyEntry.isBundle = true;
+    }
 
     gameState.gameHistory = gameState.gameHistory || [];
     gameState.gameHistory.push(historyEntry);

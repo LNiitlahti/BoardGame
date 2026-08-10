@@ -490,7 +490,41 @@
 
             <div class="challenge-setup-actions">
                 <button class="btn primary" onclick="confirmChallengeSetup(this)">Create Challenge</button>
+                <button class="btn secondary" onclick="toggleChallengeBundleMode()">Bundle Multiple Disputes…</button>
                 <button class="btn secondary" onclick="closeChallengeSetupModal()">Cancel</button>
+            </div>
+
+            <!-- Multi-hex bundling (Round 12B): separate, unrelated disputes
+                 (different challenger, different defender, different hex)
+                 can be combined into ONE challenge game if the disputing
+                 teams' relationships bipartition cleanly (no odd cycle) --
+                 see shared/scripts/challenge-bundle.js. Opt-in, hidden by
+                 default; toggled via "Bundle Multiple Disputes…" above. -->
+            <div class="challenge-bundle-section" id="challengeBundleSection" style="display: none;">
+                <div style="border-top: 1px solid var(--border-color); margin: 14px 0;"></div>
+                <h4 style="margin-bottom: 4px;">Bundle Multiple Disputes</h4>
+                <p class="modal-hint">Combine separate hex disputes (any challenger/defender/hex, not necessarily the same two teams) into one game. The disputing teams must bipartition into two consistent sides (no 3-way loops).</p>
+
+                <div id="challengeBundleRows"></div>
+                <button type="button" class="btn-small secondary" onclick="addChallengeBundleRow()">+ Add Dispute</button>
+
+                <div class="challenge-team-field" style="margin-top: 10px;">
+                    <label>Match format:</label>
+                    <select id="challengeBundleFormat" class="team-color-select">
+                        <option value="1v1">1v1</option>
+                        <option value="2v2">2v2</option>
+                        <option value="3v3" selected>3v3</option>
+                        <option value="4v4">4v4</option>
+                        <option value="5v5">5v5</option>
+                    </select>
+                </div>
+
+                <div id="challengeBundlePreview" class="modal-hint" style="margin-top: 8px;"></div>
+
+                <div class="challenge-setup-actions">
+                    <button class="btn primary" onclick="confirmChallengeBundleSetup(this)">Create Bundled Challenge</button>
+                    <button class="btn secondary" onclick="toggleChallengeBundleMode()">Back to Single Dispute</button>
+                </div>
             </div>
         </div>
     </div>
@@ -860,6 +894,7 @@
     <script defer src="../shared/scripts/board-module.js"></script>
     <script defer src="../shared/scripts/board-renderer.js"></script>
     <script defer src="../shared/scripts/match-suggester.js"></script>
+    <script defer src="../shared/scripts/challenge-bundle.js"></script>
     <script defer src="../shared/scripts/games-config.js"></script>
     <script defer src="../shared/scripts/balance-optimizer.js"></script>
     <script defer src="../shared/scripts/smart-match-generator.js"></script>
