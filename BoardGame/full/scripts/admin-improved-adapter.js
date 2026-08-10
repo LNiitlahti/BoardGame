@@ -31,6 +31,8 @@
     let _phaseManager = null;
     let _undoManager = null;
     let _backupManager = null;
+    let _boardManager = null;
+    let _spellEngine = null;
     let _initialized = false;
     let _primaryAction = null;
     let _broadcastOpen = false;
@@ -116,7 +118,17 @@
 
     // ── Minimal TeamManager shim ──
 
-    const _teamShim = {};
+    // escapeHtml added for SpellEngine's render methods (renderSpellHistory,
+    // renderActiveEffectsAdmin) — PhaseManager/UndoManager never called it,
+    // so this shim didn't need it until now.
+    const _teamShim = {
+        escapeHtml(str) {
+            if (str == null) return '';
+            const div = document.createElement('div');
+            div.textContent = String(str);
+            return div.innerHTML;
+        }
+    };
 
     // ── Undo Last Action ──
 
@@ -204,6 +216,63 @@
             resolveDiscordChannelName: (slot, sideId) =>
                 typeof resolveDiscordChannelName === 'function' ? resolveDiscordChannelName(slot, sideId) : null
         });
+
+        const onPhaseChanged = () => _phaseManager?.recheckRequirements();
+
+        // BoardManager — wraps admin.js's own boardModule/boardRenderer
+        // (already created by initializeBoardModules() before this adapter
+        // first runs). Required so SpellEngine's restriction predicates
+        // (_isControllingMountainHeart, hex-type checks, etc.) work instead
+        // of silently degrading to "unknown" — see the spec's boardManager
+        // note in docs/superpowers/specs/2026-08-10-spell-admin-processing-ui-design.md.
+        //
+        // logEventCallback/deleteLastTileEventCallback/clearPendingHexWinCallback
+        // are wired to admin.js's real equivalents (logEvent,
+        // deleteLastTileCaptureEvent, clearPendingHexWin — all already
+        // defined and exposed on window by admin.js) rather than left as
+        // BoardManager's internal no-op defaults, mirroring how god-app.js
+        // wires this same constructor to real ResultManager/event-log
+        // functions instead of stubs.
+        if (typeof BoardManager !== 'undefined' && typeof boardModule !== 'undefined' && boardModule) {
+            _boardManager = new BoardManager(gameState, {
+                boardModule,
+                boardRenderer,
+                uiManager: _uiShim,
+                teamManager: _teamShim,
+                saveCallback: (btn) => saveGameState(btn),
+                logEventCallback: (type, data) =>
+                    typeof logEvent === 'function' ? logEvent(type, data) : null,
+                logActionCallback: logAction,
+                deleteLastTileEventCallback: (coord) =>
+                    typeof deleteLastTileCaptureEvent === 'function' ? deleteLastTileCaptureEvent(coord) : null,
+                clearPendingHexWinCallback: (teamId) =>
+                    typeof clearPendingHexWin === 'function' ? clearPendingHexWin(teamId) : null,
+                onDisplayRefresh: () => {
+                    if (typeof updateDisplay === 'function') updateDisplay();
+                },
+                onPhaseRequirementsChanged: onPhaseChanged
+            });
+        }
+
+        // SpellEngine — mirrors god-app.js's construction. Reads/writes the
+        // same Firestore spellPiles/spellDefinitions/activeEffects god.html
+        // initializes at setup.
+        if (typeof SpellEngine !== 'undefined') {
+            _spellEngine = new SpellEngine(gameState, {
+                uiManager: _uiShim,
+                teamManager: _teamShim,
+                boardManager: _boardManager,
+                saveCallback: (btn) => saveGameState(btn),
+                logActionCallback: logAction,
+                onPhaseRequirementsChanged: onPhaseChanged,
+                onDisplayRefresh: () => {
+                    if (typeof updateDisplay === 'function') updateDisplay();
+                }
+            });
+            window.spellEngine = _spellEngine;
+            _spellEngine.renderSpellHistory();
+            _spellEngine.renderActiveEffectsAdmin();
+        }
 
         // BackupManager — round-boundary snapshots that replay.html uses as
         // keyframes. god.html has always wired this via _onRoundStartSpells;
