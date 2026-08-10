@@ -1713,51 +1713,52 @@
             margin-bottom: 24px;
         }
         .dm-dual-slot-title {
-            font-family: 'Russo One', sans-serif; font-size: 36px;
+            font-family: 'Russo One', sans-serif; font-size: 44px;
             color: var(--gold-bright); text-transform: uppercase; letter-spacing: 1px;
         }
         .dm-dual-slot-badge {
-            font-family: 'Quantico', sans-serif; font-size: 20px; font-weight: 700;
-            padding: 6px 18px; border-radius: 20px; text-transform: uppercase;
+            font-family: 'Quantico', sans-serif; font-size: 24px; font-weight: 700;
+            padding: 8px 20px; border-radius: 20px; text-transform: uppercase;
         }
         .dm-dual-slot-badge--setup  { background: rgba(255,255,255,0.08); color: var(--text-muted); }
         .dm-dual-slot-badge--lobby  { background: rgba(247,186,50,0.15); color: #f7ba32; }
         .dm-dual-slot-badge--playing { background: rgba(34,197,94,0.15); color: #22c55e; }
         .dm-dual-slot-badge--done   { background: rgba(34,197,94,0.08); color: #22c55e; opacity: 0.7; }
         .dm-dual-slot-status {
-            font-family: 'Quantico', sans-serif; font-size: 26px; color: var(--text-muted);
-            text-align: center; padding: 28px 0;
+            font-family: 'Quantico', sans-serif; font-size: 34px; color: var(--text-muted);
+            text-align: center; padding: 32px 0;
         }
         .dm-dual-ready-sides {
             display: flex; flex-wrap: wrap; justify-content: center; gap: 24px; align-items: center;
         }
-        .dm-dual-ready-side { display: flex; flex-direction: column; gap: 12px; min-width: 220px; }
+        .dm-dual-ready-side { display: flex; flex-direction: column; gap: 14px; min-width: 300px; }
         .dm-dual-ready-row {
-            display: flex; align-items: center; gap: 14px;
-            padding: 10px 14px; background: rgba(255,255,255,0.03); border-radius: 8px;
+            display: flex; align-items: center; gap: 16px;
+            padding: 14px 18px; background: rgba(255,255,255,0.03); border-radius: 8px;
         }
         .dm-dual-ready-name {
-            font-family: 'Quantico', sans-serif; font-size: 24px; font-weight: 700; flex: 1;
+            font-family: 'Quantico', sans-serif; font-size: 38px; font-weight: 700; flex: 1;
+            overflow-wrap: anywhere;
         }
         .dm-dual-ready-indicator { display: inline-flex; align-items: center; gap: 4px; }
-        .dm-dual-ready-indicator svg { width: 22px; height: 22px; }
+        .dm-dual-ready-indicator svg { width: 30px; height: 30px; }
         .dm-dual-winner-side .dm-dual-ready-row {
             background: rgba(247,186,50,0.1); border: 1px solid rgba(247,186,50,0.3);
         }
         .dm-dual-winner-label {
-            display: flex; align-items: center; justify-content: center; gap: 6px;
-            font-family: 'Russo One', sans-serif; font-size: 18px; font-weight: 800;
-            color: #f7ba32; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            font-family: 'Russo One', sans-serif; font-size: 24px; font-weight: 800;
+            color: #f7ba32; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;
         }
-        .dm-dual-winner-label svg { width: 20px; height: 20px; }
+        .dm-dual-winner-label svg { width: 26px; height: 26px; }
         .dm-dual-live-match { text-align: center; padding: 16px 0; }
         .dm-dual-game-name {
-            font-family: 'Quantico', sans-serif; font-size: 30px; font-weight: 800;
-            color: var(--gold-bright); margin-bottom: 16px;
+            font-family: 'Quantico', sans-serif; font-size: 38px; font-weight: 800;
+            color: var(--gold-bright); margin-bottom: 20px;
         }
         .dm-dual-vs {
-            font-family: 'Russo One', sans-serif; font-size: 28px; font-weight: 800; color: var(--gold);
-            padding: 0 12px;
+            font-family: 'Russo One', sans-serif; font-size: 36px; font-weight: 800; color: var(--gold);
+            padding: 0 16px;
         }
         .dm-dual-live-tag {
             font-family: 'Quantico', sans-serif; font-size: 18px; font-weight: 700;
@@ -1773,6 +1774,36 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.55; }
         }
+
+        /* ── Focus mode ──────────────────────────────────────────────────
+           Applied by DisplayManager._dualSlotLayout() when exactly one match
+           slot is still active. The live slot takes the room; the finished
+           one shrinks to a narrow winner column rather than disappearing,
+           so "who won match 1" stays on screen while match 2 plays out.
+           Requested by Inffi, 2026-08-05 Discord thread. */
+        .dm-matches-dual--focus { gap: 24px; align-items: flex-start; }
+
+        .dm-matches-dual--focus .dm-dual-slot-panel--focus {
+            flex: 1 1 auto; max-width: 1480px; padding: 40px;
+        }
+        .dm-matches-dual--focus .dm-dual-slot-panel--focus .dm-dual-slot-title { font-size: 52px; }
+        .dm-matches-dual--focus .dm-dual-slot-panel--focus .dm-dual-game-name { font-size: 46px; }
+        .dm-matches-dual--focus .dm-dual-slot-panel--focus .dm-dual-ready-name { font-size: 52px; }
+        .dm-matches-dual--focus .dm-dual-slot-panel--focus .dm-dual-ready-side { min-width: 380px; }
+        .dm-matches-dual--focus .dm-dual-slot-panel--focus .dm-dual-ready-indicator svg { width: 36px; height: 36px; }
+        .dm-matches-dual--focus .dm-dual-slot-panel--focus .dm-dual-vs { font-size: 48px; }
+        .dm-matches-dual--focus .dm-dual-slot-panel--focus .dm-dual-ready-sides { gap: 32px; }
+
+        .dm-matches-dual--focus .dm-dual-slot-panel--minor {
+            flex: 0 0 400px; max-width: 400px; padding: 24px; opacity: 0.75;
+        }
+        .dm-matches-dual--focus .dm-dual-slot-panel--minor .dm-dual-slot-title { font-size: 30px; }
+        .dm-matches-dual--focus .dm-dual-slot-panel--minor .dm-dual-slot-badge { font-size: 18px; padding: 5px 14px; }
+        .dm-matches-dual--focus .dm-dual-slot-panel--minor .dm-dual-game-name { font-size: 24px; }
+        .dm-matches-dual--focus .dm-dual-slot-panel--minor .dm-dual-ready-name { font-size: 26px; }
+        .dm-matches-dual--focus .dm-dual-slot-panel--minor .dm-dual-ready-side { min-width: 150px; }
+        .dm-matches-dual--focus .dm-dual-slot-panel--minor .dm-dual-vs { font-size: 22px; }
+        .dm-matches-dual--focus .dm-dual-slot-panel--minor .dm-dual-winner-label { font-size: 18px; }
 
         /* ── Live Match Large ────────────────────────── */
         .dm-live-matches-wrapper {
