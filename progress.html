@@ -123,6 +123,14 @@
   <p class="meta">commits c98c364, c928a80, 8e2a1d3 · full suite 254/254</p>
 </div>
 
+<div class="piece">
+  <span class="status done">1 gap found and fixed, merged</span>
+  <h2>Discord lobby-info for self-service challenge matches</h2>
+  <p>A queued self-service CHALLENGE match on team.html never showed the Discord-channel/lobby-info panel that normal matches get. Two root causes: the "Your Next Match" panel's visibility gate excluded challenges entirely (they don't use the Match-1/Match-2 slot sub-phases), and self-service challenge queue entries never even got a <code>slot: 'challenge'</code> tag set on them at all — only TD-created challenges did. Fixed both. Given self-service challenges are expected to become more common than TD-mediated ones, this closes a real gap.</p>
+  <p>Harsh critique caught a real regression risk before merge: the new lookup was missing the same <code>_belongsToCurrentRound()</code> guard that exists on two sibling lookups in the same file — added there specifically after a 2026-08-03 live event where a never-completed entry kept matching "my active match" forever across rounds. Without it, a stuck/abandoned challenge from a prior round would have popped the panel indefinitely. Fixed and deduplicated against the file's existing helper.</p>
+  <p class="meta">commits a9b7ae6, 548e527 · full suite 254/254</p>
+</div>
+
 <div class="round">Round 4 — mobile/iPad admin touch support</div>
 <div class="sub" style="margin-bottom:12px">User decision: tap-to-select as the primary interaction, drag-and-drop kept working as a backup — multiple ways to do the same thing, intuitive and responsive. Two waves: establish the pattern on one site, then apply it to the rest.</div>
 
