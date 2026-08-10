@@ -579,6 +579,14 @@
   line-height: 1.4;
 }
 
+.spell-card-thumb {
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
 /* ==================== SPELL PHASE OVERLAY ==================== */
 
 .spell-hand-grid {
@@ -611,6 +619,19 @@
 .spell-phase-card.disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.spell-phase-card-art {
+  padding: 0;
+  overflow: hidden;
+}
+
+.spell-phase-card-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  object-fit: cover;
+  border-radius: 8px;
 }
 
 .spell-phase-card-name {

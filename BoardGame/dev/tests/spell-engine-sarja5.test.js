@@ -32,6 +32,25 @@ const spellsData = JSON.parse(
 const byId = {};
 spellsData.spells.forEach(s => { byId[s.id] = s; });
 
+// Synthetic fixture: mountain-purification was a legacy pre-illustration
+// placeholder card (bonus_points effect) retired from spells.json — it had
+// no equivalent in the final 43-card illustrated deck, and no other real
+// card uses the bonus_points effect type. Injected here (rather than
+// relying on spells.json) so copy_spell's ability to re-execute a
+// bonus_points spell stays covered even though no real card exercises it.
+byId['mountain-purification'] = {
+    id: 'mountain-purification',
+    name: 'Vuoren puhdistus',
+    nameEn: 'Mountain Purification',
+    type: 'instant',
+    rarity: 'common',
+    description: 'Voitte pelata tämän heti, kun olette asettaneet laatan laudalle. Saatte yhden voittopisteen jokaisesta vuoren sydämestä (myös sivusydämet), jotka ovat hallussanne sillä hetkellä.',
+    descriptionEn: 'You may play this immediately after placing a tile on the board. You get one victory point for each mountain heart (including side hearts) you control at that moment.',
+    timing: 'after-placement',
+    targetType: 'self',
+    effect: { type: 'bonus_points', calculation: 'controlled_hearts' }
+};
+
 function makeGameState(overrides = {}) {
     return {
         spellDefinitions: byId,

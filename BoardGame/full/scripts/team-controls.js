@@ -570,6 +570,17 @@ function _getTeamMatchInfo() {
 }
 
 /**
+ * Resolve a spell card's illustrated artwork URL, or null if this spell
+ * has none (the legacy pre-illustration draft cards, e.g.). Same
+ * BOARDGAME_BASE-relative pattern as resolveGameImage().
+ */
+function resolveSpellImage(def) {
+    if (!def?.image) return null;
+    if (def.image.startsWith('http')) return def.image;
+    return (window.BOARDGAME_BASE || '..') + '/' + def.image;
+}
+
+/**
  * Render spell cards sidebar (uses new spellPiles data model)
  */
 function renderSpellCards() {
@@ -603,8 +614,11 @@ function renderSpellCards() {
         const def = defs[spellId] || {};
         const name = _escapeHtmlSafe(def.nameEn || def.name || spellId);
         const desc = _escapeHtmlSafe(def.descriptionEn || def.description || '');
+        const img = resolveSpellImage(def);
+        const thumb = img ? `<img class="spell-card-thumb" src="${img}" alt="" loading="lazy">` : '';
         return `
             <div class="spell-card" onclick="viewSpellDetail('${spellId}')">
+                ${thumb}
                 <div class="spell-card-name">${name}</div>
                 <div class="spell-card-desc">${desc.substring(0, 80)}${desc.length > 80 ? '...' : ''}</div>
             </div>
@@ -621,11 +635,16 @@ function viewSpellDetail(spellId) {
     const name = _escapeHtmlSafe(def.name || spellId);
     const nameEn = _escapeHtmlSafe(def.nameEn || '');
     const desc = _escapeHtmlSafe(def.descriptionEn || def.description || '');
+    const img = resolveSpellImage(def);
+    const artHtml = img
+        ? `<img src="${img}" alt="" style="width: 100%; border-radius: 8px; margin-bottom: 14px; display: block;" loading="lazy">`
+        : '';
 
     const modal = document.createElement('div');
     modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:10000;';
     modal.innerHTML = `
         <div style="background: var(--bg-panel, rgba(20, 22, 30, 0.95)); padding: 25px; border-radius: 12px; max-width: 450px; width: 90%; color: white; border: 2px solid rgba(168,85,247,0.4);">
+            ${artHtml}
             <h3 style="color: #a855f7; margin-top: 0;">${name}</h3>
             ${nameEn ? `<p style="color: #9aa1ad; font-size: 0.85rem; margin-top: -10px;">${nameEn}</p>` : ''}
             <p style="font-size: 0.8rem; color: #64748b; text-transform: uppercase;">${def.type || ''} &bull; ${def.rarity || ''} &bull; ${def.timing || ''}</p>
@@ -717,6 +736,19 @@ function _renderSpellPhaseHand(interactive) {
         const nameEn = _escapeHtmlSafe(def.nameEn || '');
         const desc = _escapeHtmlSafe(def.descriptionEn || def.description || '');
         const clickAttr = interactive ? `onclick="selectSpellToCast('${spellId}')"` : '';
+        const img = resolveSpellImage(def);
+
+        // Illustrated cards already have the name/description printed on
+        // the art itself (same card the table uses physically) — show just
+        // the image, matching the physical card 1:1. Cards with no art yet
+        // (the legacy pre-illustration drafts) fall back to the text layout.
+        if (img) {
+            return `
+                <div class="spell-phase-card spell-phase-card-art ${interactive ? 'interactive' : 'disabled'}" ${clickAttr}>
+                    <img class="spell-phase-card-image" src="${img}" alt="${name}" loading="lazy">
+                </div>
+            `;
+        }
         return `
             <div class="spell-phase-card ${interactive ? 'interactive' : 'disabled'}" ${clickAttr}>
                 <div class="spell-phase-card-name">${name}</div>

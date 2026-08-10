@@ -8,8 +8,8 @@
  *   sarja1-k2  harkittu agressio  destroy_adjacent (existing handler, new card)
  *   sarja1-k3  Juho Puhuu         reminder (new effect type — informational only)
  *   sarja1-k4  Sabotaasia         ban (existing handler, new card)
- *   sarja1-k5  Kiven Muisti       modifier / double_draw (shares _checkDoubleDraw
- *                                 with the placeholder 'double-bid' card)
+ *   sarja1-k5  Kiven Muisti       modifier / double_draw (_checkDoubleDraw is
+ *                                 shape-based, not id-based — see below)
  */
 const test = require('node:test');
 const assert = require('node:assert');
@@ -195,19 +195,6 @@ test('sarja1-k5 (Kiven Muisti) doubles the next spell draw for the casting team'
     const drawn = engine.drawSpell(1, 1);
     assert.strictEqual(drawn.length, 2, 'one draw call pulls 2 cards while the modifier is active');
     assert.strictEqual(gs.activeEffects[0].isExpired, true, 'modifier is consumed after use');
-});
-
-test('the pre-existing double-bid card still works after generalizing _checkDoubleDraw', () => {
-    const gs = makeGameState({
-        spellPiles: {
-            1: { drawPile: ['a', 'b', 'c'], hand: [], usedPile: [] }
-        }
-    });
-    const engine = makeSpellEngine(gs);
-
-    engine.executeSpellEffect('double-bid', 1, {});
-    const drawn = engine.drawSpell(1, 1);
-    assert.strictEqual(drawn.length, 2);
 });
 
 test('double_draw modifier only benefits the casting team, not others', () => {
