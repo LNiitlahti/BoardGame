@@ -33,18 +33,26 @@ test('resolves game name from gameDefinitions, team names, and discord channels 
         gameQueue: [{
             id: 'm1', status: 'pending', slot: 1, roundNumber: 3, createdAt: 2_000_000,
             game: 'cs2', matchNumber: 7,
-            teams: [{ id: 1, playerIds: [101] }, { id: 2, playerIds: [102] }],
-            discordChannels: { 1: 'voice-1', 2: 'voice-2' }
+            teams: [{ id: 1, playerIds: [101] }, { id: 2, playerIds: [102] }]
         }]
     });
-    const pm = new PhaseManager(gs, {});
+    // Discord channel names are resolved via an injected dependency (the
+    // tournament's real slotChannels/channelCache config), not read off the
+    // match directly -- see the discordChannel comment in
+    // getSlotMatchDetails(). Stub it the way admin.js/god-app.js's real
+    // resolveDiscordChannelName(slot, sideId) would, to verify the wiring.
+    const resolveDiscordChannelName = (slot, sideId) => {
+        assert.strictEqual(slot, 1);
+        return { 1: 'ALPHA', 2: 'BRAVO' }[sideId] || null;
+    };
+    const pm = new PhaseManager(gs, { resolveDiscordChannelName });
     const details = pm.getSlotMatchDetails(1);
 
     assert.strictEqual(details.length, 1);
     assert.strictEqual(details[0].gameName, 'Counter-Strike 2');
     assert.strictEqual(details[0].matchNumber, 7);
     assert.deepStrictEqual(details[0].sides.map(s => s.teamName), ['Red Dragons', 'Blue Owls']);
-    assert.deepStrictEqual(details[0].sides.map(s => s.discordChannel), ['voice-1', 'voice-2']);
+    assert.deepStrictEqual(details[0].sides.map(s => s.discordChannel), ['ALPHA', 'BRAVO']);
 });
 
 test('legacy sides[].players[].teamId shape resolves team names too', () => {
