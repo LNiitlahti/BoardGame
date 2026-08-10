@@ -1,4 +1,4 @@
-from colors import resolve_team_color, apply_brightness, hex_to_rgb, DEFAULT_TEAM_COLOR
+from colors import resolve_team_color, apply_brightness, hex_to_rgb, rgb_to_hex, DEFAULT_TEAM_COLOR
 
 
 def test_resolve_team_color_passes_hex_through_unchanged():
@@ -29,3 +29,16 @@ def test_apply_brightness_zero_factor_is_a_no_op():
 
 def test_apply_brightness_clamps_at_full_value():
     assert apply_brightness('#ffffff', 0.5) == '#ffffff'
+
+
+def test_resolve_team_color_falls_back_to_default_for_malformed_hex():
+    assert resolve_team_color('#12') == DEFAULT_TEAM_COLOR
+    assert resolve_team_color('#zzzzzz') == DEFAULT_TEAM_COLOR
+
+
+def test_apply_brightness_clamps_at_zero_for_very_negative_factor():
+    assert apply_brightness('#804020', -2.0) == '#000000'
+
+
+def test_hex_to_rgb_and_rgb_to_hex_round_trip():
+    assert rgb_to_hex(hex_to_rgb('#a1b2c3')) == '#a1b2c3'

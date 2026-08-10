@@ -1,5 +1,8 @@
 """Team color resolution and recency-glow brightness, ported from replay.html."""
 import colorsys
+import re
+
+HEX_COLOR_PATTERN = re.compile(r'^#[0-9a-fA-F]{6}$')
 
 LEGACY_TEAM_COLOR_MAP = {
     'red': '#de392c', 'blue': '#2278a3', 'green': '#2e9158',
@@ -16,7 +19,7 @@ def resolve_team_color(color):
     if not color:
         return DEFAULT_TEAM_COLOR
     if color.startswith('#'):
-        return color
+        return color if HEX_COLOR_PATTERN.match(color) else DEFAULT_TEAM_COLOR
     return LEGACY_TEAM_COLOR_MAP.get(color.lower(), DEFAULT_TEAM_COLOR)
 
 
@@ -35,6 +38,6 @@ def apply_brightness(hex_color, factor):
     """
     r, g, b = hex_to_rgb(hex_color)
     h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
-    v = min(1.0, v * (1 + factor))
+    v = max(0.0, min(1.0, v * (1 + factor)))
     r2, g2, b2 = colorsys.hsv_to_rgb(h, s, v)
     return rgb_to_hex((round(r2 * 255), round(g2 * 255), round(b2 * 255)))
