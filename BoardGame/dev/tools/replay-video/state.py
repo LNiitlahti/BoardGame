@@ -33,6 +33,8 @@ def _apply_points_awarded(state, payload):
     teams = state['teams']
     awarded = payload.get('pointsAwarded') or {}
     for team_name, points in awarded.items():
+        if not isinstance(points, (int, float)):
+            continue
         team = _find_team(teams, team_id=team_name, name=team_name)
         if team:
             team['points'] = team.get('points', 0) + points

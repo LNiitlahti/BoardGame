@@ -109,6 +109,40 @@ def test_spell_cast_returns_a_toast_effect_without_mutating_board():
     assert effect == {'toast': {'teamId': 1, 'teamName': 'Red Team', 'spellName': 'Fireball'}}
 
 
+def test_points_awarded_for_unknown_team_is_silently_ignored():
+    state = make_state()
+    apply_action(state, {
+        'actionType': 'points_awarded',
+        'payload': {'pointsAwarded': {'Nonexistent Team': 5}},
+    })
+    assert [t['points'] for t in state['teams']] == [0, 0]
+
+
+def test_team_renamed_for_unknown_team_is_silently_ignored():
+    state = make_state()
+    apply_action(state, {
+        'actionType': 'team_renamed',
+        'payload': {'teamId': 999, 'oldName': 'Nobody', 'newName': 'New Name'},
+    })
+    assert [t['name'] for t in state['teams']] == ['Red Team', 'Blue Team']
+
+
+def test_team_color_changed_for_unknown_team_is_silently_ignored():
+    state = make_state()
+    apply_action(state, {'actionType': 'team_color_changed', 'payload': {'teamId': 999, 'newColor': '#000000'}})
+    assert [t['color'] for t in state['teams']] == ['red', '#2278a3']
+
+
+def test_points_awarded_bulk_shape_ignores_non_numeric_values():
+    state = make_state()
+    apply_action(state, {
+        'actionType': 'points_awarded',
+        'payload': {'pointsAwarded': {'Red Team': 'not-a-number'}},
+    })
+    red = next(t for t in state['teams'] if t['id'] == 1)
+    assert red['points'] == 0
+
+
 def test_unhandled_action_types_are_a_no_op():
     state = make_state()
     effect = apply_action(state, {'actionType': 'match_created', 'payload': {}})
