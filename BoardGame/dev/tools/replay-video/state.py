@@ -180,3 +180,44 @@ class SpellToastQueue:
                 return {**toast, 'elapsed': t - start}
             start = end
         return None
+
+
+def build_initial_state(bundle):
+    """The starting state for a full linear render: the nearest backup
+    snapshot at-or-before the first action's sequence number, or the
+    tournament-doc-derived empty baseline if no such backup exists.
+    """
+    actions = bundle.get('actions') or []
+    if not actions:
+        return initial_state_from_tournament_doc(bundle['tournamentDoc'])
+
+    first_seq = actions[0]['sequenceNumber']
+    best_backup = None
+    for backup in bundle.get('backups') or []:
+        mapped_seq = backup.get('mappedSeq')
+        if mapped_seq is None or mapped_seq > first_seq:
+            continue
+        if best_backup is None or mapped_seq > best_backup['mappedSeq']:
+            best_backup = backup
+
+    if best_backup is None:
+        return initial_state_from_tournament_doc(bundle['tournamentDoc'])
+
+    state = copy.deepcopy(best_backup['snapshot'])
+    state.setdefault('board', {})
+    state.setdefault('teams', [])
+    return state
+
+
+def iter_frames_state(bundle):
+    """Yield (action, state_after_action, effect) for every action in the
+    bundle, in order, forward-applying against one running state. `effect`
+    is whatever apply_action() returned for that action, or None.
+    """
+    state = build_initial_state(bundle)
+    for action in bundle.get('actions') or []:
+        if action.get('undone'):
+            yield action, copy.deepcopy(state), None
+            continue
+        effect = apply_action(state, action)
+        yield action, copy.deepcopy(state), effect
