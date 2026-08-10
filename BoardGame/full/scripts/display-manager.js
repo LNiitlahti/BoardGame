@@ -1552,11 +1552,38 @@ class DisplayManager {
      * entries) — every active match for the slot renders as its own
      * matchup group, not just the first one.
      */
+    /**
+     * Should one match panel expand to fill the screen?
+     *
+     * A slot stays "active" until it reaches 'done'. With exactly one active
+     * slot there is nothing to share the width with — the finished slot only
+     * needs enough room for its winner column — so the active one takes the
+     * room. With two active (or two finished) slots the even 50/50 split is
+     * still correct.
+     *
+     * Pure: depends only on its argument. Tested in
+     * dev/tests/display-manager-dual-slot-layout.test.js.
+     *
+     * @param {Object|undefined} slots - currentPhase.slots, keys 1/2 (string
+     *        or number — Firestore returns strings), values setup|lobby|
+     *        playing|done
+     * @returns {{mode: 'dual'|'focus', focusSlot: 1|2|null}}
+     */
+    _dualSlotLayout(slots) {
+        const stateOf = slot => (slots && slots[slot]) || 'setup';
+        const active = [1, 2].filter(slot => stateOf(slot) !== 'done');
+        if (active.length === 1) {
+            return { mode: 'focus', focusSlot: active[0] };
+        }
+        return { mode: 'dual', focusSlot: null };
+    }
+
     _renderMatchesDualSlot(container, data) {
         const currentRoundNumber = data.currentPhase?.roundNumber;
         const phaseStartedAt = data.currentPhase?.startedAt;
         const slots = data.currentPhase?.slots || {};
         const queue = data.gameQueue || [];
+        const layout = this._dualSlotLayout(slots);
 
         const panelHTML = [1, 2].map(slot => {
             const sub = slots[slot] || 'setup';
@@ -1587,8 +1614,18 @@ class DisplayManager {
                 bodyHTML = `<div class="dm-dual-slot-status">No match queued yet</div>`;
             }
 
+            // In focus mode the one active slot takes the room and the
+            // finished slot shrinks to a narrow winner column. In dual mode
+            // neither modifier is applied and the panels stay even.
+            let panelModifier = '';
+            if (layout.mode === 'focus') {
+                panelModifier = layout.focusSlot === slot
+                    ? ' dm-dual-slot-panel--focus'
+                    : ' dm-dual-slot-panel--minor';
+            }
+
             return `
-                <div class="dm-dual-slot-panel">
+                <div class="dm-dual-slot-panel${panelModifier}">
                     <div class="dm-dual-slot-header">
                         <span class="dm-dual-slot-title">Match ${slot}</span>
                         <span class="dm-dual-slot-badge dm-dual-slot-badge--${sub}">${subLabel}</span>
@@ -1597,7 +1634,8 @@ class DisplayManager {
                 </div>`;
         }).join('');
 
-        container.innerHTML = `<div class="dm-matches-dual">${panelHTML}</div>`;
+        const wrapModifier = layout.mode === 'focus' ? ' dm-matches-dual--focus' : '';
+        container.innerHTML = `<div class="dm-matches-dual${wrapModifier}">${panelHTML}</div>`;
     }
 
     _renderStandingsLarge(container, data) {
