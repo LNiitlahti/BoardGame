@@ -330,6 +330,7 @@ class SpellEngine {
         this.updateTeamSpellInventory();
         this.renderSpellStats();
         this._populateTeamDropdown();
+        this.filterSpells();
     }
 
     /** Remove spell from a team's hand by index */
@@ -351,6 +352,66 @@ class SpellEngine {
         this.updateTeamSpellInventory();
         this.renderSpellStats();
         this._populateTeamDropdown();
+        this.filterSpells();
+    }
+
+    /** Admin: clear one team's entire spell hand */
+    async clearTeamSpells(teamId) {
+        const key = String(teamId);
+        const pile = this._gameState.spellPiles?.[key];
+        const team = this._gameState.teams?.find(t => t.id === teamId);
+
+        if (!pile || pile.hand.length === 0) {
+            this._ui?.showStatus(`${team?.name || 'Team ' + teamId} has no spells to clear`, 'info');
+            return;
+        }
+
+        if (!confirm(`Clear all ${pile.hand.length} spell(s) from ${team?.name || 'this team'}'s hand?`)) return;
+
+        const removed = [...pile.hand];
+        pile.hand = [];
+        await this._save();
+
+        this._logAction('spell_hand_cleared', 'spell', {
+            teamId, teamName: team?.name, clearedCount: removed.length
+        }, { hand: removed });
+
+        this._ui?.showStatus(`Cleared ${removed.length} spell(s) from ${team?.name || 'Team ' + teamId}`, 'success');
+        this.updateTeamSpellInventory();
+        this.renderSpellStats();
+        this._populateTeamDropdown();
+        this.filterSpells();
+    }
+
+    /** Admin: clear every team's spell hand */
+    async clearAllTeamsSpells() {
+        const piles = this._gameState.spellPiles || {};
+        const teams = this._gameState.teams || [];
+        const totalHeld = Object.values(piles).reduce((sum, p) => sum + (p.hand?.length || 0), 0);
+
+        if (totalHeld === 0) {
+            this._ui?.showStatus('No teams currently hold any spells', 'info');
+            return;
+        }
+
+        if (!confirm(`Clear ALL teams' spell hands? This removes ${totalHeld} card(s) total across ${teams.length} team(s).`)) return;
+
+        const before = {};
+        for (const [key, pile] of Object.entries(piles)) {
+            before[key] = [...(pile.hand || [])];
+            pile.hand = [];
+        }
+        await this._save();
+
+        this._logAction('spell_hand_cleared_all', 'spell', {
+            totalCleared: totalHeld
+        }, { piles: before });
+
+        this._ui?.showStatus(`Cleared ${totalHeld} spell(s) from all teams`, 'success');
+        this.updateTeamSpellInventory();
+        this.renderSpellStats();
+        this._populateTeamDropdown();
+        this.filterSpells();
     }
 
     /** Distribute random spells to all teams */
@@ -2486,7 +2547,17 @@ class SpellEngine {
             return;
         }
 
-        container.innerHTML = spells.map(spell => `
+        container.innerHTML = spells.map(spell => {
+            const holders = this._getSpellHolders(spell.id);
+            const totalOut = holders.reduce((sum, h) => sum + h.count, 0);
+            const heldBadge = totalOut > 0
+                ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(168, 85, 247, 0.2); font-size: 0.7rem; color: #c4b5fd;">
+                       Held: ${holders.map(h =>
+                           `${this._teams?.escapeHtml(h.teamName) || h.teamName}${h.count > 1 ? ` &times;${h.count}` : ''}`
+                       ).join(', ')} <span style="opacity: 0.6;">(${totalOut} total)</span>
+                   </div>`
+                : '';
+            return `
             <div class="spell-card-display" style="
                 background: rgba(168, 85, 247, 0.1);
                 border: 2px solid rgba(168, 85, 247, 0.3);
@@ -2513,8 +2584,10 @@ class SpellEngine {
                 <div style="font-size: 0.75rem; color: #64748b; font-style: italic;">
                     Target: ${spell.targetType}
                 </div>
+                ${heldBadge}
             </div>
-        `).join('');
+        `;
+        }).join('');
     }
 
     /** Filter spells by search + type */
@@ -2586,6 +2659,25 @@ class SpellEngine {
         });
     }
 
+    /**
+     * Teams currently holding `spellId` in hand, with per-team counts (a
+     * team can hold more than one copy). Only counts `hand` — drawn-but-
+     * unseen (drawPile) and already-cast (usedPile) copies aren't
+     * "distributed" in the sense admins care about here.
+     * @returns {{teamId: number, teamName: string, count: number}[]}
+     */
+    _getSpellHolders(spellId) {
+        const piles = this._gameState.spellPiles || {};
+        const teams = this._gameState.teams || [];
+        const holders = [];
+        for (const team of teams) {
+            const hand = piles[String(team.id)]?.hand || [];
+            const count = hand.filter(id => id === spellId).length;
+            if (count > 0) holders.push({ teamId: team.id, teamName: team.name, count });
+        }
+        return holders;
+    }
+
     /** Show spell preview for selected spell */
     showSpellPreview(spellId) {
         const spell = this.getSpellDef(spellId);
@@ -2593,6 +2685,17 @@ class SpellEngine {
 
         const preview = document.getElementById('spellPreview');
         if (!preview) return;
+
+        const holders = this._getSpellHolders(spellId);
+        const holdersHtml = holders.length > 0
+            ? `<div style="font-size: 0.75rem; color: #9aa1ad; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(168, 85, 247, 0.2);">
+                   Held by: ${holders.map(h =>
+                       `${this._teams?.escapeHtml(h.teamName) || h.teamName}${h.count > 1 ? ` &times;${h.count}` : ''}`
+                   ).join(', ')}
+               </div>`
+            : `<div style="font-size: 0.75rem; color: #64748b; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(168, 85, 247, 0.2); font-style: italic;">
+                   Not currently held by any team
+               </div>`;
 
         preview.style.display = 'block';
         preview.innerHTML = `
@@ -2603,13 +2706,19 @@ class SpellEngine {
             <div style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.5;">
                 ${this._teams?.escapeHtml(spell.descriptionEn || spell.description) || spell.description}
             </div>
+            ${holdersHtml}
         `;
     }
 
     /** Update team spell inventory display */
     updateTeamSpellInventory() {
         const teamIdStr = document.getElementById('spellDistTeam')?.value;
-        if (!teamIdStr) return;
+        const clearBtn = document.getElementById('clearTeamSpellsBtn');
+
+        if (!teamIdStr) {
+            if (clearBtn) clearBtn.disabled = true;
+            return;
+        }
 
         const teamId = parseInt(teamIdStr);
         const container = document.getElementById('teamSpellsList');
@@ -2617,6 +2726,8 @@ class SpellEngine {
 
         const pile = this._gameState.spellPiles?.[String(teamId)];
         const hand = pile?.hand || [];
+
+        if (clearBtn) clearBtn.disabled = hand.length === 0;
 
         if (hand.length === 0) {
             container.innerHTML = '<p style="opacity: 0.5; font-size: 0.85rem;">No spells in hand</p>';

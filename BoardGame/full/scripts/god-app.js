@@ -1603,6 +1603,12 @@ class GodApp {
         window.filterSpells = () => app.spells?.filterSpells();
         window.initializeSpellPiles = (n) => app.spells?.initializeSpellPiles(n);
         window.removeSpellFromTeam = (tid, idx) => app.spells?.removeSpellFromTeam(tid, idx);
+        window.clearSelectedTeamSpells = () => {
+            const teamIdStr = document.getElementById('spellDistTeam')?.value;
+            if (!teamIdStr) { app.ui?.showStatus('Select a team first', 'warning'); return; }
+            app.spells?.clearTeamSpells(parseInt(teamIdStr));
+        };
+        window.clearAllTeamsSpells = () => app.spells?.clearAllTeamsSpells();
         window.showSpellPreview = (id) => app.spells?.showSpellPreview(id);
         window.removeActiveEffect = (id) => app.spells?.removeActiveEffect(id);
         window.skipSpellTurn = (tid) => app.spells?.skipTeamTurn(tid);

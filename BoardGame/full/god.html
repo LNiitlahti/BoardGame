@@ -313,6 +313,17 @@
                             <p style="opacity: 0.5; font-size: 0.85rem;">Select a team to view</p>
                         </div>
                     </div>
+
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button class="btn-small secondary" onclick="clearSelectedTeamSpells()" id="clearTeamSpellsBtn" disabled
+                                style="flex: 1;" data-tooltip="Clear the selected team's entire spell hand">
+                            Clear Team's Spells
+                        </button>
+                        <button class="btn-small danger" onclick="clearAllTeamsSpells()"
+                                style="flex: 1;" data-tooltip="Clear every team's spell hand">
+                            Clear ALL Teams' Spells
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Spell Selection -->
