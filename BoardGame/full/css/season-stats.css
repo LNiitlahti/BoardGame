@@ -174,12 +174,12 @@
    .summary-stats / .leaderboard-* / .teammate-synergy-* language directly —
    only the season-page-specific grid placement lives here. */
 .season-insights-card .summary-stats {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .player-grid {
     margin-top: 16px;
-    grid-template-columns: 1.2fr 1fr;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
 }
 
 .player-leaderboard-card,
@@ -195,6 +195,6 @@
 
 @media (max-width: 900px) {
     .player-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 }

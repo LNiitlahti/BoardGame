@@ -289,7 +289,7 @@ body::before {
    ============================================================ */
 .overview-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 16px;
 }
 
@@ -302,20 +302,24 @@ body::before {
     overflow-x: auto;
 }
 
-.standings-table table {
+.standings-table table,
+.stats-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.85rem;
 }
 
 .standings-table th,
-.standings-table td {
+.standings-table td,
+.stats-table th,
+.stats-table td {
     padding: 12px 14px;
     text-align: left;
     border-bottom: 1px solid var(--border-faint);
 }
 
-.standings-table th {
+.standings-table th,
+.stats-table th {
     color: var(--text-muted);
     font-weight: 600;
     font-size: 0.7rem;
@@ -324,12 +328,21 @@ body::before {
     font-family: var(--font-secondary);
 }
 
-.standings-table tr {
+.standings-table tr,
+.stats-table tr {
     transition: background var(--transition-fast);
 }
 
-.standings-table tr:hover td {
+.standings-table tr:hover td,
+.stats-table tr:hover td {
     background: rgba(200,179,126,0.04);
+}
+
+/* #drinkReportTable renders a bare .stats-table with no card-level
+   scroll wrapper of its own (unlike .standings-table/.team-game-stats) --
+   give the container the same overflow-x safety net directly. */
+#drinkReportTable {
+    overflow-x: auto;
 }
 
 .standings-table .rank {
@@ -870,7 +883,7 @@ body::before {
    ============================================================ */
 .games-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 16px;
 }
 
@@ -933,6 +946,10 @@ body::before {
 }
 
 /* Team Game Stats */
+.team-game-stats {
+    overflow-x: auto;
+}
+
 .team-game-stats table {
     width: 100%;
     border-collapse: collapse;
@@ -1229,7 +1246,7 @@ body::before {
 /* Player Stats Grid */
 .player-stats-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
     margin-top: 16px;
 }
@@ -1762,7 +1779,7 @@ body::before {
    ============================================================ */
 @media (max-width: 1200px) {
     .overview-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .standings-card {
@@ -1774,7 +1791,7 @@ body::before {
     }
 
     .games-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .game-breakdown-card {
@@ -1782,7 +1799,7 @@ body::before {
     }
 
     .player-stats-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .player-detail-card {
