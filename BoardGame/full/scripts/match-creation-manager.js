@@ -1136,11 +1136,12 @@ class MatchCreationManager {
             return;
         }
 
-        // Don't allow editing ongoing matches
-        if (game.status === 'ongoing') {
-            this._ui.showStatus('Cannot edit an ongoing match', 'warning');
-            return;
-        }
+        // Ongoing matches ARE editable — at a LAN, admins sometimes queue the
+        // wrong players and only notice after the match has started. Editing
+        // here just corrects gameQueue[].teams; saveMatchEdits() is
+        // status-agnostic, and confirmResult() reads that same array, so a
+        // correction made before confirming flows straight into credit.
+        // (Mirrors admin-improved-adapter.js's proven override for admin.html.)
 
         // Completed matches: redirect to correct result
         if (game.status === 'completed') {

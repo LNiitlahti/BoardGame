@@ -154,6 +154,7 @@ async function loadTournamentData() {
                 renderPhaseBanner();
                 renderTeammates();
                 renderSpellCards();
+                renderDrinkCounter();
                 renderActiveConditions();
                 renderBoard();
                 renderCurrentMatch();
@@ -2699,3 +2700,77 @@ window.addEventListener('beforeunload', () => {
         unsubscribeDiscordChannelCacheListener();
     }
 });
+
+// =============================================================================
+// DRINK COUNTER
+// =============================================================================
+// A fun, non-competitive tally: tap a button, a count goes up. Deliberately
+// drink-generic (soft drink / beer), never alcohol-specific, and completely
+// separate from scoring -- see docs/superpowers/plans/2026-08-05-drink-counter.md.
+
+/**
+ * Render the current player's own counters plus their running total.
+ * Called from the same snapshot callback as every other team.html renderer,
+ * so the numbers update live as teammates log their own.
+ */
+function renderDrinkCounter() {
+    const container = document.getElementById('drinkCounterBody');
+    if (!container || !currentUser) return;
+
+    const entry = (gameData?.drinkCounts || {})[currentUser.uid] || {};
+    const total = window.DrinkCounter.totalFor(entry);
+
+    const buttonsHTML = window.DrinkCounter.DRINK_TYPES.map(type => `
+        <button class="btn drink-btn" onclick="logDrink('${type.id}')">
+            <span class="drink-btn-icon">${type.icon}</span>
+            <span class="drink-btn-label">${type.label}</span>
+            <span class="drink-btn-count">${Number(entry[type.id]) || 0}</span>
+        </button>
+    `).join('');
+
+    container.innerHTML = `
+        <div class="drink-btn-row">${buttonsHTML}</div>
+        <div class="drink-total">Your total: <strong>${total}</strong></div>
+    `;
+}
+
+/**
+ * Log one drink for the signed-in player.
+ *
+ * Uses FieldValue.increment so two taps from two devices (or a double-tap
+ * over a slow connection) can never clobber each other the way a
+ * read-modify-write would.
+ *
+ * Requires 'drinkCounts' in isPlayerGameplayUpdate()'s whitelist in
+ * firestore.rules -- that file is gitignored, so if this starts failing with
+ * permission-denied on a fresh machine, that is why.
+ *
+ * @param {string} typeId - a DRINK_TYPES id ('soft' | 'beer')
+ */
+async function logDrink(typeId) {
+    if (!currentUser || !currentTournamentId) return;
+    if (!window.DrinkCounter.DRINK_TYPES.some(t => t.id === typeId)) {
+        console.warn(`[Team Controls] logDrink('${typeId}') ignored — unknown drink type`);
+        return;
+    }
+
+    try {
+        const db = firebase.firestore();
+        const uid = currentUser.uid;
+
+        await db.collection('tournaments').doc(currentTournamentId).update({
+            [`drinkCounts.${uid}.${typeId}`]: firebase.firestore.FieldValue.increment(1),
+            [`drinkCounts.${uid}.name`]: _nickForUid(uid, currentUser.displayName),
+            [`drinkCounts.${uid}.teamId`]: currentTeamId,
+            [`drinkCounts.${uid}.updatedAt`]: new Date().toISOString()
+        });
+
+        console.log(`[Team Controls] Logged a ${typeId}`);
+    } catch (error) {
+        console.error('[Team Controls] Error logging drink:', error);
+        // Surface it rather than letting the button look merely unresponsive.
+        // A quota wall (429 resource-exhausted) reads exactly like a dead
+        // button otherwise.
+        showStatus('Could not log that drink: ' + error.message, 'error');
+    }
+}

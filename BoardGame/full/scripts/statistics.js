@@ -356,6 +356,7 @@ function renderAllStatistics() {
     renderMatches();
     renderHeadToHead();
     renderGameAnalysis();
+    renderDrinkReport();
 
     // Player statistics
     populatePlayerSelector();
@@ -1908,5 +1909,58 @@ function exportStatistics() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+// =============================================================================
+// DRINKS & PERFORMANCE
+// =============================================================================
+// Self-reported drink counts against each player's completed-match record.
+// Purely a fun after-the-fact read -- see the note in the tab pane, and
+// docs/superpowers/plans/2026-08-05-drink-counter.md for why this is kept
+// well clear of anything scoring-related.
+
+function renderDrinkReport() {
+    const container = document.getElementById('drinkReportTable');
+    if (!container || !gameState) return;
+
+    const rows = window.DrinkCounter.buildDrinkPerformanceReport(gameState);
+
+    if (rows.length === 0) {
+        container.innerHTML = '<p class="empty-state">No players on the roster yet.</p>';
+        return;
+    }
+
+    const anyLogged = rows.some(row => row.drinks > 0);
+    if (!anyLogged) {
+        container.innerHTML = '<p class="empty-state">Nobody logged a drink this tournament.</p>';
+        return;
+    }
+
+    container.innerHTML = `
+        <table class="stats-table">
+            <thead>
+                <tr>
+                    <th>Player</th>
+                    <th>Team</th>
+                    <th>Drinks</th>
+                    <th>Played</th>
+                    <th>Won</th>
+                    <th>Win rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rows.map(row => `
+                    <tr>
+                        <td style="color:${row.color}; font-weight: 600;">${row.name}</td>
+                        <td>${row.teamName}</td>
+                        <td>${row.drinks}</td>
+                        <td>${row.played}</td>
+                        <td>${row.wons}</td>
+                        <td>${row.winRate === null ? '—' : row.winRate + '%'}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
 }
 

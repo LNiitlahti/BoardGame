@@ -82,6 +82,7 @@
             <button class="tab-btn" data-tab="matches" onclick="switchTab('matches')">Match History</button>
             <button class="tab-btn" data-tab="headtohead" onclick="switchTab('headtohead')">Head-to-Head</button>
             <button class="tab-btn" data-tab="games" onclick="switchTab('games')">Game Analysis</button>
+            <button class="tab-btn" data-tab="drinks" onclick="switchTab('drinks')">Drinks</button>
             <div class="action-buttons" style="margin-left: auto;">
                 <button class="btn primary" onclick="generatePDF()">Export PDF</button>
             </div>
@@ -273,6 +274,16 @@
                     </section>
                 </div>
             </div>
+
+            <!-- Drinks Tab -->
+            <div class="tab-pane" id="tab-drinks">
+                <h2>Drinks &amp; Performance</h2>
+                <p class="stat-note">
+                    A fun stat, not a standings table. Drink counts are self-reported
+                    by each player and have no effect on points, hexes, or placement.
+                </p>
+                <div id="drinkReportTable"></div>
+            </div>
         </div>
     </div>
 
@@ -300,6 +311,7 @@
     <script defer src="../shared/scripts/pdf-generator.js"></script>
     <script defer src="../shared/scripts/resolve-tournament-id.js"></script>
     <script defer src="../shared/scripts/team-standings.js"></script>
+    <script defer src="../shared/scripts/drink-counter.js"></script>
     <script defer src="scripts/statistics.js"></script>
 </body>
 </html>

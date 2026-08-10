@@ -1361,11 +1361,34 @@ class DisplayManager {
      */
     _renderBreakScreen(container, data) {
         const auto = data.currentPhase?.autoInserted;
+
+        // Fun stat, break-only: who has logged the most drinks. Purely
+        // display -- drinkCounts has nothing to do with standings or points
+        // (see docs/superpowers/plans/2026-08-05-drink-counter.md). Renders
+        // nothing at all until someone has actually logged something, so an
+        // early-tournament break stays clean.
+        const leaders = window.DrinkCounter
+            ? window.DrinkCounter.buildDrinkLeaderboard(data, 5)
+            : [];
+
+        const leaderboardHTML = leaders.length > 0 ? `
+            <div class="dm-drink-board">
+                <div class="dm-drink-title">Most Drinks</div>
+                ${leaders.map((row, i) => `
+                    <div class="dm-drink-row">
+                        <span class="dm-drink-rank">${i + 1}</span>
+                        <span class="dm-drink-name" style="color:${row.color};">${this._escapeText(row.name)}</span>
+                        <span class="dm-drink-total">${row.total}</span>
+                    </div>
+                `).join('')}
+            </div>` : '';
+
         container.innerHTML = `
             <div class="dm-break-screen">
                 <div class="dm-break-icon">${ICON_SVGS.pause}</div>
                 <div class="dm-break-title">On Break</div>
                 <div class="dm-break-subtitle">${auto ? 'Scheduled break — ' : ''}The tournament resumes shortly</div>
+                ${leaderboardHTML}
             </div>
         `;
     }

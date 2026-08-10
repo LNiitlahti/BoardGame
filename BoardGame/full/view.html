@@ -1641,6 +1641,34 @@
             font-size: 48px; font-weight: 600; color: var(--text-muted);
         }
 
+        /* Break-screen drink leaderboard — a fun stat, deliberately styled
+           apart from the standings so nobody reads it as tournament points. */
+        .dm-drink-board {
+            margin-top: 56px; width: 720px;
+            background: var(--bg-glass); border-radius: 16px; padding: 32px 40px;
+        }
+        .dm-drink-title {
+            font-family: 'Russo One', sans-serif; font-size: 34px;
+            color: var(--gold-bright); text-transform: uppercase;
+            letter-spacing: 2px; text-align: center; margin-bottom: 24px;
+        }
+        .dm-drink-row {
+            display: flex; align-items: center; gap: 20px;
+            padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .dm-drink-row:last-child { border-bottom: none; }
+        .dm-drink-rank {
+            font-family: 'Russo One', sans-serif; font-size: 28px;
+            color: var(--text-muted); width: 44px;
+        }
+        .dm-drink-name {
+            font-family: 'Quantico', sans-serif; font-size: 32px; font-weight: 700;
+            flex: 1; overflow-wrap: anywhere;
+        }
+        .dm-drink-total {
+            font-family: 'Russo One', sans-serif; font-size: 32px; color: var(--gold);
+        }
+
         /* ── Spells Window ───────────────────────────── */
         .dm-spell-screen { width: 100%; max-width: 1800px; text-align: center; }
         .dm-spell-screen .dm-spell-icon {
@@ -2128,6 +2156,7 @@
     <script defer src="../shared/scripts/board-module.js"></script>
     <script defer src="../shared/scripts/board-renderer.js"></script>
     <script defer src="../shared/scripts/player-utils.js"></script>
+    <script defer src="../shared/scripts/drink-counter.js"></script>
     <script defer src="scripts/scoring-ceremony.js"></script>
     <script defer src="scripts/display-manager.js"></script>
     <script defer src="scripts/chat-overlay.js"></script>
