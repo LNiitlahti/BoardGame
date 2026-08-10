@@ -1,0 +1,22 @@
+{
+  "tournamentDoc": {
+    "name": "Fixture Cup",
+    "teams": [
+      { "id": 1, "name": "Red Team", "color": "red" },
+      { "id": 2, "name": "Blue Team", "color": "#2278a3" }
+    ]
+  },
+  "backups": [],
+  "actions": [
+    { "sequenceNumber": 1, "actionType": "plate_placed", "payload": { "hexCoord": "q0r0", "teamId": 1 } },
+    { "sequenceNumber": 2, "actionType": "plate_placed", "payload": { "hexCoord": "q1r0", "teamId": 2 } },
+    { "sequenceNumber": 3, "actionType": "points_awarded", "payload": { "pointsAwarded": { "Red Team": 3 } } },
+    { "sequenceNumber": 4, "actionType": "spell_cast", "payload": { "teamId": 1, "teamName": "Red Team", "spellId": "fireball", "spellName": "Fireball" } },
+    { "sequenceNumber": 5, "actionType": "spell_board_effect", "payload": { "spellId": "fireball", "castByTeamId": 1, "destroyedTiles": ["q1r0"] } },
+    { "sequenceNumber": 6, "actionType": "plate_placed", "payload": { "hexCoord": "q-1r1", "teamId": 2 } },
+    { "sequenceNumber": 7, "actionType": "points_corrected", "payload": { "teamId": 2, "newPoints": 5 } },
+    { "sequenceNumber": 8, "actionType": "team_renamed", "payload": { "teamId": 2, "oldName": "Blue Team", "newName": "Blue Squad" } },
+    { "sequenceNumber": 9, "actionType": "plate_removed", "payload": { "hexCoord": "q0r0" } },
+    { "sequenceNumber": 10, "actionType": "spell_cast", "payload": { "teamId": 2, "teamName": "Blue Squad", "spellId": "shield", "spellName": "Shield" } }
+  ]
+}
