@@ -1,17 +1,18 @@
 /**
  * Coverage for the 8 individually-named custom spell cards (see docs/SPELLS.md)
- * — the final batch of the 43-card physical deck. Filenames are player names,
- * but the card text itself is generic (confirmed during transcription).
+ * — the final batch of the 43-card physical deck. The card text itself is
+ * generic (confirmed during transcription); ids/filenames use a plain n1-n8
+ * numbering rather than any real name.
  *
  * Cards covered:
- *   named-hilma     Katso kuinka se kuolee     forced_removal_condition (new, tracked-only — no match-loss hook exists)
- *   named-jussi     Vettähän se vain oli       marked_relocation_charge (new: mark now, relocate-with-destroy later)
- *   named-luttinen  Epävakaa todellisuus       temporary_capture (new: immediate capture, auto-removed after 2 rounds)
- *   named-miikka    Rintama vaihtuu            reposition w/ requiresConnectedFormation (new precondition on existing handler)
- *   named-rony      Rinnalla loppuun asti      piggyback_condition (new, tracked + admin-triggered grant)
- *   named-pauliina  Vaistonvarainen väistö     evasion_condition (new — primitives only, not wired into destroy paths)
- *   named-teemu     Tuhoa suunnitelmat         blind_card_swap (new: two independent random swaps)
- *   named-ville     Priimus                    win_streak_bonus (new: admin-attested streak level, escalating reward)
+ *   named-n1  Katso kuinka se kuolee     forced_removal_condition (new, tracked-only — no match-loss hook exists)
+ *   named-n2  Vettähän se vain oli       marked_relocation_charge (new: mark now, relocate-with-destroy later)
+ *   named-n3  Epävakaa todellisuus       temporary_capture (new: immediate capture, auto-removed after 2 rounds)
+ *   named-n4  Rintama vaihtuu            reposition w/ requiresConnectedFormation (new precondition on existing handler)
+ *   named-n5  Rinnalla loppuun asti      piggyback_condition (new, tracked + admin-triggered grant)
+ *   named-n6  Vaistonvarainen väistö     evasion_condition (new — primitives only, not wired into destroy paths)
+ *   named-n7  Tuhoa suunnitelmat         blind_card_swap (new: two independent random swaps)
+ *   named-n8  Priimus                    win_streak_bonus (new: admin-attested streak level, escalating reward)
  */
 const test = require('node:test');
 const assert = require('node:assert');
@@ -58,21 +59,21 @@ function makeSpellEngine(gs, extraDeps = {}) {
 }
 
 test('all 8 named cards exist in spells.json', () => {
-    for (const id of ['named-hilma', 'named-jussi', 'named-luttinen', 'named-miikka',
-        'named-rony', 'named-pauliina', 'named-teemu', 'named-ville']) {
+    for (const id of ['named-n1', 'named-n2', 'named-n3', 'named-n4',
+        'named-n5', 'named-n6', 'named-n7', 'named-n8']) {
         assert.ok(byId[id], `${id} should exist`);
     }
 });
 
 // ------------------------------------------------------------------
-// named-hilma — Katso kuinka se kuolee (forced_removal_condition)
+// named-n1 — Katso kuinka se kuolee (forced_removal_condition)
 // ------------------------------------------------------------------
 
 test('forced_removal_condition tracks the obligation and applyForcedRemoval enforces it', () => {
     const gs = makeGameState({ board: { 'q0r0': 2 } });
     const engine = makeSpellEngine(gs);
 
-    const cast = engine.executeSpellEffect('named-hilma', 1, { targetTeamId: 2 });
+    const cast = engine.executeSpellEffect('named-n1', 1, { targetTeamId: 2 });
     assert.strictEqual(engine.hasForcedRemovalObligation(2), true);
     assert.strictEqual(engine.hasForcedRemovalObligation(3), false);
 
@@ -84,7 +85,7 @@ test('forced_removal_condition tracks the obligation and applyForcedRemoval enfo
 test('applyForcedRemoval refuses a coord not owned by the obligated team', () => {
     const gs = makeGameState({ board: { 'q0r0': 3 } });
     const engine = makeSpellEngine(gs);
-    const cast = engine.executeSpellEffect('named-hilma', 1, { targetTeamId: 2 });
+    const cast = engine.executeSpellEffect('named-n1', 1, { targetTeamId: 2 });
 
     const result = engine.applyForcedRemoval(cast.effectId, 'q0r0');
     assert.strictEqual(result.success, false);
@@ -96,19 +97,19 @@ test('forced_removal_condition respects shield', () => {
     const engine = makeSpellEngine(gs);
     engine.executeSpellEffect('elf-protection', 2, {});
 
-    const result = engine.executeSpellEffect('named-hilma', 1, { targetTeamId: 2 });
+    const result = engine.executeSpellEffect('named-n1', 1, { targetTeamId: 2 });
     assert.strictEqual(result.success, false);
 });
 
 // ------------------------------------------------------------------
-// named-jussi — Vettähän se vain oli (marked_relocation_charge)
+// named-n2 — Vettähän se vain oli (marked_relocation_charge)
 // ------------------------------------------------------------------
 
 test('marking spends charges and tracks marked coords; resolving relocates and destroys on landing', () => {
     const gs = makeGameState({ board: { 'q0r0': 1, 'q9r9': 2 } });
     const engine = makeSpellEngine(gs);
 
-    const cast = engine.executeSpellEffect('named-jussi', 1, {});
+    const cast = engine.executeSpellEffect('named-n2', 1, {});
     assert.strictEqual(cast.usesRemaining, 2);
 
     const mark1 = engine.markTileForRelocation(cast.effectId, 'q0r0');
@@ -124,7 +125,7 @@ test('marking spends charges and tracks marked coords; resolving relocates and d
 test('resolveMarkedRelocation destroys whatever occupies the destination hex', () => {
     const gs = makeGameState({ board: { 'q0r0': 1, 'q1r0': 2 } });
     const engine = makeSpellEngine(gs);
-    const cast = engine.executeSpellEffect('named-jussi', 1, {});
+    const cast = engine.executeSpellEffect('named-n2', 1, {});
     engine.markTileForRelocation(cast.effectId, 'q0r0');
 
     const resolved = engine.resolveMarkedRelocation(cast.effectId, [{ from: 'q0r0', to: 'q1r0' }]);
@@ -137,7 +138,7 @@ test('resolveMarkedRelocation destroys whatever occupies the destination hex', (
 test('resolveMarkedRelocation rejects a move whose destination is not adjacent to the marked tile', () => {
     const gs = makeGameState({ board: { 'q0r0': 1 } });
     const engine = makeSpellEngine(gs);
-    const cast = engine.executeSpellEffect('named-jussi', 1, {});
+    const cast = engine.executeSpellEffect('named-n2', 1, {});
     engine.markTileForRelocation(cast.effectId, 'q0r0');
 
     const resolved = engine.resolveMarkedRelocation(cast.effectId, [{ from: 'q0r0', to: 'q9r9' }]);
@@ -149,7 +150,7 @@ test('resolveMarkedRelocation rejects a move whose destination is not adjacent t
 test('markTileForRelocation refuses once the 2 charges are spent', () => {
     const gs = makeGameState({ board: { 'a': 1, 'b': 1, 'c': 1 } });
     const engine = makeSpellEngine(gs);
-    const cast = engine.executeSpellEffect('named-jussi', 1, {});
+    const cast = engine.executeSpellEffect('named-n2', 1, {});
     engine.markTileForRelocation(cast.effectId, 'a');
     engine.markTileForRelocation(cast.effectId, 'b');
 
@@ -158,14 +159,14 @@ test('markTileForRelocation refuses once the 2 charges are spent', () => {
 });
 
 // ------------------------------------------------------------------
-// named-luttinen — Epävakaa todellisuus (temporary_capture)
+// named-n3 — Epävakaa todellisuus (temporary_capture)
 // ------------------------------------------------------------------
 
 test('temporary_capture takes two adjacent opponent tiles touching the caster', () => {
     const gs = makeGameState({ board: { 'q0r0': 1, 'q1r0': 2, 'q1r-1': 2 } });
     const engine = makeSpellEngine(gs);
 
-    const result = engine.executeSpellEffect('named-luttinen', 1, { coords: ['q1r0', 'q1r-1'] });
+    const result = engine.executeSpellEffect('named-n3', 1, { coords: ['q1r0', 'q1r-1'] });
 
     assert.strictEqual(result.success, true);
     assert.strictEqual(gs.board['q1r0'], 1);
@@ -176,7 +177,7 @@ test('temporary_capture rejects tiles that do not touch each other', () => {
     const gs = makeGameState({ board: { 'q0r0': 1, 'q1r0': 2, 'q9r9': 2 } });
     const engine = makeSpellEngine(gs);
 
-    const result = engine.executeSpellEffect('named-luttinen', 1, { coords: ['q1r0', 'q9r9'] });
+    const result = engine.executeSpellEffect('named-n3', 1, { coords: ['q1r0', 'q9r9'] });
 
     assert.strictEqual(result.success, false);
 });
@@ -185,7 +186,7 @@ test('temporary_capture rejects when neither tile touches the caster', () => {
     const gs = makeGameState({ board: { 'q5r5': 1, 'q1r0': 2, 'q1r-1': 2 } });
     const engine = makeSpellEngine(gs);
 
-    const result = engine.executeSpellEffect('named-luttinen', 1, { coords: ['q1r0', 'q1r-1'] });
+    const result = engine.executeSpellEffect('named-n3', 1, { coords: ['q1r0', 'q1r-1'] });
 
     assert.strictEqual(result.success, false);
 });
@@ -196,7 +197,7 @@ test('captured tiles are removed from the game entirely once the effect expires'
         currentPhase: { roundNumber: 1 }
     });
     const engine = makeSpellEngine(gs);
-    engine.executeSpellEffect('named-luttinen', 1, { coords: ['q1r0', 'q1r-1'] });
+    engine.executeSpellEffect('named-n3', 1, { coords: ['q1r0', 'q1r-1'] });
 
     gs.currentPhase.roundNumber = 10; // well past the 2-round duration
     engine.expireConditions();
@@ -206,14 +207,14 @@ test('captured tiles are removed from the game entirely once the effect expires'
 });
 
 // ------------------------------------------------------------------
-// named-miikka — Rintama vaihtuu (reposition + requiresConnectedFormation)
+// named-n4 — Rintama vaihtuu (reposition + requiresConnectedFormation)
 // ------------------------------------------------------------------
 
 test('a connected 3-tile formation may be repositioned freely (translation covers rotation)', () => {
     const gs = makeGameState({ board: { 'q0r0': 1, 'q1r0': 1, 'q1r-1': 1 } });
     const engine = makeSpellEngine(gs);
 
-    const result = engine.executeSpellEffect('named-miikka', 1, {
+    const result = engine.executeSpellEffect('named-n4', 1, {
         moves: [
             { from: 'q0r0', to: 'q5r5' },
             { from: 'q1r0', to: 'q6r5' },
@@ -229,7 +230,7 @@ test('a non-connected set of 3 tiles is rejected outright', () => {
     const gs = makeGameState({ board: { 'q0r0': 1, 'q9r9': 1, 'q1r-1': 1 } }); // q9r9 isn't adjacent to the others
     const engine = makeSpellEngine(gs);
 
-    const result = engine.executeSpellEffect('named-miikka', 1, {
+    const result = engine.executeSpellEffect('named-n4', 1, {
         moves: [
             { from: 'q0r0', to: 'q5r5' },
             { from: 'q9r9', to: 'q6r5' },
@@ -244,7 +245,7 @@ test('fewer than 3 tiles in the formation is rejected', () => {
     const gs = makeGameState({ board: { 'q0r0': 1, 'q1r0': 1 } });
     const engine = makeSpellEngine(gs);
 
-    const result = engine.executeSpellEffect('named-miikka', 1, {
+    const result = engine.executeSpellEffect('named-n4', 1, {
         moves: [{ from: 'q0r0', to: 'q5r5' }, { from: 'q1r0', to: 'q6r5' }]
     });
 
@@ -252,13 +253,13 @@ test('fewer than 3 tiles in the formation is rejected', () => {
 });
 
 // ------------------------------------------------------------------
-// named-rony — Rinnalla loppuun asti (piggyback_condition)
+// named-n5 — Rinnalla loppuun asti (piggyback_condition)
 // ------------------------------------------------------------------
 
 test('piggyback_condition tracks the target team and grantPiggybackPlacement places matching tiles for the caster', () => {
     const gs = makeGameState();
     const engine = makeSpellEngine(gs);
-    const cast = engine.executeSpellEffect('named-rony', 1, { targetTeamId: 2 });
+    const cast = engine.executeSpellEffect('named-n5', 1, { targetTeamId: 2 });
 
     const result = engine.grantPiggybackPlacement(cast.effectId, ['q1r0', 'q2r0']);
 
@@ -275,13 +276,13 @@ test('grantPiggybackPlacement fails cleanly on an unknown or expired effect', ()
 });
 
 // ------------------------------------------------------------------
-// named-pauliina — Vaistonvarainen väistö (evasion_condition primitives)
+// named-n6 — Vaistonvarainen väistö (evasion_condition primitives)
 // ------------------------------------------------------------------
 
 test('_hasEvasion reflects an active evasion_condition effect', () => {
     const gs = makeGameState();
     const engine = makeSpellEngine(gs);
-    engine.executeSpellEffect('named-pauliina', 1, {});
+    engine.executeSpellEffect('named-n6', 1, {});
 
     assert.strictEqual(engine._hasEvasion(1), true);
     assert.strictEqual(engine._hasEvasion(2), false);
@@ -312,7 +313,7 @@ test('_findEvasionHex returns null when boxed in within the search radius', () =
 });
 
 // ------------------------------------------------------------------
-// named-teemu — Tuhoa suunnitelmat (blind_card_swap)
+// named-n7 — Tuhoa suunnitelmat (blind_card_swap)
 // ------------------------------------------------------------------
 
 test('blind_card_swap swaps one random card between the two named teams', () => {
@@ -324,7 +325,7 @@ test('blind_card_swap swaps one random card between the two named teams', () => 
     });
     const engine = makeSpellEngine(gs);
 
-    const result = engine.executeSpellEffect('named-teemu', 1, { teamAId: 2, teamBId: 3 });
+    const result = engine.executeSpellEffect('named-n7', 1, { teamAId: 2, teamBId: 3 });
 
     assert.strictEqual(result.success, true);
     assert.deepStrictEqual(gs.spellPiles[2].hand, ['sarja1-k2']);
@@ -341,7 +342,7 @@ test('blind_card_swap also performs the caster\'s own chosen-vs-blind swap when 
     });
     const engine = makeSpellEngine(gs);
 
-    const result = engine.executeSpellEffect('named-teemu', 1, {
+    const result = engine.executeSpellEffect('named-n7', 1, {
         teamAId: 2, teamBId: 3, casterSpellId: 'sarja1-k4', casterSwapTeamId: 2
     });
 
@@ -356,20 +357,20 @@ test('blind_card_swap fails cleanly when a team has an empty hand', () => {
     });
     const engine = makeSpellEngine(gs);
 
-    const result = engine.executeSpellEffect('named-teemu', 1, { teamAId: 2, teamBId: 3 });
+    const result = engine.executeSpellEffect('named-n7', 1, { teamAId: 2, teamBId: 3 });
 
     assert.strictEqual(result.success, false);
 });
 
 // ------------------------------------------------------------------
-// named-ville — Priimus (win_streak_bonus)
+// named-n8 — Priimus (win_streak_bonus)
 // ------------------------------------------------------------------
 
 test('win_streak_bonus places 1 tile at streak level 2', () => {
     const gs = makeGameState();
     const engine = makeSpellEngine(gs);
 
-    const result = engine.executeSpellEffect('named-ville', 1, { streakLevel: 2, coords: ['q1r0'] });
+    const result = engine.executeSpellEffect('named-n8', 1, { streakLevel: 2, coords: ['q1r0'] });
 
     assert.strictEqual(result.success, true);
     assert.deepStrictEqual(result.placed, ['q1r0']);
@@ -379,7 +380,7 @@ test('win_streak_bonus places 2 tiles at streak level 3', () => {
     const gs = makeGameState();
     const engine = makeSpellEngine(gs);
 
-    const result = engine.executeSpellEffect('named-ville', 1, { streakLevel: 3, coords: ['q1r0', 'q2r0'] });
+    const result = engine.executeSpellEffect('named-n8', 1, { streakLevel: 3, coords: ['q1r0', 'q2r0'] });
 
     assert.strictEqual(result.success, true);
     assert.strictEqual(result.placed.length, 2);
@@ -389,6 +390,6 @@ test('win_streak_bonus rejects an invalid streak level', () => {
     const gs = makeGameState();
     const engine = makeSpellEngine(gs);
 
-    assert.strictEqual(engine.executeSpellEffect('named-ville', 1, { streakLevel: 1, coords: ['q1r0'] }).success, false);
-    assert.strictEqual(engine.executeSpellEffect('named-ville', 1, { coords: ['q1r0'] }).success, false);
+    assert.strictEqual(engine.executeSpellEffect('named-n8', 1, { streakLevel: 1, coords: ['q1r0'] }).success, false);
+    assert.strictEqual(engine.executeSpellEffect('named-n8', 1, { coords: ['q1r0'] }).success, false);
 });

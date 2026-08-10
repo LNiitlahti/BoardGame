@@ -216,7 +216,7 @@ test('undoing spell_forced_redraw restores the target team\'s pile to its exact 
 });
 
 // ------------------------------------------------------------------
-// spell_tiles_captured (temporary_capture / named-luttinen)
+// spell_tiles_captured (temporary_capture / named-n3)
 // ------------------------------------------------------------------
 
 test('undoing spell_tiles_captured restores each tile to its previous owner', async () => {
@@ -224,7 +224,7 @@ test('undoing spell_tiles_captured restores each tile to its previous owner', as
     const engine = makeSpellEngine(gs);
     const undo = makeUndoManager(gs);
 
-    engine.executeSpellEffect('named-luttinen', 1, { coords: ['q1r0', 'q1r-1'] });
+    engine.executeSpellEffect('named-n3', 1, { coords: ['q1r0', 'q1r-1'] });
     const entry = entryFor(engine, 'spell_tiles_captured');
 
     const ok = await undo.executeUndo(entry);
@@ -235,7 +235,7 @@ test('undoing spell_tiles_captured restores each tile to its previous owner', as
 });
 
 // ------------------------------------------------------------------
-// spell_marked_tiles_relocated (marked_relocation_charge / named-jussi)
+// spell_marked_tiles_relocated (marked_relocation_charge / named-n2)
 // ------------------------------------------------------------------
 
 test('undoing spell_marked_tiles_relocated moves the tile back and restores anything destroyed on landing', async () => {
@@ -243,7 +243,7 @@ test('undoing spell_marked_tiles_relocated moves the tile back and restores anyt
     const engine = makeSpellEngine(gs);
     const undo = makeUndoManager(gs);
 
-    const cast = engine.executeSpellEffect('named-jussi', 1, {});
+    const cast = engine.executeSpellEffect('named-n2', 1, {});
     engine.markTileForRelocation(cast.effectId, 'q0r0');
     engine.resolveMarkedRelocation(cast.effectId, [{ from: 'q0r0', to: 'q1r0' }]);
     const entry = entryFor(engine, 'spell_marked_tiles_relocated');
@@ -256,7 +256,7 @@ test('undoing spell_marked_tiles_relocated moves the tile back and restores anyt
 });
 
 // ------------------------------------------------------------------
-// spell_blind_swap (blind_card_swap / named-teemu)
+// spell_blind_swap (blind_card_swap / named-n7)
 // ------------------------------------------------------------------
 
 test('undoing spell_blind_swap restores both swapped cards to their original hand slots', async () => {
@@ -270,7 +270,7 @@ test('undoing spell_blind_swap restores both swapped cards to their original han
     const engine = makeSpellEngine(gs);
     const undo = makeUndoManager(gs);
 
-    engine.executeSpellEffect('named-teemu', 1, {
+    engine.executeSpellEffect('named-n7', 1, {
         teamAId: 2, teamBId: 3, casterSpellId: 'sarja1-k4', casterSwapTeamId: 2
     });
     const entry = entryFor(engine, 'spell_blind_swap');

@@ -799,11 +799,11 @@
       }
     },
     {
-      "id": "named-hilma",
+      "id": "named-n1",
       "name": "Katso kuinka se kuolee",
       "nameEn": "Watch It Die",
       "deck": "named",
-      "image": "shared/images/spell-cards/named-hilma.png",
+      "image": "shared/images/spell-cards/named-n1.png",
       "type": "debuff",
       "rarity": "uncommon",
       "description": "Valitse joukkue. Kahden vuoron ajan sen on poistettava yksi oma laattansa jokaisen häviämänsä pelin jälkeen.",
@@ -816,11 +816,11 @@
       }
     },
     {
-      "id": "named-jussi",
+      "id": "named-n2",
       "name": "Vettähän se vain oli",
       "nameEn": "It Was Only Water",
       "deck": "named",
-      "image": "shared/images/spell-cards/named-jussi.png",
+      "image": "shared/images/spell-cards/named-n2.png",
       "type": "tactical",
       "rarity": "rare",
       "description": "2 käyttöä. Merkitse käytöllä mikä tahansa laatta. Pelivoiton laatanpoistolla kaikki merkityt laatat siirtyvät viereiseen ruutuun, poistavat siellä olevan laatan ja aktivoivat asetussäännön.",
@@ -833,11 +833,11 @@
       }
     },
     {
-      "id": "named-luttinen",
+      "id": "named-n3",
       "name": "Epävakaa todellisuus",
       "nameEn": "Unstable Reality",
       "deck": "named",
-      "image": "shared/images/spell-cards/named-luttinen.png",
+      "image": "shared/images/spell-cards/named-n3.png",
       "type": "aggressive",
       "rarity": "rare",
       "description": "Valitse kaksi vastustajan laattaa, jotka koskettavat toisiaan ja vähintään yhtä joukkueenne laattaa. Ottakaa laatat hallintaanne. Kahden vuoron kuluttua ne poistuvat pelistä.",
@@ -850,11 +850,11 @@
       }
     },
     {
-      "id": "named-miikka",
+      "id": "named-n4",
       "name": "Rintama vaihtuu",
       "nameEn": "The Front Shifts",
       "deck": "named",
-      "image": "shared/images/spell-cards/named-miikka.png",
+      "image": "shared/images/spell-cards/named-n4.png",
       "type": "placement",
       "rarity": "uncommon",
       "description": "Valitse kolmen oman vierekkäisen laatan muodostelma. Siirrä ja halutessasi käännä se mihin tahansa vapaaseen kohtaan. Laatat aktivoivat asetussäännön.",
@@ -868,11 +868,11 @@
       }
     },
     {
-      "id": "named-rony",
+      "id": "named-n5",
       "name": "Rinnalla loppuun asti",
       "nameEn": "Together to the End",
       "deck": "named",
-      "image": "shared/images/spell-cards/named-rony.png",
+      "image": "shared/images/spell-cards/named-n5.png",
       "type": "tactical",
       "rarity": "uncommon",
       "description": "Valitse toinen joukkue. Kahden vuoron ajan aina, kun se asettaa laattoja, joukkueenne saa asettaa yhtä monta laattaa.",
@@ -885,11 +885,11 @@
       }
     },
     {
-      "id": "named-pauliina",
+      "id": "named-n6",
       "name": "Vaistonvarainen väistö",
       "nameEn": "Instinctive Dodge",
       "deck": "named",
-      "image": "shared/images/spell-cards/named-pauliina.png",
+      "image": "shared/images/spell-cards/named-n6.png",
       "type": "defensive",
       "rarity": "rare",
       "description": "Pelaa, kun teihin kohdistetaan negatiivinen efekti. Kolmen vuoron ajan poistettava laattanne siirtyy vapaaseen ruutuun kauemmas poistajan laatoista. Ellei siirto onnistu, laatta poistuu.",
@@ -902,11 +902,11 @@
       }
     },
     {
-      "id": "named-teemu",
+      "id": "named-n7",
       "name": "Tuhoa suunnitelmat",
       "nameEn": "Destroy the Plans",
       "deck": "named",
-      "image": "shared/images/spell-cards/named-teemu.png",
+      "image": "shared/images/spell-cards/named-n7.png",
       "type": "tactical",
       "rarity": "rare",
       "description": "Valitse kaksi joukkuetta vaihtamaan kortti sokkona. Vaihtakaa sitten kortti valitsemanne joukkueen kanssa: valitsette oman korttinne, heidän korttinsa valitaan sokkona. Kaikki vaihdetut kortit palautuvat alkuperäisiin käsiin käytön jälkeen tai kahden vuoron kuluttua.",
@@ -918,11 +918,11 @@
       }
     },
     {
-      "id": "named-ville",
+      "id": "named-n8",
       "name": "Priimus",
       "nameEn": "Primus",
       "deck": "named",
-      "image": "shared/images/spell-cards/named-ville.png",
+      "image": "shared/images/spell-cards/named-n8.png",
       "type": "permanent-buff",
       "rarity": "rare",
       "description": "Toisesta peräkkäisestä voitostanne saatte asettaa yhden ylimääräisen laatan ja kolmannesta kaksi. Vaikutus päättyy ensimmäiseen häviöönne tai kolmanteen peräkkäiseen voittoonne.",
