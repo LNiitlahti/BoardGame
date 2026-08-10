@@ -121,6 +121,7 @@
                     <button class="btn-small secondary" id="forceAdvanceBtn" onclick="forceAdvancePhase()" title="Force advance (skip requirements)">&#x26A0; Force Advance</button>
                     <button class="btn-small danger" id="undoLastActionBtn" onclick="undoLastAction()" title="Undo the most recent undoable action (result, points, or hex placement)">&#x21B6; Undo Last Action</button>
                     <button class="btn-small secondary" id="insertBreakBtn" onclick="insertBreak()" title="Insert break">&#x23F8; Break</button>
+                    <button class="btn-small secondary" id="logSpellCastBtn" onclick="openSpellCastModal()" title="Log which team cast which spell, and when (for cross-referencing against board actions later)">&#x1FA84; Log Spell Cast</button>
                     <button class="btn-small secondary" id="broadcastToggleBtn" onclick="toggleBroadcastBar()" title="Broadcast a message to view screens">&#x1F4E2;</button>
                     <span id="breakIntervalBadge" class="break-interval-badge" onclick="openBreakSettings()" title="Break interval settings" style="display: none;"></span>
                 </div>
@@ -785,6 +786,41 @@
                 <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
                     <button class="btn secondary" onclick="closeSpellsActiveModal()">Cancel</button>
                     <button class="btn primary" onclick="saveSpellsActive(this)">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Spell Cast Modal — manual actionLog entry (spell_cast) for
+         cross-referencing board actions against spell timing later.
+         Logging aid only; does not resolve any spell effect. -->
+    <div id="spellCastModal" class="phase-modal" style="display: none;">
+        <div class="phase-modal-content" style="max-width: 440px;">
+            <div class="phase-modal-header">
+                <h2>Log Spell Cast</h2>
+                <button onclick="closeSpellCastModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div class="phase-modal-body">
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 12px;">
+                    Records who cast which spell and when. This is a manual note for later cross-referencing against board actions (e.g. rules disputes, replay) — it does not apply any effect.
+                </p>
+                <div class="form-group">
+                    <label style="color: var(--text-secondary); font-size: 0.9rem;">Casting team</label>
+                    <select id="spellCastTeamSelect" class="team-color-select" style="width: 100%;"></select>
+                </div>
+                <div class="form-group">
+                    <label style="color: var(--text-secondary); font-size: 0.9rem;">Spell</label>
+                    <select id="spellCastSpellSelect" class="team-color-select" style="width: 100%;"></select>
+                </div>
+                <div class="form-group">
+                    <label style="color: var(--text-secondary); font-size: 0.9rem;">Target team (optional)</label>
+                    <select id="spellCastTargetSelect" class="team-color-select" style="width: 100%;">
+                        <option value="">— None —</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+                    <button class="btn secondary" onclick="closeSpellCastModal()">Cancel</button>
+                    <button class="btn primary" onclick="logSpellCast(this)">Log Cast</button>
                 </div>
             </div>
         </div>

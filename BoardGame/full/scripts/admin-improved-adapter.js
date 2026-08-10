@@ -2537,6 +2537,115 @@
     };
 
     // ══════════════════════════════════════════════════════════════
+    //  LOG SPELL CAST — manual actionLog entry (spell_cast) for cross-
+    //  referencing board actions against spell timing later (rules
+    //  disputes / replay). This is a pure logging aid, not a spell-
+    //  resolution engine — it does not apply any effect.
+    //
+    //  Distinct from the Spell Log bar above (_renderSpellLogBar,
+    //  addSpellLogEntry): that one batches free-text entries into
+    //  gameState.spellWindowLog and only flushes them as
+    //  'spell_used_manual' actionLog entries once the spell window
+    //  closes (phase-manager.js's _clearSpellPhaseState), so their
+    //  timestamp is the window's end, not the actual cast time, and
+    //  the control is only shown during spell_window_* phases. Several
+    //  spells in data/spells.json have "anytime"/"reactive"/"instant"
+    //  timing and can be cast outside a spell window entirely, so this
+    //  control is always available and logs immediately with a real
+    //  server timestamp.
+    // ══════════════════════════════════════════════════════════════
+
+    let _spellCastDefs = null; // cached data/spells.json spells[], lazy-loaded
+
+    async function _loadSpellCastDefs() {
+        if (_spellCastDefs) return _spellCastDefs;
+        try {
+            const base = window.BOARDGAME_BASE || '..';
+            const res = await fetch(`${base}/data/spells.json`);
+            const data = await res.json();
+            _spellCastDefs = Array.isArray(data?.spells) ? data.spells : [];
+        } catch (error) {
+            console.error('[SpellCast] Error loading data/spells.json:', error);
+            _spellCastDefs = [];
+        }
+        return _spellCastDefs;
+    }
+
+    function _populateSpellCastTeamSelects() {
+        const teams = gameState?.teams || [];
+        const teamOptions = teams
+            .map(t => `<option value="${_esc(_jsStr(t.id))}">${_esc(t.name || 'Team ' + t.id)}</option>`)
+            .join('');
+
+        const teamSelect = document.getElementById('spellCastTeamSelect');
+        if (teamSelect) teamSelect.innerHTML = teamOptions || '<option value="">No teams</option>';
+
+        const targetSelect = document.getElementById('spellCastTargetSelect');
+        if (targetSelect) targetSelect.innerHTML = '<option value="">— None —</option>' + teamOptions;
+    }
+
+    window.openSpellCastModal = async () => {
+        const modal = document.getElementById('spellCastModal');
+        if (!modal) return;
+
+        _populateSpellCastTeamSelects();
+
+        const spellSelect = document.getElementById('spellCastSpellSelect');
+        if (spellSelect) spellSelect.innerHTML = '<option value="">Loading spells...</option>';
+
+        modal.style.display = 'flex';
+
+        const defs = await _loadSpellCastDefs();
+        if (spellSelect) {
+            spellSelect.innerHTML = defs.length
+                ? defs.map(s => `<option value="${_esc(_jsStr(s.id))}">${_esc(s.name || s.id)}</option>`).join('')
+                : '<option value="">No spells found in data/spells.json</option>';
+        }
+    };
+
+    window.closeSpellCastModal = () => {
+        const modal = document.getElementById('spellCastModal');
+        if (modal) modal.style.display = 'none';
+    };
+
+    window.logSpellCast = async (triggerBtn) => {
+        const teams = gameState?.teams || [];
+        const teamId = document.getElementById('spellCastTeamSelect')?.value;
+        const spellId = document.getElementById('spellCastSpellSelect')?.value;
+        const targetTeamId = document.getElementById('spellCastTargetSelect')?.value || null;
+
+        if (!teamId) {
+            showStatus('Choose a casting team.', 'warning');
+            return;
+        }
+        if (!spellId) {
+            showStatus('Choose a spell.', 'warning');
+            return;
+        }
+
+        const team = teams.find(t => String(t.id) === String(teamId));
+        const spellDef = (_spellCastDefs || []).find(s => s.id === spellId);
+        const targetTeam = targetTeamId ? teams.find(t => String(t.id) === String(targetTeamId)) : null;
+
+        if (triggerBtn) triggerBtn.disabled = true;
+        try {
+            await _actionLogger?.logAction('spell_cast', 'spell', {
+                teamId,
+                teamName: team?.name || `Team ${teamId}`,
+                spellId,
+                spellName: spellDef?.name || spellId,
+                targetTeamId: targetTeamId || undefined,
+                targetTeamName: targetTeam?.name || undefined
+            }, null);
+        } finally {
+            if (triggerBtn) triggerBtn.disabled = false;
+        }
+
+        showStatus(`Logged: ${team?.name || 'Team'} cast "${spellDef?.name || spellId}".`, 'success');
+        window.closeSpellCastModal();
+    };
+
+    // ══════════════════════════════════════════════════════════════
     //  HEX PLACEMENT POPUP — show which match it's for, gate the wrong team
     // ══════════════════════════════════════════════════════════════
     //
