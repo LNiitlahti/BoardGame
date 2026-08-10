@@ -5641,23 +5641,36 @@ async function confirmResult(winnerIndex) {
     // normal (non-bundled) challenge's entry is completely unaffected,
     // since bundleDisputes is only ever set here when isBundle is true.
     if (selectedQueuedGame.isBundle && Array.isArray(selectedQueuedGame.bundleDisputes)) {
-        const winningSide = winnerIndex === 0 ? 'A' : 'B';
-        const outcomes = window.ChallengeBundle.resolveBundleDisputes({
-            disputes: selectedQueuedGame.bundleDisputes,
-            sideA: selectedQueuedGame.bundleSideA || [],
-            sideB: selectedQueuedGame.bundleSideB || [],
-            winningSide
-        });
+        // Reuses ChallengeBundle.resolveBundleFromQueueEntry() — the single,
+        // unit-tested place that encodes "queue entry teams[0]/[1] map to
+        // bundleSideA/bundleSideB positionally via winnerIndex" instead of
+        // re-deriving that mapping inline here.
+        const outcomes = window.ChallengeBundle.resolveBundleFromQueueEntry(selectedQueuedGame, winnerIndex);
 
         gameState.board = gameState.board || {};
         gameState.heartHexControl = gameState.heartHexControl || {};
         outcomes.forEach(o => {
             if (o.outcome === 'challenger_won') {
                 // Transfer: place the challenger's tile, replacing the
-                // defender's — same board/heartHexControl writes
-                // assignTeamToHex() makes for a manual single-hex award.
+                // defender's — same board write assignTeamToHex() makes
+                // for a manual single-hex award. heartHexControl is only
+                // ever set for heart-hex-eligible coords (side-heart /
+                // mountain-heart), matching assignTeamToHex()'s own
+                // hexType gate above (lines ~2072-2082) — a bundled
+                // dispute's hex is always heart-eligible in practice
+                // (that's the only kind of hex the UI lets an admin
+                // dispute), but this guard keeps the invariant explicit
+                // rather than assuming it.
                 gameState.board[o.hexCoord] = o.newOwnerTeamId;
-                gameState.heartHexControl[o.hexCoord] = o.newOwnerTeamId;
+
+                const matches = o.hexCoord.match(/q(-?\d+)r(-?\d+)/);
+                if (matches) {
+                    const [, q, r] = matches;
+                    const hexType = boardModule.getHexType(parseInt(q), parseInt(r));
+                    if (hexType === 'side-heart' || hexType === 'mountain-heart') {
+                        gameState.heartHexControl[o.hexCoord] = o.newOwnerTeamId;
+                    }
+                }
             }
             // 'defender_won' -> hex stays with the defender, no board
             // mutation needed (they already own it).

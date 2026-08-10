@@ -379,5 +379,12 @@ class MatchSuggester {
     }
 }
 
-// Make available globally
-window.MatchSuggester = MatchSuggester;
+// Make available globally (browser) and via require() (Node/tests) — same
+// dual-export pattern as shared/scripts/board-module.js.
+if (typeof window !== 'undefined') {
+    window.MatchSuggester = MatchSuggester;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = MatchSuggester;
+}

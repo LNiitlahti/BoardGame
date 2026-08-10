@@ -808,6 +808,10 @@
     <script defer src="../shared/scripts/board-module.js"></script>
     <script defer src="../shared/scripts/board-renderer.js"></script>
     <script defer src="../shared/scripts/match-suggester.js"></script>
+    <!-- Bundled-challenge resolution (Round 12B) — a bundled challenge can
+         be built via admin.html but confirmed from here, so
+         ResultManager.confirmResult() needs window.ChallengeBundle too. -->
+    <script defer src="../shared/scripts/challenge-bundle.js"></script>
     <script defer src="../shared/scripts/games-config.js"></script>
     <script defer src="../shared/vendor/chart.min.js"></script>
     <script defer src="../shared/scripts/player-utils.js"></script>

@@ -199,9 +199,13 @@ function parseSymmetricFormat(format) {
 /**
  * Fill a bundled challenge's roster to the chosen format: the disputing
  * teams' full rosters go on their bipartitioned side, and any remaining
- * seats are filled one-player-per-side from uninvolved teams (split /
- * "hajotettu", mirroring shared/scripts/match-suggester.js's rotation
- * split mechanic).
+ * seats are filled one-player-per-side from uninvolved teams — this is
+ * exactly the "split team" (hajotettu) mechanic the normal 10-match
+ * rotation uses, so this function REUSES it rather than reimplementing
+ * it: it builds a MatchSuggester over a synthetic { teams: allTeams }
+ * gameState and calls its getTeamById()/getPlayersFromTeam() (the same
+ * calls buildRotationMatch() makes at shared/scripts/match-suggester.js
+ * lines ~176-198) to fetch each team's roster and mark split players.
  *
  * @param {Object} args
  * @param {Array} args.sideATeamIds - team ids on bipartition side A
@@ -221,25 +225,21 @@ function fillBundleRoster({ sideATeamIds, sideBTeamIds, allTeams, format }) {
         };
     }
 
-    const teams = allTeams || [];
-    const getTeam = (id) => teams.find(t => String(t.id) === String(id));
+    const MatchSuggesterCtor = (typeof window !== 'undefined' && window.MatchSuggester) ||
+        (typeof require !== 'undefined' ? require('./match-suggester.js') : null);
+    if (!MatchSuggesterCtor) {
+        return { error: { type: 'internal', message: 'MatchSuggester is not available — cannot fill bundled roster.' } };
+    }
 
-    const playersOf = (teamId, isSplit) => {
-        const team = getTeam(teamId);
-        return (team?.players || []).map(p => ({
-            id: p.id || p.uid,
-            name: p.name,
-            originalTeamId: team.id,
-            originalTeamName: team.name,
-            originalTeamColor: team.color,
-            isSplit: !!isSplit
-        }));
-    };
+    const teams = allTeams || [];
+    const suggester = new MatchSuggesterCtor({ teams, gameHistory: [], gameQueue: [] });
+
+    const markSplit = (players, isSplit) => players.map(p => ({ ...p, isSplit: !!isSplit }));
 
     const sideAPlayers = [];
-    (sideATeamIds || []).forEach(id => sideAPlayers.push(...playersOf(id, false)));
+    (sideATeamIds || []).forEach(id => sideAPlayers.push(...markSplit(suggester.getPlayersFromTeam(id), false)));
     const sideBPlayers = [];
-    (sideBTeamIds || []).forEach(id => sideBPlayers.push(...playersOf(id, false)));
+    (sideBTeamIds || []).forEach(id => sideBPlayers.push(...markSplit(suggester.getPlayersFromTeam(id), false)));
 
     if (sideAPlayers.length > perSide || sideBPlayers.length > perSide) {
         return {
@@ -256,24 +256,26 @@ function fillBundleRoster({ sideATeamIds, sideBTeamIds, allTeams, format }) {
     const involved = new Set([...(sideATeamIds || []), ...(sideBTeamIds || [])].map(String));
     const uninvolvedTeams = teams.filter(t => !involved.has(String(t.id)));
 
+    // Same one-player-per-side split as MatchSuggester.buildRotationMatch():
+    // getPlayersFromTeam(splitTeamId)[0] -> side A, [1] -> side B.
     const splitTeamIds = [];
     let ti = 0;
     while ((sideAPlayers.length < perSide || sideBPlayers.length < perSide) && ti < uninvolvedTeams.length) {
         const team = uninvolvedTeams[ti++];
-        const players = playersOf(team.id, true);
+        const players = suggester.getPlayersFromTeam(team.id);
         let used = false;
 
         if (sideAPlayers.length < perSide && players[0]) {
-            sideAPlayers.push(players[0]);
+            sideAPlayers.push({ ...players[0], isSplit: true });
             used = true;
         }
         if (sideBPlayers.length < perSide && players[1]) {
-            sideBPlayers.push(players[1]);
+            sideBPlayers.push({ ...players[1], isSplit: true });
             used = true;
         } else if (sideBPlayers.length < perSide && players[0] && !used) {
             // Team has only one player and side A didn't need it (or the
             // team had no player[1]) — give the lone player to side B.
-            sideBPlayers.push(players[0]);
+            sideBPlayers.push({ ...players[0], isSplit: true });
             used = true;
         }
 
@@ -319,6 +321,43 @@ function resolveBundleDisputes({ disputes, sideA, sideB, winningSide }) {
 }
 
 /**
+ * Resolve a bundled challenge's outcome DIRECTLY from a confirmed queue
+ * entry + the winner index the confirm UI passes (0 or 1 — the same
+ * `winnerIndex` argument `confirmResult(winnerIndex)` /
+ * `ResultManager.confirmResult(winnerIndex)` always take, picked from
+ * `queueEntry.teams[winnerIndex]`).
+ *
+ * This function is the SINGLE place that encodes the "queue entry's two
+ * team slots map to bipartition sideA/sideB positionally" contract:
+ * `confirmChallengeBundleSetup()` always builds `queueEntry.teams` as
+ * `[TEAM_A, TEAM_B]` (index 0 = TEAM_A = bundleSideA, index 1 = TEAM_B =
+ * bundleSideB) — see admin.js. Both admin.js's confirmResult() and
+ * result-manager.js's ResultManager (god.html's separate confirm path)
+ * call this ONE function instead of each re-deriving `winnerIndex === 0
+ * ? 'A' : 'B'` inline, so the mapping is asserted by real unit tests
+ * (challenge-bundle.test.js) rather than trusted duplicated inline logic.
+ *
+ * @param {Object} queueEntry - a gameQueue entry with isBundle:true
+ * @param {Array} queueEntry.bundleDisputes
+ * @param {Array} queueEntry.bundleSideA
+ * @param {Array} queueEntry.bundleSideB
+ * @param {number} winnerIndex - 0 or 1, index into queueEntry.teams
+ * @returns {Array<{hexCoord, challengerTeamId, defenderTeamId, outcome, newOwnerTeamId}>}
+ */
+function resolveBundleFromQueueEntry(queueEntry, winnerIndex) {
+    if (winnerIndex !== 0 && winnerIndex !== 1) {
+        throw new Error(`resolveBundleFromQueueEntry: winnerIndex must be 0 or 1 for a 2-sided bundle, got ${winnerIndex}`);
+    }
+    const winningSide = winnerIndex === 0 ? 'A' : 'B';
+    return resolveBundleDisputes({
+        disputes: queueEntry.bundleDisputes || [],
+        sideA: queueEntry.bundleSideA || [],
+        sideB: queueEntry.bundleSideB || [],
+        winningSide
+    });
+}
+
+/**
  * Convenience one-shot: validate + bipartition + fill roster. Used by the
  * admin UI to go from "list of disputes the admin picked" straight to
  * "queue-entry-ready teams array", surfacing the first error encountered.
@@ -355,6 +394,7 @@ const ChallengeBundle = {
     parseSymmetricFormat,
     fillBundleRoster,
     resolveBundleDisputes,
+    resolveBundleFromQueueEntry,
     buildChallengeBundle
 };
 

@@ -10,7 +10,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 
 const ChallengeBundle = require('../../shared/scripts/challenge-bundle.js');
-const { bipartitionDisputes, parseSymmetricFormat, fillBundleRoster, resolveBundleDisputes, buildChallengeBundle } = ChallengeBundle;
+const { bipartitionDisputes, parseSymmetricFormat, fillBundleRoster, resolveBundleDisputes, resolveBundleFromQueueEntry, buildChallengeBundle } = ChallengeBundle;
 
 // ---------------------------------------------------------------------------
 // bipartitionDisputes
@@ -321,6 +321,77 @@ test('resolveBundleDisputes: worked example — every dispute gets a consistent,
 // ---------------------------------------------------------------------------
 // buildChallengeBundle (integration of the three pieces)
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// resolveBundleFromQueueEntry — the winnerIndex(0/1) -> bundleSideA/B
+// mapping contract admin.js's confirmResult() and result-manager.js's
+// ResultManager.confirmResult() both rely on. See admin.js's
+// confirmChallengeBundleSetup(): queueEntry.teams is always built as
+// [TEAM_A (bundleSideA), TEAM_B (bundleSideB)], so winnerIndex 0 must
+// resolve exactly like resolveBundleDisputes(..., winningSide: 'A') and
+// winnerIndex 1 exactly like winningSide: 'B'.
+// ---------------------------------------------------------------------------
+
+test('resolveBundleFromQueueEntry: winnerIndex 0 resolves identically to winningSide "A"', () => {
+    const queueEntry = {
+        bundleDisputes: [{ challengerTeamId: 1, defenderTeamId: 2, hexCoord: 'h1' }],
+        bundleSideA: [1],
+        bundleSideB: [2]
+    };
+    const viaIndex = resolveBundleFromQueueEntry(queueEntry, 0);
+    const viaSide = resolveBundleDisputes({
+        disputes: queueEntry.bundleDisputes, sideA: queueEntry.bundleSideA, sideB: queueEntry.bundleSideB, winningSide: 'A'
+    });
+    assert.deepStrictEqual(viaIndex, viaSide);
+    assert.strictEqual(viaIndex[0].outcome, 'challenger_won');
+});
+
+test('resolveBundleFromQueueEntry: winnerIndex 1 resolves identically to winningSide "B"', () => {
+    const queueEntry = {
+        bundleDisputes: [{ challengerTeamId: 1, defenderTeamId: 2, hexCoord: 'h1' }],
+        bundleSideA: [1],
+        bundleSideB: [2]
+    };
+    const viaIndex = resolveBundleFromQueueEntry(queueEntry, 1);
+    const viaSide = resolveBundleDisputes({
+        disputes: queueEntry.bundleDisputes, sideA: queueEntry.bundleSideA, sideB: queueEntry.bundleSideB, winningSide: 'B'
+    });
+    assert.deepStrictEqual(viaIndex, viaSide);
+    assert.strictEqual(viaIndex[0].outcome, 'defender_won');
+});
+
+test('resolveBundleFromQueueEntry: full worked-example bundle resolves the same via index 0/1 as via side A/B', () => {
+    const queueEntry = {
+        bundleDisputes: [
+            { challengerTeamId: 5, defenderTeamId: 1, hexCoord: 'hexA' },
+            { challengerTeamId: 1, defenderTeamId: 2, hexCoord: 'hexB' },
+            { challengerTeamId: 2, defenderTeamId: 3, hexCoord: 'hexC' }
+        ],
+        bundleSideA: [1, 3],
+        bundleSideB: [2, 5]
+    };
+    assert.deepStrictEqual(
+        resolveBundleFromQueueEntry(queueEntry, 0),
+        resolveBundleDisputes({ disputes: queueEntry.bundleDisputes, sideA: queueEntry.bundleSideA, sideB: queueEntry.bundleSideB, winningSide: 'A' })
+    );
+    assert.deepStrictEqual(
+        resolveBundleFromQueueEntry(queueEntry, 1),
+        resolveBundleDisputes({ disputes: queueEntry.bundleDisputes, sideA: queueEntry.bundleSideA, sideB: queueEntry.bundleSideB, winningSide: 'B' })
+    );
+});
+
+test('resolveBundleFromQueueEntry: rejects any winnerIndex other than 0 or 1 (a bundle is always exactly 2-sided)', () => {
+    const queueEntry = { bundleDisputes: [{ challengerTeamId: 1, defenderTeamId: 2, hexCoord: 'h1' }], bundleSideA: [1], bundleSideB: [2] };
+    assert.throws(() => resolveBundleFromQueueEntry(queueEntry, 2));
+    assert.throws(() => resolveBundleFromQueueEntry(queueEntry, -1));
+    assert.throws(() => resolveBundleFromQueueEntry(queueEntry, undefined));
+});
+
+test('resolveBundleFromQueueEntry: missing bundleDisputes/sideA/sideB degrade to empty arrays rather than throwing', () => {
+    const queueEntry = {};
+    assert.deepStrictEqual(resolveBundleFromQueueEntry(queueEntry, 0), []);
+    assert.deepStrictEqual(resolveBundleFromQueueEntry(queueEntry, 1), []);
+});
 
 test('buildChallengeBundle: happy path returns rosters and bipartition together', () => {
     const allTeams = [team(1, 2), team(2, 2), team(3, 2), team(5, 2), team(9, 2, 'Uninvolved')];

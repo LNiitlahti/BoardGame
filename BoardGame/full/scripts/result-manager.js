@@ -523,6 +523,41 @@ class ResultManager {
             challengeHexCoord: this._selectedQueuedGame.challengeHexCoord || null
         };
 
+        // Bundled challenge (Round 12B) — mirrors admin.js confirmResult()'s
+        // isBundle branch exactly, so a bundle built via admin.html's
+        // dispute-bundling UI still gets its hex-transfer applied when the
+        // result is instead confirmed from here (god.html/ResultManager is
+        // a separate confirm path from admin.js's). See admin.js for the
+        // fuller inline commentary on this block.
+        if (this._selectedQueuedGame.isBundle && Array.isArray(this._selectedQueuedGame.bundleDisputes)) {
+            // Same ChallengeBundle.resolveBundleFromQueueEntry() call
+            // admin.js's confirmResult() makes — one tested implementation
+            // of the winnerIndex->side mapping, not two independently
+            // trusted copies.
+            const outcomes = window.ChallengeBundle.resolveBundleFromQueueEntry(this._selectedQueuedGame, winnerIndex);
+
+            this._gameState.board = this._gameState.board || {};
+            this._gameState.heartHexControl = this._gameState.heartHexControl || {};
+            outcomes.forEach(o => {
+                if (o.outcome === 'challenger_won') {
+                    this._gameState.board[o.hexCoord] = o.newOwnerTeamId;
+
+                    const matches = o.hexCoord.match(/q(-?\d+)r(-?\d+)/);
+                    if (matches && window.boardModule) {
+                        const [, q, r] = matches;
+                        const hexType = window.boardModule.getHexType(parseInt(q), parseInt(r));
+                        if (hexType === 'side-heart' || hexType === 'mountain-heart') {
+                            this._gameState.heartHexControl[o.hexCoord] = o.newOwnerTeamId;
+                        }
+                    }
+                }
+                // 'defender_won' -> hex stays with the defender, nothing to do.
+            });
+
+            historyEntry.bundleDisputes = outcomes;
+            historyEntry.isBundle = true;
+        }
+
         this._gameState.gameHistory = this._gameState.gameHistory || [];
         this._gameState.gameHistory.push(historyEntry);
 
