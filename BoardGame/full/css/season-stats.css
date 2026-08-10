@@ -126,6 +126,7 @@
 .btn.small {
     padding: 6px 12px;
     font-size: 0.72rem;
+    min-height: 36px;
 }
 
 .tournament-filter-list {

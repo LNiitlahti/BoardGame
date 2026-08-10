@@ -996,9 +996,9 @@
                                    oninput="updateTeam(${idx}, 'player${slotIdx + 1}', this.value)">
                             ${player.uid
                                 ? `<span style="font-size:0.7rem;color:#10b981;white-space:nowrap;">● Linked</span>
-                                   <button type="button" class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem;"
+                                   <button type="button" class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem;min-height:36px;min-width:36px;"
                                            onclick="unlinkSetupUser(${idx}, ${slotIdx})" title="Unlink account">×</button>`
-                                : `<button type="button" class="btn" style="padding:4px 8px;font-size:0.9rem;"
+                                : `<button type="button" class="btn" style="padding:4px 8px;font-size:0.9rem;min-height:36px;min-width:36px;"
                                            onclick="openSetupUserPicker(${idx}, ${slotIdx})" title="Link an existing user"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>`
                             }
                         </div>
