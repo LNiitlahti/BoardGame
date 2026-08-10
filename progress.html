@@ -142,6 +142,17 @@
   <p class="meta">commits 809d43f, 6a117c5, 0caab1e, ab37eeb, 1f28fb7, f944cd8, 9a2546a (docs)</p>
 </div>
 
+<div class="round">Round 8 — live-screen readability + chat overlay — done</div>
+<div class="piece">
+  <span class="status done">2/2 built from fully-specified plans, harsh-critic clean</span>
+  <h2>Bigger names, focus mode, and live chat on the spectator screen</h2>
+  <p>Player names on the live match screen: 24px → 38px (52px in focus mode). A lone active match slot now expands to fill the screen while the finished one shrinks to a dimmed winner column, instead of always sitting in a fixed 50/50 split. Tournament chat messages now pop up as transient toasts bottom-left, tagged with the sender's name in their team color, fading after ~9s.</p>
+  <img src="progress-screenshots/p8-live-screen-focus-mode.png" alt="view.html focus mode: Match 2 live and expanded, Match 1 done and shrunk to a side column">
+  <img src="progress-screenshots/p8-chat-overlay.png" alt="view.html chat overlay: a blue-tinted toast bottom-left reading TOUCH: Hyvä peli!">
+  <p>Both re-verified independently: I regenerated the Puppeteer e2e screenshots myself after merging (the builder's originals were lost when its isolated worktree was cleaned up) and re-ran the full test suite. Found and fixed one genuinely pre-existing (not caused by this round) stale test that predated the Discord channel-name fix from round 7 — full suite is 254/254 now.</p>
+  <p class="meta">commits 746763b, ec45e78, 812ad75 (live-screen) · 577b8dd, 908c580, 99e7832 (chat overlay) · 01812b8 (stale test fix) · still needs real-hardware judgment on the actual LAN screen before the next event</p>
+</div>
+
 <div class="piece">
   <span class="status blocked">needs your input before an autonomous build</span>
   <h2>Challenge concurrency (2-slot model) + multi-hex bundling</h2>
