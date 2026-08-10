@@ -64,6 +64,15 @@
             </div>
         </div>
 
+        <div class="broadcast-box">
+            <label>Chat overlay</label>
+            <input type="text" id="chatOverlayText" placeholder="Message text" value="Hyvä peli!" />
+            <input type="text" id="chatOverlaySender" placeholder="Sender uid" value="uid_t1a" />
+            <div class="row">
+                <button class="set-btn" onclick="pushChatMessage()">Push message</button>
+            </div>
+        </div>
+
         <div id="groups"></div>
     </div>
     <div class="frame-wrap">
@@ -411,6 +420,17 @@ function clearBroadcast() {
     if (!currentData) return;
     const { broadcastMessage, ...rest } = currentData;
     send(rest);
+}
+
+function pushChatMessage() {
+    const text = document.getElementById('chatOverlayText').value.trim();
+    const senderId = document.getElementById('chatOverlaySender').value.trim();
+    if (!text) return;
+    if (typeof frame.contentWindow.__devPushChatMessage !== 'function') {
+        statusEl.textContent = 'ERROR: __devPushChatMessage not found (check view.html)';
+        return;
+    }
+    frame.contentWindow.__devPushChatMessage({ text, senderId, senderName: 'Preview Sender' });
 }
 
 const groupsEl = document.getElementById('groups');

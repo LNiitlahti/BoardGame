@@ -2130,6 +2130,7 @@
     <script defer src="../shared/scripts/player-utils.js"></script>
     <script defer src="scripts/scoring-ceremony.js"></script>
     <script defer src="scripts/display-manager.js"></script>
+    <script defer src="scripts/chat-overlay.js"></script>
     <!-- Not deferred: the inline block below reads resolveTournamentId()
          synchronously at parse time, before deferred scripts would run. -->
     <script src="../shared/scripts/resolve-tournament-id.js"></script>
@@ -2557,6 +2558,7 @@
     // ====================================================================
 
     let displayManager = null;
+    let chatOverlay = null;
 
     function initDisplayManager() {
         displayManager = new DisplayManager({
@@ -2581,6 +2583,8 @@
         if (!gameState) return;
         if (!displayManager) initDisplayManager();
         displayManager.onFirebaseSnapshot(gameState);
+        // Keep sender colours tracking the live roster (renames, swaps).
+        if (chatOverlay) chatOverlay.setGameData(gameState);
     }
 
     // Dev-only hook for BoardGame/dev/view-preview.html: lets an external
@@ -2591,6 +2595,7 @@
     // explicitly reaches in and invokes it.
     window.__devPreviewSnapshot = function (mockData) {
         if (!displayManager) initDisplayManager();
+        window.__devLastPreviewData = mockData;
         displayManager.onFirebaseSnapshot(mockData);
     };
 
@@ -2602,6 +2607,19 @@
     // has something to read via getResultLogCache().
     window.__devSetResultLog = function (events) {
         resultLogCache = events || [];
+    };
+
+    // Dev-only hook for dev/view-preview.html and
+    // dev/tests/e2e-view-chat-overlay.js: renders a toast without a real chat
+    // message existing. Inert unless something explicitly calls it.
+    window.__devPushChatMessage = function (msg) {
+        if (!chatOverlay) {
+            chatOverlay = new ChatOverlay({ tournamentId });
+            // No mount() -- that would open a Firestore listener the preview
+            // does not want. showMessage() works standalone.
+        }
+        chatOverlay.setGameData(window.__devLastPreviewData || null);
+        chatOverlay.showMessage(msg);
     };
 
     // Note: applyTeamColors, renderScoreBars, renderMatches, renderArenaMatch,
@@ -2687,6 +2705,13 @@
     document.addEventListener('firebase-ready', () => {
         setupTournamentListener();
         setupOnboardingListener();
+
+        // Read-only tournament chat feed on the big screen. Works on an
+        // unattended display: firebase-loader signs anonymous sessions in,
+        // and chatTournament allows reads to any authenticated user.
+        chatOverlay = new ChatOverlay({ tournamentId });
+        chatOverlay.mount();
+        if (gameState) chatOverlay.setGameData(gameState);
     });
 
     // Clean up Firebase listeners on page unload to prevent zombie callbacks
@@ -2694,6 +2719,7 @@
         if (activeListener) { activeListener(); activeListener = null; }
         if (resultLogListener) { resultLogListener(); resultLogListener = null; }
         if (onboardingListener) { onboardingListener(); onboardingListener = null; }
+        if (chatOverlay) { chatOverlay.destroy(); chatOverlay = null; }
     });
     </script>
 
