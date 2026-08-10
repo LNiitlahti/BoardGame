@@ -2442,6 +2442,10 @@ body.challenge-hex-picking .challenge-hex-pick-banner {
     display: flex;
 }
 
+body.spell-hex-picking .challenge-hex-pick-banner#spellHexPickBanner {
+    display: flex;
+}
+
 .board-hex.challenge-hex-candidate {
     cursor: pointer;
     box-shadow: 0 0 0 3px var(--gold, #d4af37), 0 0 16px 4px rgba(212, 175, 55, 0.6);

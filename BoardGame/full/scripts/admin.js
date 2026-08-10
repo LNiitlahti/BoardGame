@@ -1955,9 +1955,24 @@ function renderBoard() {
     if (_challengeHexPickActive) {
         applyChallengeHexPickHighlights();
     }
+    if (_spellHexPickActive) {
+        applySpellHexPickHighlights();
+    }
 }
 
 function handleHexClick(coord) {
+    // While picking a hex for a spell Process/Active-Effects field,
+    // intercept every hex click here before the challenge-hex-pick and
+    // normal team-assignment picker branches below.
+    if (_spellHexPickActive) {
+        if (_spellHexPickEligibleCoords.includes(coord)) {
+            completeSpellHexPick(coord);
+        } else {
+            showStatus('That hex is not a valid choice for this field', 'warning');
+        }
+        return;
+    }
+
     // While picking the challenge's contested hex directly on the board,
     // intercept every hex click here instead of opening the normal
     // team-assignment picker below: only eligible heart hexes (the same
@@ -2951,6 +2966,75 @@ function exitChallengeHexPickMode() {
 
     document.getElementById('challengeSetupModal')?.classList.add('active');
 }
+
+// ── Generic spell field-picker board-takeover mode ──────────────────────
+// Same shape as _challengeHexPickActive above, generalized: caller supplies
+// the eligible coords and what happens when a valid hex is clicked, instead
+// of this being hardcoded to challenge-hex picking.
+
+let _spellHexPickActive = false;
+let _spellHexPickEligibleCoords = [];
+let _spellHexPickOnComplete = null;
+
+/**
+ * Enter pick-on-board mode for a spell field. `bannerText` is shown in the
+ * banner; `onComplete(coord)` fires when an eligible hex is clicked.
+ */
+function startSpellHexPickMode(eligibleCoords, bannerText, onComplete) {
+    if (_spellHexPickActive) exitSpellHexPickMode();
+
+    _spellHexPickEligibleCoords = eligibleCoords || [];
+    if (_spellHexPickEligibleCoords.length === 0) {
+        showStatus('No valid hexes available to pick', 'warning');
+        return;
+    }
+
+    _spellHexPickActive = true;
+    _spellHexPickOnComplete = onComplete;
+    document.getElementById('spellHexPickBannerText').textContent = bannerText;
+    document.body.classList.add('spell-hex-picking');
+
+    applySpellHexPickHighlights();
+    document.addEventListener('keydown', _spellHexPickKeyHandler);
+}
+
+function _spellHexPickKeyHandler(e) {
+    if (e.key === 'Escape') cancelSpellHexPickMode();
+}
+
+function applySpellHexPickHighlights() {
+    document.querySelectorAll('.board-hex.challenge-hex-candidate')
+        .forEach(hex => hex.classList.remove('challenge-hex-candidate'));
+
+    _spellHexPickEligibleCoords.forEach(coord => {
+        const hex = document.querySelector(`#hexBoard [data-coord="${coord}"]`);
+        if (hex) hex.classList.add('challenge-hex-candidate');
+    });
+}
+
+function completeSpellHexPick(coord) {
+    const callback = _spellHexPickOnComplete;
+    exitSpellHexPickMode();
+    if (typeof callback === 'function') callback(coord);
+}
+
+function cancelSpellHexPickMode() {
+    exitSpellHexPickMode();
+}
+
+function exitSpellHexPickMode() {
+    if (!_spellHexPickActive) return;
+
+    document.querySelectorAll('.board-hex.challenge-hex-candidate')
+        .forEach(hex => hex.classList.remove('challenge-hex-candidate'));
+    document.removeEventListener('keydown', _spellHexPickKeyHandler);
+    document.body.classList.remove('spell-hex-picking');
+
+    _spellHexPickActive = false;
+    _spellHexPickEligibleCoords = [];
+    _spellHexPickOnComplete = null;
+}
+window.cancelSpellHexPickMode = cancelSpellHexPickMode;
 
 /**
  * Update select border color based on selected team

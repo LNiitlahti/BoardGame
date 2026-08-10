@@ -249,6 +249,11 @@
                         <span>Click a heart hex below to set it as the contested hex</span>
                         <button type="button" class="btn-small secondary" onclick="cancelChallengeHexPickMode()">Cancel (Esc)</button>
                     </div>
+                    <!-- Shown only while picking a hex for a spell Process/Active-Effects field -->
+                    <div class="challenge-hex-pick-banner" id="spellHexPickBanner">
+                        <span id="spellHexPickBannerText">Click a hex on the board</span>
+                        <button type="button" class="btn-small secondary" onclick="cancelSpellHexPickMode()">Cancel (Esc)</button>
+                    </div>
                     <div id="hexBoard"></div>
                 </section>
 
