@@ -317,12 +317,15 @@ function renderSeasonStats() {
     const filtered = getFilteredTournaments();
 
     const { rows, warnings } = aggregateSeasonStandings(filtered);
-    renderSeasonWarnings(warnings);
+    const { rows: playerRows, uidNameMap, unlinkedCount } = aggregateSeasonPlayerStats(filtered);
+    const playerWarnings = unlinkedCount > 0
+        ? [...warnings, `${unlinkedCount} roster slot${unlinkedCount === 1 ? '' : 's'} excluded from player stats (not linked to a real account)`]
+        : warnings;
+    renderSeasonWarnings(playerWarnings);
     renderSeasonStandings(rows);
     renderSeasonSummary(filtered);
     renderTournamentBreakdown(filtered);
 
-    const { rows: playerRows, uidNameMap } = aggregateSeasonPlayerStats(filtered);
     currentPlayerRows = playerRows;
     renderSeasonLeaderboard(currentPlayerLeaderboard, playerRows);
 
@@ -792,7 +795,7 @@ function renderSeasonLeaderboard(type, rows) {
     let players = [...rows];
     switch (type) {
         case 'winrate':
-            players = players.filter(p => p.gamesPlayed >= 3); // same floor as statistics.js's win-rate board
+            players = players.filter(p => p.gamesPlayed >= MIN_MVP_GAMES); // same floor as the MVP tile
             players.sort((a, b) => b.winRate - a.winRate);
             break;
         case 'games':
