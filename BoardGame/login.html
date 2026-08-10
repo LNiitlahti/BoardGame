@@ -240,8 +240,27 @@
 
     showStatus('Connecting…', 'info');
 
+    // If Firebase never loads (blocked script, flaky venue Wi-Fi, offline),
+    // 'firebase-ready' never fires and this is the first page every user
+    // hits -- without this, "Connecting…" stays up forever with the
+    // login/register/reset buttons permanently disabled and no way for
+    // the user to know why.
+    let firebaseReadyFired = false;
+    setTimeout(() => {
+      if (!firebaseReadyFired) {
+        // Not showStatus(..., 'error') -- that auto-hides after 5s, which
+        // would silently remove the only clue while the buttons are still
+        // dead. This state needs a reload, not a retry, so it stays up.
+        const statusEl = document.getElementById('statusMessage');
+        statusEl.textContent = 'Could not connect. Check your connection and reload.';
+        statusEl.className = 'auth-status-message error';
+        statusEl.style.display = 'block';
+      }
+    }, 10000);
+
     // Wait for Firebase to be ready
     document.addEventListener('firebase-ready', function() {
+      firebaseReadyFired = true;
       hideStatus();
       console.log("Firebase ready, setting up auth...");
 

@@ -65,10 +65,24 @@
             filter: none;
             box-shadow: 0 0 12px rgba(247, 186, 50, 0.2);
         }
+        .sb.save-failed {
+            border-color: #ef4444;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+        }
+        .error-msg {
+            display: none;
+            color: #ef4444;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 12px;
+            text-align: center;
+            max-width: 220px;
+            padding: 8px;
+        }
     </style>
 </head>
 <body>
     <div class="label">My Status</div>
+    <div class="error-msg" id="errorMsg"></div>
     <div class="grid" id="grid">
         <button class="sb" data-s="eating" title="Eating"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:#f97316"><path d="m12 14-1 1"/><path d="m13.75 18.25-1.25 1.42"/><path d="M17.775 5.654a15.68 15.68 0 0 0-12.121 12.12"/><path d="M18.8 9.3a1 1 0 0 0 2.1 7.7"/><path d="M21.964 20.732a1 1 0 0 1-1.232 1.232l-18-5a1 1 0 0 1-.695-1.232A19.68 19.68 0 0 1 15.732 2.037a1 1 0 0 1 1.232.695z"/></svg></button>
         <button class="sb" data-s="smoking" title="Smoke break"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:#fef9c3"><path d="M17 12H3a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h14"/><path d="M18 8c0-2.5-2-2.5-2-5"/><path d="M21 16a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M22 8c0-2.5-2-2.5-2-5"/><path d="M7 12v4"/></svg></button>
@@ -94,8 +108,18 @@
     let onboardingRef = null;
     let currentStatuses = {};
 
+    function showError(message) {
+        const el = document.getElementById('errorMsg');
+        el.textContent = message;
+        el.style.display = 'block';
+        document.getElementById('grid').style.display = 'none';
+    }
+
     document.addEventListener('firebase-ready', () => {
-        if (!tournamentId || !playerId) return;
+        if (!tournamentId || !playerId) {
+            showError('Link invalid or expired — reopen this from the onboarding page.');
+            return;
+        }
         const db = window.firebaseDB;
         onboardingRef = db.collection('tournaments').doc(tournamentId)
             .collection('onboarding').doc('state');
@@ -131,7 +155,15 @@
         }
         updates[`players.${playerId}.lastUpdated`] = new Date().toISOString();
 
-        onboardingRef.update(updates).catch(err => console.error('Save failed:', err));
+        onboardingRef.update(updates).catch(err => {
+            console.error('Save failed:', err);
+            // The snapshot listener is the only thing that ever updates
+            // currentStatuses/renders -- on a failed write nothing else
+            // changes, so without this the tap silently does nothing with
+            // no indication why.
+            btn.classList.add('save-failed');
+            setTimeout(() => btn.classList.remove('save-failed'), 1500);
+        });
     });
     </script>
 </body>
