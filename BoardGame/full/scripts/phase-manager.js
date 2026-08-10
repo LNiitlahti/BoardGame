@@ -96,6 +96,58 @@ const SLOT_SUB_PHASE_DISPLAY = {
     done:    { name: 'Done',    icon: ICON_SVGS.circleCheck }
 };
 
+/**
+ * Up to 4 challenges can now run concurrently during 'challenge_game',
+ * exactly analogous to matches_in_progress's Match 1 / Match 2 slots. Each
+ * pseudo-slot id below walks the SAME SLOT_SUB_PHASES sequence
+ * independently, stored in the SAME gs.currentPhase.slots map
+ * matches_in_progress already uses for its slots 1/2 — this never
+ * collides, because every phase entry starts with a brand-new currentPhase
+ * object (see advancePhase()/loopBack()) and matches_in_progress /
+ * challenge_game are never the current phase at the same time. All the
+ * generic slot machinery below (getSlotSubPhase, getSlotRequirements,
+ * advanceSlot, _getPlayersWhoMustReadyForSlot, getSlotMatchDetails, ...)
+ * accepts either a numeric match slot (1, 2) or one of these challenge
+ * pseudo-slot ids.
+ *
+ * The OLD flat single-challenge-in-flight machinery (challengeLobbyState /
+ * 'challenge' pseudo-slot / openChallengeLobby / isChallengeLobbyActive /
+ * getChallengeLobbyRequirements / forceAllChallengeReady, further below)
+ * is kept working UNCHANGED for backward compatibility with any code path
+ * still calling it directly, and 'challenge'-tagged queue entries from
+ * before this change alias onto challenge1 (see _slotTagMatches).
+ */
+const CHALLENGE_SLOT_IDS = ['challenge1', 'challenge2', 'challenge3', 'challenge4'];
+
+function _isChallengeSlotId(slot) {
+    return typeof slot === 'string' && CHALLENGE_SLOT_IDS.includes(slot);
+}
+
+/** True for any pseudo-slot (new 4-slot ids, or the old flat 'challenge' one) that should only match isChallenge===true queue entries. */
+function _wantsChallengeMatches(slot) {
+    return slot === 'challenge' || _isChallengeSlotId(slot);
+}
+
+/**
+ * True if a queue entry's raw .slot tag should count toward pseudo-slot
+ * `slot`. Exact match, OR the legacy-alias case: matches tagged plain
+ * 'challenge' (written before 4-slot concurrency existed, or by the
+ * still-untouched flat single-challenge admin-improved-adapter.js flow)
+ * count toward challenge1 ONLY — never toward challenge2-4, so an old
+ * tournament's single in-flight challenge doesn't ambiguously spread
+ * across all 4 new slots.
+ */
+function _slotTagMatches(matchSlotValue, slot) {
+    if (matchSlotValue === slot) return true;
+    if (matchSlotValue === 'challenge' && slot === 'challenge1') return true;
+    return false;
+}
+
+/** Human label for a slot id: "Match 1" / "Challenge 3". */
+function _slotLabel(slot) {
+    return _isChallengeSlotId(slot) ? `Challenge ${slot.slice('challenge'.length)}` : `Match ${slot}`;
+}
+
 /** Phases skipped in normal linear flow (only entered via dedicated methods) */
 const SKIP_IN_LINEAR_FLOW = ['break'];
 
@@ -192,6 +244,42 @@ class PhaseManager {
         if (oldName === 'matches_in_progress' && !gs.currentPhase.slots) {
             console.warn('[PhaseManager] Migrating ancient "matches_in_progress" phase to slot-based model');
             gs.currentPhase.slots = { 1: 'playing', 2: 'setup' };
+            return true;
+        }
+
+        // A tournament caught mid challenge_game the moment 4-slot
+        // concurrency shipped has no .slots yet — only the old flat
+        // challengeLobbyState. Derive challenge1's sub-phase from it (best
+        // effort) and seed challenge2-4 as unused 'setup', rather than
+        // losing an in-flight challenge's progress.
+        if (oldName === 'challenge_game' && !gs.currentPhase.slots) {
+            const queue = gs.gameQueue || [];
+            const currentRoundNumber = gs.currentPhase?.roundNumber;
+            // Narrow to THIS round's challenges before deriving sub1, same
+            // round-scoping policy as getSlotRequirements'/belongsToSlot's
+            // (undefined roundNumber counts as "could be this round";
+            // anything explicitly tagged for a different round doesn't) —
+            // otherwise a stale prior-round challenge entry that was never
+            // cleaned up out of the queue could make a fresh round_N
+            // challenge_game look like it already has an ongoing/pending
+            // challenge when it doesn't.
+            const belongsToCurrentRound = m => m.roundNumber === undefined ||
+                currentRoundNumber === undefined || m.roundNumber === currentRoundNumber;
+            const hasOngoingChallenge = queue.some(m => m.isChallenge === true && m.status === 'ongoing' &&
+                belongsToCurrentRound(m));
+            const hasPendingChallenge = queue.some(m => m.isChallenge === true &&
+                (m.status === 'pending' || m.status === undefined || m.status === 'queued') &&
+                belongsToCurrentRound(m));
+            let sub1 = 'setup';
+            if (hasOngoingChallenge) {
+                sub1 = 'playing';
+            } else if (gs.currentPhase.challengeLobbyState === 'lobby' || gs.currentPhase.challengeLobbyState === 'ready') {
+                sub1 = 'lobby';
+            } else if (hasPendingChallenge) {
+                sub1 = 'setup';
+            }
+            console.warn('[PhaseManager] Migrating ancient flat "challenge_game" phase to slot-based model (challenge1)');
+            gs.currentPhase.slots = { challenge1: sub1, challenge2: 'setup', challenge3: 'setup', challenge4: 'setup' };
             return true;
         }
 
@@ -320,20 +408,36 @@ class PhaseManager {
     getSlotDisplayInfo(slot) {
         const sub = this.getSlotSubPhase(slot);
         const info = SLOT_SUB_PHASE_DISPLAY[sub] || SLOT_SUB_PHASE_DISPLAY.setup;
-        return { name: `Match ${slot} — ${info.name}`, icon: info.icon, subPhase: sub };
+        return { name: `${_slotLabel(slot)} — ${info.name}`, icon: info.icon, subPhase: sub };
     }
 
     isSlotLobby(slot) {
-        return this.getCurrentPhase() === 'matches_in_progress' && this.getSlotSubPhase(slot) === 'lobby';
+        const expectedPhase = _isChallengeSlotId(slot) ? 'challenge_game' : 'matches_in_progress';
+        return this.getCurrentPhase() === expectedPhase && this.getSlotSubPhase(slot) === 'lobby';
     }
 
     isSlotPlaying(slot) {
-        return this.getCurrentPhase() === 'matches_in_progress' && this.getSlotSubPhase(slot) === 'playing';
+        const expectedPhase = _isChallengeSlotId(slot) ? 'challenge_game' : 'matches_in_progress';
+        return this.getCurrentPhase() === expectedPhase && this.getSlotSubPhase(slot) === 'playing';
     }
 
     /** Are both match slots done? (the gate for leaving matches_in_progress) */
     bothSlotsDone() {
         return this.getSlotSubPhase(1) === 'done' && this.getSlotSubPhase(2) === 'done';
+    }
+
+    /**
+     * Are all 4 challenge slots done (or never used this challenge_game
+     * entry)? Mirrors bothSlotsDone(), but unlike Match 1/2 (mandatory
+     * every round), 0-4 challenge slots being in play is legitimate — an
+     * untouched slot (still 'setup', nothing ever assigned to it) doesn't
+     * block leaving challenge_game.
+     */
+    allChallengeSlotsDone() {
+        return CHALLENGE_SLOT_IDS.every(id => {
+            const sub = this.getSlotSubPhase(id);
+            return sub === 'done' || (sub === 'setup' && this.getSlotMatchDetails(id).length === 0);
+        });
     }
 
     /**
@@ -477,6 +581,13 @@ class PhaseManager {
         // sub-phase; each progresses on its own via advanceSlot() from here on.
         if (nextPhase === 'matches_in_progress') {
             gs.currentPhase.slots = { 1: 'setup', 2: 'setup' };
+        }
+
+        // Same for challenge_game's 4 concurrent challenge slots — each
+        // starts unused ('setup') and only gets populated as challenges
+        // are assigned to it (see advanceSlot()/getSlotRequirements()).
+        if (nextPhase === 'challenge_game') {
+            gs.currentPhase.slots = { challenge1: 'setup', challenge2: 'setup', challenge3: 'setup', challenge4: 'setup' };
         }
 
         // Scoring ceremony when entering scoring_vp (skip round 1 — nothing to celebrate)
@@ -641,6 +752,12 @@ class PhaseManager {
             challengeGamesPlayed: challengeGamesPlayed
         };
 
+        // Looping back into challenge_game (from spell_window_3) resets all
+        // 4 challenge slots fresh, same as advancePhase()'s linear entry.
+        if (target === 'challenge_game') {
+            gs.currentPhase.slots = { challenge1: 'setup', challenge2: 'setup', challenge3: 'setup', challenge4: 'setup' };
+        }
+
         await this._save();
 
         this._logAction('phase_loop', 'phase', {
@@ -703,9 +820,12 @@ class PhaseManager {
             startedAt: new Date().toISOString(),
             returnToPhase: current,
             // Preserve each slot's progress across the break — a break taken
-            // mid-match (e.g. Match 1 playing, Match 2 still in lobby) must
-            // resume exactly where it was, not reset both slots to setup.
-            returnSlots: current === 'matches_in_progress' ? { ...previousPhase.slots } : undefined,
+            // mid-match (e.g. Match 1 playing, Match 2 still in lobby), or
+            // mid-challenge (some of the 4 challenge slots further along
+            // than others), must resume exactly where it was, not reset
+            // every slot to setup.
+            returnSlots: (current === 'matches_in_progress' || current === 'challenge_game')
+                ? { ...previousPhase.slots } : undefined,
             challengeGamesPlayed: gs.currentPhase?.challengeGamesPlayed || 0
         };
 
@@ -751,7 +871,7 @@ class PhaseManager {
             startedAt: new Date().toISOString(),
             challengeGamesPlayed: challengeGamesPlayed
         };
-        if (returnTo === 'matches_in_progress' && returnSlots) {
+        if ((returnTo === 'matches_in_progress' || returnTo === 'challenge_game') && returnSlots) {
             gs.currentPhase.slots = returnSlots;
         }
 
@@ -938,6 +1058,8 @@ class PhaseManager {
         };
         if (name === 'matches_in_progress') {
             gs.currentPhase.slots = slots || { 1: 'setup', 2: 'setup' };
+        } else if (name === 'challenge_game') {
+            gs.currentPhase.slots = slots || { challenge1: 'setup', challenge2: 'setup', challenge3: 'setup', challenge4: 'setup' };
         }
         if (name === 'tournament_end') gs.status = 'finished';
         else if (name !== 'pre_game_setup' && gs.status !== 'playing') gs.status = 'playing';
@@ -1001,6 +1123,26 @@ class PhaseManager {
                 setTimeout(async () => {
                     if (this.getSlotSubPhase(slot) === 'lobby') {
                         await this.advanceSlot(slot);
+                    }
+                    this[guardKey] = false;
+                }, 100);
+            });
+        }
+
+        // Challenge slots auto-advance independently, same pattern as
+        // match slots — each of the (up to) 4 concurrent challenges fires
+        // its own lobby -> playing the moment THAT slot's players are
+        // ready, regardless of where the other challenge slots are.
+        if (phase === 'challenge_game') {
+            CHALLENGE_SLOT_IDS.forEach(id => {
+                if (this.getSlotSubPhase(id) !== 'lobby') return;
+                const guardKey = `_autoAdvanceSlot_${id}_Pending`;
+                if (this[guardKey]) return;
+                if (!this.getSlotRequirements(id).every(r => r.met)) return;
+                this[guardKey] = true;
+                setTimeout(async () => {
+                    if (this.getSlotSubPhase(id) === 'lobby') {
+                        await this.advanceSlot(id);
                     }
                     this[guardKey] = false;
                 }, 100);
@@ -1075,11 +1217,15 @@ class PhaseManager {
         const sub = this.getSlotSubPhase(slot);
         const currentRoundNumber = gs.currentPhase?.roundNumber;
         const phaseStartedAt = gs.currentPhase?.startedAt;
+        const wantChallenge = _isChallengeSlotId(slot);
+        const noun = wantChallenge ? 'challenge' : 'match';
+        const plural = wantChallenge ? 'challenges' : 'matches';
 
         const belongsToSlot = m => {
-            if (m.isBreak || m.isChallenge === true) return false;
+            if (m.isBreak) return false;
+            if (wantChallenge ? m.isChallenge !== true : m.isChallenge === true) return false;
             if (m.slot !== undefined) {
-                return m.slot === slot &&
+                return _slotTagMatches(m.slot, slot) &&
                     (m.roundNumber === undefined || m.roundNumber === currentRoundNumber);
             }
             if (!m.createdAt || !phaseStartedAt) return false;
@@ -1098,8 +1244,8 @@ class PhaseManager {
                 const pending = pendingMatches();
                 return [{
                     label: pending.length > 0
-                        ? `${pending.length} match${pending.length !== 1 ? 'es' : ''} queued`
-                        : `Create a match for Match ${slot}`,
+                        ? `${pending.length} ${pending.length !== 1 ? plural : noun} queued`
+                        : `Create a ${noun} for ${_slotLabel(slot)}`,
                     met: pending.length > 0
                 }];
             }
@@ -1134,24 +1280,24 @@ class PhaseManager {
                     (m.status === 'ongoing' || m.status === 'completed'));
 
                 if (!hasStarted) {
-                    return [{ label: 'Start the match first', met: false }];
+                    return [{ label: `Start the ${noun} first`, met: false }];
                 }
                 const reqs = [];
                 if (ongoing.length > 0) {
-                    reqs.push({ label: `${ongoing.length} match${ongoing.length !== 1 ? 'es' : ''} still playing`, met: false });
+                    reqs.push({ label: `${ongoing.length} ${ongoing.length !== 1 ? plural : noun} still playing`, met: false });
                 }
                 if (pending.length > 0) {
-                    reqs.push({ label: `${pending.length} match${pending.length !== 1 ? 'es' : ''} not started`, met: false });
+                    reqs.push({ label: `${pending.length} ${pending.length !== 1 ? plural : noun} not started`, met: false });
                 }
                 if (reqs.length === 0) {
-                    reqs.push({ label: 'Match result confirmed', met: true });
+                    reqs.push({ label: wantChallenge ? 'Challenge result confirmed' : 'Match result confirmed', met: true });
                 }
                 return reqs;
             }
 
             case 'done':
             default:
-                return [{ label: `Match ${slot} complete`, met: true }];
+                return [{ label: `${_slotLabel(slot)} complete`, met: true }];
         }
     }
 
@@ -1174,19 +1320,23 @@ class PhaseManager {
     /** Body of advanceSlot — only ever called via the guarded wrapper above. */
     async _advanceSlotInner(slot, force = false) {
         const gs = this._gameState;
-        if (this.getCurrentPhase() !== 'matches_in_progress') {
-            this._ui.showStatus('Not currently in the matches segment.', 'warning');
+        const expectedPhase = _isChallengeSlotId(slot) ? 'challenge_game' : 'matches_in_progress';
+        if (this.getCurrentPhase() !== expectedPhase) {
+            this._ui.showStatus(
+                `Not currently in the ${expectedPhase === 'challenge_game' ? 'challenge game' : 'matches'} segment.`,
+                'warning'
+            );
             return false;
         }
         const current = this.getSlotSubPhase(slot);
         if (current === 'done') {
-            this._ui.showStatus(`Match ${slot} is already done.`, 'warning');
+            this._ui.showStatus(`${_slotLabel(slot)} is already done.`, 'warning');
             return false;
         }
         if (!force) {
             const reqs = this.getSlotRequirements(slot);
             if (!reqs.every(r => r.met)) {
-                this._ui.showStatus(`Match ${slot} requirements not met. Use force to override.`, 'warning');
+                this._ui.showStatus(`${_slotLabel(slot)} requirements not met. Use force to override.`, 'warning');
                 return false;
             }
         }
@@ -1197,8 +1347,8 @@ class PhaseManager {
         const prevSlots = { ...(gs.currentPhase.slots || {}) };
         gs.currentPhase.slots = { ...(gs.currentPhase.slots || {}), [slot]: next };
 
-        // Reset lobby readiness scoped to THIS slot's players only — the
-        // other slot may already be mid-lobby or mid-play and must not be
+        // Reset lobby readiness scoped to THIS slot's players only — other
+        // slots may already be mid-lobby or mid-play and must not be
         // disturbed by this slot entering its own lobby.
         if (next === 'lobby') {
             const prevLobbyReady = { ...(gs.lobbyReady || {}) };
@@ -1222,7 +1372,7 @@ class PhaseManager {
         }, { currentPhase: { ...gs.currentPhase, slots: prevSlots } });
 
         this._ui.showStatus(
-            `Match ${slot}: ${SLOT_SUB_PHASE_DISPLAY[next]?.name || next}`,
+            `${_slotLabel(slot)}: ${SLOT_SUB_PHASE_DISPLAY[next]?.name || next}`,
             force ? 'warning' : 'success'
         );
 
@@ -1320,31 +1470,23 @@ class PhaseManager {
                 }];
             }
 
+            // Up to 4 challenges progress independently, mirroring
+            // matches_in_progress's per-slot gate (getSlotRequirements /
+            // getSlotSubPhase) — but unlike Match 1/2 (mandatory every
+            // round), a challenge slot that was never used this
+            // challenge_game entry (still 'setup', nothing ever assigned
+            // to it) doesn't block leaving the phase: 0-4 concurrent
+            // challenges per round is legitimate (a round can have zero
+            // challenges at all).
             case 'challenge_game': {
-                const ongoing = queue.filter(m => !m.isBreak && m.status === 'ongoing');
-                const pending = queue.filter(m => !m.isBreak && m.status === 'pending');
-                const hasStarted = queue.some(m => !m.isBreak && (m.status === 'ongoing' || m.status === 'completed'));
-
-                if (!hasStarted) {
-                    return [{ label: 'Start challenge matches', met: false }];
-                }
-                const reqs = [];
-                if (ongoing.length > 0) {
-                    reqs.push({
-                        label: `${ongoing.length} match${ongoing.length !== 1 ? 'es' : ''} still playing`,
-                        met: false
-                    });
-                }
-                if (pending.length > 0) {
-                    reqs.push({
-                        label: `${pending.length} match${pending.length !== 1 ? 'es' : ''} not started`,
-                        met: false
-                    });
-                }
-                if (reqs.length === 0) {
-                    reqs.push({ label: 'All challenge results confirmed', met: true });
-                }
-                return reqs;
+                return CHALLENGE_SLOT_IDS.map(id => {
+                    const sub = this.getSlotSubPhase(id);
+                    const used = sub !== 'setup' || this.getSlotMatchDetails(id).length > 0;
+                    return {
+                        label: `${_slotLabel(id)}: ${used ? (SLOT_SUB_PHASE_DISPLAY[sub]?.name || sub) : 'Unused'}`,
+                        met: !used || sub === 'done'
+                    };
+                });
             }
 
             // ── Board resolved — manual admin check ──
@@ -1436,12 +1578,13 @@ class PhaseManager {
         const teams = gs.teams || [];
         const currentRoundNumber = gs.currentPhase?.roundNumber;
 
+        const wantChallenge = _wantsChallengeMatches(slot);
         const activeTeamIds = new Set();
         const activePlayerIds = new Set();
         queue.forEach(match => {
             if (match.isBreak || match.status === 'completed') return;
-            if (slot === 'challenge' ? match.isChallenge !== true : match.isChallenge === true) return;
-            if (match.slot !== undefined && match.slot !== slot) return;
+            if (wantChallenge ? match.isChallenge !== true : match.isChallenge === true) return;
+            if (match.slot !== undefined && !_slotTagMatches(match.slot, slot)) return;
             if (match.roundNumber !== undefined && currentRoundNumber !== undefined &&
                 match.roundNumber !== currentRoundNumber) return;
             (match.teams || match.sides || []).forEach(side => {
@@ -1491,10 +1634,11 @@ class PhaseManager {
             return id;
         };
 
+        const wantChallenge = _wantsChallengeMatches(slot);
         return queue.filter(m => {
             if (m.isBreak || m.status === 'completed') return false;
-            if (slot === 'challenge' ? m.isChallenge !== true : m.isChallenge === true) return false;
-            if (m.slot !== undefined && m.slot !== slot) return false;
+            if (wantChallenge ? m.isChallenge !== true : m.isChallenge === true) return false;
+            if (m.slot !== undefined && !_slotTagMatches(m.slot, slot)) return false;
             if (m.roundNumber !== undefined && currentRoundNumber !== undefined &&
                 m.roundNumber !== currentRoundNumber) return false;
             return true;
@@ -1951,7 +2095,10 @@ class PhaseManager {
         if (!bar) return;
 
         let container = document.getElementById('matchSlotPanels');
-        if (phase !== 'matches_in_progress') {
+        const slotIds = phase === 'matches_in_progress' ? [1, 2]
+            : phase === 'challenge_game' ? CHALLENGE_SLOT_IDS
+            : null;
+        if (!slotIds) {
             if (container) container.style.display = 'none';
             return;
         }
@@ -1963,11 +2110,14 @@ class PhaseManager {
         }
         container.style.display = '';
 
-        container.innerHTML = [1, 2].map(slot => {
+        container.innerHTML = slotIds.map(slot => {
             const info = this.getSlotDisplayInfo(slot);
             const reqs = this.getSlotRequirements(slot);
             const allMet = reqs.every(r => r.met);
             const isDone = info.subPhase === 'done';
+            const isUnused = _isChallengeSlotId(slot) && info.subPhase === 'setup' &&
+                this.getSlotMatchDetails(slot).length === 0;
+            const slotArg = typeof slot === 'number' ? slot : `'${slot}'`;
 
             const reqsHtml = reqs.map(r =>
                 `<span class="phase-req-item ${r.met ? 'met' : 'unmet'}">` +
@@ -1978,17 +2128,21 @@ class PhaseManager {
             const detailsHtml = (sub === 'setup' || sub === 'lobby' || sub === 'playing')
                 ? this.renderSlotDetailsHtml(slot, { players: sub === 'lobby' })
                 : '';
+            const forceReadyHtml = sub === 'lobby'
+                ? `<button class="btn-small secondary" onclick="forceAllReady(${slotArg})" title="Mark all ${this._escHtml(_slotLabel(slot))} players as ready">Force Ready</button>`
+                : '';
 
             return `
-                <div class="match-slot-panel${isDone ? ' slot-done' : ''}">
+                <div class="match-slot-panel${isDone ? ' slot-done' : ''}${isUnused ? ' slot-unused' : ''}">
                     <div class="match-slot-header">
                         <span class="match-slot-icon">${info.icon}</span>
                         <span class="match-slot-name">${this._escHtml(info.name)}</span>
                     </div>
                     ${detailsHtml}
                     <div class="match-slot-reqs">${reqsHtml}</div>
-                    ${isDone ? '' : `<button class="btn-small primary" ${allMet ? '' : 'disabled'} onclick="advanceSlot(${slot})">Advance Match ${slot} ${ICON_SVGS.play}</button>`}
-                    <button class="btn-small secondary" onclick="forceAdvanceSlot(${slot})" title="Force advance (skip requirements)" ${isDone ? 'style="display:none"' : ''}>${ICON_SVGS.triangleAlert} Force Advance</button>
+                    ${isDone ? '' : `<button class="btn-small primary" ${allMet ? '' : 'disabled'} onclick="advanceSlot(${slotArg})">Advance ${this._escHtml(_slotLabel(slot))} ${ICON_SVGS.play}</button>`}
+                    ${forceReadyHtml}
+                    <button class="btn-small secondary" onclick="forceAdvanceSlot(${slotArg})" title="Force advance (skip requirements)" ${isDone ? 'style="display:none"' : ''}>${ICON_SVGS.triangleAlert} Force Advance</button>
                 </div>`;
         }).join('');
     }

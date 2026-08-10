@@ -221,11 +221,20 @@ const STATUS_SEVERITY_EMOJI = {
     noop: 'ℹ️',    // information_source
 };
 
-function buildStatusMessage({ command, results, channelsById }) {
+/**
+ * @param {string} [planWarning]  Non-fatal warning surfaced by
+ *   discord-move-planner's planMoves() (e.g. a challenge slot missing its
+ *   own Discord channel config, falling back to the legacy 'challenge'
+ *   alias). Already console.warn'd by the planner itself — this is what
+ *   gets it in front of a TD actually watching the status channel, instead
+ *   of only a Cloud Functions log nobody's tailing mid-event.
+ */
+function buildStatusMessage({ command, results, channelsById, planWarning }) {
     const ctx = computeStatusContext({ command, results, channelsById });
     const template = pickTemplate(ctx.category);
     const emoji = STATUS_SEVERITY_EMOJI[ctx.category] || '';
-    return emoji ? `${emoji} ${template.render(ctx)}` : template.render(ctx);
+    const line = emoji ? `${emoji} ${template.render(ctx)}` : template.render(ctx);
+    return planWarning ? `${line}\n⚠️ ${planWarning}` : line;
 }
 
 async function handleCommand({ db, rest, sleep, tournamentId, command }) {
@@ -285,7 +294,7 @@ async function handleCommand({ db, rest, sleep, tournamentId, command }) {
     }
 
     const links = await tournament.getLinks();
-    const { moves, skipped } = planMoves({
+    const { moves, skipped, warning: planWarning } = planMoves({
         match,
         teams: gameState.teams,
         slot: command.slot,
@@ -361,9 +370,9 @@ async function handleCommand({ db, rest, sleep, tournamentId, command }) {
         await sleep(wait);
     }
 
-    await postStatusMessage({ tournament, rest, config, command, results });
+    await postStatusMessage({ tournament, rest, config, command, results, planWarning });
 
-    return { status: 'done', results };
+    return { status: 'done', results, ...(planWarning ? { planWarning } : {}) };
 }
 
 /**
@@ -376,7 +385,7 @@ async function handleCommand({ db, rest, sleep, tournamentId, command }) {
  * adapter are plain objects in tests, and older fakes predate
  * sendMessage/getChannelCache.
  */
-async function postStatusMessage({ tournament, rest, config, command, results }) {
+async function postStatusMessage({ tournament, rest, config, command, results, planWarning }) {
     if (!config.statusChannelId) return;
     if (typeof rest.sendMessage !== 'function') return;
 
@@ -387,7 +396,7 @@ async function postStatusMessage({ tournament, rest, config, command, results })
         const channelsById = {};
         (channels || []).forEach(c => { channelsById[c.channelId] = c.name; });
 
-        const content = buildStatusMessage({ command, results, channelsById });
+        const content = buildStatusMessage({ command, results, channelsById, planWarning });
         await rest.sendMessage({ channelId: config.statusChannelId, content });
     } catch (err) {
         console.error('[Discord] Status message failed', err);

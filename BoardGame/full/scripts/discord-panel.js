@@ -126,7 +126,16 @@ const DiscordPanel = {
         const slots = config.slotChannels || {};
         const slot1 = slots['1'] || [];
         const slot2 = slots['2'] || [];
-        const slotChallenge = slots['challenge'] || [];
+        // Up to 4 challenges can run concurrently now (see phase-manager.js's
+        // CHALLENGE_SLOT_IDS) — one channel pair per slot. A tournament
+        // configured before this only has the old flat `challenge` pair; it
+        // still displays here (pre-filled into Challenge 1) so saving the
+        // form migrates it forward without the TD losing their existing
+        // config. See discord-move-planner.js's resolveSlotChannelPair for
+        // the read-side fallback that keeps that legacy pair working for
+        // challenge1 until the form is re-saved.
+        const challengeSlots = [1, 2, 3, 4].map(n =>
+            slots[`challenge${n}`] || (n === 1 ? (slots['challenge'] || []) : []));
 
         const noChannels = this._channels.length === 0
             ? `<p style="color: var(--text-tertiary); font-size: 0.85rem;">
@@ -157,8 +166,9 @@ const DiscordPanel = {
                 ${field('Match 1 — side B', 'discordSlot1B', slot1[1])}
                 ${field('Match 2 — side A', 'discordSlot2A', slot2[0])}
                 ${field('Match 2 — side B', 'discordSlot2B', slot2[1])}
-                ${field('Challenge — side A', 'discordSlotChallengeA', slotChallenge[0])}
-                ${field('Challenge — side B', 'discordSlotChallengeB', slotChallenge[1])}
+                ${challengeSlots.map((pair, i) => `
+                ${field(`Challenge ${i + 1} — side A`, `discordSlotChallenge${i + 1}A`, pair[0])}
+                ${field(`Challenge ${i + 1} — side B`, `discordSlotChallenge${i + 1}B`, pair[1])}`).join('')}
             </div>
             <div style="margin-bottom:12px;">
                 <label style="display:block; font-size:0.8rem; color:var(--text-tertiary); margin-bottom:4px;">
@@ -197,7 +207,15 @@ const DiscordPanel = {
             slotChannels: {
                 '1': [value('discordSlot1A'), value('discordSlot1B')],
                 '2': [value('discordSlot2A'), value('discordSlot2B')],
-                'challenge': [value('discordSlotChallengeA'), value('discordSlotChallengeB')]
+                'challenge1': [value('discordSlotChallenge1A'), value('discordSlotChallenge1B')],
+                'challenge2': [value('discordSlotChallenge2A'), value('discordSlotChallenge2B')],
+                'challenge3': [value('discordSlotChallenge3A'), value('discordSlotChallenge3B')],
+                'challenge4': [value('discordSlotChallenge4A'), value('discordSlotChallenge4B')]
+                // 'challenge' (legacy, pre-4-slot) is deliberately left in
+                // place if it already exists (merge:true below) rather than
+                // deleted — discord-move-planner.js's resolveSlotChannelPair
+                // still reads it as a challenge1 fallback for tournaments
+                // that haven't re-saved this form yet.
             }
         };
 

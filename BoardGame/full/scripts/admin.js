@@ -165,7 +165,16 @@ function resolveDiscordChannelName(slot, sideId) {
     const slotChannels = discordChannelConfig?.slotChannels;
     if (!slotChannels || slot === undefined || slot === null) return null;
 
-    const pair = slotChannels[String(slot)];
+    // Backward compat: a tournament's Discord config saved before 4-slot
+    // concurrent challenges existed only has the flat 'challenge' pair —
+    // alias it onto challenge1 only (never challenge2-4), mirroring
+    // discord-move-planner.js's resolveSlotChannelPair on the Cloud
+    // Function side. Keep both in sync if this policy ever changes.
+    const key = String(slot) === 'challenge1' && !slotChannels['challenge1'] && slotChannels['challenge']
+        ? 'challenge'
+        : String(slot);
+
+    const pair = slotChannels[key];
     if (!pair) return null;
 
     const channelId = pair[sideId === 'TEAM_B' ? 1 : 0];
@@ -2925,6 +2934,35 @@ function closeChallengeSetupModal() {
     document.getElementById('challengeSetupModal').classList.remove('active');
 }
 
+/** Pseudo-slot ids for the 4 concurrently-runnable challenges — mirrors phase-manager.js's CHALLENGE_SLOT_IDS. */
+const CHALLENGE_SLOT_IDS = ['challenge1', 'challenge2', 'challenge3', 'challenge4'];
+
+/**
+ * First challenge slot (1-4) not currently occupied by a non-completed
+ * challenge this round, or null if all 4 are in use. A legacy 'challenge'
+ * tag (from before 4-slot concurrency) counts as occupying challenge1,
+ * matching phase-manager.js's _slotTagMatches alias.
+ *
+ * Round filter deliberately mirrors phase-manager.js's getSlotRequirements
+ * / belongsToSlot exactly (`m.roundNumber === undefined || m.roundNumber
+ * === currentRoundNumber`) rather than also treating an undefined CURRENT
+ * round as "match everything" — that extra leniency would let a stale
+ * prior-round challenge entry with no roundNumber block a slot even once
+ * the tournament has moved past it into a round where currentRoundNumber
+ * is well-defined. Kept in sync with that function; if this policy ever
+ * changes, change both.
+ */
+function getNextFreeChallengeSlot() {
+    const queue = gameState?.gameQueue || [];
+    const roundNumber = gameState?.currentPhase?.roundNumber;
+    const usedSlots = new Set(
+        queue.filter(m => m.isChallenge === true && m.status !== 'completed' &&
+            (m.roundNumber === undefined || m.roundNumber === roundNumber))
+            .map(m => m.slot === 'challenge' ? 'challenge1' : m.slot)
+    );
+    return CHALLENGE_SLOT_IDS.find(id => !usedSlots.has(id)) || null;
+}
+
 /**
  * Confirm and create the challenge match with selected disputing teams
  * Supports multiple disputes - Side A teams vs Side B teams
@@ -2963,6 +3001,16 @@ async function confirmChallengeSetup(triggerBtn) {
         return;
     }
 
+    // Up to 4 challenges can run concurrently (see phase-manager.js's
+    // CHALLENGE_SLOT_IDS) — assign this one to the first free challenge
+    // slot right away, so the TD sees where it landed and the phase
+    // system's per-slot lobby/advance machinery can pick it up.
+    const assignedChallengeSlot = getNextFreeChallengeSlot();
+    if (!assignedChallengeSlot) {
+        showStatus('All 4 challenge slots are already in use — resolve one before adding another.', 'warning');
+        return;
+    }
+
     closeChallengeSetupModal();
 
     const playType = getCalculatedPlayType();
@@ -2989,6 +3037,13 @@ async function confirmChallengeSetup(triggerBtn) {
         status: 'pending',
         isChallenge: true,
         challengeHexCoord: challengeHexCoord,
+        // Which of the 4 concurrent challenge slots this runs in — same
+        // role .slot plays for regular matches_in_progress matches (see
+        // phase-manager.js's getSlotRequirements/getSlotSubPhase and the
+        // gameHistory write in confirmMatchResult, which carries this
+        // field straight through unchanged).
+        slot: assignedChallengeSlot,
+        roundNumber: gameState.currentPhase?.roundNumber,
         // New structure: teams grouped by side
         disputingSideA: sideATeams,
         disputingSideB: sideBTeams,
@@ -3725,6 +3780,36 @@ let editMatchState = {
 };
 
 /**
+ * Fill #editMatchSlotSelect's options for the match/challenge currently
+ * being edited, and select whichever slot it's currently tagged with (if
+ * any). Regular matches get Match 1/Match 2 (unchanged); challenges get
+ * Challenge 1-4 (CHALLENGE_SLOT_IDS — see phase-manager.js's same-named
+ * constant, which this mirrors). Re-tagging a challenge's slot this way
+ * lets a TD fix an auto-assigned slot or free one up for reuse, since
+ * getNextFreeChallengeSlot() otherwise only ever assigns at creation time.
+ */
+function _populateEditMatchSlotOptions(game) {
+    const slotSelect = document.getElementById('editMatchSlotSelect');
+    const hint = document.getElementById('editMatchTagHint');
+    if (!slotSelect) return;
+
+    if (game.isChallenge) {
+        slotSelect.innerHTML = CHALLENGE_SLOT_IDS
+            .map((id, i) => `<option value="${id}">Challenge ${i + 1}</option>`)
+            .join('');
+        // A legacy flat 'challenge' tag aliases onto challenge1 (matches
+        // phase-manager.js's _slotTagMatches) — reflect that in the UI too.
+        const current = game.slot === 'challenge' ? 'challenge1' : game.slot;
+        if (CHALLENGE_SLOT_IDS.includes(current)) slotSelect.value = current;
+        if (hint) hint.textContent = 'Controls which of the 4 concurrent challenge slots this entry runs in';
+    } else {
+        slotSelect.innerHTML = '<option value="1">Match 1</option><option value="2">Match 2</option>';
+        if (game.slot === 1 || game.slot === 2) slotSelect.value = String(game.slot);
+        if (hint) hint.textContent = 'Controls which round & match slot this entry gates';
+    }
+}
+
+/**
  * Open the edit match modal for a queued match
  */
 function openEditMatchModal(gameId) {
@@ -3760,14 +3845,14 @@ function openEditMatchModal(gameId) {
     const matchNumber = game.matchNumber ? `#${game.matchNumber}` : '';
     document.getElementById('editMatchNumber').textContent = matchNumber;
 
-    // Round/slot retag fields (hidden for challenges — challenge<->regular
-    // conversion is not supported here)
+    // Round/slot retag fields. Always shown now — challenge<->regular
+    // conversion is still not supported, but a challenge CAN be re-tagged
+    // between its own 4 slots (see _populateEditMatchSlotOptions).
     const tagRow = document.getElementById('editMatchTagRow');
-    if (tagRow) tagRow.style.display = game.isChallenge ? 'none' : 'flex';
+    if (tagRow) tagRow.style.display = 'flex';
     const roundInput = document.getElementById('editMatchRoundInput');
     if (roundInput) roundInput.value = game.roundNumber !== undefined ? game.roundNumber : '';
-    const slotSelect = document.getElementById('editMatchSlotSelect');
-    if (slotSelect && (game.slot === 1 || game.slot === 2)) slotSelect.value = String(game.slot);
+    _populateEditMatchSlotOptions(game);
 
     // Populate game type dropdown
     populateEditGameTypeDropdown();
@@ -4027,13 +4112,19 @@ async function saveMatchEdits(triggerBtn) {
 
     // Round/slot retag — only ever SETS values; Firestore merge:true cannot
     // persist a deletion, so there is deliberately no "untag" option.
-    if (match.isChallenge !== true) {
+    {
         const roundInput = document.getElementById('editMatchRoundInput');
         const slotSelect = document.getElementById('editMatchSlotSelect');
         if (roundInput && roundInput.value.trim() !== '') {
             match.roundNumber = parseInt(roundInput.value, 10);
         }
-        if (slotSelect && (slotSelect.value === '1' || slotSelect.value === '2')) {
+        if (match.isChallenge === true) {
+            // Re-tag which of the 4 concurrent challenge slots this
+            // challenge runs in (see _populateEditMatchSlotOptions).
+            if (slotSelect && CHALLENGE_SLOT_IDS.includes(slotSelect.value)) {
+                match.slot = slotSelect.value;
+            }
+        } else if (slotSelect && (slotSelect.value === '1' || slotSelect.value === '2')) {
             match.slot = parseInt(slotSelect.value, 10);
         }
     }
@@ -4557,8 +4648,12 @@ function renderMatchQueue() {
         // Round/slot tag badge — makes the phase system's invisible tagging
         // visible (this is what every slot gate actually keys off of).
         let tagBadge = '';
-        if (game.slot === 'challenge' || game.isChallenge === true) {
-            tagBadge = ''; // CHALLENGE badge already communicates it
+        if (game.isChallenge === true) {
+            // Up to 4 challenges can be in flight at once now — show WHICH
+            // one, same as regular matches show ·M1/·M2. Legacy 'challenge'
+            // (pre-4-slot) or no tag at all reads as slot 1.
+            const n = /^challenge([1-4])$/.exec(String(game.slot || ''))?.[1] || '1';
+            tagBadge = `<span class="tag-badge" title="Challenge slot">C${n}</span>`;
         } else if (game.roundNumber === undefined && game.slot === undefined) {
             tagBadge = '<span class="tag-badge tag-untagged" title="No round/slot tag — counts for either slot this round">R?</span>';
         } else {
@@ -4782,7 +4877,20 @@ async function moveMatchToTop(gameId) {
         const targetSlot = window.getTargetMatchSlot?.();
         if (targetSlot && targetSlot.slot !== null && targetSlot.slot !== undefined) {
             match.roundNumber = targetSlot.roundNumber;
-            match.slot = match.isChallenge ? 'challenge' : targetSlot.slot;
+            // Challenges already carry their own challenge1-4 slot tag from
+            // creation (see confirmChallengeSetup/getNextFreeChallengeSlot)
+            // — preserve it rather than collapsing it back to the generic
+            // 'challenge' pseudo-slot admin-improved-adapter.js's
+            // getTargetMatchSlot() returns. Only a challenge with no slot
+            // tag at all falls back, and it falls back to the same free-slot
+            // lookup creation uses (not the flat legacy alias), so a
+            // queue-jumped untagged challenge still lands on its own
+            // independent slot instead of piling onto challenge1.
+            if (match.isChallenge) {
+                match.slot = match.slot || getNextFreeChallengeSlot() || 'challenge1';
+            } else {
+                match.slot = targetSlot.slot;
+            }
         }
 
         gameState.gameQueue = [...ongoingGames, ...pendingGames, ...completedGames];
@@ -4875,7 +4983,14 @@ function renderOngoingMatches() {
         const gameName = getGameDisplayName(game.game || game.gameType);
         const matchNumDisplay = game.matchNumber ? `#${game.matchNumber} ` : '';
         const isChallenge = game.isChallenge === true;
-        const challengeBadge = isChallenge ? '<span class="challenge-badge">CHALLENGE</span> ' : '';
+        // Up to 4 challenges can be ongoing at once now — show which slot,
+        // same as the queue list's C1-C4 tag badge (see renderQueue()).
+        const challengeSlotNum = isChallenge
+            ? (/^challenge([1-4])$/.exec(String(game.slot || ''))?.[1] || '1')
+            : null;
+        const challengeBadge = isChallenge
+            ? `<span class="challenge-badge">CHALLENGE ${challengeSlotNum}</span> `
+            : '';
 
         // Build team names display (supports both old players and new playerIds format)
         const teamNamesHtml = teams.map((team, idx) => {
@@ -5318,8 +5433,12 @@ async function confirmResult(winnerIndex) {
 
         // Send this match's players back to the waiting room. Not
         // awaited — a Discord failure must never block result saving.
+        // Prefer the queue entry's own slot tag (which is now 'challenge1'
+        // .. 'challenge4' for challenges, not just the old flat
+        // 'challenge') — only fall back to the legacy literal when a
+        // challenge somehow has no slot tag at all (pre-4-slot leftover).
         window.DiscordCommands?.request('return', {
-            slot: queueEntry.isChallenge ? 'challenge' : queueEntry.slot,
+            slot: queueEntry.slot ?? (queueEntry.isChallenge ? 'challenge' : undefined),
             matchId: queueEntry.id
         });
     }

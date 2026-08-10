@@ -512,6 +512,61 @@ test('a failed status send does not fail the overall command', async () => {
     assert.strictEqual(result.status, 'done');
 });
 
+test('a planMoves warning (legacy challenge channel, unconfigured challenge2+) is surfaced on the result and the status message', async () => {
+    const db = fakeDbWithChannelCache({
+        config: {
+            ...CONFIG,
+            statusChannelId: 'statusCh',
+            // Only the legacy flat 'challenge' pair exists — challenge2 has
+            // no channel of its own yet (see resolveSlotChannelPair).
+            slotChannels: { '1': ['chAlpha', 'chBravo'], challenge: ['chC1', 'chC2'] }
+        },
+        gameState: {
+            currentPhase: { name: 'challenge_game', slots: { challenge2: 'lobby' } },
+            gameQueue: [{ id: 'm1', status: 'ongoing' }],
+            teams: [{ id: 1, players: [{ id: '1a', uid: 'uidA' }] }]
+        },
+        links: { uidA: { discordUserId: 'dA' } },
+        match: { id: 'm1', sides: [{ playerIds: ['1a'] }, { playerIds: [] }] }
+    });
+    const rest = fakeRestWithSend([]);
+    const result = await handleCommand({
+        db, rest, sleep: noSleep,
+        tournamentId: 't1',
+        command: { type: 'pull', slot: 'challenge2', matchId: 'm1' }
+    });
+
+    assert.strictEqual(result.status, 'done');
+    assert.match(result.planWarning, /slotChannels\.challenge2 is not configured/);
+    assert.strictEqual(rest.sentMessages.length, 1);
+    assert.match(rest.sentMessages[0].content, /⚠️ slotChannels\.challenge2 is not configured/);
+});
+
+test('no planMoves warning means the status message has no extra warning line', async () => {
+    const db = fakeDbWithChannelCache(
+        { config: { ...CONFIG, statusChannelId: 'statusCh' }, links: { uidA: { discordUserId: 'dA' } } },
+        [{ channelId: 'chAlpha', name: 'ALPHA' }]
+    );
+    const rest = fakeRestWithSend([{ outcome: 'moved' }]);
+    const result = await handleCommand({
+        db, rest, sleep: noSleep,
+        tournamentId: 't1',
+        command: { type: 'pull', slot: '1', matchId: 'm1' }
+    });
+    assert.strictEqual(result.planWarning, undefined);
+    assert.doesNotMatch(rest.sentMessages[0].content, /⚠️.*slotChannels/);
+});
+
+test('buildStatusMessage appends a warning line when planWarning is passed', () => {
+    const msg = buildStatusMessage({
+        command: { type: 'pull', slot: 'challenge2' },
+        results: [{ outcome: 'no_channel' }],
+        channelsById: {},
+        planWarning: 'slotChannels.challenge2 is not configured'
+    });
+    assert.match(msg, /⚠️ slotChannels\.challenge2 is not configured$/);
+});
+
 test('older db/rest fakes without getChannelCache/sendMessage do not break the command', async () => {
     const db = fakeDb({
         config: { ...CONFIG, statusChannelId: 'statusCh' },

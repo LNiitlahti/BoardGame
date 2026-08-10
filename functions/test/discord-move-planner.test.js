@@ -143,3 +143,67 @@ test('force bypasses every staleness check', () => {
 test('refresh-members is always current', () => {
     assert.strictEqual(isCommandCurrent({}, { type: 'refresh-members' }), true);
 });
+
+// ---- 4-slot concurrent challenges (Round 12A) ----
+
+const CONFIG_4SLOT = {
+    waitingRoomChannelId: 'chWait',
+    slotChannels: {
+        '1': ['chAlpha', 'chBravo'], '2': ['chCharlie', 'chDelta'],
+        challenge1: ['chC1A', 'chC1B'],
+        challenge2: ['chC2A', 'chC2B'],
+        challenge3: ['chC3A', 'chC3B'],
+        challenge4: ['chC4A', 'chC4B']
+    }
+};
+
+test('each of the 4 challenge slots uses its own configured channel pair', () => {
+    for (const [slot, pair] of [
+        ['challenge1', ['chC1A', 'chC1B']],
+        ['challenge2', ['chC2A', 'chC2B']],
+        ['challenge3', ['chC3A', 'chC3B']],
+        ['challenge4', ['chC4A', 'chC4B']]
+    ]) {
+        const { moves } = planMoves({ match: MATCH, teams: TEAMS, slot, direction: 'pull', links: LINKS, config: CONFIG_4SLOT });
+        assert.deepStrictEqual([...new Set(moves.map(m => m.channelId))], pair, `slot ${slot}`);
+    }
+});
+
+test('challenge1 degrades gracefully to the legacy "challenge" pair when challenge1 itself is not configured', () => {
+    const { moves, warning } = planMoves({
+        match: MATCH, teams: TEAMS, slot: 'challenge1', direction: 'pull', links: LINKS, config: CONFIG
+    });
+    assert.deepStrictEqual([...new Set(moves.map(m => m.channelId))], ['chEcho', 'chFoxtrot']);
+    assert.strictEqual(warning, null);
+});
+
+test('challenge2-4 do NOT silently reuse the legacy "challenge" pair — no channel, and a warning is surfaced', () => {
+    for (const slot of ['challenge2', 'challenge3', 'challenge4']) {
+        const { moves, skipped, warning } = planMoves({
+            match: MATCH, teams: TEAMS, slot, direction: 'pull', links: LINKS, config: CONFIG
+        });
+        assert.strictEqual(moves.length, 0, `slot ${slot} should route no one`);
+        assert.ok(skipped.filter(s => s.uid).every(s => s.outcome === 'no_channel'), `slot ${slot} linked players should be no_channel`);
+        assert.ok(typeof warning === 'string' && warning.includes(slot), `slot ${slot} should warn`);
+    }
+});
+
+test('a tournament with no legacy "challenge" config at all just gets no_channel, no throw, no warning', () => {
+    const config = { waitingRoomChannelId: 'chWait', slotChannels: { '1': ['a', 'b'] } };
+    const { moves, skipped, warning } = planMoves({
+        match: MATCH, teams: TEAMS, slot: 'challenge1', direction: 'pull', links: LINKS, config
+    });
+    assert.strictEqual(moves.length, 0);
+    assert.ok(skipped.filter(s => s.uid).every(s => s.outcome === 'no_channel'));
+    assert.strictEqual(warning, null);
+});
+
+test('pull for a new-style challenge slot is current only while that specific slot is in lobby', () => {
+    const gs = { currentPhase: { name: 'challenge_game', slots: { challenge1: 'lobby', challenge2: 'setup' } } };
+    assert.strictEqual(isCommandCurrent(gs, { type: 'pull', slot: 'challenge1' }), true);
+    assert.strictEqual(isCommandCurrent(gs, { type: 'pull', slot: 'challenge2' }), false);
+    assert.strictEqual(
+        isCommandCurrent({ currentPhase: { name: 'break' } }, { type: 'pull', slot: 'challenge1' }),
+        false
+    );
+});

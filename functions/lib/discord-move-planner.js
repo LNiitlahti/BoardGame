@@ -42,16 +42,58 @@ function sidePlayerIds(side) {
     return [...ids];
 }
 
+const CHALLENGE_SLOT_RE = /^challenge[1-4]$/;
+
+/**
+ * Resolve the [sideA, sideB] channel pair for one slot, tolerating a
+ * pre-4-slot-concurrency Discord config that only has `slotChannels.challenge`
+ * (a single pair, from when challenge_game only ever ran one challenge at a
+ * time — see phase-manager.js's CHALLENGE_SLOT_IDS doc comment).
+ *
+ * Additive, non-throwing degradation for in-flight tournaments:
+ *   - challenge1 falls back to the legacy `challenge` pair when
+ *     `challenge1` itself isn't configured yet.
+ *   - challenge2-4 do NOT also fall back to that same legacy pair (that
+ *     would silently pile every concurrent challenge's voice traffic into
+ *     one pair of channels) — instead they resolve to no channel and a
+ *     `warning` is returned so the caller can surface it (never dropped
+ *     silently), telling the TD which slots still need a channel.
+ *
+ * @returns {{pair: [string,string]|Array, warning: string|null}}
+ */
+function resolveSlotChannelPair(config, slot) {
+    const slotChannels = config.slotChannels || {};
+    const key = String(slot);
+
+    if (slotChannels[key]) return { pair: slotChannels[key], warning: null };
+
+    if (CHALLENGE_SLOT_RE.test(key) && slotChannels.challenge) {
+        if (key === 'challenge1') {
+            return { pair: slotChannels.challenge, warning: null };
+        }
+        return {
+            pair: [],
+            warning: `slotChannels.${key} is not configured (only the legacy "challenge" pair exists, which aliases to challenge1 only) — players routed to ${key} will not be moved to a voice channel until it's configured in Discord Setup.`
+        };
+    }
+
+    return { pair: [], warning: null };
+}
+
 /**
  * Plan the moves for one command.
  *
- * @returns {{moves: Array, skipped: Array}} `moves` are actionable;
- *   `skipped` carry a terminal outcome and are reported without an API call.
+ * @returns {{moves: Array, skipped: Array, warning: string|null}} `moves`
+ *   are actionable; `skipped` carry a terminal outcome and are reported
+ *   without an API call; `warning` is set when the tournament's Discord
+ *   config hasn't been extended for this slot yet (see
+ *   resolveSlotChannelPair) — callers may surface it to the TD.
  */
 function planMoves({ match, teams, slot, direction, links, config }) {
     const sides = match.sides || match.teams || [];
     const uidByPlayerId = buildUidByPlayerId(teams);
-    const slotChannels = (config.slotChannels || {})[String(slot)] || [];
+    const { pair: slotChannels, warning } = resolveSlotChannelPair(config, slot);
+    if (warning) console.warn(`[discord-move-planner] ${warning}`);
 
     const moves = [];
     const skipped = [];
@@ -81,7 +123,7 @@ function planMoves({ match, teams, slot, direction, links, config }) {
         });
     });
 
-    return { moves, skipped };
+    return { moves, skipped, warning: warning || null };
 }
 
 /**
@@ -101,8 +143,16 @@ function isCommandCurrent(gameState, command) {
     const phase = (gameState && gameState.currentPhase) || {};
 
     if (command.type === 'pull') {
+        // Legacy flat pseudo-slot ('challenge', pre-4-slot-concurrency):
+        // no per-slot lobby state to check against, just the phase itself.
         if (String(command.slot) === 'challenge') {
             return phase.name === 'challenge_game';
+        }
+        // New 4-slot challenges (challenge1-4) have real per-slot lobby
+        // state now, same shape as matches_in_progress's slots.
+        if (CHALLENGE_SLOT_RE.test(String(command.slot))) {
+            return phase.name === 'challenge_game'
+                && (phase.slots || {})[command.slot] === 'lobby';
         }
         return phase.name === 'matches_in_progress'
             && (phase.slots || {})[command.slot] === 'lobby';
