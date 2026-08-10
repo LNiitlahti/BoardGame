@@ -85,14 +85,14 @@ Rosters get filled out to the match's format (e.g. 5v5) using players from teams
 **Fix:** Dropped the hardcoded `/BoardGame` segment from both URL templates; referral links now point to `${protocol}//${host}/login.html?referralCode=${code}`.
 **Status:** Fixed, not yet verified live.
 
-### [ ] Discord bot should confirm its actions by posting a status message to a channel
+### [x] Discord bot should confirm its actions by posting a status message to a channel
 **Reported:** It would help if the Discord bot posted a message to a specific channel confirming what it did (e.g. that it moved players) — that channel should be configurable from the Discord section in `god.html`.
 **Confirmed in code:**
 - The Discord tab in `god.html` (Tab 9, `full/god.html:504-517`, backed by `full/scripts/discord-panel.js`) currently only configures per-slot *voice* channels for moving players — there's no "status/log channel" concept anywhere in it.
 - Its "Activity" section (`discordActivity`, `discord-panel.js:567-593`) only renders a web-page log built from Firestore data — that's a UI element, not something the bot itself posts into Discord.
-- The bot's Discord REST wrapper (`functions/lib/discord-rest.js:165`) only exposes `moveMember`, `listGuildMembers`, `listGuildChannels` — there's currently no capability at all to send a text message to a channel. This would be genuinely new functionality, not a disconnected existing feature.
-**Suggested direction:** Add a `sendMessage({ channelId, content })` method to `discord-rest.js` (Discord's `POST /channels/{channel.id}/messages`), a configurable "status channel" field alongside the existing per-slot channel config in the Discord tab, and a call to it after each move-command batch completes (success/partial/failure). Bonus: this would also make the earlier "Discord doesn't work in challenges" bug (above) immediately visible *in Discord itself* instead of only in the web UI's activity log.
-**Status:** Not yet implemented — new capability, not a wiring fix.
+- The bot's Discord REST wrapper (`functions/lib/discord-rest.js:165`) only exposed `moveMember`, `listGuildMembers`, `listGuildChannels` — no capability to send a text message to a channel.
+**Fix:** Added `sendMessage({channelId, content})` to `discord-rest.js` (Discord's `POST /channels/{channel.id}/messages`, same auth/outcome-mapping pattern as the existing methods), a `getChannelCache()` read helper on `firestore-adapter.js`, a configurable "Status message channel ID" text field in the Discord tab (`discordConfig/state.statusChannelId`, additive), and a call to it after every pull/return move-command batch completes — the summary names the actual destination channel(s) (e.g. "moved 2 player(s) to ALPHA/BRAVO"), resolved via the channel cache rather than raw ids. A failed status post never affects the underlying move command's own outcome. 7 new discord-rest tests + additional command-handler tests added; full suite 88/88 passing.
+**Status:** Fixed, not yet verified live. Manual check before next event: god.html → Discord tab → set a status channel ID (must be a TEXT channel, not one of the voice channels above), run a move command, confirm the bot posts a summary there.
 
 ---
 
