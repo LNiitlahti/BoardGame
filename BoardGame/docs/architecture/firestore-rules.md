@@ -137,13 +137,20 @@ flowchart TD
         U3 -->|Yes| U4{"Registration update?"}
         U4 --> U5["used: false → true"]
         U4 --> U6["assignedTo == request.auth.uid"]
-        U4 --> U7["Only 'used' and 'assignedTo' changed"]
+        U4 --> U7["Only 'used', 'assignedTo', 'assignedEmail',<br/>'assignedName', 'usedAt' changed"]
         U5 & U6 & U7 -->|All pass| U8[ALLOW]
         U3 -->|No| U9[DENY]
     end
 
     style G1 fill:#ffffcc
 ```
+
+**2026-08-10 fix:** the allowed-fields list was originally just `['used', 'assignedTo']`,
+which rejected login.html's actual registration write (5 fields — see §4b sibling note
+and TODO.md) whenever the real ruleset was deployed. Widened to match what
+login.html actually writes. **This fix lives only in the local, gitignored
+`firestore.rules` file** — it is not live until manually redeployed via the
+Firebase console.
 
 ## 4b. Seasons — `seasons/{seasonId}` — KNOWN GAP, NOT YET FIXED
 
