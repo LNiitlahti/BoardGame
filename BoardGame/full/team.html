@@ -73,6 +73,35 @@
         <div class="team-main-layout">
             <!-- Left Sidebar: Team Info -->
             <div>
+                <!-- Match Result Voting: moved here (was the top of the right sidebar)
+                     and placed first, ahead of even the Match Panel below -- on the
+                     single-column mobile layout DOM order IS visual order, and voting
+                     was landing near the very bottom of the page, past the whole game
+                     board, right when a player most needs to see it (right after their
+                     match ends). Same "what's next" prominence reasoning as the Match
+                     Panel comment below. -->
+                <div class="voting-section" id="votingSection" style="display: none;">
+                    <h3>Match Result Voting</h3>
+                    <div id="votingMatchInfo" style="margin-bottom: 15px;">
+                        <!-- Match info will be inserted here -->
+                    </div>
+
+                    <div class="vote-options" id="voteOptions">
+                        <!-- Vote options will be inserted here -->
+                    </div>
+
+                    <button class="btn primary" onclick="submitVote()" id="submitVoteBtn" style="width: 100%; margin-top: 10px;">
+                        Submit Vote
+                    </button>
+
+                    <div class="vote-progress" id="voteProgress" style="display: none;">
+                        <h4>Voting Progress</h4>
+                        <div id="voteProgressList">
+                            <!-- Vote progress will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Match Panel: one evolving section for "you have a match" -> "lobby is
                      open, ready up". Match info (matchAssignmentCards) is always shown once
                      a match exists. The ready-check section (lobbyReadyControls) is revealed
@@ -154,31 +183,8 @@
                 </div>
             </div>
 
-            <!-- Right Sidebar: Voting + Current Match -->
+            <!-- Right Sidebar: Current Match -->
             <div>
-                <!-- Match Result Voting Section -->
-                <div class="voting-section" id="votingSection" style="display: none;">
-                    <h3>Match Result Voting</h3>
-                    <div id="votingMatchInfo" style="margin-bottom: 15px;">
-                        <!-- Match info will be inserted here -->
-                    </div>
-
-                    <div class="vote-options" id="voteOptions">
-                        <!-- Vote options will be inserted here -->
-                    </div>
-
-                    <button class="btn primary" onclick="submitVote()" id="submitVoteBtn" style="width: 100%; margin-top: 10px;">
-                        Submit Vote
-                    </button>
-
-                    <div class="vote-progress" id="voteProgress" style="display: none;">
-                        <h4>Voting Progress</h4>
-                        <div id="voteProgressList">
-                            <!-- Vote progress will be inserted here -->
-                        </div>
-                    </div>
-                </div>
-
                 <div class="team-section">
                     <div class="team-section-header">Current Match</div>
                     <div id="currentMatchDisplay">

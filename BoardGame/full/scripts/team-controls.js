@@ -665,6 +665,7 @@ function renderSpellPhaseOverlay() {
 
     if (isCompleted) {
         statusEl.textContent = 'Your turn is complete.';
+        statusEl.style.color = ''; // reached directly from the "your turn" branch, which sets purple
         actionsEl.style.display = 'none';
         completedEl.style.display = '';
         _renderSpellPhaseHand(false);
@@ -2787,9 +2788,16 @@ function renderDrinkCounter() {
     const entry = (gameData?.drinkCounts || {})[currentUser.uid] || {};
     const total = window.DrinkCounter.totalFor(entry);
 
+    // Vector line icons (ICON_SVGS), matching the rest of the page's icon
+    // language, rather than raw color emoji -- keyed here rather than in
+    // drink-counter.js since that module stays icon-system-agnostic (no
+    // DOM, no globals) and is also consumed by pages with no icon needs
+    // (display-manager.js's leaderboard, statistics.js's table).
+    const DRINK_ICON_KEYS = { soft: 'cupSoda', beer: 'beerMug' };
+
     const buttonsHTML = window.DrinkCounter.DRINK_TYPES.map(type => `
         <button class="btn drink-btn" onclick="logDrink('${type.id}')">
-            <span class="drink-btn-icon">${type.icon}</span>
+            <span class="drink-btn-icon">${ICON_SVGS[DRINK_ICON_KEYS[type.id]] || ''}</span>
             <span class="drink-btn-label">${type.label}</span>
             <span class="drink-btn-count">${Number(entry[type.id]) || 0}</span>
         </button>
