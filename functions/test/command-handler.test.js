@@ -572,7 +572,7 @@ test('buildStatusMessage: falls back to the raw channel id when the cache has no
     assert.match(msg, /rawId123/);
 });
 
-// ── Persona template pool (Urho, the mountain's chronicle-keeper) ──────────
+// ── Persona template pool (Tobias Thorn / Topias Törni, the quiet guide) ───
 
 test('computeStatusContext classifies outcomes into the right category', () => {
     const base = { command: { type: 'pull', slot: '1' }, channelsById: { c1: 'ALPHA' } };
