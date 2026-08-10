@@ -660,6 +660,13 @@
         max-width: none;
         text-align: center;
       }
+
+      /* .custom-modal is only 90vw wide (~281px of content at 375px);
+         a 340px minmax floor forces the grid wider than that regardless
+         of container width. */
+      .codes-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
   <link rel="stylesheet" href="css/styles.css">
