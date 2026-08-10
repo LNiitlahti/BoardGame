@@ -731,7 +731,7 @@
      * into one downloadable JSON file. See BoardGame/dev/tools/replay-video/.
      */
     function exportVideoData() {
-        if (!replayEngine) return;
+        if (!replayEngine?.loaded) return;
 
         const bundle = {
             tournamentDoc: replayEngine.tournamentDoc,
