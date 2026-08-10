@@ -30,7 +30,13 @@ At a LAN tournament, an admin queues matches from a central dashboard. Teams pla
 
 **Statistics & Export** — Win rates, player leaderboards, match history charts, and JSON export for post-event analysis.
 
-**Discord Voice Automation** — Configurable per-slot voice channels move players into the right lobby automatically when a match starts, no manual channel-herding needed.
+**Discord Voice Automation** — Configurable per-slot voice channels move players into the right lobby automatically when a match starts, no manual channel-herding needed. The bot also posts a status update after each move, in the voice of a persistent in-universe character.
+
+**Touch-Friendly Admin** — Every drag-and-drop interaction (seating, team assignment, match sides, queue reordering) has a tap-to-select alternative, so the admin dashboard works on a tablet, not just a mouse.
+
+**Tournament Replay & Export** — Scrub through a finished tournament match-by-match, or export the whole thing as a video file to relive later.
+
+**Season Standings** — Link multiple tournaments into a season and see combined team/player standings, best-teammate pairings, and other cross-event stats, filterable by which tournaments to include.
 
 ## How a Tournament Works
 
@@ -116,6 +122,8 @@ For detailed instructions, see the [Setup Guide](BoardGame/docs/guides/SETUP_GUI
 
 This project is in **active development**, currently at **v1.0.1-alpha**. The lightweight version ran its first live LAN event successfully in February 2026 and proved the concept. Since then, a full-featured version with the OOP module stack (phases, spells, undo/backup, replay, ceremony, and player-facing pages) plus a guided admin flow has taken over as the primary version — it ran its first live LAN event in August 2026, mostly successfully, with remaining rough edges tracked in `docs/guides/EVENT_BUG_REPORTS.md`.
 
+A hardening pass following that event closed out most of the live-event bug reports, fixed several real correctness bugs (a Discord challenge-move wiring gap, "Undo Last Action" reaching further back than intended, team.html leaking other teams' matches), and added the touch-friendly admin support, replay/export, and season-standings features described above. See `progress.html` for a detailed log. A few things from that pass — the season-standings page's Firestore permissions, and a couple of tablet/live-screen items — still need a hands-on check before the next event.
+
 | Version | Status |
 |---------|--------|
 | Full | **The only version** — the OOP module stack with a guided admin dashboard (next-step prompts, phase gating, safety-rail confirmations) is what runs live events |
@@ -148,6 +156,7 @@ BoardGame/
 │   ├── setup.html           # Tournament creation wizard (incl. Room Hexes step)
 │   ├── view.html            # Spectator display (1920×1080)
 │   ├── statistics.html      # Analytics & data export
+│   ├── season-stats.html    # Cross-tournament season standings
 │   ├── onboarding.html / onboarding-status.html / view-onboarding.html / view-onboarding-layout.html
 │   ├── match-queue.html     # Match queue TV display
 │   ├── team.html / home.html / profile.html / replay.html
