@@ -95,6 +95,15 @@
   <p class="meta">season-stats.html / season-stats.js / team-standings.js · commit 357e721 · rules fix commit 8f899f0 (docs only)</p>
 </div>
 
+<div class="round">Round 9 — season stats v2 (user request) — done</div>
+<div class="piece">
+  <span class="status blocked">built, not live (same rules gap as P7 above)</span>
+  <h2>Player-level analytics, tournament filter, best teammates</h2>
+  <p>Expanded season-stats.html: player-level stats keyed by stable Firebase uid (not name or team — neither persists across tournaments), live tournament-filter checkboxes that recompute every card on the page (team standings, player leaderboard, synergy, insights — not just some of them), "Best Teammates" pairing, and 4 more insight cards (Season MVP, Most Active, Best Win Streak spanning tournament boundaries, Most Improved) — all built only from fields that actually exist in the data, no fabricated metrics.</p>
+  <p>Winner correctly handles a real edge case the losing candidate missed: a single match can have 3+ teams (multi-team matches exist in the schema), so "on the losing side" isn't the same as "on the losing team" — the winner re-groups by registry team, the loser's synergy logic could have credited two players from different losing teams as "teammates." Two more gaps (unlinked-player count computed but never shown to the user; a duplicated magic-number floor) fixed directly after merge.</p>
+  <p class="meta">commits f27cb17, 5f355ae · needs real Firestore auth + linked season data to visually verify — not yet verified live, same as P7</p>
+</div>
+
 <div class="round">Round 4 — mobile/iPad admin touch support</div>
 <div class="sub" style="margin-bottom:12px">User decision: tap-to-select as the primary interaction, drag-and-drop kept working as a backup — multiple ways to do the same thing, intuitive and responsive. Two waves: establish the pattern on one site, then apply it to the rest.</div>
 
