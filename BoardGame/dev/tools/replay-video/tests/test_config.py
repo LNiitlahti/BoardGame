@@ -1,6 +1,7 @@
 import json
 import os
 import tempfile
+import pytest
 from config import DEFAULT_CONFIG, load_config, apply_overrides
 
 
@@ -30,3 +31,14 @@ def test_apply_overrides_only_replaces_non_none_values():
     assert merged['fps'] == 24
     assert merged['width'] == DEFAULT_CONFIG['width']
     assert base['fps'] == DEFAULT_CONFIG['fps']  # original untouched
+
+
+def test_load_config_raises_a_clear_error_for_malformed_json():
+    with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False) as f:
+        f.write('{invalid json,,,')
+        path = f.name
+    try:
+        with pytest.raises(SystemExit, match='not valid JSON'):
+            load_config(path)
+    finally:
+        os.unlink(path)

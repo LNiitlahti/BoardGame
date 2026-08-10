@@ -21,7 +21,10 @@ def load_config(config_path):
     config = dict(DEFAULT_CONFIG)
     if config_path and os.path.exists(config_path):
         with open(config_path, 'r', encoding='utf-8') as f:
-            config.update(json.load(f))
+            try:
+                config.update(json.load(f))
+            except json.JSONDecodeError as e:
+                raise SystemExit(f"{config_path} is not valid JSON: {e}") from e
     return config
 
 
