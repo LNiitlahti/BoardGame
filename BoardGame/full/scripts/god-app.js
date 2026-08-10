@@ -1603,6 +1603,7 @@ class GodApp {
         window.removeActiveEffect = (id) => app.spells?.removeActiveEffect(id);
         window.skipSpellTurn = (tid) => app.spells?.skipTeamTurn(tid);
         window.forceEndSpellPhase = () => app.spells?.forceEndSpellPhase();
+        window.processSpellCast = (timestamp) => app.spells?.processPendingSpellCast(timestamp);
 
         // Misc stubs
         window.loadBackup = () => {

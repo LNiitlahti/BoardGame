@@ -16,6 +16,9 @@ const path = require('node:path');
 
 global.window = global.window || {};
 global.ICON_SVGS = global.ICON_SVGS || new Proxy({}, { get: () => '' });
+// renderSpellHistory() (invoked by processPendingSpellCast) hits document;
+// it early-returns when the container element isn't found.
+global.document = global.document || { getElementById: () => null };
 
 require('../../full/scripts/spell-engine.js');
 require('../../full/scripts/undo-manager.js');
@@ -298,6 +301,100 @@ test('rematch fails cleanly (no state mutation) when the match was already rever
     assert.strictEqual(result.success, false);
     assert.match(result.error, /no confirmed result/i);
     assert.strictEqual(JSON.stringify(gs), before, 'game state must be untouched on failure');
+});
+
+// ------------------------------------------------------------------
+// Admin-side "process this cast" trigger (processPendingSpellCast)
+//
+// castSpellViaFirestore() in team-controls.js only WRITES the cast to
+// Firestore -- it never calls executeSpellEffect(). Without an explicit
+// admin-side trigger, casting Rematch would never actually revert
+// anything at a live event. processPendingSpellCast() is that trigger
+// (wired to a "Process Rematch" button in god.html's spell history via
+// god-app.js's window.processSpellCast).
+// ------------------------------------------------------------------
+
+test('processPendingSpellCast finds a pending rematch cast by timestamp and executes its effect', async () => {
+    const gs = makeGameState();
+    gs.spellHistory = [
+        { timestamp: 'ts-1', spellId: 'rematch', teamId: 1, teamName: 'Red', targetData: { gameId: 'm1' }, result: { success: true } }
+    ];
+    let calledWith = null;
+    const engine = makeSpellEngine(gs, {
+        revertMatchByGameId: (gameId) => { calledWith = gameId; return { success: true }; }
+    });
+
+    const result = await engine.processPendingSpellCast('ts-1');
+
+    assert.strictEqual(calledWith, 'm1');
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(gs.spellHistory[0].result.processed, true, 'entry should be marked processed so the button does not re-fire');
+});
+
+test('processPendingSpellCast is idempotent: a second call on an already-processed entry does not re-execute', async () => {
+    const gs = makeGameState();
+    gs.spellHistory = [
+        { timestamp: 'ts-1', spellId: 'rematch', teamId: 1, teamName: 'Red', targetData: { gameId: 'm1' }, result: { success: true, processed: true } }
+    ];
+    let calls = 0;
+    const engine = makeSpellEngine(gs, {
+        revertMatchByGameId: () => { calls++; return { success: true }; }
+    });
+
+    const result = await engine.processPendingSpellCast('ts-1');
+
+    assert.strictEqual(calls, 0);
+    assert.strictEqual(result.success, false);
+    assert.match(result.error, /already processed/i);
+});
+
+test('processPendingSpellCast surfaces a clear error when the spell-history entry cannot be found', async () => {
+    const gs = makeGameState();
+    gs.spellHistory = [];
+    const engine = makeSpellEngine(gs, { revertMatchByGameId: () => ({ success: true }) });
+
+    const result = await engine.processPendingSpellCast('no-such-timestamp');
+
+    assert.strictEqual(result.success, false);
+    assert.match(result.error, /not found/i);
+});
+
+test('processPendingSpellCast records the failure result (not just throwing) when the underlying revert fails', async () => {
+    const gs = makeGameState();
+    gs.spellHistory = [
+        { timestamp: 'ts-2', spellId: 'rematch', teamId: 1, teamName: 'Red', targetData: { gameId: 'm1' }, result: {} }
+    ];
+    const engine = makeSpellEngine(gs, {
+        revertMatchByGameId: () => ({ success: false, error: 'Already undone' })
+    });
+
+    const result = await engine.processPendingSpellCast('ts-2');
+
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.error, 'Already undone');
+    assert.strictEqual(gs.spellHistory[0].result.processed, false, 'a failed attempt must stay retriable, not get permanently marked processed');
+});
+
+test('processPendingSpellCast allows retrying after a failed attempt (not permanently stuck)', async () => {
+    const gs = makeGameState();
+    gs.spellHistory = [
+        { timestamp: 'ts-3', spellId: 'rematch', teamId: 1, teamName: 'Red', targetData: { gameId: 'm1' }, result: {} }
+    ];
+    let attempt = 0;
+    const engine = makeSpellEngine(gs, {
+        revertMatchByGameId: () => {
+            attempt++;
+            return attempt === 1 ? { success: false, error: 'transient error' } : { success: true };
+        }
+    });
+
+    const first = await engine.processPendingSpellCast('ts-3');
+    assert.strictEqual(first.success, false);
+
+    const second = await engine.processPendingSpellCast('ts-3');
+    assert.strictEqual(second.success, true);
+    assert.strictEqual(attempt, 2);
+    assert.strictEqual(gs.spellHistory[0].result.processed, true);
 });
 
 test('rematch fails cleanly when the target match id does not match any log entry', async () => {

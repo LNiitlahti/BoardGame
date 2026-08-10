@@ -657,6 +657,45 @@ class SpellEngine {
     }
 
     /**
+     * Admin: process a spell-history entry whose effect needs an explicit
+     * admin-side trigger (currently only 'rematch' — casting writes the
+     * cast to Firestore via team-controls.js's castSpellViaFirestore, but
+     * nothing calls executeSpellEffect() automatically; this is the god.html
+     * "Process" button's handler). Idempotent on SUCCESS only: an entry
+     * already marked result.processed is skipped rather than re-executed
+     * (reverting the same match twice would hit UndoManager's "Already
+     * undone" guard anyway, but this avoids even trying). A FAILED attempt
+     * is deliberately left unmarked/retriable — most failure reasons here
+     * are deterministic (already undone, no match selected) so a retry is
+     * harmless, and a transient Firestore hiccup shouldn't permanently
+     * strand the admin without a way to retry mid-event.
+     * @param {string} timestamp  entry.timestamp — used to locate the entry
+     *   in gameState.spellHistory (entries have no other stable id)
+     * @returns {Promise<Object>} the executeSpellEffect() result
+     */
+    async processPendingSpellCast(timestamp) {
+        const gs = this._gameState;
+        const history = gs.spellHistory || [];
+        const entry = history.find(h => h.timestamp === timestamp);
+
+        if (!entry) return { success: false, error: 'Spell cast not found' };
+        if (entry.result?.processed) return { success: false, error: 'Already processed' };
+
+        const outcome = await this.executeSpellEffect(entry.spellId, entry.teamId, entry.targetData);
+
+        entry.result = outcome?.success
+            ? { ...(entry.result || {}), ...outcome, processed: true }
+            : { ...(entry.result || {}), ...outcome, processed: false };
+        await this._save();
+        this.renderSpellHistory();
+        this._ui?.showStatus(
+            outcome?.success ? `${entry.spellName || entry.spellId} processed` : (outcome?.error || 'Processing failed'),
+            outcome?.success ? 'success' : 'error'
+        );
+        return outcome;
+    }
+
+    /**
      * Create an active effect entry (covers Type B conditions and tracked buffs).
      * @returns {Object} result with effectId
      */
@@ -1063,6 +1102,11 @@ class SpellEngine {
 
         container.innerHTML = history.slice().reverse().map(entry => {
             const time = entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString() : '';
+            const def = this.getSpellDef(entry.spellId);
+            // Only spells whose effect needs an explicit admin trigger (currently
+            // 'rematch') get a Process button — casting itself only writes the
+            // Firestore cast record, it doesn't call executeSpellEffect().
+            const needsProcessing = def?.effect?.type === 'rematch' && !entry.result?.processed;
             return `
                 <div style="padding: 10px; background: rgba(168, 85, 247, 0.1); border-radius: 6px; margin-bottom: 8px; border-left: 3px solid #a855f7;">
                     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 5px;">
@@ -1076,6 +1120,17 @@ class SpellEngine {
                     ${entry.result?.changes?.note ? `
                         <div style="font-size: 0.75rem; color: #9aa1ad; margin-top: 5px; font-style: italic;">
                             ${this._teams?.escapeHtml(entry.result.changes.note) || ''}
+                        </div>
+                    ` : ''}
+                    ${needsProcessing ? `
+                        <button class="btn-small primary" style="margin-top: 8px; font-size: 0.75rem;"
+                                onclick="processSpellCast('${entry.timestamp}')">
+                            Process Rematch (revert match)
+                        </button>
+                    ` : ''}
+                    ${entry.result?.processed ? `
+                        <div style="font-size: 0.75rem; margin-top: 5px; color: ${entry.result.success ? '#22c55e' : '#ef4444'};">
+                            ${entry.result.success ? 'Match reverted' : ('Failed: ' + (this._teams?.escapeHtml(entry.result.error) || entry.result.error || 'unknown error'))}
                         </div>
                     ` : ''}
                 </div>
