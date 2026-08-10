@@ -479,6 +479,24 @@
   padding: 20px;
 }
 
+/* .form-group is used inside several phase-modal bodies (break settings,
+   win condition, spells-active, spell-cast log) but was never defined by
+   any stylesheet admin.html actually loads -- fields rendered with no
+   spacing between them. Minimal fix shared across all of those modals. */
+.phase-modal .form-group {
+  margin-bottom: 16px;
+}
+.phase-modal .form-group:last-child {
+  margin-bottom: 0;
+}
+.phase-modal .form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary, #a3a3a3);
+}
+
 /* ==================== MATCH SLOT PANELS (concurrent Match 1 / Match 2) ==================== */
 
 .match-slot-panels {
