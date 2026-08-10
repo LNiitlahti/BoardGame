@@ -1785,7 +1785,7 @@
      */
     function _highlightNextQueueItem() {
         const phase = _phaseManager?.getCurrentPhase() || '';
-        let target = null;
+        let targets = [];
         // Same live-player-conflict exclusion as _computeSlotStep: never
         // highlight a queued match as "next" if its players are already
         // tied up in a currently-ongoing match elsewhere (TODO.md — the
@@ -1793,7 +1793,15 @@
         // being wrong, was this exact bug).
         if (phase === 'challenges' || phase === 'challenge_game' ||
             phase === 'spell_window_2' || phase === 'spell_window_3') {
-            target = _excludeLiveConflicts(_pendingChallengeMatches())[0];
+            // One badge candidate PER open challenge slot (Round 12A: up to
+            // 4 concurrent challenges), not a single flat pick — otherwise
+            // 3 of 4 slots waiting on their next challenge would badge
+            // nothing at all. Playing slots first, same priority as the
+            // matches_in_progress branch below.
+            const pick = slotId => _excludeLiveConflicts(_pendingChallengeSlotMatches(slotId))[0];
+            const playing = CHALLENGE_SLOT_IDS.filter(id => _phaseManager.isSlotPlaying(id)).map(pick);
+            const anySlot = CHALLENGE_SLOT_IDS.map(pick);
+            targets = [...playing, ...anySlot].filter(Boolean);
         } else if (phase === 'matches_in_progress') {
             // Per-slot pick, playing slots first — the panel's NEXT badge and
             // the slot card's own Next-up must agree. (The old branches keyed
@@ -1801,17 +1809,20 @@
             // slot migration — and fell through to "first pending in the
             // whole queue", badging future-round imports.)
             const pick = slot => _excludeLiveConflicts(_pendingSlotMatches(slot))[0];
-            target = (_phaseManager.isSlotPlaying(1) ? pick(1) : null) ||
-                     (_phaseManager.isSlotPlaying(2) ? pick(2) : null) ||
-                     pick(1) || pick(2) || null;
+            targets = [
+                (_phaseManager.isSlotPlaying(1) ? pick(1) : null),
+                (_phaseManager.isSlotPlaying(2) ? pick(2) : null),
+                pick(1), pick(2)
+            ].filter(Boolean);
         }
         // Outside match/challenge phases nothing is "next to start" — badge
         // nothing rather than an arbitrary (possibly future-round) entry.
 
+        const targetIds = new Set(targets.map(t => String(t.id)));
         const items = document.querySelectorAll('#matchQueue .queue-item');
         items.forEach(el => {
             el.classList.toggle('next-up',
-                !!target && String(el.dataset.queueId) === String(target.id) &&
+                targetIds.has(String(el.dataset.queueId)) &&
                 !el.classList.contains('ongoing'));
         });
     }
