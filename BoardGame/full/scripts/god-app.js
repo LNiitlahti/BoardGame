@@ -231,7 +231,10 @@ class GodApp {
 
                 logAction('points_awarded', 'points',
                     { roundNumber, pointsAwarded },
-                    { teamPoints: prevTeamPoints, currentRound: gs.currentRound }
+                    // pointsHistoryRound lets _undoPointsChange() pop the
+                    // matching pointsHistory entry too, not just restore
+                    // team.points -- see undo-manager.js for why.
+                    { teamPoints: prevTeamPoints, currentRound: gs.currentRound, pointsHistoryRound: roundNumber }
                 );
 
                 const msg = Object.entries(pointsAwarded)

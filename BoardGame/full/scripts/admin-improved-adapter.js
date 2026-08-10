@@ -2236,7 +2236,10 @@
 
         window.logAction?.('points_awarded', 'points',
             { roundNumber, pointsAwarded },
-            { teamPoints: prevTeamPoints, currentRound: gameState.currentRound }
+            // pointsHistoryRound lets _undoPointsChange() pop the matching
+            // pointsHistory entry too, not just restore team.points -- see
+            // undo-manager.js for why (stale double-award guard otherwise).
+            { teamPoints: prevTeamPoints, currentRound: gameState.currentRound, pointsHistoryRound: roundNumber }
         );
 
         // No explicit save — advancePhase() saves after all hooks run

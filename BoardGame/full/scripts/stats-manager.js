@@ -354,7 +354,7 @@ class StatsManager {
 
         this._logAction('points_awarded', 'points', {
             roundNumber: currentPhaseRound, pointsAwarded
-        }, { teamPoints: prevTeamPoints, currentRound: currentPhaseRound });
+        }, { teamPoints: prevTeamPoints, currentRound: currentPhaseRound, pointsHistoryRound: currentPhaseRound });
 
         this._ui.showStatus(`Round ${currentPhaseRound} points awarded! ${pointsMessage}`, 'success');
         this._onPhaseChanged(); // Triggers phase requirements recheck

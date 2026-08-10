@@ -5781,7 +5781,15 @@ async function confirmAdvanceRound(triggerBtn) {
     // undo/audit-trail eligible the same way the phase-flow's
     // 'points_awarded' entries are (see phase-manager.js).
     const _prevRound = gameState.currentRound || 0;
-    const _prevTeamPoints = (gameState.teams || []).map(t => ({ id: t.id, points: t.points || 0 }));
+    // Object map keyed by team id (NOT an array) -- matches the shape
+    // _undoPointsChange() (undo-manager.js) and every other points_awarded
+    // producer (stats-manager.js's confirmAdvanceRound) actually consume:
+    // Object.entries(prev.teamPoints) expects {teamId: points}, not
+    // [{id, points}, ...] -- an array here would corrupt team.points on
+    // undo (or silently no-op) the moment 'round_advance' is ever added to
+    // undo-manager.js's UNDOABLE_TYPES.
+    const _prevTeamPoints = {};
+    (gameState.teams || []).forEach(t => { _prevTeamPoints[t.id] = t.points || 0; });
 
     // Award points BEFORE advancing round
     const pointsAwarded = awardRoundPoints();
@@ -5818,7 +5826,7 @@ async function confirmAdvanceRound(triggerBtn) {
     });
     window.logAction?.('round_advance', 'points', {
         round: gameState.currentRound, previousRound: _prevRound, pointsAwarded
-    }, { round: _prevRound, teamPoints: _prevTeamPoints });
+    }, { currentRound: _prevRound, teamPoints: _prevTeamPoints });
 
     showStatus(`Round ${gameState.currentRound} started! Points: ${pointsMessage}`, 'success');
 }

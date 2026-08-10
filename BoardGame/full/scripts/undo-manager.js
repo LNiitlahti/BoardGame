@@ -355,6 +355,19 @@ class UndoManager {
         if (prev.currentRound !== undefined) {
             gs.currentRound = prev.currentRound;
         }
+        // Pop the matching gameState.pointsHistory entry too, not just
+        // team.points/currentRound. Without this, undoing a points award
+        // left pointsHistory still showing the round as paid, which (a)
+        // kept the "don't double-award" guard (history.some(e => e.round
+        // === roundNumber)) permanently tripped for that round even after
+        // undo -- silently blocking a legitimate re-award later -- and (b)
+        // left summary-generator.js/replay-engine.js, which read
+        // pointsHistory directly, disagreeing with the just-restored
+        // team.points.
+        if (prev.pointsHistoryRound !== undefined && Array.isArray(gs.pointsHistory)) {
+            const idx = gs.pointsHistory.findIndex(e => e.round === prev.pointsHistoryRound);
+            if (idx !== -1) gs.pointsHistory.splice(idx, 1);
+        }
     }
 
     _undoMatchStarted(gs, prev, p) {
