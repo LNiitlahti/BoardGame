@@ -104,6 +104,15 @@
   <p class="meta">commits f27cb17, 5f355ae · needs real Firestore auth + linked season data to visually verify — not yet verified live, same as P7</p>
 </div>
 
+<div class="round">Round 10 — Discord bot personality (user request) — done</div>
+<div class="piece">
+  <span class="status done">merged, harsh-critic clean, 95/95 tests</span>
+  <h2>Urho, the mountain's chronicle-keeper</h2>
+  <p>The Discord status-message feature (round 7) now has a persistent character: Urho, a dry/weary rune-spirit bound to the mountain since Gasmorah's sealing, grounded in the game's actual lore (LORE.md). 50 hand-written message variations across 4 outcome shapes (16 success / 14 partial / 12 failure / 8 no-op) — every single template, not a sample, is test-verified to still convey the real facts (destination channel names, moved/total counts, failure reasons). Weighted-random selection with anti-repeat so the same line can't fire twice in a row for the same outcome shape.</p>
+  <p>Winner kept English as the primary language with sprinkled Finnish loanwords (kulkija, Kronikat) — consistent with the rest of the app's English operational UI; the losing candidate rewrote the entire channel into full Finnish, a much bigger unrequested change to a live-event tool a TD reads mid-match. One concrete gap fixed after merge: the persona text had dropped the original's ✅/❌/⚠️ at-a-glance severity emoji — restored as a fixed prefix independent of which of the 50 lines gets picked.</p>
+  <p class="meta">commits 7779e49, 6615499 · functions/ test suite 95/95</p>
+</div>
+
 <div class="round">Round 4 — mobile/iPad admin touch support</div>
 <div class="sub" style="margin-bottom:12px">User decision: tap-to-select as the primary interaction, drag-and-drop kept working as a backup — multiple ways to do the same thing, intuitive and responsive. Two waves: establish the pattern on one site, then apply it to the rest.</div>
 
