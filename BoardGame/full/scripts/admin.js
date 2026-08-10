@@ -2135,6 +2135,22 @@ async function assignTeamToHex(coord, teamId) {
         teamId, teamName: team?.name || `Team ${teamId}`, hexCoord: coord, isHeart: isHeartHex
     }, oldOccupier ? { board: { [coord]: oldOccupier } } : null);
 
+    // Room hex spell draw (SpellEngine integration) — mirrors
+    // board-manager.js's BoardManager._onRoomHexPlacement, which only
+    // fires on god.html today. admin.html is the primary live-play
+    // surface, so it needs the same hook (see spec's role-split section).
+    const isRoomHex = (gameState.rooms || []).includes(coord);
+    if (isRoomHex && teamId !== null && window.spellEngine) {
+        const drawn = window.spellEngine.drawSpell(teamId);
+        if (drawn.length > 0) {
+            const names = drawn.map(id => {
+                const def = window.spellEngine.getSpellDef(id);
+                return def?.nameEn || def?.name || id;
+            }).join(', ');
+            showStatus(`Team drew spell: ${names}`, 'success');
+        }
+    }
+
     // Deliberately does NOT auto-clear a pending hex win here anymore.
     // Assigning a hex is a general board action (spells, admin rulings,
     // ordinary play) that happens for all kinds of reasons unrelated to a
