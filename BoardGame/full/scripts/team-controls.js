@@ -2012,6 +2012,7 @@ function renderMatchPanel(isLobbyPhase) {
     const subtitle = document.getElementById('matchPanelSubtitle');
     const waitingFooter = document.getElementById('matchPanelWaitingFooter');
     const readyControls = document.getElementById('lobbyReadyControls');
+    const matchSection = document.getElementById('matchPanelSection');
 
     if (subtitle) {
         subtitle.textContent = isLobbyPhase
@@ -2020,6 +2021,16 @@ function renderMatchPanel(isLobbyPhase) {
     }
     if (waitingFooter) waitingFooter.style.display = isLobbyPhase ? 'none' : '';
     if (readyControls) readyControls.style.display = isLobbyPhase ? '' : 'none';
+
+    // Visually highlight the panel itself (matching the top phase-banner's
+    // "action-needed" treatment) whenever the lobby is open and this player
+    // hasn't confirmed the game lobby yet -- pure presentation, doesn't touch
+    // renderReadinessStatus()'s own readiness rendering below.
+    if (matchSection) {
+        const r = (gameData.lobbyReady || {})[currentUser?.uid] || {};
+        const confirmed = r.gameLobby === true || r.ready === true;
+        matchSection.classList.toggle('action-needed', isLobbyPhase && !confirmed);
+    }
 
     if (!isLobbyPhase) return;
 

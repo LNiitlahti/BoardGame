@@ -73,19 +73,16 @@
         <div class="team-main-layout">
             <!-- Left Sidebar: Team Info -->
             <div>
-                <div class="team-section">
-                    <div class="team-section-header">Teammates</div>
-                    <div id="teammatesList">
-                        <p class="empty-state-inline">Loading teammates...</p>
-                    </div>
-                </div>
-
                 <!-- Match Panel: one evolving section for "you have a match" -> "lobby is
                      open, ready up". Match info (matchAssignmentCards) is always shown once
                      a match exists. The ready-check section (lobbyReadyControls) is revealed
                      in place once the TD opens the lobby for this match. Inline in the
                      sidebar rather than a blocking overlay, so the rest of the page (board,
-                     teammates, etc.) stays usable while a player readies up. -->
+                     teammates, etc.) stays usable while a player readies up.
+
+                     Placed FIRST in the sidebar (above Teammates) so it's the most
+                     prominent thing a player sees when they have something to do --
+                     testers at the live event had trouble finding "what's next". -->
                 <div class="team-section" id="matchPanelSection" style="display: none;">
                     <div class="team-section-header">Your Next Match</div>
                     <p id="matchPanelSubtitle" class="empty-state-inline">Review your upcoming match for this round</p>
@@ -96,7 +93,7 @@
                         Waiting for admin to open the lobby...
                     </div>
                     <!-- Self/teammate Game Lobby confirm buttons are NOT duplicated
-                         here -- the Teammates section above already has them (see
+                         here -- the Teammates section below already has them (see
                          renderTeammates(), clickable for yourself and, via a
                          "confirm on behalf of" title, for teammates too). This panel
                          only adds what Teammates doesn't show: the aggregate per-team
@@ -107,6 +104,13 @@
                         <div id="readyStatus" class="ready-status">
                             <!-- Dynamically populated: per-team two-status readiness -->
                         </div>
+                    </div>
+                </div>
+
+                <div class="team-section">
+                    <div class="team-section-header">Teammates</div>
+                    <div id="teammatesList">
+                        <p class="empty-state-inline">Loading teammates...</p>
                     </div>
                 </div>
 

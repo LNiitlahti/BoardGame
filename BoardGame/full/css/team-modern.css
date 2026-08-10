@@ -356,6 +356,23 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
+/* "Your Next Match" panel: called out with the same green accent as the
+   top phase-banner's action-needed state when this player still has a
+   pending match action (ready-check not done, lobby open, etc). */
+#matchPanelSection.action-needed {
+  border-color: rgba(0, 216, 128, 0.45);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 0 25px rgba(0, 216, 128, 0.15);
+  animation: match-panel-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes match-panel-pulse {
+  0%, 100% { border-color: rgba(0, 216, 128, 0.45); }
+  50% { border-color: rgba(0, 216, 128, 0.85); }
+}
+
 .team-section-header {
   font-size: 0.85rem;
   font-weight: 700;
