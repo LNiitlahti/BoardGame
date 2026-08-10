@@ -46,12 +46,25 @@ function channelLabel(channelId, channelsById) {
     return (channelsById && channelsById[channelId]) || channelId;
 }
 
+/** Count of each non-"moved" outcome, e.g. "2 unlinked, 1 forbidden". */
+function summariseOutcomes(items) {
+    const counts = {};
+    items.forEach(i => { counts[i.outcome] = (counts[i.outcome] || 0) + 1; });
+    return Object.entries(counts).map(([outcome, n]) => `${n} ${outcome}`).join(', ') || 'none';
+}
+
+/** "" for 1, "s" for anything else — keeps "traveler(s)" out of the prose. */
+function pl(n) {
+    return n === 1 ? '' : 's';
+}
+
 /**
- * Turn one command's results into the text posted to the status channel.
- * Summarises success/partial/failure rather than listing every player —
- * the channel is for a human glancing at what the bot just did, not a log.
+ * Reduce one command's results down to the facts a status message must
+ * convey, independent of how those facts get phrased. Every template in
+ * STATUS_TEMPLATES renders from this — it's the single place that decides
+ * what "success"/"partial"/"failure"/"noop" mean and what data each carries.
  */
-function buildStatusMessage({ command, results, channelsById }) {
+function computeStatusContext({ command, results, channelsById }) {
     const verb = command.type === 'return' ? 'Return' : 'Pull';
     const label = slotLabel(command.slot);
 
@@ -60,26 +73,145 @@ function buildStatusMessage({ command, results, channelsById }) {
     const total = results.length;
 
     const destinations = [...new Set(moved.map(r => channelLabel(r.channelId, channelsById)))];
-    const destText = destinations.length > 0 ? ` to ${destinations.join('/')}` : '';
+    const destStr = destinations.join('/');
+    const reasons = summariseOutcomes(notMoved);
 
-    if (total === 0) {
-        return `ℹ️ ${verb} — ${label}: nobody to move.`;
-    }
-    if (moved.length === total) {
-        return `✅ ${verb} complete — moved ${moved.length} player(s)${destText} (${label}).`;
-    }
-    if (moved.length === 0) {
-        return `❌ ${verb} failed — 0 of ${total} player(s) moved (${label}). Reasons: ${summariseOutcomes(notMoved)}.`;
-    }
-    return `⚠️ ${verb} partial — moved ${moved.length}/${total} player(s)${destText} (${label}). ` +
-        `${notMoved.length} not moved: ${summariseOutcomes(notMoved)}.`;
+    let category;
+    if (total === 0) category = 'noop';
+    else if (moved.length === total) category = 'success';
+    else if (moved.length === 0) category = 'failure';
+    else category = 'partial';
+
+    return {
+        category, verb, label,
+        movedCount: moved.length, total, notMovedCount: notMoved.length,
+        destinations, destStr, reasons
+    };
 }
 
-/** Count of each non-"moved" outcome, e.g. "2 unlinked, 1 forbidden". */
-function summariseOutcomes(items) {
-    const counts = {};
-    items.forEach(i => { counts[i.outcome] = (counts[i.outcome] || 0) + 1; });
-    return Object.entries(counts).map(([outcome, n]) => `${n} ${outcome}`).join(', ') || 'none';
+/**
+ * The bot's persona: Urho, a rune-spirit bound to the mountain since the
+ * sealing of Gasmorah, kept on as the Kronikat's unpaid night clerk. He has
+ * watched the deep halls for longer than he cares to say and now spends his
+ * evenings shuffling "kulkijat" (travelers) between voice channels for a LAN
+ * tournament he finds mildly beneath him. Dry, weary, occasionally wry —
+ * a grumpy old caretaker, not a solemn prophecy. He always reports the real
+ * outcome (who moved where, and why the rest didn't) before he editorializes.
+ *
+ * Organised by outcome category because the *shape* of what happened should
+ * drive the phrasing, not just be filler wrapped around one template. Every
+ * render() must surface the load-bearing facts for its category — that's
+ * covered by the "every template still tells the truth" tests below.
+ */
+const STATUS_TEMPLATES = {
+    success: [
+        { id: 's01', render: ctx => `The halls shift as commanded: ${ctx.movedCount} traveler${pl(ctx.movedCount)} delivered to ${ctx.destStr} (${ctx.label}). The Kronikat note it and move on.` },
+        { id: 's02', render: ctx => `Done. ${ctx.movedCount} kulkija${pl(ctx.movedCount)} walked the dark passage and came out the other side in ${ctx.destStr} (${ctx.label}). No fuss, no delay.` },
+        { id: 's03', render: ctx => `${ctx.verb} complete — ${ctx.movedCount} traveler${pl(ctx.movedCount)} now stand in ${ctx.destStr} (${ctx.label}). The mountain barely stirred.` },
+        { id: 's04', render: ctx => `Every name accounted for: ${ctx.movedCount}/${ctx.total} moved to ${ctx.destStr} (${ctx.label}). Even I am mildly impressed.` },
+        { id: 's05', render: ctx => `The stone doors opened without argument this time. ${ctx.movedCount} traveler${pl(ctx.movedCount)} now in ${ctx.destStr} (${ctx.label}).` },
+        { id: 's06', weight: 1.4, render: ctx => `${ctx.verb} complete, ${ctx.label}: all ${ctx.movedCount} sent through to ${ctx.destStr}. Logged, and back to staring at the walls.` },
+        { id: 's07', render: ctx => `${ctx.movedCount} traveler${pl(ctx.movedCount)} pulled through the tunnels to ${ctx.destStr} (${ctx.label}) — no stragglers, no complaints. A rare evening.` },
+        { id: 's08', render: ctx => `Recorded in the Kronikat: ${ctx.movedCount} of ${ctx.total} reached ${ctx.destStr} for ${ctx.label}, all present and accounted for.` },
+        { id: 's09', render: ctx => `They moved when called. All ${ctx.movedCount} now wait in ${ctx.destStr} (${ctx.label}). Somewhere, a riimumestari is smiling.` },
+        { id: 's10', render: ctx => `${ctx.verb} finished clean — ${ctx.destStr} now holds ${ctx.movedCount} more soul${pl(ctx.movedCount)} than it did a minute ago (${ctx.label}).` },
+        { id: 's11', render: ctx => `No one got lost in the deep halls this round. ${ctx.movedCount} traveler${pl(ctx.movedCount)} safely in ${ctx.destStr} (${ctx.label}).` },
+        { id: 's12', render: ctx => `The passage held true: ${ctx.movedCount}/${ctx.total} through to ${ctx.destStr}, ${ctx.label} accounted for. Write it down and move on.` },
+        { id: 's13', render: ctx => `Full marks, ${ctx.label}: ${ctx.movedCount} traveler${pl(ctx.movedCount)} now standing in ${ctx.destStr}. Don't get used to it.` },
+        { id: 's14', render: ctx => `${ctx.movedCount} kulkija${pl(ctx.movedCount)} answered the call without wandering off. All present in ${ctx.destStr} (${ctx.label}).` },
+        { id: 's15', render: ctx => `The mountain remembers obedience fondly. ${ctx.movedCount} traveler${pl(ctx.movedCount)} delivered to ${ctx.destStr} for ${ctx.label}.` },
+        { id: 's16', render: ctx => `Another clean entry for the Kronikat: ${ctx.movedCount}/${ctx.total} to ${ctx.destStr} (${ctx.label}). Nothing to report but success.` }
+    ],
+    partial: [
+        { id: 'p01', render: ctx => `${ctx.verb} partial, ${ctx.label}: ${ctx.movedCount} of ${ctx.total} made it to ${ctx.destStr}. The rest (${ctx.notMovedCount}) are still missing — ${ctx.reasons}.` },
+        { id: 'p02', render: ctx => `Half the tale is written. ${ctx.movedCount}/${ctx.total} reached ${ctx.destStr} (${ctx.label}); the rest didn't — ${ctx.reasons}.` },
+        { id: 'p03', render: ctx => `Some kulkijat found the path, some didn't. ${ctx.movedCount} of ${ctx.total} now in ${ctx.destStr} (${ctx.label}). Left behind: ${ctx.reasons}.` },
+        { id: 'p04', render: ctx => `The tunnels only opened partway — ${ctx.movedCount}/${ctx.total} through to ${ctx.destStr} for ${ctx.label}. Still stuck: ${ctx.reasons}.` },
+        { id: 'p05', render: ctx => `Not everyone answered. ${ctx.movedCount} of ${ctx.total} moved to ${ctx.destStr} (${ctx.label}); the missing ${ctx.notMovedCount} — ${ctx.reasons}.` },
+        { id: 'p06', render: ctx => `A mixed page for the Kronikat: ${ctx.movedCount}/${ctx.total} arrived at ${ctx.destStr} (${ctx.label}). The rest: ${ctx.reasons}.` },
+        { id: 'p07', render: ctx => `${ctx.movedCount} of ${ctx.total} traveler${pl(ctx.movedCount)} made it through to ${ctx.destStr}; the rest are still wandering the dark (${ctx.label}) — ${ctx.reasons}.` },
+        { id: 'p08', render: ctx => `Progress, not victory. ${ctx.movedCount}/${ctx.total} at ${ctx.destStr} for ${ctx.label}. Unfinished business: ${ctx.reasons}.` },
+        { id: 'p09', render: ctx => `The halls took some and refused others. ${ctx.movedCount} of ${ctx.total} landed in ${ctx.destStr} (${ctx.label}); refused entry: ${ctx.reasons}.` },
+        { id: 'p10', weight: 1.4, render: ctx => `${ctx.verb} partial, ${ctx.label}: ${ctx.movedCount}/${ctx.total} to ${ctx.destStr}. What's left: ${ctx.reasons}. The mountain shrugs.` },
+        { id: 'p11', render: ctx => `Some found the way to ${ctx.destStr}, ${ctx.movedCount} of ${ctx.total} (${ctx.label}). Others are still out there — ${ctx.reasons}.` },
+        { id: 'p12', render: ctx => `${ctx.verb} limped through: ${ctx.movedCount}/${ctx.total} to ${ctx.destStr} (${ctx.label}), ${ctx.notMovedCount} left behind — ${ctx.reasons}.` },
+        { id: 'p13', render: ctx => `Half-finished work, like most things down here. ${ctx.movedCount} of ${ctx.total} now in ${ctx.destStr} (${ctx.label}); stragglers: ${ctx.reasons}.` },
+        { id: 'p14', render: ctx => `The Kronikat records an uneven page: ${ctx.movedCount}/${ctx.total} reached ${ctx.destStr} (${ctx.label}). The rest — ${ctx.reasons}.` }
+    ],
+    failure: [
+        { id: 'f01', render: ctx => `${ctx.verb} failed outright, ${ctx.label}: none of the ${ctx.total} traveler${pl(ctx.total)} moved. Reasons carved plainly: ${ctx.reasons}.` },
+        { id: 'f02', render: ctx => `Nothing moved. Not one of the ${ctx.total} kulkija${pl(ctx.total)} reached the halls for ${ctx.label} — ${ctx.reasons}.` },
+        { id: 'f03', render: ctx => `The tunnels stayed shut. Zero of ${ctx.total} moved (${ctx.label}). Why: ${ctx.reasons}.` },
+        { id: 'f04', render: ctx => `A blank page in the Kronikat tonight — ${ctx.total} attempted for ${ctx.label}, ${ctx.total} refused. Cause: ${ctx.reasons}.` },
+        { id: 'f05', render: ctx => `Complete stillness. ${ctx.total} were called for ${ctx.label}; none arrived. ${ctx.reasons}.` },
+        { id: 'f06', render: ctx => `The mountain didn't budge. 0 of ${ctx.total} moved (${ctx.label}) — ${ctx.reasons}.` },
+        { id: 'f07', render: ctx => `Every path was blocked tonight, ${ctx.label}. 0/${ctx.total} moved. ${ctx.reasons}.` },
+        { id: 'f08', render: ctx => `An empty hall waits still. None of the ${ctx.total} traveler${pl(ctx.total)} made it through for ${ctx.label} — ${ctx.reasons}.` },
+        { id: 'f09', render: ctx => `Nothing to show for this one, ${ctx.label}: ${ctx.total} attempted, ${ctx.total} failed. ${ctx.reasons}.` },
+        { id: 'f10', render: ctx => `The old wards held them all back. 0 of ${ctx.total} moved (${ctx.label}). ${ctx.reasons}.` },
+        { id: 'f11', render: ctx => `A wasted trip for everyone, ${ctx.label} — none of the ${ctx.total} traveler${pl(ctx.total)} got through. ${ctx.reasons}.` },
+        { id: 'f12', weight: 1.4, render: ctx => `${ctx.verb} failed, ${ctx.label}: 0/${ctx.total} moved. ${ctx.reasons}. The mountain has seen worse.` }
+    ],
+    noop: [
+        { id: 'n01', render: ctx => `${ctx.verb} called for ${ctx.label}, but the halls were already empty. Nobody to move.` },
+        { id: 'n02', render: ctx => `Nothing to record, ${ctx.label} — no one was waiting to be moved.` },
+        { id: 'n03', render: ctx => `An empty roster for ${ctx.label}. The mountain rests a while longer.` },
+        { id: 'n04', render: ctx => `No travelers to summon this round (${ctx.label}). The Kronikat page stays blank.` },
+        { id: 'n05', render: ctx => `${ctx.label}: nobody was waiting. Even the old stones found that dull.` },
+        { id: 'n06', render: ctx => `Quiet halls, ${ctx.label} — nothing to move, nothing to log.` },
+        { id: 'n07', render: ctx => `No one to ${ctx.verb.toLowerCase()} for ${ctx.label} this time. A rare still moment.` },
+        { id: 'n08', render: ctx => `The call went out to an empty room (${ctx.label}). Nothing happened, nothing to note.` }
+    ]
+};
+
+/**
+ * Tracks the last template id used per category (module-scoped, so a warm
+ * Cloud Function instance keeps some memory between invocations) so the
+ * same line never fires twice in a row for the same outcome shape.
+ * `resetStatusMessageVariety` exists purely so tests get a clean slate.
+ */
+let lastUsedByCategory = {};
+
+function resetStatusMessageVariety() {
+    lastUsedByCategory = {};
+}
+
+/** Weighted random pick, weight defaulting to 1 when a template omits it. */
+function weightedPick(list) {
+    const totalWeight = list.reduce((sum, t) => sum + (t.weight || 1), 0);
+    let r = Math.random() * totalWeight;
+    for (const t of list) {
+        r -= (t.weight || 1);
+        if (r <= 0) return t;
+    }
+    return list[list.length - 1]; // floating-point fallback, never hit in practice
+}
+
+/**
+ * Picks a template for a category, filtering out whichever id fired last
+ * time so back-to-back messages never repeat verbatim (when the category
+ * has more than one template — a category with just one has nowhere else
+ * to go).
+ */
+function pickTemplate(category) {
+    const list = STATUS_TEMPLATES[category];
+    const avoidId = lastUsedByCategory[category];
+    const candidates = list.length > 1 ? list.filter(t => t.id !== avoidId) : list;
+    const chosen = weightedPick(candidates);
+    lastUsedByCategory[category] = chosen.id;
+    return chosen;
+}
+
+/**
+ * Turn one command's results into the text posted to the status channel.
+ * Delegates the facts to computeStatusContext and the phrasing to Urho's
+ * template pool — the channel is for a human glancing at what the bot just
+ * did (and reads a little personality while they're at it), not a log.
+ */
+function buildStatusMessage({ command, results, channelsById }) {
+    const ctx = computeStatusContext({ command, results, channelsById });
+    const template = pickTemplate(ctx.category);
+    return template.render(ctx);
 }
 
 async function handleCommand({ db, rest, sleep, tournamentId, command }) {
@@ -248,4 +380,7 @@ async function postStatusMessage({ tournament, rest, config, command, results })
     }
 }
 
-module.exports = { handleCommand, RETRY_DELAYS_MS, TERMINAL_OUTCOMES, buildStatusMessage };
+module.exports = {
+    handleCommand, RETRY_DELAYS_MS, TERMINAL_OUTCOMES,
+    buildStatusMessage, computeStatusContext, STATUS_TEMPLATES, resetStatusMessageVariety
+};

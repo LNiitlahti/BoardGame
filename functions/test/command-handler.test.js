@@ -1,6 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { handleCommand, RETRY_DELAYS_MS, buildStatusMessage } = require('../lib/command-handler');
+const {
+    handleCommand, RETRY_DELAYS_MS, buildStatusMessage,
+    computeStatusContext, STATUS_TEMPLATES, resetStatusMessageVariety
+} = require('../lib/command-handler');
 
 const CONFIG = {
     enabled: true,
@@ -475,8 +478,10 @@ test('a status channel gets a success message after a pull completes', async () 
     });
     assert.strictEqual(rest.sentMessages.length, 1);
     assert.strictEqual(rest.sentMessages[0].channelId, 'statusCh');
+    // Wording is persona-flavored and varies per call, but the destination
+    // channel names must survive in every variant.
     assert.match(rest.sentMessages[0].content, /ALPHA/);
-    assert.match(rest.sentMessages[0].content, /complete/i);
+    assert.match(rest.sentMessages[0].content, /BRAVO/);
 });
 
 test('no status channel configured means no message is sent', async () => {
@@ -532,7 +537,6 @@ test('buildStatusMessage: all moved is a success summary naming destination chan
     });
     assert.match(msg, /ALPHA/);
     assert.match(msg, /BRAVO/);
-    assert.match(msg, /complete/i);
 });
 
 test('buildStatusMessage: partial success reports both counts', () => {
@@ -544,8 +548,10 @@ test('buildStatusMessage: partial success reports both counts', () => {
         ],
         channelsById: { c1: 'ALPHA' }
     });
-    assert.match(msg, /partial/i);
-    assert.match(msg, /1\/2/);
+    // Wording varies by template, but the destination and the reason the
+    // other player didn't move must survive every variant.
+    assert.match(msg, /ALPHA/);
+    assert.match(msg, /unlinked/);
 });
 
 test('buildStatusMessage: zero moved is a failure summary', () => {
@@ -554,7 +560,6 @@ test('buildStatusMessage: zero moved is a failure summary', () => {
         results: [{ uid: 'a', outcome: 'forbidden' }],
         channelsById: {}
     });
-    assert.match(msg, /failed/i);
     assert.match(msg, /forbidden/);
 });
 
@@ -565,4 +570,131 @@ test('buildStatusMessage: falls back to the raw channel id when the cache has no
         channelsById: {}
     });
     assert.match(msg, /rawId123/);
+});
+
+// ── Persona template pool (Urho, the mountain's chronicle-keeper) ──────────
+
+test('computeStatusContext classifies outcomes into the right category', () => {
+    const base = { command: { type: 'pull', slot: '1' }, channelsById: { c1: 'ALPHA' } };
+    assert.strictEqual(computeStatusContext({ ...base, results: [] }).category, 'noop');
+    assert.strictEqual(computeStatusContext({
+        ...base, results: [{ uid: 'a', outcome: 'moved', channelId: 'c1' }]
+    }).category, 'success');
+    assert.strictEqual(computeStatusContext({
+        ...base, results: [
+            { uid: 'a', outcome: 'moved', channelId: 'c1' },
+            { uid: 'b', outcome: 'unlinked' }
+        ]
+    }).category, 'partial');
+    assert.strictEqual(computeStatusContext({
+        ...base, results: [{ uid: 'a', outcome: 'forbidden' }]
+    }).category, 'failure');
+});
+
+test('every success template still names the destination and the moved count', () => {
+    const ctx = computeStatusContext({
+        command: { type: 'pull', slot: '1' },
+        results: [
+            { uid: 'a', outcome: 'moved', channelId: 'c1' },
+            { uid: 'b', outcome: 'moved', channelId: 'c2' }
+        ],
+        channelsById: { c1: 'ALPHA', c2: 'BRAVO' }
+    });
+    assert.strictEqual(STATUS_TEMPLATES.success.length >= 15, true, 'expected a real pool, not a token few');
+    for (const t of STATUS_TEMPLATES.success) {
+        const msg = t.render(ctx);
+        assert.match(msg, /ALPHA/, `${t.id} dropped the destination`);
+        assert.match(msg, /BRAVO/, `${t.id} dropped the destination`);
+        assert.match(msg, /2/, `${t.id} dropped the moved count`);
+    }
+});
+
+test('every partial template still names the destination, the reason, and the split', () => {
+    const ctx = computeStatusContext({
+        command: { type: 'pull', slot: '1' },
+        results: [
+            { uid: 'a', outcome: 'moved', channelId: 'c1' },
+            { uid: 'b', outcome: 'unlinked' },
+            { uid: 'c', outcome: 'forbidden' }
+        ],
+        channelsById: { c1: 'ALPHA' }
+    });
+    assert.strictEqual(STATUS_TEMPLATES.partial.length >= 10, true, 'expected a real pool, not a token few');
+    for (const t of STATUS_TEMPLATES.partial) {
+        const msg = t.render(ctx);
+        assert.match(msg, /ALPHA/, `${t.id} dropped the destination`);
+        assert.match(msg, /unlinked/, `${t.id} dropped the failure reasons`);
+        assert.match(msg, /forbidden/, `${t.id} dropped the failure reasons`);
+        assert.match(msg, /1/, `${t.id} dropped the moved count`);
+        assert.match(msg, /3/, `${t.id} dropped the total count`);
+    }
+});
+
+test('every failure template still names the total and the reasons', () => {
+    const ctx = computeStatusContext({
+        command: { type: 'return', slot: 'challenge' },
+        results: [
+            { uid: 'a', outcome: 'forbidden' },
+            { uid: 'b', outcome: 'not_in_guild' }
+        ],
+        channelsById: {}
+    });
+    assert.strictEqual(STATUS_TEMPLATES.failure.length >= 10, true, 'expected a real pool, not a token few');
+    for (const t of STATUS_TEMPLATES.failure) {
+        const msg = t.render(ctx);
+        assert.match(msg, /forbidden/, `${t.id} dropped the failure reasons`);
+        assert.match(msg, /not_in_guild/, `${t.id} dropped the failure reasons`);
+        assert.match(msg, /2/, `${t.id} dropped the total count`);
+    }
+});
+
+test('the persona pool totals roughly fifty distinct lines across all outcome categories', () => {
+    const totalTemplates = Object.values(STATUS_TEMPLATES).reduce((n, list) => n + list.length, 0);
+    assert.strictEqual(totalTemplates >= 45, true, `only ${totalTemplates} templates`);
+    const allIds = Object.values(STATUS_TEMPLATES).flatMap(list => list.map(t => t.id));
+    assert.strictEqual(new Set(allIds).size, allIds.length, 'template ids must be unique');
+    // Genuinely distinct wording, not the same sentence with one word swapped:
+    // every rendered line in a category should be a unique string.
+    const ctx = computeStatusContext({
+        command: { type: 'pull', slot: '1' },
+        results: [
+            { uid: 'a', outcome: 'moved', channelId: 'c1' },
+            { uid: 'b', outcome: 'unlinked' }
+        ],
+        channelsById: { c1: 'ALPHA' }
+    });
+    for (const category of Object.keys(STATUS_TEMPLATES)) {
+        const rendered = STATUS_TEMPLATES[category].map(t => t.render(ctx));
+        assert.strictEqual(new Set(rendered).size, rendered.length, `${category} has duplicate wording`);
+    }
+});
+
+test('buildStatusMessage never repeats the same template twice in a row for the same outcome shape', () => {
+    resetStatusMessageVariety();
+    const args = {
+        command: { type: 'pull', slot: '1' },
+        results: [
+            { uid: 'a', outcome: 'moved', channelId: 'c1' },
+            { uid: 'b', outcome: 'moved', channelId: 'c2' }
+        ],
+        channelsById: { c1: 'ALPHA', c2: 'BRAVO' }
+    };
+    let previous = null;
+    for (let i = 0; i < 100; i++) {
+        const msg = buildStatusMessage(args);
+        assert.notStrictEqual(msg, previous, `back-to-back repeat at call ${i}`);
+        previous = msg;
+    }
+});
+
+test('buildStatusMessage draws from real variety, not one template dominating', () => {
+    resetStatusMessageVariety();
+    const args = {
+        command: { type: 'pull', slot: '1' },
+        results: [{ uid: 'a', outcome: 'moved', channelId: 'c1' }],
+        channelsById: { c1: 'ALPHA' }
+    };
+    const seen = new Set();
+    for (let i = 0; i < 60; i++) seen.add(buildStatusMessage(args));
+    assert.strictEqual(seen.size > 5, true, `only saw ${seen.size} distinct messages in 60 draws`);
 });
