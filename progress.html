@@ -113,6 +113,16 @@
   <p class="meta">commits 7779e49, 6615499 · functions/ test suite 95/95</p>
 </div>
 
+<div class="round">Round 11 — investigations — done</div>
+<div class="piece">
+  <span class="status done">2 real bugs found, fixed, independently re-verified; 1 clean investigation</span>
+  <h2>Undo Last Action, phase-init dependency, logEvent/logAction audit</h2>
+  <p><strong>Undo Last Action bug — confirmed real, fixed.</strong> Hex-territory point awards were never logged via <code>logAction()</code>, making them invisible to "Undo Last Action." The undo scan correctly skipped the deliberately-non-undoable phase-advance entries and landed on a match result from 2 phases back — exactly the reported symptom. Fixed by logging the award properly, plus a new warning in the undo confirm modal when it's genuinely reaching past newer non-undoable actions. A harsh independent critique then found a deeper related gap: undoing a points award never removed the matching <code>pointsHistory</code> entry, leaving the "don't double-award" guard stuck and the post-tournament summary/replay disagreeing with the restored points. Fixed across all 3 places that award points.</p>
+  <p><strong>Tournament-flow phase-init dependency — investigated, no bug found.</strong> Traced every <code>currentPhase</code> read across 14 files. Match creation and player linking have zero coupling to it; every other read is optional-chained or sits behind an explicit guard. Code already matches the intended independence — nothing to fix.</p>
+  <p><strong>logEvent vs logAction audit — 4 real coverage gaps found and fixed</strong> in admin.js (completing a break, clearing the match queue, waiving a pending hex win, and the legacy round-advance path were all only reaching the public event log, invisible to the structured audit trail). A harsh critique caught that one of the two new previousState snapshots used the wrong shape (an array where the working convention expects an object map, plus a wrong field name) — currently harmless since that action type isn't wired to undo yet, but would have silently corrupted data the moment it was. Fixed to match the proven-working convention before it could become a live landmine.</p>
+  <p class="meta">commits c98c364, c928a80, 8e2a1d3 · full suite 254/254</p>
+</div>
+
 <div class="round">Round 4 — mobile/iPad admin touch support</div>
 <div class="sub" style="margin-bottom:12px">User decision: tap-to-select as the primary interaction, drag-and-drop kept working as a backup — multiple ways to do the same thing, intuitive and responsive. Two waves: establish the pattern on one site, then apply it to the rest.</div>
 
