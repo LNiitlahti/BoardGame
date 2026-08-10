@@ -1624,6 +1624,21 @@ function _getMyActiveSlot() {
 }
 
 /**
+ * The viewing team's active queued/ongoing challenge match, if any --
+ * mirrors _getMyActiveSlot()'s scoping (not completed, involves our team)
+ * but for isChallenge matches, which _getMyActiveSlot() deliberately
+ * excludes (challenges don't use the Match 1/Match 2 slot sub-phases).
+ * Used by renderPhaseOverlays() to surface the same Discord/lobby "Your
+ * Next Match" panel for a self-service challenge that normal matches
+ * already get, instead of leaving it to show up only in the generic
+ * "Upcoming Matches" list with no lobby-join details.
+ */
+function _getMyActiveChallenge() {
+    const queue = gameData?.gameQueue || [];
+    return queue.find(m => m.isChallenge === true && m.status !== 'completed' && _matchInvolvesUs(m)) || null;
+}
+
+/**
  * Check if voting is available for any of this player's ongoing matches.
  */
 function checkForVoting() {
@@ -1985,9 +2000,19 @@ function renderPhaseOverlays() {
 
     const myOverlaySlot = currentPhase === 'matches_in_progress' ? _getMyActiveSlot() : null;
     const mySlotSub = myOverlaySlot ? gameData?.currentPhase?.slots?.[myOverlaySlot] : null;
+    // A queued/ongoing challenge never has a Match 1/Match 2 slot sub-phase
+    // (see _getMyActiveSlot()'s isChallenge exclusion), so it's checked
+    // separately here -- same panel, same Discord/lobby card treatment,
+    // just driven by challengeLobbyState instead of currentPhase.slots.
+    const myChallenge = mySlotSub ? null : _getMyActiveChallenge();
 
     if (mySlotSub === 'setup' || mySlotSub === 'lobby') {
         renderMatchPanel(mySlotSub === 'lobby');
+        if (matchSection) matchSection.style.display = '';
+    } else if (myChallenge) {
+        const challengeLobbyOpen = currentPhase === 'challenge_game' &&
+            gameData.currentPhase?.challengeLobbyState === 'lobby';
+        renderMatchPanel(challengeLobbyOpen);
         if (matchSection) matchSection.style.display = '';
     } else if (currentPhase && currentPhase.startsWith('spell_window')) {
         renderSpellPhaseOverlay();
@@ -2589,6 +2614,14 @@ async function submitChallenge() {
                 teams,
                 status: 'pending',
                 isChallenge: true,
+                // Same 'challenge' slot key admin-improved-adapter.js stamps
+                // on TD-created challenges (_tagNewQueueEntries/
+                // _tagImportedBatch) -- required for _resolveDiscordChannelName()
+                // to find this match's configured channel in
+                // discordConfig.slotChannels.challenge; without it, a
+                // self-service challenge's Discord card silently never
+                // resolves even though the channel IS configured.
+                slot: 'challenge',
                 challengeHexCoord: hex.coord,
                 disputingSideA: [myTeamId],
                 disputingSideB: [controllingTeamId],
