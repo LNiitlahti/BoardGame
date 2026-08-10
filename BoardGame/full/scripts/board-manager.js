@@ -225,6 +225,11 @@ class BoardManager {
                 this._gameState.heartHexControl[coord] = teamId;
                 isHeartHex = true;
             }
+
+            // Heart-hex dispute eligibility trigger -- mirrors admin.js's
+            // markAdjacentHeartHexesEligible(). See team-controls.js's
+            // _getEligibleChallengeHexes() for the read side.
+            this._markAdjacentHeartHexesEligible(parseInt(q), parseInt(r), teamId);
         }
 
         this.closeTeamPicker();
@@ -259,6 +264,35 @@ class BoardManager {
 
         this.renderBoard();
         this._onPhaseChanged();
+    }
+
+    /**
+     * Trigger heart-hex dispute eligibility for `teamId` against any heart
+     * hex adjacent to the plate it just placed at (q, r) that's currently
+     * controlled by a DIFFERENT team. See admin.js's
+     * markAdjacentHeartHexesEligible() for the full rationale -- kept in
+     * sync with it since this class is an alternate assignTeamToHex path
+     * (used by god.html) covering the same board mutation.
+     */
+    _markAdjacentHeartHexesEligible(q, r, teamId) {
+        if (!this._boardModule?.getHexNeighbors || !this._gameState) return;
+
+        const neighbors = this._boardModule.getHexNeighbors(q, r);
+        neighbors.forEach(neighborCoord => {
+            const nm = neighborCoord.match(/q(-?\d+)r(-?\d+)/);
+            if (!nm) return;
+            const [, nq, nr] = nm;
+            const neighborType = this._boardModule.getHexType(parseInt(nq), parseInt(nr));
+            if (neighborType !== 'side-heart' && neighborType !== 'mountain-heart') return;
+
+            const ownerId = this._gameState.heartHexControl?.[neighborCoord];
+            if (ownerId == null || String(ownerId) === String(teamId)) return;
+
+            this._gameState.heartHexChallengeEligibility = this._gameState.heartHexChallengeEligibility || {};
+            this._gameState.heartHexChallengeEligibility[neighborCoord] =
+                this._gameState.heartHexChallengeEligibility[neighborCoord] || {};
+            this._gameState.heartHexChallengeEligibility[neighborCoord][teamId] = true;
+        });
     }
 
     // ------------------------------------------------------------------

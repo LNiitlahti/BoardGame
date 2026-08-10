@@ -2271,27 +2271,62 @@ function resolveGameImage(gameId) {
 // multi-team/multi-player picker -- a team can only ever raise a dispute as
 // itself (single side) against whichever other team currently controls a
 // contested heart hex, with each side's FULL roster auto-included (no
-// player-by-player picking). Framing assumption (flagged in the commit/
-// report): a team may only dispute a heart hex it does NOT currently
-// control -- there's no adjacency/standing requirement found in the hex
-// rules elsewhere in the codebase, so eligibility is simply "any hex in
-// gameState.heartHexControl owned by another team". This mirrors how
-// updateChallengeHexPicker() itself has no adjacency check, just an
-// "owned by one of the currently-selected teams" filter.
+// player-by-player picking).
+//
+// Rulebook eligibility rule: a heart-hex dispute is TRIGGERED by placing
+// your own plate adjacent to a heart hex already controlled by another team
+// -- that placement creates the OPPORTUNITY to dispute it, it does not force
+// immediate action. The team can then freely decide whether, and when (in
+// any later "challenges" phase), to actually raise it, and the eligibility
+// persists indefinitely once triggered -- it never expires on its own.
+// The adjacency trigger itself lives where plates get placed: see
+// admin.js's markAdjacentHeartHexesEligible() / board-manager.js's
+// _markAdjacentHeartHexesEligible(), both of which set
+// gameState.heartHexChallengeEligibility[heartCoord][teamId] = true using
+// boardModule.getHexNeighbors() for the actual hex-adjacency math. This
+// function only READS that persisted flag -- it does not compute adjacency
+// itself.
+//
+// Exception: the "Täytä sopimus" ("Complete the Contract") spell lets its
+// caster dispute the Mountain Heart specifically from anywhere on the board,
+// no adjacency trigger required -- see _hasCompleteContractException() below.
 
 /**
- * All heart hexes NOT controlled by our own team -- i.e. every hex our team
- * could raise a dispute against right now. Mirrors admin.js's
- * updateChallengeHexPicker() hex-gathering logic (same coord regex, same
- * hex-type labeling via boardModule.getHexType), scoped to "controlled by
- * someone other than us" instead of "controlled by any selected team".
+ * True if `teamId` currently holds an unexpired "Täytä sopimus" active
+ * effect, granting it unconditional eligibility to dispute the Mountain
+ * Heart regardless of adjacency (spells.json id "complete-contract" --
+ * "Saatte haastaa Vuoren Sydämen ... hallinnan").
+ */
+function _hasCompleteContractException(teamId) {
+    const effects = gameData?.activeEffects || [];
+    return effects.some(eff =>
+        eff.spellId === 'complete-contract' &&
+        !eff.isExpired &&
+        String(eff.castByTeamId) === String(teamId)
+    );
+}
+
+/**
+ * All heart hexes our team is currently eligible to dispute: hexes
+ * controlled by another team where either (a) our team has a persisted
+ * adjacency-triggered eligibility flag (gameState.heartHexChallengeEligibility),
+ * or (b) it's the Mountain Heart and our team holds the "Täytä sopimus"
+ * exception. Mirrors admin.js's updateChallengeHexPicker() hex-gathering
+ * logic (same coord regex, same hex-type labeling via boardModule.getHexType).
  */
 function _getEligibleChallengeHexes() {
     const control = gameData?.heartHexControl || {};
+    const eligibility = gameData?.heartHexChallengeEligibility || {};
+    const mountainHeartCoord = boardModule?.mountainHeartLocation || 'q0r0';
+    const hasContractException = _hasCompleteContractException(currentTeamId);
     const result = [];
 
     Object.entries(control).forEach(([coord, ownerId]) => {
         if (ownerId == null || String(ownerId) === String(currentTeamId)) return;
+
+        const triggered = eligibility[coord]?.[currentTeamId] === true;
+        const contractException = hasContractException && coord === mountainHeartCoord;
+        if (!triggered && !contractException) return;
 
         const team = gameData.teams?.find(t => String(t.id) === String(ownerId));
         const teamName = team?.name || `Team ${ownerId}`;

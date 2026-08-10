@@ -14,11 +14,14 @@
  *   - `#challengeSection` (team.html left sidebar) is visible only during
  *     `currentPhase.name === 'challenges'` (renderChallengePanel(),
  *     team-controls.js).
- *   - Eligibility = any heart hex in `gameState.heartHexControl` NOT
- *     controlled by the requesting team (`_getEligibleChallengeHexes()`).
- *     Flagged assumption (no adjacency/standing rule found elsewhere in the
- *     codebase): a team may dispute ANY hex it doesn't currently control,
- *     mirroring updateChallengeHexPicker()'s own lack of an adjacency check.
+ *   - Eligibility = a heart hex in `gameState.heartHexControl` NOT controlled
+ *     by the requesting team, AND persistently flagged eligible for that team
+ *     in `gameState.heartHexChallengeEligibility[coord][teamId]`
+ *     (`_getEligibleChallengeHexes()`). That flag is normally set by the
+ *     adjacency trigger in admin.js/board-manager.js's
+ *     markAdjacentHeartHexesEligible() when a plate is placed next to an
+ *     opponent-controlled heart hex; this test seeds it directly (synthetic
+ *     hexes have no real board position to trigger adjacency from).
  *   - 0 eligible hexes → disabled button + explanation, no modal reachable.
  *   - 1 eligible hex → clicking "⚔ CHALLENGE" skips the picker and shows a
  *     direct confirm summary.
@@ -144,6 +147,7 @@ async function main() {
 
     const original = await tdPage.evaluate(() => ({
       heartHexControl: JSON.parse(JSON.stringify(window.godApp.gameState.heartHexControl || {})),
+      heartHexChallengeEligibility: JSON.parse(JSON.stringify(window.godApp.gameState.heartHexChallengeEligibility || {})),
       currentPhase: JSON.parse(JSON.stringify(window.godApp.gameState.currentPhase || null)),
       gameQueue: JSON.parse(JSON.stringify(window.godApp.gameState.gameQueue || []))
     }));
@@ -156,6 +160,7 @@ async function main() {
       await tdPage.evaluate(() => {
         const gs = window.godApp.gameState;
         gs.heartHexControl = {}; // nothing contested yet
+        gs.heartHexChallengeEligibility = {};
         gs.currentPhase = { name: 'challenges', roundNumber: 999901 };
         gs.gameQueue = [];
         return window.godApp.saveGameState();
@@ -197,6 +202,10 @@ async function main() {
       await tdPage.evaluate((coord) => {
         const gs = window.godApp.gameState;
         gs.heartHexControl = { [coord]: 2 }; // Team Beta controls it
+        // Synthetic hex has no real board position to trigger the adjacency
+        // rule from, so seed the persisted eligibility flag directly (this
+        // is what markAdjacentHeartHexesEligible() would have set).
+        gs.heartHexChallengeEligibility = { [coord]: { 1: true } }; // Team Alpha (id 1) is eligible
         return window.godApp.saveGameState();
       }, HEX_A);
 
@@ -279,6 +288,7 @@ async function main() {
       await tdPage.evaluate((coords) => {
         const gs = window.godApp.gameState;
         gs.heartHexControl = { [coords.a]: 2, [coords.b]: 2 }; // both held by Team Beta
+        gs.heartHexChallengeEligibility = { [coords.a]: { 1: true }, [coords.b]: { 1: true } };
         gs.gameQueue = gs.gameQueue.filter(m => !m.isChallenge); // clear PART 2's entry so matchNumber math stays simple
         return window.godApp.saveGameState();
       }, { a: HEX_A, b: HEX_B });
@@ -363,6 +373,10 @@ async function main() {
         await db.collection('tournaments').doc(tid).update({
           'heartHexControl.e2e_test_hex_a': 2, // Team Beta controls it again
           'heartHexControl.e2e_test_hex_b': firebase.firestore.FieldValue.delete(),
+          // Eligibility for hex_a persists indefinitely from PART 2/3 (never
+          // cleared by ownership changes), but set it explicitly too so this
+          // part doesn't depend on that carry-over.
+          'heartHexChallengeEligibility.e2e_test_hex_a.1': true,
           gameQueue: queue
         });
       }, HEX_A);
@@ -423,16 +437,20 @@ async function main() {
         gs.gameQueue = orig.gameQueue;
         gs.currentPhase = orig.currentPhase;
         gs.heartHexControl = orig.heartHexControl;
+        gs.heartHexChallengeEligibility = orig.heartHexChallengeEligibility;
         await window.godApp.saveGameState();
-        // heartHexControl is a Firestore MAP field -- merge:true does not
-        // delete keys omitted from a plain reassign+save. Explicitly delete
-        // the two synthetic keys this test may have added, in addition to
-        // the reassign above (same pattern as the board/players gotchas).
+        // heartHexControl/heartHexChallengeEligibility are Firestore MAP
+        // fields -- merge:true does not delete keys omitted from a plain
+        // reassign+save. Explicitly delete the synthetic keys this test may
+        // have added, in addition to the reassign above (same pattern as the
+        // board/players gotchas).
         const db = firebase.firestore();
         const tid = new URLSearchParams(window.location.search).get('tournamentId');
         await db.collection('tournaments').doc(tid).update({
           'heartHexControl.e2e_test_hex_a': firebase.firestore.FieldValue.delete(),
-          'heartHexControl.e2e_test_hex_b': firebase.firestore.FieldValue.delete()
+          'heartHexControl.e2e_test_hex_b': firebase.firestore.FieldValue.delete(),
+          'heartHexChallengeEligibility.e2e_test_hex_a': firebase.firestore.FieldValue.delete(),
+          'heartHexChallengeEligibility.e2e_test_hex_b': firebase.firestore.FieldValue.delete()
         });
       }, original);
       console.log('Restored original heartHexControl/currentPhase/gameQueue.');

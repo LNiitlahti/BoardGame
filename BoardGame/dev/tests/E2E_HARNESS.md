@@ -750,11 +750,20 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   currently controls a contested heart hex, with each side's FULL roster
   auto-included via `PlayerUtils.getTeamPlayerIds()` (same helper used for
   normal roster resolution elsewhere) instead of manual player picking.
-  **Flagged assumption** (no written dispute-eligibility rule found anywhere
-  in `docs/` or the hex-control code): a team may dispute ANY heart hex it
-  doesn't currently control, no adjacency/standing requirement — this
-  mirrors `updateChallengeHexPicker()`'s own lack of an adjacency check, but
-  should be confirmed with the tournament rules owner. Also flagged: the
+  Eligibility follows the rulebook's adjacency-trigger rule (§7): placing a
+  plate adjacent to a heart hex another team controls creates a persistent
+  "eligible to dispute" flag for that hex/team pair
+  (`gameState.heartHexChallengeEligibility`, set by `admin.js`'s
+  `markAdjacentHeartHexesEligible()` / `board-manager.js`'s
+  `_markAdjacentHeartHexesEligible()` at plate-placement time, using
+  `boardModule.getHexNeighbors()` for the adjacency check), and that
+  eligibility never expires on its own — a team can act on it in any later
+  "challenges" phase. The "Täytä sopimus" spell is the one documented
+  exception: it grants unconditional eligibility to dispute the Mountain
+  Heart specifically, regardless of adjacency (`_hasCompleteContractException()`
+  in `team-controls.js`). This test's synthetic hexes have no real board
+  position to trigger adjacency from, so it seeds
+  `heartHexChallengeEligibility` directly instead. Also flagged: the
   created entry's `game` field defaults to `GAMES_CONFIG.getActiveGames()[0].id`
   (currently `'predecessor'`) since there's no "any"/"unspecified" game
   convention anywhere in `games-config.js` and a team has no game-type

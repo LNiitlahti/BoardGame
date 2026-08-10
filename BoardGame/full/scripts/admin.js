@@ -2071,6 +2071,15 @@ async function assignTeamToHex(coord, teamId) {
             gameState.heartHexControl[coord] = teamId;
             isHeartHex = true;
         }
+
+        // Heart-hex dispute eligibility trigger (rulebook: placing your own
+        // plate adjacent to a heart hex already controlled by ANOTHER team
+        // creates the OPPORTUNITY to dispute it -- doesn't force immediate
+        // action). Mark it in gameState.heartHexChallengeEligibility, a
+        // persisted per-hex/per-team flag that, once set, never expires --
+        // see team-controls.js's _getEligibleChallengeHexes() for the read
+        // side of this.
+        markAdjacentHeartHexesEligible(parseInt(q), parseInt(r), teamId);
     }
 
     closeTeamPicker();
@@ -2101,6 +2110,41 @@ async function assignTeamToHex(coord, teamId) {
     // (admin-improved-adapter.js's _augmentTeamPicker).
 
     renderBoard();
+}
+
+/**
+ * Trigger heart-hex dispute eligibility for `teamId` against any heart hex
+ * adjacent to the plate it just placed at (q, r) that's currently controlled
+ * by a DIFFERENT team. Uses boardModule.getHexNeighbors() -- the same axial
+ * neighbor math used everywhere else (canPlaceAt, spell-engine's
+ * destroy_adjacent) -- rather than reimplementing hex adjacency here.
+ *
+ * Persists into gameState.heartHexChallengeEligibility[heartCoord][teamId] = true.
+ * Additive-only: once set, this flag is never cleared by this function, so
+ * eligibility to dispute a given heart hex persists indefinitely for the
+ * team that triggered it, even across later ownership changes of that hex --
+ * per the rulebook, the placement only creates the OPPORTUNITY to dispute,
+ * which the team can act on whenever it likes in a later "challenges" phase.
+ */
+function markAdjacentHeartHexesEligible(q, r, teamId) {
+    if (!boardModule?.getHexNeighbors || !gameState) return;
+
+    const neighbors = boardModule.getHexNeighbors(q, r);
+    neighbors.forEach(neighborCoord => {
+        const nm = neighborCoord.match(/q(-?\d+)r(-?\d+)/);
+        if (!nm) return;
+        const [, nq, nr] = nm;
+        const neighborType = boardModule.getHexType(parseInt(nq), parseInt(nr));
+        if (neighborType !== 'side-heart' && neighborType !== 'mountain-heart') return;
+
+        const ownerId = gameState.heartHexControl?.[neighborCoord];
+        if (ownerId == null || String(ownerId) === String(teamId)) return;
+
+        gameState.heartHexChallengeEligibility = gameState.heartHexChallengeEligibility || {};
+        gameState.heartHexChallengeEligibility[neighborCoord] =
+            gameState.heartHexChallengeEligibility[neighborCoord] || {};
+        gameState.heartHexChallengeEligibility[neighborCoord][teamId] = true;
+    });
 }
 
 function closeTeamPicker() {
