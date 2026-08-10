@@ -149,10 +149,11 @@
             .filter(([, owner]) => String(owner) !== String(effect.castByTeamId))
             .map(([coord]) => coord);
 
-        startSpellHexPickMode(valid, 'Pick the tile to remove', (coord) => {
+        startSpellHexPickMode(valid, 'Pick the tile to remove', async (coord) => {
             const result = engine.useChargedRemoval(effectId, coord);
             if (result.success) {
                 showStatus(`Tile removed. ${result.usesRemaining} charge(s) left.`, 'success');
+                await saveGameState();
             } else {
                 showStatus(`Could not remove tile: ${result.error}`, 'error');
             }
