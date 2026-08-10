@@ -63,6 +63,15 @@ class BoardManager {
         return this._boardModule ? this._boardModule.getHexType(q, r) : null;
     }
 
+    /**
+     * Public passthrough to the injected BoardModule's coordinate generator,
+     * for callers (currently SpellEngine.getValidHexesForField) that need
+     * the full board coordinate list without their own BoardModule reference.
+     */
+    generateHexCoordinates() {
+        return this._boardModule ? this._boardModule.generateHexCoordinates() : [];
+    }
+
     // ------------------------------------------------------------------
     // Board rendering (admin.js patterns)
     // ------------------------------------------------------------------

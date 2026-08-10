@@ -796,6 +796,42 @@ class SpellEngine {
     }
 
     /**
+     * Compute the coords eligible for a hex-picker field on the Process
+     * modal / Active Effects action buttons, for the field types wired up
+     * so far. `formState` carries in-progress picks from the same field set
+     * (e.g. reposition's `to` step needs the `from` hex already chosen).
+     * Reuses the same algorithm BoardManager.highlightValidPlacements()
+     * uses (generateHexCoordinates() -> canPlaceAt(q, r, teamId)), exposed
+     * as pure data instead of DOM highlighting.
+     * @returns {string[]} coords in "qXrY" format
+     */
+    getValidHexesForField(effectType, fieldKey, def, castByTeamId, formState = {}) {
+        const gs = this._gameState;
+        const board = gs.board || {};
+        const teamId = typeof castByTeamId === 'string' ? parseInt(castByTeamId) : castByTeamId;
+
+        if (effectType === 'extra_placement' && fieldKey === 'coords') {
+            if (!this._board) return [];
+            return this._board.generateHexCoordinates()
+                .filter(([q, r]) => this._board.canPlaceAt(q, r, teamId))
+                .map(([q, r]) => `q${q}r${r}`);
+        }
+
+        if (effectType === 'reposition' && fieldKey === 'moves') {
+            if (formState.from) {
+                // "to" step: neighbors of the already-chosen "from" hex.
+                return this._getHexNeighbors(formState.from);
+            }
+            // "from" step: hexes the casting team currently occupies.
+            return Object.entries(board)
+                .filter(([, owner]) => String(owner) === String(teamId))
+                .map(([coord]) => coord);
+        }
+
+        return [];
+    }
+
+    /**
      * Pure placement loop shared by _handleExtraPlacement and
      * _handleConditionalBonus (Ylimielistä tietoa / sarja4-k1 — a fixed
      * points+tiles reward, not a restriction-gated placement). Does not log
