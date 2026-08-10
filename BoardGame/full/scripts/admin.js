@@ -2148,6 +2148,7 @@ async function assignTeamToHex(coord, teamId) {
                 return def?.nameEn || def?.name || id;
             }).join(', ');
             showStatus(`Team drew spell: ${names}`, 'success');
+            await saveGameState();
         }
     }
 
