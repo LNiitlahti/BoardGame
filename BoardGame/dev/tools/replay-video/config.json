@@ -1,0 +1,11 @@
+{
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "seconds_per_action": 0.75,
+  "recency_tile_count": 10,
+  "recency_brightness_max": 0.5,
+  "recency_brightness_min": 0.1,
+  "spell_toast_duration_seconds": 2.0,
+  "output_format": "mp4"
+}
