@@ -449,6 +449,18 @@
         </div>
     </div>
 
+    <!-- Spell Process Modal (Process button on a pending spellHistory entry) -->
+    <div class="modal-overlay" id="spellProcessModal">
+        <div class="modal-content">
+            <h3 id="spellProcessTitle">Process Spell</h3>
+            <div id="spellProcessBody"></div>
+            <div class="challenge-setup-actions">
+                <button type="button" class="btn-small secondary" onclick="closeSpellProcessModal()">Cancel</button>
+                <button type="button" class="btn-small primary" id="spellProcessSubmitBtn" onclick="submitSpellProcessModal()">Submit</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Challenge Setup Modal -->
     <div class="modal-overlay" id="challengeSetupModal">
         <div class="modal-content challenge-setup-modal">
@@ -934,5 +946,7 @@
     <script defer src="scripts/backup-manager.js"></script>
     <script defer src="scripts/spell-engine.js"></script>
     <script defer src="scripts/admin-improved-adapter.js"></script>
+    <script defer src="scripts/spell-process-fields.js"></script>
+    <script defer src="scripts/spell-process-ui.js"></script>
 </body>
 </html>
