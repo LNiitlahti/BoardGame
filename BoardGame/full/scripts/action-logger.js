@@ -92,7 +92,25 @@ class ActionLogger {
                     undoneAt: null
                 };
 
-                transaction.set(counterRef, { seq: nextSeq });
+                // Atomic increment with merge, NOT transaction.set(counterRef,
+                // { seq: nextSeq }). When counterDoc didn't exist at read time,
+                // a raw set() sends Firestore an "exists: false" create
+                // precondition on commit; if two logAction() calls race (e.g.
+                // right after creating a tournament, when creation + an
+                // immediate first phase-advance both log in quick succession)
+                // and both lose that race, the loser's whole transaction is
+                // rejected with `already-exists` — a code the SDK's automatic
+                // transaction retry does NOT cover (unlike the usual `aborted`
+                // conflict code), so the entire action-log entry silently
+                // vanishes. FieldValue.increment() has no such precondition:
+                // it initializes an absent field to 0 before adding, so it
+                // succeeds regardless of which concurrent writer's read was
+                // stale. The only cost is that sequenceNumber (used for
+                // display/ordering, not correctness — replay/undo already key
+                // off Firestore doc ids and serverTimestamp) can rarely
+                // collide across two truly simultaneous writes, which beats
+                // losing the entry outright.
+                transaction.set(counterRef, { seq: firebase.firestore.FieldValue.increment(1) }, { merge: true });
                 transaction.set(actionLogRef, entry);
             });
         } catch (error) {

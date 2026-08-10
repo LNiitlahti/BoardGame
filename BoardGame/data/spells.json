@@ -19,12 +19,15 @@
     },
     {
       "id": "get-away",
-      "name": "Irti minusta!",
-      "nameEn": "Get Away From Me!",
+      "name": "Irti minusta",
+      "nameEn": "Get Away From Me",
+      "deck": "sarja5",
+      "cardNumber": 3,
+      "image": "shared/images/spell-cards/sarja5-k3.png",
       "type": "pre-game",
       "rarity": "common",
-      "description": "Pelatkaa ennen pelin alkua. Jos rotu, jossa ylihaltijat ovat, voittaa pelin, kaikki vastustajarodujen laatat, jotka koskettavat ylihaltijoidien laattoja, tuhotaan pelin jälkeen.",
-      "descriptionEn": "Play before game starts. If the race with High Elves wins the game, all opponent race tiles touching High Elves' tiles are destroyed after the game.",
+      "description": "Jos tiiminne voittaa seuraavan pelin, kaikki vastustajien laatat jotka koskevat omianne tuhotaan pelin jälkeen",
+      "descriptionEn": "If your team wins the next game, all opponent tiles touching yours are destroyed after the game.",
       "timing": "pre-game",
       "targetType": "opponents",
       "effect": {
@@ -56,10 +59,13 @@
       "id": "elf-protection",
       "name": "Haltiasuoja",
       "nameEn": "Elf Protection",
+      "deck": "sarja5",
+      "cardNumber": 2,
+      "image": "shared/images/spell-cards/sarja5-k2.png",
       "type": "defensive",
       "rarity": "uncommon",
-      "description": "Pelatkaa minkä tahansa hävityn ottelun jälkeen. Kaikki omat laatat ovat suojassa seuraavan pelin loppuun asti, eikä niitä voi poistaa millään efektillä. Ylihaltijoihin ei voi kohdistaa negatiivisia korttiefektejä ennen seuraavan kierroksen loppua.",
-      "descriptionEn": "Play after any lost match. All your tiles are protected until the end of the next game and cannot be removed by any effect. High Elves cannot be targeted by negative card effects until the end of the next round.",
+      "description": "Pelatkaa hävityn ottelun jälkeen. Teihin ei voi kohdistaa negatiivisia efektejä ennen seuraavan ottelun loppua",
+      "descriptionEn": "Play after a lost match. Negative effects cannot target you until the end of the next match.",
       "timing": "post-game",
       "targetType": "self",
       "effect": {
@@ -72,10 +78,13 @@
       "id": "all-according-plan",
       "name": "Kaikki on minun suunnitelmaani",
       "nameEn": "All According to My Plan",
+      "deck": "sarja5",
+      "cardNumber": 1,
+      "image": "shared/images/spell-cards/sarja5-k1.png",
       "type": "tactical",
       "rarity": "rare",
-      "description": "Pelaa milloin tahansa omalla vuorollasi. Valitse yksi muiden rotujen käytetyistä korteista ja pelaa se välittömästi omana korttinasi (kortin on oltava mahdollista pelata heti).",
-      "descriptionEn": "Play anytime on your turn. Choose one used card from other races and play it immediately as your own card (the card must be playable immediately).",
+      "description": "Valitse yksi vastustajien kortti käytettyjen korttien pakoista pelaa se välittömästi omana korttinasi",
+      "descriptionEn": "Choose one opponent's card from a used-card pile and play it immediately as your own card.",
       "timing": "anytime",
       "targetType": "opponent-card",
       "effect": {
@@ -204,10 +213,13 @@
       "id": "echo-silence",
       "name": "Hiljaisuuden kaiku",
       "nameEn": "Echo of Silence",
+      "deck": "sarja5",
+      "cardNumber": 4,
+      "image": "shared/images/spell-cards/sarja5-k4.png",
       "type": "debuff",
       "rarity": "uncommon",
-      "description": "Pelatkaa ennen pelin alkua. Valitkaa yksi pelaaja mistä tahansa rodusta, joka ei saa käyttää mikrofonia eikä puhua lainkaan pelin aikana.",
-      "descriptionEn": "Play before game starts. Choose one player from any race who cannot use microphone or speak at all during the game.",
+      "description": "Valitkaa yksi pelaaja mistä tahansa tiimistä hän ei saa puhua lainkaan seuraavan pelin aikana",
+      "descriptionEn": "Choose one player from any team who cannot speak at all during the next game.",
       "timing": "pre-game",
       "targetType": "opponent-player",
       "effect": {
@@ -218,12 +230,15 @@
     },
     {
       "id": "betting-depths",
-      "name": "Vedonlyöntiä syyvyksistä",
+      "name": "Vedonlyöntiä syvyyksissä",
       "nameEn": "Betting from the Depths",
+      "deck": "sarja6",
+      "cardNumber": 7,
+      "image": "shared/images/spell-cards/sarja6-k7.png",
       "type": "bet",
       "rarity": "uncommon",
-      "description": "Ennen peliä Kääpiömestari & Drow täyttävät vedonlyöntilapun:\n- Kumpi rotu voittaa pelin\n- Kuka tekee eniten damagea/tappoja\n- Kuka kuolee eniten\nJokaisesta oikein menneestä saa 1 voittopisteen ja laatan. Jos kaikki väärin, tuhotkaa 2 omaa laattaa laudalta.",
-      "descriptionEn": "Before game, Dwarf Master & Drow fill a betting slip:\n- Which race wins the game\n- Who does most damage/kills\n- Who dies most\nFor each correct bet, get 1 victory point and tile. If all wrong, destroy 2 of your tiles from the board.",
+      "description": "Kirjoittakaa lapulle. Kumpi tiimi voittaa, kenellä on parhaat statsit, kenellä on huonoimmat. Jos oikein +1 laatta ja voittopiste, jos kaikki väärin tuhotkaa 2 omaa laattaa laudalta",
+      "descriptionEn": "Write it on a slip: which team wins, who has the best stats, who has the worst. For each correct prediction, +1 tile and 1 victory point. If all wrong, destroy 2 of your own tiles from the board.",
       "timing": "pre-game",
       "targetType": "self",
       "effect": {
@@ -240,12 +255,15 @@
     },
     {
       "id": "rift-knowledge",
-      "name": "Syvän tiedon rako",
+      "name": "Syvän tiedon kuilu",
       "nameEn": "Rift of Deep Knowledge",
+      "deck": "sarja6",
+      "cardNumber": 6,
+      "image": "shared/images/spell-cards/sarja6-k6.png",
       "type": "counter",
       "rarity": "rare",
-      "description": "Tämä kortti pysyy hallussanne, kunnes käytätte sen. Kun joku muu rotu nostaa tapahtumakortin, saatte lukea sen ja halutessanne estää noston – kortti siirtyy suoraan käytettyjen pinoon eikä sitä pelata.",
-      "descriptionEn": "This card stays in your possession until you use it. When another race draws an event card, you may read it and optionally prevent the draw – the card moves directly to the used pile and is not played.",
+      "description": "Valitkaa vastustaja tiimi. heidän nostaessa kortin voitte katsoa mikä se on ja päättää estättekö sen noston",
+      "descriptionEn": "Choose an opponent team. When they draw a card, you may look at it and decide whether to prevent the draw.",
       "timing": "reactive",
       "targetType": "opponent-draw",
       "effect": {
@@ -258,16 +276,661 @@
       "id": "rematch",
       "name": "Uusinta",
       "nameEn": "Rematch",
+      "deck": "sarja6",
+      "cardNumber": 9,
+      "image": "shared/images/spell-cards/sarja6-k9.png",
       "type": "reversal",
       "rarity": "rare",
-      "description": "Pelatkaa minkä tahansa vahvistetun ottelun tuloksen jälkeen. Valitkaa kyseinen ottelu: sen tulos peruutetaan kokonaan – annetut voittopisteet ja laattojen valtaukset perutaan – ja ottelu palautetaan pelattavaksi alusta, ikään kuin sitä ei olisi koskaan pelattu. Tuomari vahvistaa uuden tuloksen normaalisti.",
-      "descriptionEn": "Play after any confirmed match result. Choose that match: its result is fully reverted – any awarded victory points and hex/tile claims are undone – and the match is put back into a replayable, unconfirmed state as if it never happened. The admin then confirms a brand new result through the normal flow.",
+      "description": "Pelaa aikaisempi peli uudelleen, kaikki efektit pysyvät, aikaisempi tulos mitätöityy. Pelatkaa minkä tahansa vahvistetun ottelun tuloksen jälkeen. Valitkaa kyseinen ottelu: sen tulos peruutetaan kokonaan – annetut voittopisteet ja laattojen valtaukset perutaan – ja ottelu palautetaan pelattavaksi alusta, ikään kuin sitä ei olisi koskaan pelattu. Tuomari vahvistaa uuden tuloksen normaalisti.",
+      "descriptionEn": "Play a previous match again — all active effects stay in place, and the previous result is voided. Play after any confirmed match result. Choose that match: its result is fully reverted – any awarded victory points and hex/tile claims are undone – and the match is put back into a replayable, unconfirmed state as if it never happened. The admin then confirms a brand new result through the normal flow.",
       "timing": "post-game",
       "targetType": "match",
       "effect": {
         "type": "rematch",
         "target": "confirmed_match",
         "action": "full_revert"
+      }
+    },
+    {
+      "id": "sarja1-k1",
+      "name": "Vuori Puhuu",
+      "nameEn": "The Mountain Speaks",
+      "deck": "sarja1",
+      "cardNumber": 1,
+      "image": "shared/images/spell-cards/sarja1-k1.png",
+      "type": "replay",
+      "rarity": "rare",
+      "description": "Pelaa välittömästi uudelleen kaikki käytettyjen korttien pakassa olevat loitsut",
+      "descriptionEn": "Immediately replay all spells in the used-card pile.",
+      "timing": "anytime",
+      "targetType": "self",
+      "effect": {
+        "type": "replay_used_pile",
+        "note": "Only replays used-pile entries whose effect can resolve without additional admin/player input (ban, silence, shield, multiplier, streak_bonus, permanent_buff, modifier, counter, bonus_points). Entries needing a target/choice (challenge, bet, copy_spell, rematch, extra_placement, destroy_adjacent) are listed as skipped for manual processing."
+      }
+    },
+    {
+      "id": "sarja1-k2",
+      "name": "harkittu agressio",
+      "nameEn": "Calculated Aggression",
+      "deck": "sarja1",
+      "cardNumber": 2,
+      "image": "shared/images/spell-cards/sarja1-k2.png",
+      "type": "aggressive",
+      "rarity": "common",
+      "description": "Aseta yksi laatta laudalle, tuhoa kaikki viereiset vastustajien laatat",
+      "descriptionEn": "Place one tile on the board; destroy all adjacent opponent tiles.",
+      "timing": "placement",
+      "targetType": "adjacent-enemies",
+      "effect": {
+        "type": "destroy_adjacent",
+        "trigger": "on_placement",
+        "target": "adjacent_opponent_tiles"
+      }
+    },
+    {
+      "id": "sarja1-k3",
+      "name": "Juho Puhuu",
+      "nameEn": "Juho Speaks",
+      "deck": "sarja1",
+      "cardNumber": 3,
+      "image": "shared/images/spell-cards/sarja1-k3.png",
+      "type": "debuff",
+      "rarity": "common",
+      "description": "Valitse pelaaja. hän pelaa seuraavan ottelun kuulokkeissa häiritsevää taustamelua",
+      "descriptionEn": "Choose a player. They play the next match with disruptive background noise in their headset.",
+      "timing": "pre-game",
+      "targetType": "opponent-player",
+      "effect": {
+        "type": "reminder",
+        "target": "single_player",
+        "duration": "one_game"
+      }
+    },
+    {
+      "id": "sarja1-k4",
+      "name": "Sabotaasia",
+      "nameEn": "Sabotage",
+      "deck": "sarja1",
+      "cardNumber": 4,
+      "image": "shared/images/spell-cards/sarja1-k4.png",
+      "type": "debuff",
+      "rarity": "uncommon",
+      "description": "Valitkaa vastustajatiimi. Määrittäkää yksi pelattava asia (hahmoluokka, aselaji, rotu), kyseinen tiimi ei saa käyttää sitä seuraavassa pelissä",
+      "descriptionEn": "Choose an opponent team. Name one playable thing (character class, weapon type, race) that team may not use in the next game.",
+      "timing": "pre-game",
+      "targetType": "opponent-team",
+      "effect": {
+        "type": "ban",
+        "duration": "next_game",
+        "target": "game_element"
+      }
+    },
+    {
+      "id": "sarja1-k5",
+      "name": "Kiven Muisti",
+      "nameEn": "Memory of Stone",
+      "deck": "sarja1",
+      "cardNumber": 5,
+      "image": "shared/images/spell-cards/sarja1-k5.png",
+      "type": "event-modifier",
+      "rarity": "uncommon",
+      "description": "Seuraavan kerran kun nostatte kortin loitsupakasta, nostakaa yksi lisää",
+      "descriptionEn": "Next time you draw a card from the spell deck, draw one extra.",
+      "timing": "persistent",
+      "targetType": "self",
+      "effect": {
+        "type": "modifier",
+        "trigger": "spell_draw",
+        "modifier": "double_draw",
+        "uses": 1
+      }
+    },
+    {
+      "id": "sarja2-k1",
+      "name": "Glock 17",
+      "nameEn": "Glock 17",
+      "deck": "sarja2",
+      "cardNumber": 1,
+      "image": "shared/images/spell-cards/sarja2-k1.png",
+      "type": "aggressive",
+      "rarity": "rare",
+      "description": "Kortti jää pöytään 10. ammusmerkillä. Kuluta yksi ammus merkki kortilta voit poistaa vastustajan laatan joka koskettaa omiasi. Kun kaikki ammukset on käytetty kortti poistuu pelistä",
+      "descriptionEn": "Card stays on the table with 10 ammo markers. Spend one ammo marker to remove an opponent tile touching your own. When all ammo is spent, the card leaves play.",
+      "timing": "persistent",
+      "targetType": "adjacent-enemies",
+      "effect": {
+        "type": "charged_removal",
+        "charges": 10
+      }
+    },
+    {
+      "id": "sarja2-k2",
+      "name": "Sattuma puuttuu peliin",
+      "nameEn": "Chance Intervenes",
+      "deck": "sarja2",
+      "cardNumber": 2,
+      "image": "shared/images/spell-cards/sarja2-k2.png",
+      "type": "event-modifier",
+      "rarity": "uncommon",
+      "description": "Pelaa ennen toteutusta. Korvaa tapahtuman valinta satunnaisella sallituista. Numeroi vaihtoehdot ja anna sattunais generaattorin tehdä päätös",
+      "descriptionEn": "Play before resolution. Replace an event's choice with a random one from the allowed options. Number the options and let a random-number generator decide.",
+      "timing": "anytime",
+      "targetType": "board",
+      "effect": {
+        "type": "reminder"
+      }
+    },
+    {
+      "id": "sarja2-k3",
+      "name": "huomaamatta ohi",
+      "nameEn": "Slip By Unnoticed",
+      "deck": "sarja2",
+      "cardNumber": 3,
+      "image": "shared/images/spell-cards/sarja2-k3.png",
+      "type": "placement",
+      "rarity": "uncommon",
+      "description": "Kun asetat uuden laatan, heitä d6. Saat asettaa laatan 1-6 ruutua lähimmästä omasta laatastasi. Kortti jää eteesi 2 käyttökertaa.",
+      "descriptionEn": "When you place a new tile, roll a d6. You may place the tile 1-6 hexes from your nearest own tile. Card stays in front of you for 2 uses.",
+      "timing": "persistent",
+      "targetType": "self",
+      "effect": {
+        "type": "reminder",
+        "uses": 2
+      }
+    },
+    {
+      "id": "sarja2-k4",
+      "name": "Taikuuden nälkä",
+      "nameEn": "Hunger for Magic",
+      "deck": "sarja2",
+      "cardNumber": 4,
+      "image": "shared/images/spell-cards/sarja2-k4.png",
+      "type": "placement",
+      "rarity": "common",
+      "description": "Poista kädestäsi yksi loitsu, aseta kaksi laattaa",
+      "descriptionEn": "Discard one spell from your hand, place two tiles.",
+      "timing": "anytime",
+      "targetType": "board",
+      "effect": {
+        "type": "extra_placement",
+        "amount": 2,
+        "restrictions": []
+      }
+    },
+    {
+      "id": "sarja2-k5",
+      "name": "Katalyyttiavain",
+      "nameEn": "Catalyst Key",
+      "deck": "sarja2",
+      "cardNumber": 5,
+      "image": "shared/images/spell-cards/sarja2-k5.png",
+      "type": "placement",
+      "rarity": "rare",
+      "description": "Pelaa vain, kun hallussa vuoren sydän. Aktivoituu 1. vuoron ajan. Laatat voi asettaa mihin tahansa vapaaseen ruutuun. Kulutus: aseta 6 laattaa mihin tahansa, tuhoa vastustajan laatta alta",
+      "descriptionEn": "Only playable while holding Mountain's Heart. Active for 1 turn. Tiles may be placed on any free hex. Cost: place 6 tiles anywhere, destroying the opponent tile beneath each.",
+      "timing": "anytime",
+      "targetType": "board",
+      "effect": {
+        "type": "extra_placement",
+        "amount": 6,
+        "restrictions": ["destroy_occupied"],
+        "requiresMountainHeart": true
+      }
+    },
+    {
+      "id": "sarja3-k1",
+      "name": "Jäljitys",
+      "nameEn": "Tracking",
+      "deck": "sarja3",
+      "cardNumber": 1,
+      "image": "shared/images/spell-cards/sarja3-k1.png",
+      "type": "placement",
+      "rarity": "uncommon",
+      "description": "Jos teidän laattanne koskettaa toisen joukkoeen laattaa voitte asettaa kaksi laattaa vastustaja joukkoeen laattojen viereen",
+      "descriptionEn": "If your tile touches another team's tile, you may place two tiles adjacent to that opponent team's tiles.",
+      "timing": "anytime",
+      "targetType": "board",
+      "effect": {
+        "type": "extra_placement",
+        "amount": 2,
+        "restrictions": ["must_touch_opponent"],
+        "requiresTouchingOpponentTile": true
+      }
+    },
+    {
+      "id": "sarja3-k2",
+      "name": "Tiedä vihollisesi",
+      "nameEn": "Know Your Enemy",
+      "deck": "sarja3",
+      "cardNumber": 2,
+      "image": "shared/images/spell-cards/sarja3-k2.png",
+      "type": "debuff",
+      "rarity": "common",
+      "description": "Määrä vastustaja joukkoeen roolit, sijainnit, rodut / mikä tahansa päätettävissä oleva asia.",
+      "descriptionEn": "Demand the opponent team's roles, positions, races / any other decidable information.",
+      "timing": "anytime",
+      "targetType": "opponent-team",
+      "effect": {
+        "type": "reminder"
+      }
+    },
+    {
+      "id": "sarja3-k3",
+      "name": "Parempi reitti",
+      "nameEn": "A Better Route",
+      "deck": "sarja3",
+      "cardNumber": 3,
+      "image": "shared/images/spell-cards/sarja3-k3.png",
+      "type": "placement",
+      "rarity": "uncommon",
+      "description": "Voitte uudelleen asettaa max 5. Joukkoeenne laattaa",
+      "descriptionEn": "You may re-place up to 5 of your team's tiles.",
+      "timing": "anytime",
+      "targetType": "board",
+      "effect": {
+        "type": "reposition",
+        "amount": 5
+      }
+    },
+    {
+      "id": "sarja3-k4",
+      "name": "Taitava vastaisku",
+      "nameEn": "Skillful Counter",
+      "deck": "sarja3",
+      "cardNumber": 4,
+      "image": "shared/images/spell-cards/sarja3-k4.png",
+      "type": "counter",
+      "rarity": "rare",
+      "description": "Estä vastustajan pelaama taika toteutumasta",
+      "descriptionEn": "Prevent an opponent's played spell from resolving.",
+      "timing": "reactive",
+      "targetType": "opponent-card",
+      "effect": {
+        "type": "counter",
+        "trigger": "opponent_spell_cast",
+        "action": "cancel_and_discard",
+        "uses": 1
+      }
+    },
+    {
+      "id": "sarja3-k5",
+      "name": "Kysy yrteiltä",
+      "nameEn": "Ask the Herbs",
+      "deck": "sarja3",
+      "cardNumber": 5,
+      "image": "shared/images/spell-cards/sarja3-k5.png",
+      "type": "instant",
+      "rarity": "uncommon",
+      "description": "Katso jokaisen joukkoeen kädessä olevat kortit",
+      "descriptionEn": "Look at every team's hand of cards.",
+      "timing": "anytime",
+      "targetType": "board",
+      "effect": {
+        "type": "reveal_hands"
+      }
+    },
+    {
+      "id": "sarja3-k6",
+      "name": "Kaikki alkoi kivestä",
+      "nameEn": "It All Started With a Stone",
+      "deck": "sarja3",
+      "cardNumber": 6,
+      "image": "shared/images/spell-cards/sarja3-k6.png",
+      "type": "trigger",
+      "rarity": "rare",
+      "description": "Kun valtaatte sivusydämmen ensinmäistäkertaa laita 1 merkki\n1 – laatan asetusetäisyys +1\n2 – voitte korvata laatan asetuksen kortin nostolla\n3 – taitava vastaisku +1 käyttö lisää\n4 – poista 1 vastustajan viereinen laatta kun asetatte omanne\n5 – voitte haastaa vuorensydämiä ilman laatan asettamista\n6 – kaikki sivusydämmet siirtyvät hallintaanne",
+      "descriptionEn": "When you capture a side-heart for the first time, roll a d6: 1 tile-placement range +1; 2 you may replace a tile placement with a card draw; 3 Taitava vastaisku gets +1 extra use; 4 remove 1 adjacent opponent tile when you place your own; 5 you may challenge for mountain hearts without placing a tile; 6 all side-hearts transfer to your control.",
+      "timing": "reactive",
+      "targetType": "self",
+      "effect": {
+        "type": "first_heart_roll"
+      }
+    },
+    {
+      "id": "sarja4-k1",
+      "name": "Ylimielistä tietoa",
+      "nameEn": "Arrogant Knowledge",
+      "deck": "sarja4",
+      "cardNumber": 1,
+      "image": "shared/images/spell-cards/sarja4-k1.png",
+      "type": "pre-game",
+      "rarity": "common",
+      "description": "Jos tiimin jäsenet ovat seuraavassa pelissä voittavassa joukkoeessa pistesijoituksissa paras tai toiseksi paras 2laattaa ja 2 pisteet",
+      "descriptionEn": "If the team's members are, in the next game, best or second-best by score placement within the winning team, get 2 tiles and 2 points.",
+      "timing": "pre-game",
+      "targetType": "self",
+      "effect": {
+        "type": "conditional_bonus",
+        "bonus": { "points": 2, "tiles": 2 }
+      }
+    },
+    {
+      "id": "sarja4-k2",
+      "name": "Älä tule lähemmäs",
+      "nameEn": "Don't Come Any Closer",
+      "deck": "sarja4",
+      "cardNumber": 2,
+      "image": "shared/images/spell-cards/sarja4-k2.png",
+      "type": "defensive",
+      "rarity": "uncommon",
+      "description": "Valitkaa kolme tyhjää ruutua jotka teidän laattojenne vieressä. Niihin ei voi asettaa laattaa seuraavien kahden vuoron aikana",
+      "descriptionEn": "Choose three empty hexes adjacent to your tiles. No tile may be placed there for the next two turns.",
+      "timing": "anytime",
+      "targetType": "board",
+      "effect": {
+        "type": "placement_lockout",
+        "duration": 2
+      }
+    },
+    {
+      "id": "sarja4-k3",
+      "name": "Epävakaa loitsu",
+      "nameEn": "Unstable Spell",
+      "deck": "sarja4",
+      "cardNumber": 3,
+      "image": "shared/images/spell-cards/sarja4-k3.png",
+      "type": "aggressive",
+      "rarity": "rare",
+      "description": "heitä d6. Numeroikaa tiimit 1-5. 1-5 poista kyseiseltä tiimiltä 3 laattaa. 6: poista kaikilta muilta tiimeiltä kuin teiltä 2. laattaa",
+      "descriptionEn": "Roll d6. Number teams 1-5. On 1-5, remove 3 tiles from that team. On 6, remove 2 tiles from every team except yours.",
+      "timing": "anytime",
+      "targetType": "board",
+      "effect": {
+        "type": "random_mass_removal"
+      }
+    },
+    {
+      "id": "sarja4-k4",
+      "name": "Mielen siirto",
+      "nameEn": "Mind Transfer",
+      "deck": "sarja4",
+      "cardNumber": 4,
+      "image": "shared/images/spell-cards/sarja4-k4.png",
+      "type": "debuff",
+      "rarity": "uncommon",
+      "description": "Valitkaa kaksi pelaajaa; he vaihtavat keskenään paikkansa (tietokoneet / tuolit) seuraavaan otteluun.",
+      "descriptionEn": "Choose two players; they swap places (computers/seats) for the next match.",
+      "timing": "pre-game",
+      "targetType": "board",
+      "effect": {
+        "type": "reminder"
+      }
+    },
+    {
+      "id": "sarja4-k5",
+      "name": "Magian keskittymä",
+      "nameEn": "Magical Focus",
+      "deck": "sarja4",
+      "cardNumber": 5,
+      "image": "shared/images/spell-cards/sarja4-k5.png",
+      "type": "rare-treasure",
+      "rarity": "rare",
+      "description": "5. vuoron koeaika. Valtaa Vuoren Sydän ja pidä hallussa 2 vuoroa. Onnistut: ota 6 loitsukorttia mistä tahansa joukkueista — kädestä, poistopakasta tai nostopakan päältä. Epäonnistut: kortti poistuu ilman vaikutusta",
+      "descriptionEn": "5-turn trial. Capture Mountain's Heart and hold it for 2 turns. Success: take 6 spell cards from any teams' hand, used pile, or draw pile. Failure: card leaves play with no effect.",
+      "timing": "anytime",
+      "targetType": "board",
+      "effect": {
+        "type": "conditional_card_grab",
+        "amount": 6
+      }
+    },
+    {
+      "id": "sarja5-k5",
+      "name": "Muinaiset puolustusmekanismit",
+      "nameEn": "Ancient Defense Mechanisms",
+      "deck": "sarja5",
+      "cardNumber": 5,
+      "image": "shared/images/spell-cards/sarja5-k5.png",
+      "type": "instant",
+      "rarity": "uncommon",
+      "description": "Pelaa heti sydämmen valtauksen jälkeen. Täyttäkää valtaamanne sydämmen kaikki viereiset alueet laatoillanne",
+      "descriptionEn": "Play immediately after capturing a heart. Fill all hexes adjacent to the heart you just captured with your own tiles.",
+      "timing": "after-placement",
+      "targetType": "board",
+      "effect": {
+        "type": "fill_adjacent_to_heart"
+      }
+    },
+    {
+      "id": "sarja6-k1",
+      "name": "Nyt pelataan Spellbreak",
+      "nameEn": "Now We're Playing Spellbreak",
+      "deck": "sarja6",
+      "cardNumber": 1,
+      "image": "shared/images/spell-cards/sarja6-k1.png",
+      "type": "event-modifier",
+      "rarity": "rare",
+      "description": "Seuraava peli on spellbreak yliajaa kaikki muut pelin valintaa koskevat tapahtumat. 2 käyttökertaa",
+      "descriptionEn": "The next game is Spellbreak — overrides any other game-selection events. 2 uses.",
+      "timing": "anytime",
+      "targetType": "board",
+      "effect": {
+        "type": "reminder",
+        "uses": 2
+      }
+    },
+    {
+      "id": "sarja6-k2",
+      "name": "Lukossa",
+      "nameEn": "Locked",
+      "deck": "sarja6",
+      "cardNumber": 2,
+      "image": "shared/images/spell-cards/sarja6-k2.png",
+      "type": "debuff",
+      "rarity": "rare",
+      "description": "Valitse vuoren sydän, se on seuraavat kaksi vuoroa lukossa. Sitä ei voi haastaa, vallata, eikä se tuota voittopisteitä, tai edistä loitsuja",
+      "descriptionEn": "Choose Mountain's Heart — it is locked for the next two turns. It cannot be challenged, cannot be captured, and does not generate victory points or advance spells.",
+      "timing": "anytime",
+      "targetType": "center",
+      "effect": {
+        "type": "heart_lock",
+        "duration": 2
+      }
+    },
+    {
+      "id": "sarja6-k3",
+      "name": "Samat senssit",
+      "nameEn": "Same Sensitivity",
+      "deck": "sarja6",
+      "cardNumber": 3,
+      "image": "shared/images/spell-cards/sarja6-k3.png",
+      "type": "debuff",
+      "rarity": "common",
+      "description": "Valitse tiimistäsi pelaaja ja toinen vastustaja pelaaja. Molemmat käyttävät määrittämiäsi hiiri asetuksia",
+      "descriptionEn": "Choose a player from your team and one opposing player. Both must use mouse settings you specify.",
+      "timing": "pre-game",
+      "targetType": "opponent-player",
+      "effect": {
+        "type": "reminder"
+      }
+    },
+    {
+      "id": "sarja6-k4",
+      "name": "Vaihtoon",
+      "nameEn": "Substitution",
+      "deck": "sarja6",
+      "cardNumber": 4,
+      "image": "shared/images/spell-cards/sarja6-k4.png",
+      "type": "debuff",
+      "rarity": "uncommon",
+      "description": "Valitse kortti, sen omistaja nostaa uuden kortin pakastaan, laittaa valitun kortin nostopakkaan ja sekoittaa sen",
+      "descriptionEn": "Choose a card; its owner draws a new card from their deck, puts the chosen card into the draw pile, and shuffles it.",
+      "timing": "anytime",
+      "targetType": "opponent-card",
+      "effect": {
+        "type": "force_redraw"
+      }
+    },
+    {
+      "id": "sarja6-k5",
+      "name": "Me halutaan pelata omia pelejä",
+      "nameEn": "We Want to Play Our Own Games",
+      "deck": "sarja6",
+      "cardNumber": 5,
+      "image": "shared/images/spell-cards/sarja6-k5.png",
+      "type": "event-modifier",
+      "rarity": "uncommon",
+      "description": "Valitse seuraava pelattava peli, sekä päätä joukkue kokoonpano peliin",
+      "descriptionEn": "Choose the next game to be played, and decide the team composition for it.",
+      "timing": "anytime",
+      "targetType": "board",
+      "effect": {
+        "type": "reminder"
+      }
+    },
+    {
+      "id": "sarja6-k8",
+      "name": "Perus poisto",
+      "nameEn": "Basic Removal",
+      "deck": "sarja6",
+      "cardNumber": 8,
+      "image": "shared/images/spell-cards/sarja6-k8.png",
+      "type": "aggressive",
+      "rarity": "common",
+      "description": "Poista laatta laudalta. Kaksi käyttökertaa",
+      "descriptionEn": "Remove a tile from the board. Two uses.",
+      "timing": "anytime",
+      "targetType": "board",
+      "effect": {
+        "type": "charged_removal",
+        "charges": 2,
+        "requiresAdjacency": false
+      }
+    },
+    {
+      "id": "named-hilma",
+      "name": "Katso kuinka se kuolee",
+      "nameEn": "Watch It Die",
+      "deck": "named",
+      "image": "shared/images/spell-cards/named-hilma.png",
+      "type": "debuff",
+      "rarity": "uncommon",
+      "description": "Valitse joukkue. Kahden vuoron ajan sen on poistettava yksi oma laattansa jokaisen häviämänsä pelin jälkeen.",
+      "descriptionEn": "Choose a team. For two turns, they must remove one of their own tiles after every game they lose.",
+      "timing": "anytime",
+      "targetType": "opponent-team",
+      "effect": {
+        "type": "forced_removal_condition",
+        "duration": 2
+      }
+    },
+    {
+      "id": "named-jussi",
+      "name": "Vettähän se vain oli",
+      "nameEn": "It Was Only Water",
+      "deck": "named",
+      "image": "shared/images/spell-cards/named-jussi.png",
+      "type": "tactical",
+      "rarity": "rare",
+      "description": "2 käyttöä. Merkitse käytöllä mikä tahansa laatta. Pelivoiton laatanpoistolla kaikki merkityt laatat siirtyvät viereiseen ruutuun, poistavat siellä olevan laatan ja aktivoivat asetussäännön.",
+      "descriptionEn": "2 uses. Each use marks any tile. On a game-win tile-removal, all marked tiles move to an adjacent hex, destroying whatever's there and triggering the normal placement rule.",
+      "timing": "anytime",
+      "targetType": "board",
+      "effect": {
+        "type": "marked_relocation_charge",
+        "charges": 2
+      }
+    },
+    {
+      "id": "named-luttinen",
+      "name": "Epävakaa todellisuus",
+      "nameEn": "Unstable Reality",
+      "deck": "named",
+      "image": "shared/images/spell-cards/named-luttinen.png",
+      "type": "aggressive",
+      "rarity": "rare",
+      "description": "Valitse kaksi vastustajan laattaa, jotka koskettavat toisiaan ja vähintään yhtä joukkueenne laattaa. Ottakaa laatat hallintaanne. Kahden vuoron kuluttua ne poistuvat pelistä.",
+      "descriptionEn": "Choose two opponent tiles that touch each other and touch at least one of your team's tiles. Take control of them. After two turns, they are removed from the game.",
+      "timing": "anytime",
+      "targetType": "adjacent-enemies",
+      "effect": {
+        "type": "temporary_capture",
+        "duration": 2
+      }
+    },
+    {
+      "id": "named-miikka",
+      "name": "Rintama vaihtuu",
+      "nameEn": "The Front Shifts",
+      "deck": "named",
+      "image": "shared/images/spell-cards/named-miikka.png",
+      "type": "placement",
+      "rarity": "uncommon",
+      "description": "Valitse kolmen oman vierekkäisen laatan muodostelma. Siirrä ja halutessasi käännä se mihin tahansa vapaaseen kohtaan. Laatat aktivoivat asetussäännön.",
+      "descriptionEn": "Choose a formation of 3 of your own adjacent tiles. Move it, and optionally rotate it, to any free location. Tiles trigger the normal placement rule.",
+      "timing": "anytime",
+      "targetType": "board",
+      "effect": {
+        "type": "reposition",
+        "amount": 3,
+        "requiresConnectedFormation": true
+      }
+    },
+    {
+      "id": "named-rony",
+      "name": "Rinnalla loppuun asti",
+      "nameEn": "Together to the End",
+      "deck": "named",
+      "image": "shared/images/spell-cards/named-rony.png",
+      "type": "tactical",
+      "rarity": "uncommon",
+      "description": "Valitse toinen joukkue. Kahden vuoron ajan aina, kun se asettaa laattoja, joukkueenne saa asettaa yhtä monta laattaa.",
+      "descriptionEn": "Choose another team. For two turns, whenever they place tiles, your team may place an equal number of tiles.",
+      "timing": "anytime",
+      "targetType": "board",
+      "effect": {
+        "type": "piggyback_condition",
+        "duration": 2
+      }
+    },
+    {
+      "id": "named-pauliina",
+      "name": "Vaistonvarainen väistö",
+      "nameEn": "Instinctive Dodge",
+      "deck": "named",
+      "image": "shared/images/spell-cards/named-pauliina.png",
+      "type": "defensive",
+      "rarity": "rare",
+      "description": "Pelaa, kun teihin kohdistetaan negatiivinen efekti. Kolmen vuoron ajan poistettava laattanne siirtyy vapaaseen ruutuun kauemmas poistajan laatoista. Ellei siirto onnistu, laatta poistuu.",
+      "descriptionEn": "Play when a negative effect targets you. For three turns, a tile of yours that would be removed instead moves to a free hex farther from the remover's tiles. If no such move is possible, the tile is removed as normal.",
+      "timing": "reactive",
+      "targetType": "self",
+      "effect": {
+        "type": "evasion_condition",
+        "duration": 3
+      }
+    },
+    {
+      "id": "named-teemu",
+      "name": "Tuhoa suunnitelmat",
+      "nameEn": "Destroy the Plans",
+      "deck": "named",
+      "image": "shared/images/spell-cards/named-teemu.png",
+      "type": "tactical",
+      "rarity": "rare",
+      "description": "Valitse kaksi joukkuetta vaihtamaan kortti sokkona. Vaihtakaa sitten kortti valitsemanne joukkueen kanssa: valitsette oman korttinne, heidän korttinsa valitaan sokkona. Kaikki vaihdetut kortit palautuvat alkuperäisiin käsiin käytön jälkeen tai kahden vuoron kuluttua.",
+      "descriptionEn": "Choose two teams to swap a card blind. Then swap a card with your chosen team: you choose your own card, theirs is chosen blind. All swapped cards return to their original hands after use or after two turns.",
+      "timing": "anytime",
+      "targetType": "opponent-card",
+      "effect": {
+        "type": "blind_card_swap"
+      }
+    },
+    {
+      "id": "named-ville",
+      "name": "Priimus",
+      "nameEn": "Primus",
+      "deck": "named",
+      "image": "shared/images/spell-cards/named-ville.png",
+      "type": "permanent-buff",
+      "rarity": "rare",
+      "description": "Toisesta peräkkäisestä voitostanne saatte asettaa yhden ylimääräisen laatan ja kolmannesta kaksi. Vaikutus päättyy ensimmäiseen häviöönne tai kolmanteen peräkkäiseen voittoonne.",
+      "descriptionEn": "From your 2nd consecutive win, place one extra tile; from your 3rd, two extra. Effect ends at your first loss or your 3rd consecutive win.",
+      "timing": "anytime",
+      "targetType": "self",
+      "effect": {
+        "type": "win_streak_bonus"
       }
     }
   ]

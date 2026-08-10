@@ -50,6 +50,19 @@ class BoardManager {
         this._prevBoardSignature = null;
     }
 
+    /**
+     * Public passthrough to the injected BoardModule's hex-type lookup
+     * ('mountain-heart' | 'side-heart' | null/other). Added so other
+     * managers that only receive `boardManager` as a dependency (currently
+     * SpellEngine — see Katalyyttiavain's Mountain's Heart precondition and
+     * "Kaikki alkoi kivestä"'s side-heart-only outcome in spell-engine.js)
+     * don't need their own BoardModule reference just to ask this one
+     * question.
+     */
+    getHexType(q, r) {
+        return this._boardModule ? this._boardModule.getHexType(q, r) : null;
+    }
+
     // ------------------------------------------------------------------
     // Board rendering (admin.js patterns)
     // ------------------------------------------------------------------

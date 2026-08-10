@@ -111,6 +111,18 @@ async function loadTournamentData() {
             gameData = doc.data();
             console.log('[Team Controls] Tournament data loaded:', gameData);
 
+            // Cache tournament context for the shared navbar and cross-page
+            // navigation — same pattern admin.js/god-app.js/home.html use.
+            // Without this, arriving here directly via a tournamentId URL
+            // param (e.g. a shared team.html link) works fine for the page
+            // itself, but the navbar — which only ever reads storage, never
+            // the URL — keeps showing "No tournament".
+            sessionStorage.setItem('currentTournamentId', currentTournamentId);
+            localStorage.setItem('currentTournamentId', currentTournamentId);
+            sessionStorage.setItem('currentTournamentName', gameData.name || currentTournamentId);
+            localStorage.setItem('currentTournamentName', gameData.name || currentTournamentId);
+            if (typeof window.initNavbar === 'function') window.initNavbar();
+
             // Find team (use string comparison to handle type mismatches)
             teamData = gameData.teams?.find(t => String(t.id) === String(currentTeamId));
 
@@ -809,7 +821,7 @@ function _buildActiveEffect(spellId, def, targetData) {
 
     // Only create visible effects for condition/buff types
     const conditionTypes = ['ban', 'silence', 'shield', 'multiplier', 'streak_bonus',
-        'permanent_buff', 'modifier', 'counter'];
+        'permanent_buff', 'modifier', 'counter', 'reminder'];
     if (!conditionTypes.includes(effectType)) return null;
 
     const currentRound = gameData?.currentPhase?.roundNumber || 0;
@@ -837,7 +849,10 @@ function _buildActiveEffect(spellId, def, targetData) {
         displayText = `${casterName}: next room hex draw = double cards`;
         icon = ICON_SVGS.dices;
     } else if (effectType === 'counter') {
-        displayText = `${casterName} can block an opponent's spell draw`;
+        // Generic — see the matching note in spell-engine.js's
+        // _buildDisplayText: this shape covers both Rift of Deep Knowledge
+        // and Taitava vastaisku / sarja3-k4, which mean different things.
+        displayText = `${casterName}: ${def.nameEn || def.name} ready`;
         icon = ICON_SVGS.shield;
     }
 
@@ -849,14 +864,19 @@ function _buildActiveEffect(spellId, def, targetData) {
         spellId: spellId,
         spellName: def.name || spellId,
         spellNameEn: def.nameEn || '',
-        category: ['ban', 'silence'].includes(effectType) ? 'condition' : 'buff',
+        category: ['ban', 'silence', 'reminder'].includes(effectType) ? 'condition' : 'buff',
         castByTeamId: currentTeamId,
         castInRound: currentRound,
         target: targetData || {},
         displayText: displayText,
         icon: icon,
         expiresAfterRound: expiresAfterRound,
-        isExpired: false
+        isExpired: false,
+        // Counter cards can carry multiple uses (Taitava vastaisku starts at
+        // 1, boosted by sarja3-k6's outcome 3) — set here so the client-cast
+        // path matches executeSpellEffect's _handleCounter() shape even
+        // though this card family isn't Process-gated.
+        ...(effectType === 'counter' ? { usesRemaining: def.effect?.uses || 1 } : {})
     };
 }
 
