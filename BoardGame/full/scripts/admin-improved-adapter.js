@@ -274,13 +274,23 @@
             _spellEngine.renderActiveEffectsAdmin();
         }
 
+        // Spell phase hooks — mirrors god-app.js:204-208 exactly. Now that
+        // SpellEngine is actually constructed above, admin.html can drive
+        // the same digital spell-casting flow god.html always could: an
+        // admin clicks "Begin Spells" during a spell window to open
+        // turn-based casting on team.html (only matters when the
+        // tournament's spellsActive flag is on — otherwise spells stay
+        // physical and this hook is simply never triggered by a click,
+        // since the button only renders during a spell window).
+        if (typeof SpellEngine !== 'undefined') {
+            _phaseManager._onSpellPhaseEntered = () => _spellEngine?.beginSpellPhase();
+        }
+
         // BackupManager — round-boundary snapshots that replay.html uses as
         // keyframes. god.html has always wired this via _onRoundStartSpells;
         // admin.html never did, so every admin-run tournament replayed in
         // "no round-boundary backups" degraded mode. The hook fires on
         // advancing into scoring_vp with roundNumber > 0 (phase-manager.js).
-        // Spells are physical on admin.html, so unlike god.html there are no
-        // digital conditions to expire here — the backup is the whole job.
         if (typeof BackupManager !== 'undefined') {
             _backupManager = new BackupManager(gameState, {
                 saveCallback: (btn) => saveGameState(btn),
@@ -290,7 +300,17 @@
                     if (typeof updateDisplay === 'function') updateDisplay();
                 }
             });
-            _phaseManager._onRoundStartSpells = () => _backupManager.autoBackup();
+            _phaseManager._onRoundStartSpells = () => {
+                // expireConditions() used to be a god.html-only concern
+                // (admin.html could never have active digital spell effects
+                // without a working Begin Spells button) — now that the
+                // hook above lets admin.html start real spell phases too,
+                // timed effects (temporary_capture, forced_removal_condition,
+                // etc.) need the same round-boundary expiry god.html gets,
+                // or they'd simply never expire on admin-run tournaments.
+                _spellEngine?.expireConditions();
+                _backupManager.autoBackup();
+            };
         }
 
         // Wire pending hex count (used by phase requirements)
@@ -1415,7 +1435,9 @@
                     };
                 }
                 return {
-                    text: 'Spell window — give teams time to cast at the table, then continue. (Digital spell casting is driven from the GOD view.)' + extra,
+                    text: (gs.spellsActive === true
+                        ? 'Spell window — click Begin Spells to open digital casting on team.html, or give teams time to cast at the table, then continue.'
+                        : 'Spell window — give teams time to cast at the table, then continue.') + extra,
                     primary: { label: 'Continue ▶', action: advance },
                     primaryIsAdvance: true
                 };
@@ -1725,13 +1747,18 @@
         container.style.display = '';
         let html = '';
 
-        // "Begin Spells" is deliberately absent here: on admin.html the
-        // _onSpellPhaseEntered hook is never wired (only god-app.js wires
-        // digital spell casting), so the button used to be a silent no-op —
-        // it looked like it started something and did nothing. Spells are
-        // played physically at the table by default; this window is a
-        // manual timing checkpoint (see _computeNextStep's spell_window
-        // case for the Continue guidance).
+        // "Begin Spells" — mirrors phase-manager.js's own built-in
+        // renderPhaseIndicator() button (same markup, same onclick). Used
+        // to be omitted here because the _onSpellPhaseEntered hook was
+        // never wired on admin.html, making the button a silent no-op.
+        // Now that SpellEngine is constructed above and the hook is wired
+        // to it, this works the same as god.html: only relevant when the
+        // tournament's spellsActive flag is on — otherwise nobody clicks
+        // it and spells stay physical, per _computeNextStep's spell_window
+        // Continue guidance.
+        if (!gameState.spellPhase?.isActive) {
+            html += `<button class="btn-small primary" onclick="beginSpells()" title="Start spell casting phase">${ICON_SVGS.sparkles} Begin Spells</button>`;
+        }
 
         const loopInfo = _phaseManager.getLoopInfo();
         // spell_window_4 -> challenges has no "anything pending?" gate in

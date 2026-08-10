@@ -42,11 +42,11 @@ const DISPLAY_MODES = {
     },
     // ── Spell windows ──
     // The takeover shows for the WHOLE spell-window phase, not just while
-    // casting is happening. There is no "casting has started" signal to gate
-    // on: admin.html has no "Begin Spells" button, so spellPhase.isActive
-    // (and turnOrder) are never set there — spells are played physically at
-    // the table, and _onSpellPhaseEntered/beginSpellPhase are only wired on
-    // god.html. There are 4 of these per round.
+    // casting is happening — deliberately not gated on spellPhase.isActive,
+    // since a spell window is still meaningful time even when nobody has
+    // clicked "Begin Spells" yet (or ever will, for tournaments playing
+    // spells physically at the table instead of via team.html). There are
+    // 4 of these per round.
     spell_window_1: { name: 'Spell Window', slide: 'spell_window' },
     spell_window_2: { name: 'Spell Window', slide: 'spell_window' },
     spell_window_3: { name: 'Spell Window', slide: 'spell_window' },
