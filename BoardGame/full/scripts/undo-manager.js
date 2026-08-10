@@ -404,7 +404,14 @@ class UndoManager {
     // UI: Undo Confirmation Modal
     // ------------------------------------------------------------------
 
-    openUndoConfirmModal(entry) {
+    /**
+     * @param {Object} entry
+     * @param {number} [skippedCount] - How many more-recent log entries were
+     *   passed over to reach this one (e.g. by "Undo Last Action" walking
+     *   past non-undoable phase changes / spell casts). 0 or omitted means
+     *   this is the single most recent log entry, undoable or not.
+     */
+    openUndoConfirmModal(entry, skippedCount) {
         const { canUndo, reason } = this.canUndo(entry);
         if (!canUndo) {
             this._ui?.showStatus(`Cannot undo: ${reason}`, 'warning');
@@ -413,6 +420,13 @@ class UndoManager {
 
         this._pendingUndoEntry = entry;
         const preview = this.previewUndo(entry);
+        if (skippedCount > 0) {
+            preview.warnings.unshift(
+                `This is not the most recent action — ${skippedCount} more recent ` +
+                `action${skippedCount === 1 ? '' : 's'} (phase change, spell, etc.) ` +
+                `cannot be undone and will stay as-is.`
+            );
+        }
 
         const descEl = document.getElementById('undoActionDesc');
         const changesEl = document.getElementById('undoChangesPreview');

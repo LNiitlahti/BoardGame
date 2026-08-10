@@ -121,12 +121,17 @@
             return;
         }
         const { entries } = await _actionLogger.getActions({ limit: 15 });
-        const target = (entries || []).find(e => _undoManager.canUndo(e).canUndo);
-        if (!target) {
+        const list = entries || [];
+        const targetIdx = list.findIndex(e => _undoManager.canUndo(e).canUndo);
+        if (targetIdx === -1) {
             if (typeof showStatus === 'function') showStatus('No recent action can be undone', 'info');
             return;
         }
-        _undoManager.openUndoConfirmModal(target);
+        // Entries newer than the target that were skipped because their type
+        // isn't undoable (phase changes, spell casts, ...) — surfaced in the
+        // confirm modal so a TD isn't surprised this reaches further back
+        // than "the last thing that happened".
+        _undoManager.openUndoConfirmModal(list[targetIdx], targetIdx);
     }
     window.undoLastAction = undoLastAction;
 
@@ -2208,6 +2213,16 @@
         // Don't double-award
         if (history.some(e => e.round === roundNumber)) return;
 
+        // Snapshot team points BEFORE awarding, so this is undoable (and
+        // shows up in the action log at all) — mirrors the legacy
+        // confirmAdvanceRound() flow in stats-manager.js. Without this, hex
+        // territory income was invisible to the action log — "Undo Last
+        // Action" would silently skip past it to whatever undoable entry
+        // came before, potentially several phases back, with no indication
+        // it had jumped that far.
+        const prevTeamPoints = {};
+        (gameState.teams || []).forEach(t => { prevTeamPoints[t.id] = t.points || 0; });
+
         const pointsAwarded = (typeof awardRoundPoints === 'function')
             ? awardRoundPoints()
             : {};
@@ -2218,6 +2233,11 @@
             pointsAwarded: pointsAwarded,
             timestamp: new Date().toISOString()
         });
+
+        window.logAction?.('points_awarded', 'points',
+            { roundNumber, pointsAwarded },
+            { teamPoints: prevTeamPoints, currentRound: gameState.currentRound }
+        );
 
         // No explicit save — advancePhase() saves after all hooks run
 

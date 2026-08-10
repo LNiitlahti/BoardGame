@@ -211,6 +211,16 @@ class GodApp {
             const roundNumber = gs.currentPhase?.roundNumber || 0;
             const history = gs.pointsHistory || [];
             if (!history.some(e => e.round === roundNumber)) {
+                // Snapshot team points BEFORE awarding, so this is undoable
+                // (and shows up in the action log at all) exactly like the
+                // legacy confirmAdvanceRound() flow in stats-manager.js does.
+                // Without this, hex territory income was invisible to the
+                // action log — "Undo Last Action" would silently skip past
+                // it to whatever undoable entry came before, several phases
+                // back, with no indication it had jumped that far.
+                const prevTeamPoints = {};
+                (gs.teams || []).forEach(t => { prevTeamPoints[t.id] = t.points || 0; });
+
                 const pointsAwarded = this.stats.awardRoundPoints();
                 gs.pointsHistory = history;
                 gs.pointsHistory.push({
@@ -218,6 +228,12 @@ class GodApp {
                     pointsAwarded: pointsAwarded,
                     timestamp: new Date().toISOString()
                 });
+
+                logAction('points_awarded', 'points',
+                    { roundNumber, pointsAwarded },
+                    { teamPoints: prevTeamPoints, currentRound: gs.currentRound }
+                );
+
                 const msg = Object.entries(pointsAwarded)
                     .map(([team, pts]) => `${team}: +${pts}`)
                     .join(', ') || 'No points';
