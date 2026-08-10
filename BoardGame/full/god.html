@@ -275,7 +275,7 @@
                 </div>
             </div>
 
-            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <div class="god-action-row" style="display: flex; gap: 10px; margin-bottom: 20px;">
                 <button class="btn" onclick="loadAllSpells()" style="flex: 1;"
                         data-tooltip="Load all 15 spell cards from Firebase">
                     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg> Load Spell Definitions
@@ -460,7 +460,7 @@
             </div>
 
             <!-- Search & Filter -->
-            <div style="display: grid; grid-template-columns: 1fr 200px 150px; gap: 10px; margin-bottom: 15px;">
+            <div class="users-filter-row" style="display: grid; grid-template-columns: minmax(0, 1fr) 200px 150px; gap: 10px; margin-bottom: 15px;">
                 <input type="text" id="userSearch" placeholder="Search by name, email, or UID..."
                        oninput="filterUsers()"
                        style="padding: 10px; background: rgba(11, 13, 16, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; color: white; font-size: 1rem;">

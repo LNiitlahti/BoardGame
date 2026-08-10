@@ -620,6 +620,38 @@ body {
   .god-table td {
     padding: var(--spacing-sm) var(--spacing-md);
   }
+
+  /* Fixed 200px/150px tracks leave the search input almost no room and
+     force real page overflow at phone width -- stack instead. */
+  .users-filter-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* flex:1 with no wrap on 3 action buttons pushes the third fully
+     off-screen and clips the second at 375px (measured scrollWidth
+     625px vs 375px viewport). */
+  .god-action-row {
+    flex-wrap: wrap;
+  }
+
+  .god-action-row > .btn {
+    min-width: 0;
+  }
+
+  /* Fixed min-width wider than a phone renders the modal partially
+     off-screen with no way to reach the clipped edges (position:fixed
+     produces no scrollbar). .modal-content's own max-width:90vw would
+     already handle this if this selector didn't override it. */
+  .result-confirm-modal {
+    min-width: unset;
+    max-width: 92vw;
+  }
+
+  /* Table has no horizontal-scroll handling of its own -- only its
+     wrapper sets overflow-y. */
+  .user-table {
+    overflow-x: auto;
+  }
 }
 
 /* ==================== UTILITY CLASSES ==================== */
@@ -2192,8 +2224,8 @@ body.effect-hex-images .hex-label { z-index: 1; }
   gap: 10px;
   margin-bottom: 15px;
 }
-.stat-cards--3 { grid-template-columns: repeat(3, 1fr); }
-.stat-cards--4 { grid-template-columns: repeat(4, 1fr); }
+.stat-cards--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.stat-cards--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
 .stat-card {
   padding: 15px;

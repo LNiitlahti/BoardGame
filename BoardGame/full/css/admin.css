@@ -3098,6 +3098,18 @@ body.effect-hex-images .hex-label { z-index: 1; }
         grid-template-rows: auto 1fr auto;
     }
 
+    /* At 375px this wraps to 2 rows and covers ~20 of 91 hexes including
+       the entire top row (measured), blocking taps on them. A single
+       scrollable row halves the vertical footprint; not a full fix (the
+       row still sits over the board's top edge) but meaningfully less
+       coverage without restructuring .board-section's centered flex
+       layout, which BoardRenderer's sizing depends on. */
+    .effects-panel {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        max-width: calc(100% - 20px);
+    }
+
     .teams-column {
         max-height: 150px;
     }
@@ -3123,6 +3135,23 @@ body.effect-hex-images .hex-label { z-index: 1; }
     }
 
     .confirm-matchup .confirm-team { min-width: 100px; }
+
+    /* Every other action modal (400-550px min-width, no override) is
+       wider than a phone and, being position:fixed, produces no
+       scrollbar to reach the clipped content -- same fix pattern as
+       .result-confirm-modal above, just applied to the rest of them. */
+    .player-manager-modal,
+    .next-round-modal,
+    .clear-queue-modal,
+    .auto-match-modal,
+    .mass-import-modal,
+    .challenge-setup-modal,
+    .edit-match-modal,
+    .game-manager-modal,
+    .seating-order-modal {
+        min-width: unset;
+        max-width: 95vw;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
