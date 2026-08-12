@@ -996,6 +996,7 @@ async function _setSpellPreSkip(checked) {
     } catch (error) {
         console.error('[Team Controls] Error setting spell pre-skip:', error);
         showStatus('Error: ' + error.message, 'error');
+        if (gameData?.spellPhase) _renderPreSkipCheckbox(gameData.spellPhase);
     }
 }
 
