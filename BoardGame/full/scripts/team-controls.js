@@ -25,6 +25,7 @@ let _prevRenderSignature = null;
 let _prevBoardSignature = null;
 let _hexImagesBuilt = false;
 let _selectedChallengeHex = null; // { coord, ownerId, teamName, typeLabel } chosen in the challenge modal
+let _autoSkipInFlight = false; // guards renderSpellPhaseOverlay()'s auto-pass from firing endSpellTurn() more than once per pre-skip turn
 
 /**
  * Initialize team controls when Firebase is ready
@@ -763,6 +764,11 @@ function renderSpellPhaseOverlay() {
     }
 
     overlay.style.display = 'flex';
+    // Hidden by default; only the "waiting for another team's turn" branch
+    // below re-shows it. Reset here (rather than in every branch) since
+    // this function fully re-renders the overlay on every call.
+    const preSkipEl = document.getElementById('spellPreSkipContainer');
+    if (preSkipEl) preSkipEl.style.display = 'none';
 
     if (!gameData.spellsActive) {
         document.getElementById('spellPhaseTurnStatus').textContent = 'Spell phase — resolved by the tournament admin.';
@@ -796,6 +802,22 @@ function renderSpellPhaseOverlay() {
         completedEl.style.display = '';
         _renderSpellPhaseHand(false);
     } else if (isOurTurn) {
+        // A team that pre-committed to skipping (checkbox ticked before its
+        // turn arrived) auto-passes the instant its turn starts, with no
+        // extra confirmation -- checking the box earlier already was the
+        // confirmation. _autoSkipInFlight guards against firing endSpellTurn()
+        // again on every snapshot while the write round-trips (isOurTurn
+        // stays true until teamsCompleted reflects the pass).
+        if (sp.preSkip?.[String(currentTeamId)] === true && !_autoSkipInFlight) {
+            _autoSkipInFlight = true;
+            endSpellTurn().finally(() => { _autoSkipInFlight = false; });
+            statusEl.textContent = 'Skipping your spell turn (pre-committed)...';
+            statusEl.style.color = '#a855f7';
+            actionsEl.style.display = 'none';
+            completedEl.style.display = 'none';
+            _renderSpellPhaseHand(false);
+            return;
+        }
         statusEl.textContent = 'It is YOUR TURN! Select a spell to cast or pass.';
         statusEl.style.color = '#a855f7';
         actionsEl.style.display = '';
@@ -808,6 +830,7 @@ function renderSpellPhaseOverlay() {
         actionsEl.style.display = 'none';
         completedEl.style.display = 'none';
         _renderSpellPhaseHand(false);
+        _renderPreSkipCheckbox(sp);
     }
 }
 
@@ -956,6 +979,38 @@ async function endSpellTurn() {
         console.error('[Team Controls] Error ending spell turn:', error);
         showStatus('Error: ' + error.message, 'error');
     }
+}
+
+/**
+ * Write this team's pre-commit "skip spells this window" choice. Scoped to
+ * the current spell window only — SpellEngine.beginSpellPhase() resets
+ * spellPhase.preSkip to {} every time a new spell window opens. Freely
+ * reversible up until the moment the team's turn is actually processed.
+ */
+async function _setSpellPreSkip(checked) {
+    try {
+        const tournamentRef = window.firebaseDB.collection('tournaments').doc(currentTournamentId);
+        await tournamentRef.update({
+            [`spellPhase.preSkip.${currentTeamId}`]: checked
+        });
+    } catch (error) {
+        console.error('[Team Controls] Error setting spell pre-skip:', error);
+        showStatus('Error: ' + error.message, 'error');
+    }
+}
+
+/** Render the pre-skip checkbox, shown only in the "not your turn yet" branch of renderSpellPhaseOverlay(). */
+function _renderPreSkipCheckbox(sp) {
+    const el = document.getElementById('spellPreSkipContainer');
+    if (!el) return;
+    const checked = sp.preSkip?.[String(currentTeamId)] === true;
+    el.style.display = '';
+    el.innerHTML = `
+        <label class="spell-preskip-label">
+            <input type="checkbox" ${checked ? 'checked' : ''} onchange="_setSpellPreSkip(this.checked)">
+            We will skip spells this time
+        </label>
+    `;
 }
 
 /** Build an active effect entry for Type B spells */
