@@ -479,7 +479,8 @@ class SpellEngine {
                 turnOrder: [],
                 currentTeamIndex: 0,
                 teamsCompleted: [],
-                roundStartTeam: null
+                roundStartTeam: null,
+                preSkip: {}
             };
             this._save();
             this._onPhaseChanged();
@@ -497,7 +498,8 @@ class SpellEngine {
             turnOrder: turnOrder,
             currentTeamIndex: 0,
             teamsCompleted: [],
-            roundStartTeam: turnOrder[0]
+            roundStartTeam: turnOrder[0],
+            preSkip: {}
         };
 
         this._save();
