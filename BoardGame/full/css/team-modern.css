@@ -654,6 +654,67 @@
   line-height: 1.5;
 }
 
+/* ==================== CARD FLIP (hold-to-reveal) ==================== */
+/* Grid-stacking flip card: both faces occupy the same grid cell so the
+   container sizes to the taller face (front, with name/desc text, is
+   usually taller than the back, which is just card-back.png). */
+
+.card-flip {
+  perspective: 1000px;
+}
+
+.card-flip-inner {
+  display: grid;
+  grid-template-areas: "stack";
+  transition: transform 0.4s;
+  transform-style: preserve-3d;
+}
+
+.card-flip.revealed .card-flip-inner {
+  transform: rotateY(180deg);
+}
+
+.card-flip-face {
+  grid-area: stack;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.card-flip-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-flip-back img {
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.card-flip-front {
+  transform: rotateY(180deg);
+}
+
+/* ==================== SPELL PRE-SKIP CHECKBOX ==================== */
+
+.spell-preskip-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: #9aa1ad;
+  cursor: pointer;
+}
+
+.spell-preskip-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
 /* ==================== ACTIVE CONDITIONS ==================== */
 
 #activeConditionsSection {
