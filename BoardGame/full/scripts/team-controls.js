@@ -34,6 +34,9 @@ document.addEventListener('firebase-ready', function() {
 
     const auth = firebase.auth();
 
+    attachHoldToReveal(document.getElementById('spellCardsList'));
+    attachHoldToReveal(document.getElementById('spellHandCards'));
+
     auth.onAuthStateChanged(async (user) => {
         if (!user) {
             console.log('[Team Controls] Not authenticated, redirecting to login');
@@ -567,6 +570,62 @@ function _getTeamMatchInfo() {
     }
 
     return result;
+}
+
+/**
+ * One-shot flag: a hold-and-release cycle on a .card-flip element fires a
+ * native `click` immediately after mouseup/touchend (press-without-drag is
+ * normal DOM behavior). That click would otherwise trigger the card's
+ * normal click action (open detail modal / cast spell) the instant a peek
+ * ends. Click handlers that sit behind a card-flip must call
+ * _consumeCardClickSuppression() first and bail out if it returns true.
+ */
+let _suppressNextCardClick = false;
+
+function _consumeCardClickSuppression() {
+    if (_suppressNextCardClick) {
+        _suppressNextCardClick = false;
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Event-delegated hold-to-reveal: mousedown/touchstart flips a .card-flip
+ * to its real-art face, mouseup/touchend/touchcancel/pointer-leaves-card
+ * flips it back. Delegated on a stable ancestor container since
+ * renderSpellCards()/_renderSpellPhaseHand() replace the container's
+ * innerHTML on every Firestore snapshot, which would otherwise drop
+ * per-card listeners on every render.
+ *
+ * mouseleave doesn't bubble (its event path is target-only), so it can't
+ * be caught via delegation on an ancestor. 'mouseout' does bubble; checking
+ * relatedTarget for "still inside this card" gives the same "pointer left
+ * the card" signal through a delegatable event.
+ */
+function attachHoldToReveal(container) {
+    if (!container) return;
+
+    const reveal = (e) => {
+        const card = e.target.closest('.card-flip');
+        if (card) card.classList.add('revealed');
+    };
+    const unreveal = (e) => {
+        const card = e.target.closest('.card-flip');
+        if (!card) return;
+        if (card.classList.contains('revealed')) _suppressNextCardClick = true;
+        card.classList.remove('revealed');
+    };
+
+    container.addEventListener('mousedown', reveal);
+    container.addEventListener('touchstart', reveal, { passive: true });
+    container.addEventListener('mouseup', unreveal);
+    container.addEventListener('touchend', unreveal);
+    container.addEventListener('touchcancel', unreveal);
+    container.addEventListener('mouseout', (e) => {
+        const card = e.target.closest('.card-flip');
+        if (card && !card.contains(e.relatedTarget)) unreveal(e);
+    });
 }
 
 /**
