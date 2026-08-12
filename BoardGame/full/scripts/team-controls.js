@@ -639,6 +639,11 @@ function resolveSpellImage(def) {
     return (window.BOARDGAME_BASE || '..') + '/' + def.image;
 }
 
+/** Card-back image shown by default on every spell card until held. */
+function _spellCardBackUrl() {
+    return (window.BOARDGAME_BASE || '..') + '/shared/images/spell-cards/card-back.png';
+}
+
 /**
  * Render spell cards sidebar (uses new spellPiles data model)
  */
@@ -669,6 +674,7 @@ function renderSpellCards() {
     }
 
     const defs = gameData?.spellDefinitions || {};
+    const cardBack = _spellCardBackUrl();
     container.innerHTML = cards.map((spellId, idx) => {
         const def = defs[spellId] || {};
         const name = _escapeHtmlSafe(def.nameEn || def.name || spellId);
@@ -676,10 +682,17 @@ function renderSpellCards() {
         const img = resolveSpellImage(def);
         const thumb = img ? `<img class="spell-card-thumb" src="${img}" alt="" loading="lazy">` : '';
         return `
-            <div class="spell-card" onclick="viewSpellDetail('${spellId}')">
-                ${thumb}
-                <div class="spell-card-name">${name}</div>
-                <div class="spell-card-desc">${desc.substring(0, 80)}${desc.length > 80 ? '...' : ''}</div>
+            <div class="spell-card card-flip" onclick="viewSpellDetail('${spellId}')">
+                <div class="card-flip-inner">
+                    <div class="card-flip-face card-flip-back">
+                        <img src="${cardBack}" alt="" loading="lazy">
+                    </div>
+                    <div class="card-flip-face card-flip-front">
+                        ${thumb}
+                        <div class="spell-card-name">${name}</div>
+                        <div class="spell-card-desc">${desc.substring(0, 80)}${desc.length > 80 ? '...' : ''}</div>
+                    </div>
+                </div>
             </div>
         `;
     }).join('');
@@ -687,6 +700,8 @@ function renderSpellCards() {
 
 /** View spell detail in a modal */
 function viewSpellDetail(spellId) {
+    if (_consumeCardClickSuppression()) return;
+
     const defs = gameData?.spellDefinitions || {};
     const def = defs[spellId];
     if (!def) return;
@@ -696,7 +711,16 @@ function viewSpellDetail(spellId) {
     const desc = _escapeHtmlSafe(def.descriptionEn || def.description || '');
     const img = resolveSpellImage(def);
     const artHtml = img
-        ? `<img src="${img}" alt="" style="width: 100%; border-radius: 8px; margin-bottom: 14px; display: block;" loading="lazy">`
+        ? `<div class="card-flip" id="spellDetailFlip" style="margin-bottom: 14px;">
+             <div class="card-flip-inner">
+               <div class="card-flip-face card-flip-back">
+                 <img src="${_spellCardBackUrl()}" alt="" style="width: 100%; border-radius: 8px; display: block;">
+               </div>
+               <div class="card-flip-face card-flip-front">
+                 <img src="${img}" alt="" style="width: 100%; border-radius: 8px; display: block;" loading="lazy">
+               </div>
+             </div>
+           </div>`
         : '';
 
     const modal = document.createElement('div');
@@ -713,6 +737,18 @@ function viewSpellDetail(spellId) {
     `;
     document.body.appendChild(modal);
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+
+    if (img) {
+        const flipEl = modal.querySelector('#spellDetailFlip');
+        const reveal = () => flipEl.classList.add('revealed');
+        const unreveal = () => flipEl.classList.remove('revealed');
+        flipEl.addEventListener('mousedown', reveal);
+        flipEl.addEventListener('touchstart', reveal, { passive: true });
+        flipEl.addEventListener('mouseup', unreveal);
+        flipEl.addEventListener('touchend', unreveal);
+        flipEl.addEventListener('touchcancel', unreveal);
+        flipEl.addEventListener('mouseleave', unreveal);
+    }
 }
 
 /** Render the spell phase overlay (shown/hidden based on current phase) */
@@ -789,6 +825,7 @@ function _renderSpellPhaseHand(interactive) {
         return;
     }
 
+    const cardBack = _spellCardBackUrl();
     container.innerHTML = hand.map((spellId) => {
         const def = defs[spellId] || {};
         const name = _escapeHtmlSafe(def.name || spellId);
@@ -796,6 +833,10 @@ function _renderSpellPhaseHand(interactive) {
         const desc = _escapeHtmlSafe(def.descriptionEn || def.description || '');
         const clickAttr = interactive ? `onclick="selectSpellToCast('${spellId}')"` : '';
         const img = resolveSpellImage(def);
+        const backFace = `
+            <div class="card-flip-face card-flip-back">
+                <img src="${cardBack}" alt="" loading="lazy">
+            </div>`;
 
         // Illustrated cards already have the name/description printed on
         // the art itself (same card the table uses physically) — show just
@@ -803,17 +844,27 @@ function _renderSpellPhaseHand(interactive) {
         // (the legacy pre-illustration drafts) fall back to the text layout.
         if (img) {
             return `
-                <div class="spell-phase-card spell-phase-card-art ${interactive ? 'interactive' : 'disabled'}" ${clickAttr}>
-                    <img class="spell-phase-card-image" src="${img}" alt="${name}" loading="lazy">
+                <div class="spell-phase-card spell-phase-card-art card-flip ${interactive ? 'interactive' : 'disabled'}" ${clickAttr}>
+                    <div class="card-flip-inner">
+                        ${backFace}
+                        <div class="card-flip-face card-flip-front">
+                            <img class="spell-phase-card-image" src="${img}" alt="${name}" loading="lazy">
+                        </div>
+                    </div>
                 </div>
             `;
         }
         return `
-            <div class="spell-phase-card ${interactive ? 'interactive' : 'disabled'}" ${clickAttr}>
-                <div class="spell-phase-card-name">${name}</div>
-                ${nameEn ? `<div class="spell-phase-card-type">${nameEn}</div>` : ''}
-                <div class="spell-phase-card-type">${def.type || ''} &bull; ${def.rarity || ''}</div>
-                <div class="spell-phase-card-desc">${desc}</div>
+            <div class="spell-phase-card card-flip ${interactive ? 'interactive' : 'disabled'}" ${clickAttr}>
+                <div class="card-flip-inner">
+                    ${backFace}
+                    <div class="card-flip-face card-flip-front">
+                        <div class="spell-phase-card-name">${name}</div>
+                        ${nameEn ? `<div class="spell-phase-card-type">${nameEn}</div>` : ''}
+                        <div class="spell-phase-card-type">${def.type || ''} &bull; ${def.rarity || ''}</div>
+                        <div class="spell-phase-card-desc">${desc}</div>
+                    </div>
+                </div>
             </div>
         `;
     }).join('');
@@ -821,6 +872,8 @@ function _renderSpellPhaseHand(interactive) {
 
 /** Select and cast a spell during the spell phase */
 async function selectSpellToCast(spellId) {
+    if (_consumeCardClickSuppression()) return;
+
     const defs = gameData?.spellDefinitions || {};
     const def = defs[spellId];
     if (!def) { showStatus('Spell not found', 'error'); return; }
