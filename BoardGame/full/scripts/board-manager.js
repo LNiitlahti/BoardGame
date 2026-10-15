@@ -352,6 +352,10 @@ class BoardManager {
     // ------------------------------------------------------------------
 
     async saveDefaultRooms() {
+        if (!this._boardModule.layout.usesSharedDefaultRooms) {
+            this._ui.showStatus('Default room layouts exist only for the Legacy board', 'error');
+            return;
+        }
         const rooms = this._gameState.rooms || [];
         try {
             // config/defaultRooms is ONE doc shared across every tournament -
@@ -381,6 +385,10 @@ class BoardManager {
     }
 
     async loadDefaultRooms() {
+        if (!this._boardModule.layout.usesSharedDefaultRooms) {
+            this._ui.showStatus('Default room layouts exist only for the Legacy board', 'error');
+            return;
+        }
         try {
             const rooms = await loadDefaultRoomsDoc(window.firebaseDB);
             if (!rooms) {

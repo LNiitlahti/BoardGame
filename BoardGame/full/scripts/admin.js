@@ -2256,6 +2256,10 @@ async function toggleRoomHex(coord) {
 // =============================================================================
 
 async function saveDefaultRooms() {
+    if (!boardModule.layout.usesSharedDefaultRooms) {
+        showStatus('Default room layouts exist only for the Legacy board', 'error');
+        return;
+    }
     const rooms = gameState.rooms || [];
     try {
         // config/defaultRooms is ONE doc shared across every tournament -
@@ -2285,6 +2289,10 @@ async function saveDefaultRooms() {
 }
 
 async function loadDefaultRooms() {
+    if (!boardModule.layout.usesSharedDefaultRooms) {
+        showStatus('Default room layouts exist only for the Legacy board', 'error');
+        return;
+    }
     try {
         const rooms = await loadDefaultRoomsDoc(window.firebaseDB);
         if (!rooms) {
