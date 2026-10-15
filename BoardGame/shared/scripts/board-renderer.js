@@ -193,8 +193,9 @@ class BoardRenderer {
             const wrapperWidth = wrapper.clientWidth;
             const wrapperHeight = wrapper.clientHeight;
 
-            // Board native size scales with hexScale option
-            const boardSize = 750 * this.options.hexScale;
+            // Board native size comes from the layout (750 for Legacy, 1000
+            // for Version 2) and scales with the hexScale option
+            const boardSize = this.nativeBoardSize();
 
             // Account for rotation - rotated square has larger bounding box
             // For 30deg rotation: bounding box ≈ size * (cos(30) + sin(30)) ≈ size * 1.366
@@ -229,6 +230,9 @@ class BoardRenderer {
             this.container.style.flexShrink = '0';
         };
 
+        // Kept so refreshLayout() can re-fit after the board switches layout
+        this._applyScaling = applyScaling;
+
         const resizeObserver = new ResizeObserver(applyScaling);
         resizeObserver.observe(this.container.parentElement);
 
@@ -236,6 +240,23 @@ class BoardRenderer {
         setTimeout(applyScaling, 100);
     }
     
+    /**
+     * Native (unscaled) board box in px: twice the layout's half-extent,
+     * times the hexScale option. 750 * hexScale for Legacy, as before.
+     */
+    nativeBoardSize() {
+        const half = this.boardModule?.layout?.nativeHalf ?? 375;
+        return 2 * half * this.options.hexScale;
+    }
+
+    /**
+     * Re-fit the container after boardModule.setLayout(). The caller still
+     * has to call render() to rebuild the hexes.
+     */
+    refreshLayout() {
+        if (this._applyScaling) this._applyScaling();
+    }
+
     render(gameData = {}) {
         // Clear existing hexes
         this.container.innerHTML = '';
