@@ -2101,6 +2101,12 @@ async function assignTeamToHex(coord, teamId) {
         return;
     }
 
+    // Reject coordinates that aren't on this tournament's board
+    if (!boardModule.isValidCoord(coord)) {
+        showStatus(`${coord} is not on this tournament's board`, 'error');
+        return;
+    }
+
     // Assign team to hex
     const oldOccupier = gameState.board[coord] || null;
     gameState.board[coord] = teamId;

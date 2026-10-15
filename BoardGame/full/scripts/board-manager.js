@@ -237,6 +237,13 @@ class BoardManager {
             return;
         }
 
+        // Reject coordinates that aren't on this tournament's board
+        if (!this._boardModule.isValidCoord(coord)) {
+            this._ui.showStatus(`${coord} is not on this tournament's board`, 'error');
+            this.closeTeamPicker();
+            return;
+        }
+
         // Assign team
         const oldOccupier = this._gameState.board[coord] || null;
         this._gameState.board[coord] = teamId;
