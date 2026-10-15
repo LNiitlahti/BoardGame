@@ -209,6 +209,7 @@
 <!-- Shared deps -->
 <script defer src="../shared/scripts/firebase-loader.js"></script>
 <script defer src="../shared/scripts/hex-image-preloader.js"></script>
+<script defer src="../shared/scripts/board-layouts.js"></script>
 <script defer src="../shared/scripts/board-module.js"></script>
 <script defer src="../shared/scripts/board-renderer.js"></script>
 <script defer src="../shared/scripts/games-config.js"></script>
@@ -262,7 +263,7 @@
     /**
      * Inject the per-coordinate hex artwork as a generated stylesheet.
      *
-     * Board-state-independent — the same 91 rules every time — so it is built
+     * Board-state-independent — the same rules every time for a given board — so it is built
      * once at startup rather than on every render. Ported from
      * team-controls.js applyHexImages(); admin.js and ui-manager.js carry their
      * own copies of the same routine.
@@ -277,15 +278,9 @@
             document.head.appendChild(styleEl);
         }
 
-        const base = window.BOARDGAME_BASE || '.';
-        styleEl.textContent = boardModule.generateHexCoordinates()
-            .map(([q, r]) => {
-                const coord = `q${q}r${r}`;
-                return `body.effect-hex-images .board-hex[data-coord="${coord}"]::before {
-                    background-image: url('${base}/shared/images/hexes/coords/${coord}.png');
-                }`;
-            })
-            .join('\n');
+        styleEl.textContent = window.BoardLayouts.hexImagesCss(
+            boardModule.layout, window.BOARDGAME_BASE || '.'
+        );
     }
 
     /**

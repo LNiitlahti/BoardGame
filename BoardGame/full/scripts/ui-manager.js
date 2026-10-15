@@ -111,15 +111,9 @@ class UIManager {
             document.head.appendChild(styleEl);
         }
 
-        const hexCoords = this._boardModule.generateHexCoordinates();
-        let css = '';
-        hexCoords.forEach(([q, r]) => {
-            const coord = `q${q}r${r}`;
-            css += `body.effect-hex-images .board-hex[data-coord="${coord}"]::before {
-                background-image: url('${(window.BOARDGAME_BASE || '.')}/shared/images/hexes/coords/${coord}.png');
-            }\n`;
-        });
-        styleEl.textContent = css;
+        styleEl.textContent = window.BoardLayouts.hexImagesCss(
+            this._boardModule.layout, window.BOARDGAME_BASE || '.'
+        );
     }
 
     initEffectsPanel() {

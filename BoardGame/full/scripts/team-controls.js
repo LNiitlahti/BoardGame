@@ -1360,7 +1360,7 @@ function renderBoard() {
     }
 
     // applyHexImages() builds a static, board-state-independent stylesheet
-    // (same 91 coordinate rules every time) — build it once, not per render.
+    // (same coordinate rules every time for a given board) — build it once, not per render. BoardLayouts.sync() rewrites it if the board version changes.
     if (!_hexImagesBuilt) {
         applyHexImages(true);
         _hexImagesBuilt = true;
@@ -1404,17 +1404,9 @@ function applyHexImages(enabled) {
         document.head.appendChild(styleEl);
     }
 
-    const hexCoords = boardModule.generateHexCoordinates();
-    let css = '';
-
-    hexCoords.forEach(([q, r]) => {
-        const coord = `q${q}r${r}`;
-        css += `body.effect-hex-images .board-hex[data-coord="${coord}"]::before {
-            background-image: url('${(window.BOARDGAME_BASE || '.')}/shared/images/hexes/coords/${coord}.png');
-        }\n`;
-    });
-
-    styleEl.textContent = css;
+    styleEl.textContent = window.BoardLayouts.hexImagesCss(
+        boardModule.layout, window.BOARDGAME_BASE || '.'
+    );
 }
 
 /**

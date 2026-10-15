@@ -460,18 +460,9 @@ function applyHexImages(enabled) {
         document.head.appendChild(styleEl);
     }
 
-    // Generate CSS rules for each hex coordinate
-    const hexCoords = boardModule.generateHexCoordinates();
-    let css = '';
-
-    hexCoords.forEach(([q, r]) => {
-        const coord = `q${q}r${r}`;
-        css += `body.effect-hex-images .board-hex[data-coord="${coord}"]::before {
-            background-image: url('${(window.BOARDGAME_BASE || '.')}/shared/images/hexes/coords/${coord}.png');
-        }\n`;
-    });
-
-    styleEl.textContent = css;
+    styleEl.textContent = window.BoardLayouts.hexImagesCss(
+        boardModule.layout, window.BOARDGAME_BASE || '.'
+    );
 }
 
 /**
