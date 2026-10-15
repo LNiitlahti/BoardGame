@@ -484,15 +484,18 @@
             // ---- HEX BOARD ----
             const boardCenterX = pageW / 2;
             const boardCenterY = 118;
-            const hexR = 4.8;
+            const boardLayout = window.BoardLayouts.forTournament(gameState);
+            // Keep the printed board the same size on the page: 4.8mm hexes
+            // for the 5-ring Legacy board, proportionally smaller for bigger ones.
+            const hexR = 4.8 * 5 / boardLayout.radius;
             const sqrt3 = Math.sqrt(3);
             const rot = 30 * Math.PI / 180;
             const cosR = Math.cos(rot);
             const sinR = Math.sin(rot);
 
-            const mountainHeart = 'q0r0';
-            const sideHearts = ['q-4r2', 'q-2r-2', 'q2r-4', 'q4r-2', 'q2r2', 'q-2r4'];
-            const startingLocs = ['q0r-5', 'q5r-5', 'q5r0', 'q0r5', 'q-5r5', 'q-5r0'];
+            const mountainHeart = boardLayout.mountainHeartLocation;
+            const sideHearts = boardLayout.sideHeartLocations;
+            const startingLocs = boardLayout.startingLocations;
 
             const hexDefaultFill = [40, 44, 56];
             const hexStartFill = [55, 55, 65];
@@ -521,10 +524,7 @@
                 doc.circle(cx, cy, size, 'F');
             }
 
-            for (let q = -5; q <= 5; q++) {
-                const r1 = Math.max(-5, -q - 5);
-                const r2 = Math.min(5, -q + 5);
-                for (let r = r1; r <= r2; r++) {
+            for (const [q, r] of window.BoardLayouts.coordinates(boardLayout)) {
                     const coord = `q${q}r${r}`;
                     const px = hexR * (3 / 2) * q;
                     const py = hexR * sqrt3 * (r + q / 2);
@@ -555,7 +555,6 @@
                         drawHeartMarker(cx, cy, 1.0, [255, 255, 255]);
                     }
                 }
-            }
 
             // ---- META INFO BELOW BOARD ----
             const metaY = boardCenterY + 58;
