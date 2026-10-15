@@ -1,43 +1,64 @@
 /**
  * Board Module - Reusable hex grid logic
  * Handles hex coordinate math, neighbor detection, and board state
+ *
+ * The board's size and special hexes come from a layout in
+ * board-layouts.js (Legacy 91 hexes, or Version 2 with 169). With no layout
+ * argument a module is the Legacy board, so existing callers are unchanged.
  */
 
+function resolveBoardLayouts() {
+    if (typeof window !== 'undefined' && window.BoardLayouts) return window.BoardLayouts;
+    if (typeof require === 'function') return require('./board-layouts.js');
+    throw new Error('[BoardModule] board-layouts.js must be loaded before board-module.js');
+}
+
 class BoardModule {
-    constructor(scale = 1) {
+    /**
+     * @param {number} [scale=1]
+     * @param {Object} [layout] - a BoardLayouts layout; omitted = Legacy
+     */
+    constructor(scale = 1, layout = null) {
         this.scale = scale;
         this.hexSize = 32 * scale; // Increased from 30 to reduce gaps
-        this.centerOffset = { x: 375 * scale, y: 375 * scale };
-        
-        // Define special locations (fixed)
-        this.startingLocations = ['q0r-5', 'q5r-5', 'q5r0', 'q0r5', 'q-5r5', 'q-5r0'];
         this.centerLocation = 'q0r0';
-
-        // Define heart hexes (matching physical board)
-        // Side hearts give +1 VP per game when controlled
-        this.sideHeartLocations = ['q-4r2', 'q-2r-2', 'q2r-4', 'q4r-2', 'q2r2', 'q-2r4'];
-        // Mountain heart (center) gives +2 VP per game when controlled
-        this.mountainHeartLocation = 'q0r0';
 
         // Room hexes (admin-defined during tournament setup)
         // When a team places a tile on a room, they draw a spell card
         this.roomHexes = []; // Loaded from tournament data
+
+        this.setLayout(layout || resolveBoardLayouts().get(undefined));
     }
 
     /**
-     * Generate all valid hex coordinates for a 91-hex board
-     * Uses axial coordinates (q, r) where -5 <= q, r <= 5 and -5 <= q+r <= 5
+     * Point this module at a layout. Mutates in place because other modules
+     * hold a reference to this instance (see BoardLayouts.sync()).
+     */
+    setLayout(layout) {
+        this.layout = layout;
+        this.radius = layout.radius;
+        this.centerOffset = {
+            x: layout.nativeHalf * this.scale,
+            y: layout.nativeHalf * this.scale
+        };
+
+        // Special locations (fixed per layout)
+        this.startingLocations = [...layout.startingLocations];
+
+        // Heart hexes (matching physical board)
+        // Side hearts give +1 VP per game when controlled
+        this.sideHeartLocations = [...layout.sideHeartLocations];
+        // Mountain heart (center) gives +2 VP per game when controlled
+        this.mountainHeartLocation = layout.mountainHeartLocation;
+    }
+
+    /**
+     * Generate all valid hex coordinates for this module's layout
+     * (91 for Legacy, 169 for Version 2). Axial coordinates (q, r) with
+     * |q|, |r|, |q+r| <= layout radius.
      */
     generateHexCoordinates() {
-        const coordinates = [];
-        for (let q = -5; q <= 5; q++) {
-            const r1 = Math.max(-5, -q - 5);
-            const r2 = Math.min(5, -q + 5);
-            for (let r = r1; r <= r2; r++) {
-                coordinates.push([q, r]);
-            }
-        }
-        return coordinates;
+        return resolveBoardLayouts().coordinates(this.layout);
     }
 
     /**
@@ -99,18 +120,11 @@ class BoardModule {
             [1, 0], [1, -1], [0, -1],
             [-1, 0], [-1, 1], [0, 1]
         ];
-        
-        return directions.map(([dq, dr]) => {
-            const nq = q + dq;
-            const nr = r + dr;
-            return `q${nq}r${nr}`;
-        }).filter(coord => {
-            // Check if within board bounds
-            const matches = coord.match(/-?\d+/g);
-            if (!matches) return false;
-            const [nq, nr] = matches.map(Number);
-            return Math.abs(nq) <= 5 && Math.abs(nr) <= 5 && Math.abs(nq + nr) <= 5;
-        });
+
+        return directions
+            .map(([dq, dr]) => [q + dq, r + dr])
+            .filter(([nq, nr]) => this.isValidHex(nq, nr))
+            .map(([nq, nr]) => `q${nq}r${nr}`);
     }
 
     /**
@@ -124,7 +138,15 @@ class BoardModule {
      * Check if coordinates are within valid board bounds
      */
     isValidHex(q, r) {
-        return Math.abs(q) <= 5 && Math.abs(r) <= 5 && Math.abs(q + r) <= 5;
+        return resolveBoardLayouts().isValid(this.layout, q, r);
+    }
+
+    /**
+     * Check a "q1r2"-style coordinate string against the board bounds
+     */
+    isValidCoord(coord) {
+        const m = /^q(-?\d+)r(-?\d+)$/.exec(coord);
+        return !!m && this.isValidHex(parseInt(m[1], 10), parseInt(m[2], 10));
     }
 
     /**
@@ -208,14 +230,17 @@ class BoardModule {
      * @param {Array<string>} roomCoords - Array of coordinate strings like "q1r2"
      */
     setRoomHexes(roomCoords) {
-        // Validate that rooms don't overlap with heart hexes
+        // Rooms can't overlap hearts or starting squares, and can't be off
+        // this board (e.g. a Legacy room list loaded into a Version 2 board)
         const invalidRooms = roomCoords.filter(coord =>
             this.sideHeartLocations.includes(coord) ||
-            coord === this.mountainHeartLocation
+            coord === this.mountainHeartLocation ||
+            this.startingLocations.includes(coord) ||
+            !this.isValidCoord(coord)
         );
 
         if (invalidRooms.length > 0) {
-            console.warn('[BoardModule] Rooms cannot overlap with heart hexes:', invalidRooms);
+            console.warn('[BoardModule] Dropping invalid room hexes (heart, start or off-board):', invalidRooms);
             this.roomHexes = roomCoords.filter(coord => !invalidRooms.includes(coord));
         } else {
             this.roomHexes = [...roomCoords];
@@ -238,8 +263,8 @@ class BoardModule {
         let r = centerR + radius;
         
         const directions = [
-            [1, 0], [0, -1], [-1, -1],
-            [-1, 0], [0, 1], [1, 1]
+            [1, 0], [1, -1], [0, -1],
+            [-1, 0], [-1, 1], [0, 1]
         ];
         
         for (let i = 0; i < 6; i++) {
