@@ -225,8 +225,12 @@ class BoardRenderer {
             // Adjust these values to fine-tune centering: translateX(+right/-left) translateY(+down/-up)
             this.container.style.transform = `translate(-0px, -0px) scale(${scale}) rotate(30deg)`;
             this.container.style.transformOrigin = 'center center';
-            // Let flexbox do the centering, no margin tricks
-            this.container.style.margin = '0';
+            // Keep the layout footprint at the Legacy size whatever the board
+            // size: a symmetric (negative for Version 2) margin shrinks the
+            // margin box back to LEGACY_FOOTPRINT, and since the transform is
+            // about the centre the board stays centred. 0 for Legacy.
+            const footprintMargin = (BoardRenderer.LEGACY_FOOTPRINT * this.options.hexScale - boardSize) / 2;
+            this.container.style.margin = `${footprintMargin}px`;
             this.container.style.flexShrink = '0';
         };
 
@@ -248,6 +252,16 @@ class BoardRenderer {
         const half = this.boardModule?.layout?.nativeHalf ?? 375;
         return 2 * half * this.options.hexScale;
     }
+
+    /**
+     * Layout footprint (px, before hexScale) the container always occupies,
+     * whatever nativeBoardSize() is. Pages size their board wrappers from
+     * the container's content height and applyScaling then scales by that
+     * wrapper, so a bigger box for Version 2 would grow the wrapper and draw
+     * the board too large and clipped. Legacy's 750 box keeps every page as
+     * it was.
+     */
+    static get LEGACY_FOOTPRINT() { return 750; }
 
     /**
      * Re-fit the container after boardModule.setLayout(). The caller still

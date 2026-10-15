@@ -326,9 +326,11 @@
 @media (max-width: 1200px) {
   .team-main-layout {
     /* minmax(0, 1fr), not a bare 1fr -- the hex board keeps a fixed
-       750x750px layout box (board-renderer.js's responsive scaling only
-       visually shrinks it via transform: scale(), which doesn't shrink
-       its contribution to ancestor sizing). A bare 1fr track auto-sizes
+       750x750px layout footprint on both board versions (board-renderer.js
+       pins it at the Legacy size with negative margins around the bigger
+       Version 2 box, and its responsive scaling only visually shrinks the
+       board via transform: scale(), which doesn't shrink its contribution
+       to ancestor sizing). A bare 1fr track auto-sizes
        to that 750px min-content and the whole page overflows sideways on
        any phone narrower than that -- exactly the desktop rule two
        breakpoints up already avoids this same way. */
