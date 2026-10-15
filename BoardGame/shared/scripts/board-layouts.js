@@ -150,6 +150,12 @@
         if (typeof boardModule.setLayout !== 'function') return false;
 
         boardModule.setLayout(layout);
+        // Pages may have run setRoomHexes() on the pre-switch (Legacy) module,
+        // which drops Version 2 rooms that lie outside radius 5. Re-apply them
+        // now that the module knows the real board.
+        if (typeof boardModule.setRoomHexes === 'function' && tournamentDoc && Array.isArray(tournamentDoc.rooms)) {
+            boardModule.setRoomHexes(tournamentDoc.rooms);
+        }
         if (boardRenderer && typeof boardRenderer.refreshLayout === 'function') {
             boardRenderer.refreshLayout();
         }

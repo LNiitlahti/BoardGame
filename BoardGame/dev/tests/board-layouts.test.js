@@ -161,3 +161,22 @@ test('get(): only 1/2 or exact "1"/"2" select a layout; everything else is Legac
 test('sync(): a module without setLayout returns false instead of throwing', () => {
     assert.strictEqual(BoardLayouts.sync({ layout: null }, null, { boardVersion: 2 }), false);
 });
+
+test('sync(): re-applies the tournament rooms after switching layout', () => {
+    const applied = [];
+    const mod = {
+        layout: LEGACY,
+        setLayout(l) { this.layout = l; },
+        setRoomHexes(rooms) { applied.push([...rooms]); }
+    };
+    BoardLayouts.sync(mod, null, { boardVersion: 2, rooms: ['q6r0', 'q-4r2'] });
+    assert.deepStrictEqual(applied, [['q6r0', 'q-4r2']]);
+
+    // No change of layout -> rooms are not touched again
+    BoardLayouts.sync(mod, null, { boardVersion: 2, rooms: ['q1r0'] });
+    assert.strictEqual(applied.length, 1);
+
+    // A doc without a rooms array is fine
+    BoardLayouts.sync(mod, null, {});
+    assert.strictEqual(applied.length, 1);
+});
