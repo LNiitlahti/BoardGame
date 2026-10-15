@@ -138,8 +138,8 @@
         body.cine-active #hexBoard { transform-style: preserve-3d; }
         /* Removed for performance:
            body.cine-active .board-hex { transform-style: preserve-3d; }
-           Each of the 91 hexes became its own 3D rendering context, which the
-           compositor cannot flatten or cache. .rig-3d and #hexBoard keep theirs
+           Each hex (91 on Legacy, 169 on Version 2) became its own 3D
+           rendering context, which the compositor cannot flatten or cache. .rig-3d and #hexBoard keep theirs
            (they carry the depth the drop cascade translateZ needs); a .board-hex
            has no 3D-transformed children of its own. */
 

@@ -88,9 +88,10 @@ class CineTiles {
     // DISABLED FOR PERFORMANCE, and this one is worth understanding before
     // re-enabling it. --beat-intensity is an *inherited* custom property, so
     // writing it on #hexBoard invalidated the computed style of that element's
-    // entire subtree — ~730 nodes (91 hexes plus each one's bevel, material-fx
-    // overlay, particles, landing flash and beat pulse) — on every single
-    // frame. Measured on the target machine: 302 style recalcs of ~872 elements
+    // entire subtree — ~730 nodes on the Legacy board (91 hexes plus each
+    // one's bevel, material-fx overlay, particles, landing flash and beat
+    // pulse; Version 2's 169 hexes make it more) — on every single frame.
+    // Measured on the target machine: 302 style recalcs of ~872 elements
     // averaging 16.4 ms, i.e. 5.7 s of a 21.8 s recording. Commenting out this
     // one line halved style recalc time and took the cinematic from 13.9 to
     // 17.4 fps.

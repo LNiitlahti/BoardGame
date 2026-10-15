@@ -1,9 +1,12 @@
-// Warms the browser's HTTP cache for the 91 hex-terrain tiles (the whole Legacy board and the inner 91 hexes of a Version 2 board; Version 2's outer rings use a code-drawn placeholder, so there is nothing to preload for them) and 2 heart
-// images. These are only ever requested later via CSS background-image
-// rules on team.html/god.html/view.html (see ui-manager.js/team-controls.js
-// applyHexImages()), which fire all 91 requests at once on first board
-// render. Preloading them here, on whichever page a visitor lands on first,
-// means that burst resolves from cache instead of the network.
+// Warms the browser's HTTP cache for the 91 hex-terrain tiles (the whole
+// Legacy board and the inner 91 hexes of a Version 2 board; Version 2's
+// outer rings use a code-drawn placeholder, so there is nothing to preload
+// for them) and 2 heart images. These are only ever requested later via CSS
+// background-image rules on team.html/god.html/view.html (see
+// ui-manager.js/team-controls.js applyHexImages()), which fire all 91
+// requests at once on first board render. Preloading them here, on
+// whichever page a visitor lands on first, means that burst resolves from
+// cache instead of the network.
 //
 // Runs after the current page has finished loading and at low fetch
 // priority, so it never competes with that page's own resources.
