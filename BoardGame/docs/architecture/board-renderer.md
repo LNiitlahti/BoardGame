@@ -56,7 +56,7 @@ flowchart TD
     B --> C[100ms timeout then applyScaling]
     C --> D{Parent element exists?}
     D -->|No| E[RETURN — no scaling]
-    D -->|Yes| F["nativeSize = 750 x hexScale"]
+    D -->|Yes| F["nativeSize = 2 x layout.nativeHalf x hexScale (750 Legacy / 1000 Version 2)"]
     F --> G["rotatedSize = nativeSize x 1.366 (30deg bounding box)"]
     G --> H["availableSpace = min(parentWidth, parentHeight)"]
     H --> I["scale = availableSpace / rotatedSize"]
@@ -93,3 +93,7 @@ flowchart TD
     Q --> S
     R --> S
 ```
+
+## Board versions
+
+The board's size is not hardcoded. `shared/scripts/board-layouts.js` defines Legacy (version 1, 91 hexes) and Version 2 (169 hexes). A tournament stores `boardVersion`; a missing field means Legacy. `BoardModule` takes a layout (default Legacy) and `BoardLayouts.sync(boardModule, boardRenderer, tournamentDoc)` switches a page's existing board to the tournament's layout when the doc loads. Version 2 reuses the 91 existing tile images for its inner hexes and draws a code-generated placeholder for the outer two rings. `config/defaultRooms` and `LOCAL_DEFAULT_ROOMS` are Legacy-only.

@@ -10,7 +10,7 @@ Designed for LAN events. Runs in any browser. Syncs across every screen in real 
 
 ## The Concept
 
-At a LAN tournament, an admin queues matches from a central dashboard. Teams play their game externally (CS2, Dota 2, Valorant, Age of Empires IV, Overwatch 2, Rocket League, and more) and the admin confirms the result. The winning team then places a hex tile on a shared 91-hex game board — expanding their territory and competing for 7 strategic "heart" hexes that generate victory points. Everything updates live on every connected device.
+At a LAN tournament, an admin queues matches from a central dashboard. Teams play their game externally (CS2, Dota 2, Valorant, Age of Empires IV, Overwatch 2, Rocket League, and more) and the admin confirms the result. The winning team then places a hex tile on a shared hex game board (169 hexes, or the original 91-hex Legacy board) — expanding their territory and competing for 7 strategic "heart" hexes that generate victory points. Everything updates live on every connected device.
 
 **The board becomes the scoreboard.** Instead of a plain win/loss table, spectators watch territory shift in real time on a TV display.
 
@@ -20,7 +20,7 @@ At a LAN tournament, an admin queues matches from a central dashboard. Teams pla
 
 **Smart Match Scheduling** — A built-in algorithm generates balanced matchups by minimizing variance in how often players are paired together or against each other. No manual scheduling needed.
 
-**Hex Board Meta-Game** — A 91-hex board with 7 strategic heart hexes (6 side hearts worth 1 VP each, 1 mountain heart worth 2 VP). Winning matches lets teams expand territory and fight for control of high-value positions.
+**Hex Board Meta-Game** — A 169-hex board (or the original 91-hex Legacy board, selectable per tournament) with 7 strategic heart hexes (6 side hearts worth 1 VP each, 1 mountain heart worth 2 VP). Winning matches lets teams expand territory and fight for control of high-value positions.
 
 **Real-Time Sync** — Firebase-powered live updates. The admin panel, spectator board, and statistics page all reflect changes instantly across devices.
 

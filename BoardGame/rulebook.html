@@ -1075,8 +1075,11 @@
             <h1 class="section-title">2. The Board</h1>
 
             <p>
-                The board is a <strong>91-hex</strong> honeycomb: a hexagon five rings deep in every
-                direction from the centre. Every hex is addressed by two axial coordinates,
+                The board is a hexagonal honeycomb. The organiser picks one of two sizes when the
+                tournament is created: <strong>Version 2</strong> (the current board,
+                <strong>169 hexes</strong>, seven rings deep in every direction from the centre) or
+                <strong>Legacy</strong> (the original board, <strong>91 hexes</strong>, five rings
+                deep). Every hex is addressed by two axial coordinates,
                 <code>q</code> and <code>r</code>, written together as <code>q2r-4</code>.
             </p>
 
@@ -1132,16 +1135,20 @@
 
                 <h4>Side Hearts (Sivusydämet)</h4>
                 <p>
-                    Six hearts at <code>q-4r2</code>, <code>q-2r-2</code>, <code>q2r-4</code>,
-                    <code>q4r-2</code>, <code>q2r2</code> and <code>q-2r4</code>. Each pays
-                    <strong>+1 point every round</strong>.
+                    Six hearts, each paying <strong>+1 point every round</strong>. They sit on the
+                    second-outermost ring of the board, at the middle of each side, so each one lies
+                    between two starting locations. On the Version 2 board they are
+                    <code>q-6r3</code>, <code>q-3r-3</code>, <code>q3r-6</code>, <code>q6r-3</code>,
+                    <code>q3r3</code> and <code>q-3r6</code>; on the Legacy board they are
+                    <code>q-4r2</code>, <code>q-2r-2</code>, <code>q2r-4</code>, <code>q4r-2</code>,
+                    <code>q2r2</code> and <code>q-2r4</code>.
                 </p>
                 <p>
-                    Note where these actually sit: they form a wide ring <em>four steps out</em> from
-                    the centre, not a tight ring hugging the Mountain Heart. They are much closer to
-                    the starting locations than to the middle. In practice this means the side hearts
-                    are the early game — reachable within a few placements from your corner — while
-                    the Mountain Heart is the late game.
+                    Note where these actually sit: they form a wide ring near the rim, not a tight
+                    ring hugging the Mountain Heart. They are much closer to the starting locations
+                    than to the middle. In practice this means the side hearts are the early game —
+                    reachable within a few placements from your corner — while the Mountain Heart is
+                    the late game.
                 </p>
 
                 <h4>Rooms (Huoneet)</h4>
@@ -1159,10 +1166,14 @@
 
                 <p>A hex is valid when all three of these hold:</p>
                 <ul>
-                    <li><code>-5 ≤ q ≤ 5</code></li>
-                    <li><code>-5 ≤ r ≤ 5</code></li>
-                    <li><code>-5 ≤ q + r ≤ 5</code></li>
+                    <li><code>-N ≤ q ≤ N</code></li>
+                    <li><code>-N ≤ r ≤ N</code></li>
+                    <li><code>-N ≤ q + r ≤ N</code></li>
                 </ul>
+                <p>
+                    where <code>N</code> is <strong>7</strong> on the Version 2 board and
+                    <strong>5</strong> on the Legacy board.
+                </p>
 
                 <p>
                     Every hex has six neighbours, reached by adding
@@ -1172,9 +1183,11 @@
 
                 <div class="example-block">
                     <div class="example-label">Key Coordinates</div>
-                    Mountain Heart&nbsp;&nbsp;&nbsp;&nbsp;q0r0<br>
-                    Side Hearts&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;q-4r2, q-2r-2, q2r-4, q4r-2, q2r2, q-2r4<br>
-                    Starting Locations&nbsp;q0r-5, q5r-5, q5r0, q0r5, q-5r5, q-5r0
+                    Mountain Heart&nbsp;&nbsp;&nbsp;&nbsp;q0r0 (both boards)<br>
+                    Version 2 Side Hearts&nbsp;q-6r3, q-3r-3, q3r-6, q6r-3, q3r3, q-3r6<br>
+                    Version 2 Starting Locations&nbsp;q0r-7, q7r-7, q7r0, q0r7, q-7r7, q-7r0<br>
+                    Legacy Side Hearts&nbsp;&nbsp;q-4r2, q-2r-2, q2r-4, q4r-2, q2r2, q-2r4<br>
+                    Legacy Starting Locations&nbsp;q0r-5, q5r-5, q5r0, q0r5, q-5r5, q-5r0
                 </div>
 
                 <p>
@@ -2269,7 +2282,7 @@
                         <tr><td>Total spells</td><td><strong>15</strong> (each team has all 15 in its own pile)</td></tr>
                         <tr><td>Matches per round</td><td><strong>2</strong> (parallel slots)</td></tr>
                         <tr><td>Max challenge games per round</td><td><strong>7</strong></td></tr>
-                        <tr><td>Board</td><td><strong>91 hexes</strong></td></tr>
+                        <tr><td>Board</td><td><strong>169 hexes</strong> (Version 2) or <strong>91 hexes</strong> (Legacy)</td></tr>
                         <tr><td>Hearts</td><td><strong>1 Mountain + 6 side</strong></td></tr>
                         <tr><td>Starting locations</td><td><strong>6</strong> (first-come, not assigned)</td></tr>
                         <tr><td>Rooms</td><td><strong>varies</strong> — set per tournament</td></tr>
