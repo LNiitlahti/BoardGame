@@ -750,7 +750,7 @@
 
                 <div class="form-group">
                     <label for="boardVersion">Pelilauta</label>
-                    <select id="boardVersion" onchange="onBoardVersionChange()">
+                    <select id="boardVersion" autocomplete="off" onchange="onBoardVersionChange()">
                         <option value="2" selected>Versio 2 — 169 hexaa (uusi, oletus)</option>
                         <option value="1">Legacy — 91 hexaa (vanha lauta)</option>
                     </select>
@@ -1159,6 +1159,11 @@
         function initRoomBoard() {
             if (roomBoardInitialized) return;
             roomBoardInitialized = true;
+
+            // Browsers can restore a <select>'s old value on reload/back; the script
+            // state (boardLayout) is the source of truth, so make the control match it.
+            const boardSelect = document.getElementById('boardVersion');
+            if (boardSelect) boardSelect.value = String(boardLayout.version);
 
             const container = document.getElementById('roomSetupBoard');
             roomBoardModule = new BoardModule(1, boardLayout);
