@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Board versions preview</title>
+    <script>window.BOARDGAME_BASE = '..';</script>
+    <script src="../shared/scripts/board-layouts.js"></script>
+    <script src="../shared/scripts/board-module.js"></script>
+    <script src="../shared/scripts/board-renderer.js"></script>
+    <style>
+        body { margin: 0; background: #14161d; color: #e8e4d8; font-family: sans-serif; }
+        header { padding: 12px 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+        select { font-size: 1rem; padding: 4px 8px; }
+        #stage { width: 100vw; height: calc(100vh - 60px); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        #hexBoard { position: relative; }
+        body.effect-hex-images .board-hex::before { background-size: cover; background-position: center; }
+        .board-hex.team-1::after { content: ''; position: absolute; inset: 0; background: rgba(222, 57, 44, 0.55); clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); }
+    </style>
+</head>
+<body class="effect-hex-images">
+    <header>
+        <label>Board
+            <select id="version">
+                <option value="2">Version 2 (169 hexes)</option>
+                <option value="1">Legacy (91 hexes)</option>
+            </select>
+        </label>
+        <span id="info"></span>
+    </header>
+    <div id="stage"><div id="hexBoard"></div></div>
+    <script>
+        const boardModule = new BoardModule();
+        const boardRenderer = new BoardRenderer(document.getElementById('hexBoard'), boardModule, {
+            responsive: true, showHeartImages: true
+        });
+
+        // Same call the real pages make once a tournament doc has loaded
+        function show(version) {
+            const doc = { boardVersion: Number(version) };
+            BoardLayouts.sync(boardModule, boardRenderer, doc);
+
+            let style = document.getElementById('hex-images-dynamic-css');
+            if (!style) {
+                style = document.createElement('style');
+                style.id = 'hex-images-dynamic-css';
+                document.head.appendChild(style);
+            }
+            style.textContent = BoardLayouts.hexImagesCss(boardModule.layout, window.BOARDGAME_BASE);
+
+            // Team 1 on one corner and its first neighbours, to eyeball placement
+            const start = boardModule.startingLocations[0];
+            const [sq, sr] = start.match(/-?\d+/g).map(Number);
+            const board = { [start]: 1 };
+            boardModule.getHexNeighbors(sq, sr).forEach(c => { board[c] = 1; });
+
+            boardRenderer.render({ board });
+            document.querySelectorAll('.board-hex').forEach(h => {
+                if (board[h.dataset.coord]) h.classList.add('team-1');
+            });
+            boardRenderer.refreshLayout();
+
+            document.getElementById('info').textContent =
+                `${boardModule.generateHexCoordinates().length} hexes, ` +
+                `corners: ${boardModule.startingLocations.join(' ')}, ` +
+                `side hearts: ${boardModule.sideHeartLocations.join(' ')}`;
+        }
+
+        document.getElementById('version').addEventListener('change', e => show(e.target.value));
+        show(2);
+    </script>
+</body>
+</html>
