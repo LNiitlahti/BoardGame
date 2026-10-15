@@ -82,7 +82,8 @@
 
     /** Layout for a version number/string. Unknown, missing or garbage -> Legacy. */
     function get(version) {
-        return LAYOUTS[Number(version)] || LEGACY;
+        if (version !== 1 && version !== 2 && version !== '1' && version !== '2') return LEGACY;
+        return LAYOUTS[version] || LEGACY;
     }
 
     /** Layout for a tournament doc. No boardVersion field -> Legacy. */
@@ -146,6 +147,7 @@
         if (!boardModule) return false;
         const layout = forTournament(tournamentDoc);
         if (boardModule.layout === layout) return false;
+        if (typeof boardModule.setLayout !== 'function') return false;
 
         boardModule.setLayout(layout);
         if (boardRenderer && typeof boardRenderer.refreshLayout === 'function') {

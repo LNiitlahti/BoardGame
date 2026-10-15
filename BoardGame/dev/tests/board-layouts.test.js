@@ -147,3 +147,17 @@ test('sync(): tolerates a missing module or renderer', () => {
     assert.strictEqual(BoardLayouts.sync(mod, null, { boardVersion: 2 }), true);
     assert.strictEqual(mod.layout, V2);
 });
+
+test('get(): only 1/2 or exact "1"/"2" select a layout; everything else is Legacy', () => {
+    [[2], ' 2 ', '2.0', '0x2', true].forEach(v => {
+        assert.strictEqual(BoardLayouts.get(v), LEGACY, `get(${JSON.stringify(v)})`);
+    });
+    assert.strictEqual(BoardLayouts.get(2), V2);
+    assert.strictEqual(BoardLayouts.get('2'), V2);
+    assert.strictEqual(BoardLayouts.get(1), LEGACY);
+    assert.strictEqual(BoardLayouts.get('1'), LEGACY);
+});
+
+test('sync(): a module without setLayout returns false instead of throwing', () => {
+    assert.strictEqual(BoardLayouts.sync({ layout: null }, null, { boardVersion: 2 }), false);
+});
