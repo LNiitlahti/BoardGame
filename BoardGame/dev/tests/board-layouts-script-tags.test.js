@@ -8,7 +8,7 @@ const ROOT = path.resolve(__dirname, '../..');
 function htmlFiles(dir) {
     const out = [];
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        if (entry.name === 'node_modules' || entry.name.startsWith('\.')) continue;
+        if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) out.push(...htmlFiles(full));
         else if (entry.name.endsWith('.html')) out.push(full);

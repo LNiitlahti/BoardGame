@@ -265,8 +265,8 @@
      *
      * Board-state-independent — the same rules every time for a given board — so it is built
      * once at startup rather than on every render. Ported from
-     * team-controls.js applyHexImages(); admin.js and ui-manager.js carry their
-     * own copies of the same routine.
+     * team-controls.js applyHexImages(); the generator now lives in
+     * shared/scripts/board-layouts.js (BoardLayouts.hexImagesCss).
      */
     function applyHexImages() {
         if (!boardModule) return;
@@ -341,6 +341,9 @@
             });
 
             await replayEngine.loadTournamentData();
+
+            // Match the board to the tournament being replayed (Legacy / Version 2)
+            window.BoardLayouts.sync(boardModule, boardRenderer, replayEngine.tournamentDoc);
 
             // Create export utility
             actionExport = new ActionExport({

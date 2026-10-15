@@ -1915,6 +1915,9 @@ function reinitializeMatchGenerator() {
 function renderBoard() {
     if (!boardRenderer || !boardModule) return;
 
+    // Switch to the tournament's board (Legacy / Version 2) before drawing
+    if (window.BoardLayouts.sync(boardModule, boardRenderer, gameState)) _prevBoardSignature = null;
+
     const boardSignature = window.RenderSignature.computeBoardSignature(gameState?.board, gameState?.rooms);
     if (boardSignature === _prevBoardSignature) return;
     _prevBoardSignature = boardSignature;

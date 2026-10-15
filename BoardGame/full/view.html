@@ -2283,6 +2283,9 @@
         }
         if (!boardRenderer || !boardModule) return;
 
+        // Switch to the tournament's board (Legacy / Version 2) before drawing
+        window.BoardLayouts.sync(boardModule, boardRenderer, gameState);
+
         // Load room hexes into board module if available
         if (gameState?.rooms && boardModule) {
             boardModule.setRoomHexes(gameState.rooms);

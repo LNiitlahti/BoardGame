@@ -5,7 +5,7 @@
  * (getViewRelevantSignature): a sorted, JSON-stringified join of top-level
  * document fields, used to skip a full re-render when nothing display-relevant
  * changed. computeBoardSignature() is a narrower variant scoped to just the
- * hex board + rooms, so pages can skip the 91-hex DOM rebuild specifically
+ * hex board + rooms, so pages can skip the hex-board DOM rebuild specifically
  * even when some other field (score, chat, ready-check) did change.
  */
 const RenderSignature = {

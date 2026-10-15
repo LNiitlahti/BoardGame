@@ -1359,6 +1359,10 @@ function renderBoard() {
         document.body.classList.add('effect-hex-images', 'effect-heart-glow', 'effect-pulse-hearts', 'effect-rooms');
     }
 
+    // Switch to the tournament's board (Legacy / Version 2) before drawing.
+    // Done before the stylesheet is first built so it is built for this board.
+    if (window.BoardLayouts.sync(boardModule, boardRenderer, gameData)) _prevBoardSignature = null;
+
     // applyHexImages() builds a static, board-state-independent stylesheet
     // (same coordinate rules every time for a given board) — build it once, not per render. BoardLayouts.sync() rewrites it if the board version changes.
     if (!_hexImagesBuilt) {

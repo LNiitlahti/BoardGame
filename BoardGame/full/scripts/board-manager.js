@@ -79,6 +79,11 @@ class BoardManager {
     renderBoard() {
         if (!this._boardRenderer || !this._boardModule) return;
 
+        // Switch to the tournament's board (Legacy / Version 2) before drawing
+        if (window.BoardLayouts.sync(this._boardModule, this._boardRenderer, this._gameState)) {
+            this._prevBoardSignature = null;
+        }
+
         const signature = window.RenderSignature.computeBoardSignature(
             this._gameState?.board, this._gameState?.rooms
         );

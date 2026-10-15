@@ -167,7 +167,7 @@ class DisplayManager {
         // 8. Status strip — handled by local renderStatusStrip() in view.html
         //    (called directly by the onboarding listener)
 
-        // 9. Board (skip the 91-hex rebuild when board/rooms didn't change)
+        // 9. Board (skip the hex rebuild when board/rooms didn't change)
         const boardSignature = window.RenderSignature.computeBoardSignature(gameData.board, gameData.rooms);
         if (boardSignature !== this._prevBoardSignature) {
             this._prevBoardSignature = boardSignature;
