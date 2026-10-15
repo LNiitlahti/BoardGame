@@ -292,7 +292,8 @@
             letter-spacing: 0.5px;
         }
 
-        .form-group input {
+        .form-group input,
+        .form-group select {
             padding: 12px;
             background: rgba(247, 240, 227, 0.05);
             border: 1px solid rgba(247, 240, 227, 0.15);
@@ -302,9 +303,15 @@
             transition: border-color 0.3s;
         }
 
-        .form-group input:focus {
+        .form-group input:focus,
+        .form-group select:focus {
             outline: none;
             border-color: #f7ba32;
+        }
+
+        .form-group select option {
+            background: #22241d;
+            color: #f7f0e3;
         }
 
         .btn {
@@ -741,6 +748,15 @@
                     Sydänhexat ja aloitusruudut eivät voi olla huoneita.
                 </p>
 
+                <div class="form-group">
+                    <label for="boardVersion">Pelilauta</label>
+                    <select id="boardVersion" onchange="onBoardVersionChange()">
+                        <option value="2" selected>Versio 2 — 169 hexaa (uusi, oletus)</option>
+                        <option value="1">Legacy — 91 hexaa (vanha lauta)</option>
+                    </select>
+                    <p class="room-hint" id="boardVersionHint"></p>
+                </div>
+
                 <div class="room-board-toolbar">
                     <button class="btn" onclick="loadDefaultRoomsSetup()" title="Lataa viimeksi tallennettu huonepohja (Firestore, jaettu kaikkien turnausten kesken)">
                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg> Lataa Oletushuoneet
@@ -818,6 +834,8 @@
                     <input type="number" id="winCondition" value="50" min="10" max="200">
                 </div>
 
+                <p class="room-hint" id="summaryBoardNote"></p>
+
                 <button class="btn" style="width: 100%; margin-top: 30px; padding: 20px; font-size: 1.2rem;" onclick="uploadTournament()">
                     Luo Turnaus
                 </button>
@@ -842,6 +860,9 @@
         let matches = [];
         let spellCards = [];
         let rooms = [];
+        // Gameboard version for the tournament being created. Version 2 is
+        // the default; Legacy (91 hexes) stays selectable in Step 3.
+        let boardLayout = BoardLayouts.get(BoardLayouts.DEFAULT_VERSION);
         let db;
 
         // Room board (Step 3)
@@ -1098,18 +1119,55 @@
         // Room Board (Step 3)
         // ==================================================================
 
+        function describeBoardLayout(layout) {
+            return layout.version === BoardLayouts.LEGACY_VERSION
+                ? `Legacy — ${layout.hexCount} hexaa`
+                : `Versio ${layout.version} — ${layout.hexCount} hexaa`;
+        }
+
+        function updateBoardVersionHint() {
+            const hint = document.getElementById('boardVersionHint');
+            if (!hint) return;
+            hint.textContent = boardLayout.usesSharedDefaultRooms
+                ? 'Oletushuonepohjat (Firestore ja paikallinen) toimivat tällä laudalla.'
+                : 'Oletushuonepohjat ovat vain Legacy-laudalle. Merkitse huoneet käsin.';
+        }
+
+        function onBoardVersionChange() {
+            const select = document.getElementById('boardVersion');
+            const next = BoardLayouts.get(select.value);
+            if (next === boardLayout) return;
+
+            // Rooms are coordinates on one specific board; they don't carry over.
+            if (rooms.length > 0 &&
+                !confirm('Laudan vaihtaminen tyhjentää merkityt huoneet. Jatketaanko?')) {
+                select.value = String(boardLayout.version);
+                return;
+            }
+
+            boardLayout = next;
+            rooms = [];
+            if (roomBoardModule) {
+                roomBoardModule.setLayout(boardLayout);
+                roomBoardRenderer.refreshLayout();
+                renderRoomBoard();
+            }
+            updateBoardVersionHint();
+        }
+
         /** Lazy-init the board renderer the first time Step 3 becomes visible. */
         function initRoomBoard() {
             if (roomBoardInitialized) return;
             roomBoardInitialized = true;
 
             const container = document.getElementById('roomSetupBoard');
-            roomBoardModule = new BoardModule();
+            roomBoardModule = new BoardModule(1, boardLayout);
             roomBoardRenderer = new BoardRenderer(container, roomBoardModule, {
                 responsive: true,
                 showHeartImages: false
             });
 
+            updateBoardVersionHint();
             renderRoomBoard();
         }
 
@@ -1165,6 +1223,10 @@
          * is what gets loaded here.
          */
         async function loadDefaultRoomsSetup() {
+            if (!boardLayout.usesSharedDefaultRooms) {
+                alert('Oletushuonepohjat ovat vain Legacy-laudalle. Merkitse Version 2 -laudan huoneet käsin.');
+                return;
+            }
             try {
                 const loadedRooms = await loadDefaultRoomsDoc(db);
                 if (!loadedRooms) {
@@ -1186,6 +1248,10 @@
          * Default" click overwriting it (see that file's doc comment).
          */
         function loadLocalDefaultRoomsSetup() {
+            if (!boardLayout.usesSharedDefaultRooms) {
+                alert('Oletushuonepohjat ovat vain Legacy-laudalle. Merkitse Version 2 -laudan huoneet käsin.');
+                return;
+            }
             if (!Array.isArray(LOCAL_DEFAULT_ROOMS) || LOCAL_DEFAULT_ROOMS.length === 0) {
                 alert('Paikallista oletushuonepohjaa ei ole vielä määritetty (shared/scripts/default-rooms.js).');
                 return;
@@ -1205,6 +1271,10 @@
          * so the *next* admin gets that same visibility.
          */
         async function saveDefaultRoomsSetup() {
+            if (!boardLayout.usesSharedDefaultRooms) {
+                alert('Oletushuonepohjat ovat vain Legacy-laudalle. Merkitse Version 2 -laudan huoneet käsin.');
+                return;
+            }
             try {
                 const existing = await loadDefaultRoomsMeta(db);
                 const tournamentIdField = document.getElementById('tournamentId');
@@ -1364,6 +1434,8 @@
             document.getElementById('summaryTeams').textContent = teams.length;
             document.getElementById('summaryMatches').textContent = matches.length;
             document.getElementById('summarySpells').textContent = spellCards.length;
+            const boardNote = document.getElementById('summaryBoardNote');
+            if (boardNote) boardNote.textContent = `Pelilauta: ${describeBoardLayout(boardLayout)}`;
         }
 
         async function uploadTournament() {
@@ -1420,6 +1492,7 @@
                 }
             });
 
+            const boardForValidation = new BoardModule(1, boardLayout);
             const tournamentData = {
                 tournamentId,
                 name: tournamentId,
@@ -1434,8 +1507,9 @@
                 createdAt: new Date().toISOString(),
                 status: 'setup',
                 board: {},
-                rooms: [...rooms],
-                heartHexes: ['q2r-4', 'q4r-2', 'q2r2', 'q-2r4', 'q-4r2', 'q-2r-2'],
+                rooms: rooms.filter(c => boardForValidation.isValidCoord(c)),
+                boardVersion: boardLayout.version,
+                heartHexes: [...boardLayout.sideHeartLocations],
                 heartHexControl: {},
                 currentRound: 0,
                 gamesPlayed: 0,
