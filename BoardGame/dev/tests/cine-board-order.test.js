@@ -44,3 +44,18 @@ test('buildLandingOrder: entries carry q, r, coord and are unique', () => {
     const e = order.find(x => x.coord === 'q-3r2');
     assert.deepStrictEqual({ q: e.q, r: e.r }, { q: -3, r: 2 });
 });
+
+test('buildLandingOrder: Version 2 board — 169 entries, centre first, rings 0..7 contiguous ascending', () => {
+    const BoardLayouts = require('../../shared/scripts/board-layouts.js');
+    const order = buildLandingOrder(BoardLayouts.coordinates(BoardLayouts.get(2)));
+    assert.strictEqual(order.length, 169);
+    assert.strictEqual(order[0].coord, 'q0r0');
+    const counts = {};
+    let prevRing = 0;
+    for (const e of order) {
+        assert.ok(e.ring >= prevRing, 'rings must be ascending');
+        prevRing = e.ring;
+        counts[e.ring] = (counts[e.ring] || 0) + 1;
+    }
+    assert.deepStrictEqual(counts, { 0: 1, 1: 6, 2: 12, 3: 18, 4: 24, 5: 30, 6: 36, 7: 42 });
+});
