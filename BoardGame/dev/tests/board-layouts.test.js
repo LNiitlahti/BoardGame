@@ -20,7 +20,7 @@ test('legacy layout: 91 hexes, original corners and side hearts', () => {
         ['q-4r2', 'q-2r-2', 'q2r-4', 'q4r-2', 'q2r2', 'q-2r4']);
     assert.strictEqual(LEGACY.mountainHeartLocation, 'q0r0');
     assert.strictEqual(LEGACY.nativeHalf, 375);
-    assert.strictEqual(LEGACY.usesSharedDefaultRooms, true);
+    assert.strictEqual(LEGACY.defaultRoomsDocId, 'defaultRooms');
 });
 
 test('version 2 layout: 169 hexes, corners at radius 7, side hearts on ring 6 side midpoints', () => {
@@ -34,7 +34,7 @@ test('version 2 layout: 169 hexes, corners at radius 7, side hearts on ring 6 si
     assert.deepStrictEqual([...V2.sideHeartLocations],
         ['q-6r3', 'q-3r-3', 'q3r-6', 'q6r-3', 'q3r3', 'q-3r6']);
     assert.strictEqual(V2.nativeHalf, 500);
-    assert.strictEqual(V2.usesSharedDefaultRooms, false);
+    assert.strictEqual(V2.defaultRoomsDocId, 'defaultRoomsV2');
 });
 
 test('every layout: starts and hearts are valid, on the expected rings, and distinct', () => {

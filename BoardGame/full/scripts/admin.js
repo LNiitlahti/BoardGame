@@ -2262,16 +2262,12 @@ async function toggleRoomHex(coord) {
 // =============================================================================
 
 async function saveDefaultRooms() {
-    if (!boardModule.layout.usesSharedDefaultRooms) {
-        showStatus('Default room layouts exist only for the Legacy board', 'error');
-        return;
-    }
     const rooms = gameState.rooms || [];
     try {
-        // config/defaultRooms is ONE doc shared across every tournament -
+        // The default-rooms doc is ONE doc shared across every tournament of this board version -
         // confirm before silently clobbering whatever another tournament
         // (possibly a throwaway/test one) last saved there.
-        const existing = await loadDefaultRoomsMeta(window.firebaseDB);
+        const existing = await loadDefaultRoomsMeta(window.firebaseDB, boardModule.layout.defaultRoomsDocId);
         const tournamentLabel = currentTournamentId || 'tuntematon turnaus';
         const authIdentity = firebase.auth().currentUser?.email || firebase.auth().currentUser?.uid;
         const savedBy = authIdentity ? `${authIdentity} (${tournamentLabel})` : `admin.html (${tournamentLabel})`;
@@ -2279,14 +2275,14 @@ async function saveDefaultRooms() {
             const savedAt = existing.updatedAt ? new Date(existing.updatedAt).toLocaleString() : 'unknown time';
             const savedByPrev = existing.updatedBy || 'unknown';
             const confirmed = confirm(
-                `The shared default room layout (used by ALL tournaments) currently has ${existing.rooms.length} rooms, ` +
+                `The shared default room layout for the ${boardModule.layout.name} board (used by ALL tournaments of this board) currently has ${existing.rooms.length} rooms, ` +
                 `last saved by "${savedByPrev}" (${savedAt}).\n\n` +
                 `This will PERMANENTLY overwrite it with the current layout (${rooms.length} rooms, saved by "${savedBy}").\n\n` +
                 `Continue?`
             );
             if (!confirmed) return;
         }
-        await saveDefaultRoomsDoc(window.firebaseDB, rooms, savedBy);
+        await saveDefaultRoomsDoc(window.firebaseDB, rooms, savedBy, boardModule.layout.defaultRoomsDocId);
         showStatus(`Saved ${rooms.length} default rooms`, 'success');
     } catch (error) {
         console.error('Error saving default rooms:', error);
@@ -2295,12 +2291,8 @@ async function saveDefaultRooms() {
 }
 
 async function loadDefaultRooms() {
-    if (!boardModule.layout.usesSharedDefaultRooms) {
-        showStatus('Default room layouts exist only for the Legacy board', 'error');
-        return;
-    }
     try {
-        const rooms = await loadDefaultRoomsDoc(window.firebaseDB);
+        const rooms = await loadDefaultRoomsDoc(window.firebaseDB, boardModule.layout.defaultRoomsDocId);
         if (!rooms) {
             showStatus('No default rooms found', 'error');
             return;

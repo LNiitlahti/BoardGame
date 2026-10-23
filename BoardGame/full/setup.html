@@ -1128,9 +1128,9 @@
         function updateBoardVersionHint() {
             const hint = document.getElementById('boardVersionHint');
             if (!hint) return;
-            hint.textContent = boardLayout.usesSharedDefaultRooms
-                ? 'Oletushuonepohjat (Firestore ja paikallinen) toimivat tällä laudalla.'
-                : 'Oletushuonepohjat ovat vain Legacy-laudalle. Merkitse huoneet käsin.';
+            hint.textContent = boardLayout.defaultRoomsDocId === 'defaultRoomsV2'
+                ? 'Oletushuonepohjat: Versio 2 -laudan oma pohja (erillään Legacy-pohjasta).'
+                : 'Oletushuonepohjat: Legacy-laudan oma pohja.';
         }
 
         function onBoardVersionChange() {
@@ -1222,20 +1222,16 @@
         }
 
         /**
-         * Load the shared default room layout from Firestore config/defaultRooms.
+         * Load the shared default room layout from Firestore config/<boardLayout.defaultRoomsDocId>.
          * Same collection/doc god.html's board-manager.js already reads/writes,
          * so a layout saved there previously (or via Save as Default below)
          * is what gets loaded here.
          */
         async function loadDefaultRoomsSetup() {
-            if (!boardLayout.usesSharedDefaultRooms) {
-                alert('Oletushuonepohjat ovat vain Legacy-laudalle. Merkitse Version 2 -laudan huoneet käsin.');
-                return;
-            }
             try {
-                const loadedRooms = await loadDefaultRoomsDoc(db);
+                const loadedRooms = await loadDefaultRoomsDoc(db, boardLayout.defaultRoomsDocId);
                 if (!loadedRooms) {
-                    alert('Ei tallennettuja oletushuoneita vielä.');
+                    alert(`Ei tallennettuja oletushuoneita vielä (${describeBoardLayout(boardLayout)}).`);
                     return;
                 }
                 rooms = loadedRooms;
@@ -1253,21 +1249,18 @@
          * Default" click overwriting it (see that file's doc comment).
          */
         function loadLocalDefaultRoomsSetup() {
-            if (!boardLayout.usesSharedDefaultRooms) {
-                alert('Oletushuonepohjat ovat vain Legacy-laudalle. Merkitse Version 2 -laudan huoneet käsin.');
+            const localRooms = localDefaultRoomsFor(boardLayout);
+            if (localRooms.length === 0) {
+                alert('Tälle laudalle ei ole vielä paikallista oletushuonepohjaa (shared/scripts/default-rooms.js).');
                 return;
             }
-            if (!Array.isArray(LOCAL_DEFAULT_ROOMS) || LOCAL_DEFAULT_ROOMS.length === 0) {
-                alert('Paikallista oletushuonepohjaa ei ole vielä määritetty (shared/scripts/default-rooms.js).');
-                return;
-            }
-            rooms = [...LOCAL_DEFAULT_ROOMS];
+            rooms = localRooms;
             renderRoomBoard();
         }
 
         /**
          * Saves the current room layout as the shared Firestore default —
-         * but config/defaultRooms is ONE doc shared across every tournament,
+         * but the default doc is ONE doc shared across every tournament of this board version,
          * so this would silently clobber whatever another (possibly
          * throwaway/test) tournament saved there, with no way to tell who
          * or when. Before overwriting, show the admin what's currently
@@ -1276,12 +1269,8 @@
          * so the *next* admin gets that same visibility.
          */
         async function saveDefaultRoomsSetup() {
-            if (!boardLayout.usesSharedDefaultRooms) {
-                alert('Oletushuonepohjat ovat vain Legacy-laudalle. Merkitse Version 2 -laudan huoneet käsin.');
-                return;
-            }
             try {
-                const existing = await loadDefaultRoomsMeta(db);
+                const existing = await loadDefaultRoomsMeta(db, boardLayout.defaultRoomsDocId);
                 const tournamentIdField = document.getElementById('tournamentId');
                 const tournamentLabel = (tournamentIdField && tournamentIdField.value.trim()) || 'turnausta ei vielä nimetty';
                 const authIdentity = firebase.auth().currentUser?.email || firebase.auth().currentUser?.uid;
@@ -1293,7 +1282,7 @@
                         : 'tuntematon ajankohta';
                     const savedByPrev = existing.updatedBy || 'tuntematon';
                     const confirmed = confirm(
-                        `Jaettu oletushuonepohja (käytössä KAIKISSA turnauksissa) sisältää tällä hetkellä ${existing.rooms.length} huonetta.\n` +
+                        `Jaettu oletushuonepohja (${describeBoardLayout(boardLayout)}; käytössä KAIKISSA tämän laudan turnauksissa) sisältää tällä hetkellä ${existing.rooms.length} huonetta.\n` +
                         `Sen tallensi viimeksi: "${savedByPrev}" (${savedAt}).\n\n` +
                         `Tämä YLIKIRJOITTAA sen pysyvästi nykyisellä pohjalla (${rooms.length} huonetta, tallentaja "${savedBy}").\n\n` +
                         `Haluatko varmasti jatkaa?`
@@ -1301,7 +1290,7 @@
                     if (!confirmed) return;
                 }
 
-                await saveDefaultRoomsDoc(db, rooms, savedBy);
+                await saveDefaultRoomsDoc(db, rooms, savedBy, boardLayout.defaultRoomsDocId);
                 alert(`Tallennettu ${rooms.length} huonetta oletukseksi.`);
             } catch (error) {
                 console.error('Error saving default rooms:', error);

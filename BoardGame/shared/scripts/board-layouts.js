@@ -66,17 +66,18 @@
             mountainHeartLocation: 'q0r0',
             sideHeartLocations: Object.freeze(sideHeartsOf(spec.radius)),
             artRadius: ART_RADIUS,
-            // config/defaultRooms (Firestore) and LOCAL_DEFAULT_ROOMS are
-            // Legacy coordinates. Version 2 must never read or write them.
-            usesSharedDefaultRooms: spec.usesSharedDefaultRooms
+            // Firestore doc id under config/ holding this board's default
+            // rooms. One doc per board version: coordinates of one board are
+            // not valid on the other, so they must never share a doc.
+            defaultRoomsDocId: spec.defaultRoomsDocId
         });
     }
 
     const LEGACY = makeLayout({
-        version: 1, name: 'legacy', radius: 5, nativeHalf: 375, usesSharedDefaultRooms: true
+        version: 1, name: 'legacy', radius: 5, nativeHalf: 375, defaultRoomsDocId: 'defaultRooms'
     });
     const V2 = makeLayout({
-        version: 2, name: 'v2', radius: 7, nativeHalf: 500, usesSharedDefaultRooms: false
+        version: 2, name: 'v2', radius: 7, nativeHalf: 500, defaultRoomsDocId: 'defaultRoomsV2'
     });
     const LAYOUTS = { 1: LEGACY, 2: V2 };
 

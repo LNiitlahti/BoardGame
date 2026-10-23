@@ -1,15 +1,20 @@
 /**
  * ============================================================================
- * DEFAULT-ROOMS.JS - Shared Firestore config/defaultRooms read/write
+ * DEFAULT-ROOMS.JS - Shared Firestore default-rooms read/write
  * ============================================================================
  *
  * "Load Default Rooms" / "Save as Default" (setup.html, god.html via
- * board-manager.js, admin.js) all read/write the SAME global Firestore doc:
- * config/defaultRooms, shaped as
+ * board-manager.js, admin.js) read/write a global Firestore doc shaped as
  * { rooms: string[], updatedAt: ISOString, updatedBy: string }.
  *
- * config/defaultRooms is deliberately ONE doc shared across every
- * tournament (not per-tournament) - that's a feature, not the bug: it's
+ * There is one doc PER BOARD VERSION: config/defaultRooms for Legacy and
+ * config/defaultRoomsV2 for Version 2 (BoardLayouts layout.defaultRoomsDocId).
+ * They are separate because the coordinates of one board are not valid on the
+ * other. Every function takes an optional docId that defaults to
+ * 'defaultRooms' (Legacy), so callers that omit it behave as before.
+ *
+ * Each doc is deliberately ONE doc shared across every tournament of that
+ * board version (not per-tournament) - that's a feature, not the bug: it's
  * what lets one curated layout seed every new tournament. The bug was that
  * "Save as Default" silently overwrote it with no visibility into what was
  * being replaced or who was replacing it, so a throwaway/test tournament
@@ -34,12 +39,14 @@
 
 /**
  * @param {firebase.firestore.Firestore} db
+ * @param {string} [docId] - doc under config/ ('defaultRooms' = Legacy,
+ *   'defaultRoomsV2' = Version 2)
  * @returns {Promise<string[]|null>} room hex coordinates (e.g. "q1r-2"), or
  *   null if no default has been saved yet (doc missing, or its rooms array
  *   is missing/empty).
  */
-async function loadDefaultRoomsDoc(db) {
-    const doc = await db.collection('config').doc('defaultRooms').get();
+async function loadDefaultRoomsDoc(db, docId = 'defaultRooms') {
+    const doc = await db.collection('config').doc(docId).get();
     if (!doc.exists || !doc.data().rooms?.length) {
         return null;
     }
@@ -54,12 +61,13 @@ async function loadDefaultRoomsDoc(db) {
  * enables.
  *
  * @param {firebase.firestore.Firestore} db
+ * @param {string} [docId] - doc under config/, default 'defaultRooms'
  * @returns {Promise<{rooms: string[], updatedAt: string|null, updatedBy: string|null}|null>}
  *   null if no default has been saved yet (doc missing, or its rooms array
  *   is missing/empty).
  */
-async function loadDefaultRoomsMeta(db) {
-    const doc = await db.collection('config').doc('defaultRooms').get();
+async function loadDefaultRoomsMeta(db, docId = 'defaultRooms') {
+    const doc = await db.collection('config').doc(docId).get();
     if (!doc.exists || !doc.data().rooms?.length) {
         return null;
     }
@@ -78,9 +86,10 @@ async function loadDefaultRoomsMeta(db) {
  *   tournament id), so the next admin can see who last overwrote the shared
  *   default before deciding to overwrite it again themselves. Additive field
  *   - existing readers that don't know about it are unaffected.
+ * @param {string} [docId] - doc under config/, default 'defaultRooms'
  */
-async function saveDefaultRoomsDoc(db, rooms, updatedBy) {
-    await db.collection('config').doc('defaultRooms').set({
+async function saveDefaultRoomsDoc(db, rooms, updatedBy, docId = 'defaultRooms') {
+    await db.collection('config').doc(docId).set({
         rooms: [...rooms],
         updatedAt: new Date().toISOString(),
         updatedBy: updatedBy || 'unknown'
@@ -90,7 +99,7 @@ async function saveDefaultRoomsDoc(db, rooms, updatedBy) {
 /**
  * LOCAL fallback room layout — lives in the codebase, not Firestore, so it
  * can't be silently overwritten by "Save as Default" on some other
- * (possibly throwaway/test) tournament the way config/defaultRooms can (see
+ * (possibly throwaway/test) tournament the way the shared Firestore doc can (see
  * TODO.md "Load Default Rooms" for that shared-doc problem). Use this as
  * the known-good layout once curated; re-export via "Save as Default" if
  * you also want it available as the Firestore default for other tools that
@@ -109,6 +118,23 @@ const LOCAL_DEFAULT_ROOMS = [
     'q-3r4', 'q-5r3', 'q-3r-2', 'q-4r1', 'q3r2', 'q-1r-3', 'q-2r-1', 'q-2r0'
 ];
 
+/**
+ * Version 2 local default rooms. Empty on purpose: the owner places Version 2
+ * rooms by hand on the board and saves them to Firebase (config/defaultRoomsV2).
+ */
+const LOCAL_DEFAULT_ROOMS_V2 = [];
+
+/** Copy of the local default rooms for a board layout (Legacy if unknown). */
+function localDefaultRoomsFor(layout) {
+    if (layout && layout.defaultRoomsDocId === 'defaultRoomsV2') {
+        return [...LOCAL_DEFAULT_ROOMS_V2];
+    }
+    return [...LOCAL_DEFAULT_ROOMS];
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { loadDefaultRoomsDoc, loadDefaultRoomsMeta, saveDefaultRoomsDoc, LOCAL_DEFAULT_ROOMS };
+    module.exports = {
+        loadDefaultRoomsDoc, loadDefaultRoomsMeta, saveDefaultRoomsDoc,
+        LOCAL_DEFAULT_ROOMS, LOCAL_DEFAULT_ROOMS_V2, localDefaultRoomsFor
+    };
 }
