@@ -119,10 +119,19 @@ const LOCAL_DEFAULT_ROOMS = [
 ];
 
 /**
- * Version 2 local default rooms. Empty on purpose: the owner places Version 2
- * rooms by hand on the board and saves them to Firebase (config/defaultRoomsV2).
+ * Version 2 (169-hex) local default rooms: 32 rooms, laid out by hand by the
+ * owner on 2026-10-23 (orange hexes in the setup room editor). All are valid
+ * Version 2 hexes and none sits on a heart, the centre or a starting corner
+ * (dev/tests/default-rooms.test.js enforces that). setup.html's "Lataa
+ * Paikallinen Oletus" button loads this list on a Version 2 board; the shared
+ * Firestore default for that board is config/defaultRoomsV2.
  */
-const LOCAL_DEFAULT_ROOMS_V2 = [];
+const LOCAL_DEFAULT_ROOMS_V2 = [
+    'q-5r-2', 'q-1r-6', 'q-7r2', 'q-1r-4', 'q2r-7', 'q-2r-2', 'q-5r2', 'q-6r4',
+    'q-4r2', 'q-3r1', 'q-1r-1', 'q1r-3', 'q4r-6', 'q-6r6', 'q-3r3', 'q2r-2',
+    'q4r-4', 'q0r1', 'q2r-1', 'q-4r6', 'q-3r5', 'q-2r4', 'q0r2', 'q3r-1',
+    'q5r-3', 'q7r-5', 'q4r0', 'q-2r7', 'q3r2', 'q5r0', 'q2r4', 'q4r3'
+];
 
 /** Copy of the local default rooms for a board layout (Legacy if unknown). */
 function localDefaultRoomsFor(layout) {

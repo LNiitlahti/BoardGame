@@ -79,15 +79,29 @@ test('layouts carry their defaultRoomsDocId', () => {
     assert.strictEqual(BoardLayouts.get(2).defaultRoomsDocId, 'defaultRoomsV2');
 });
 
-test('localDefaultRoomsFor: Legacy copy, Version 2 empty fresh array', () => {
+test('localDefaultRoomsFor: Legacy copy, Version 2 fresh copy of its own list', () => {
     const legacy = DR.localDefaultRoomsFor(BoardLayouts.get(1));
     assert.strictEqual(legacy.length, 24);
     assert.deepStrictEqual(legacy, DR.LOCAL_DEFAULT_ROOMS);
     assert.notStrictEqual(legacy, DR.LOCAL_DEFAULT_ROOMS);
     const v2a = DR.localDefaultRoomsFor(BoardLayouts.get(2));
     const v2b = DR.localDefaultRoomsFor(BoardLayouts.get(2));
-    assert.deepStrictEqual(v2a, []);
+    assert.deepStrictEqual(v2a, DR.LOCAL_DEFAULT_ROOMS_V2);
+    assert.strictEqual(v2a.length, 32);
     assert.notStrictEqual(v2a, v2b);
     assert.notStrictEqual(v2a, DR.LOCAL_DEFAULT_ROOMS_V2);
     assert.strictEqual(DR.localDefaultRoomsFor(undefined).length, 24);
+});
+
+test('LOCAL_DEFAULT_ROOMS_V2: 32 unique rooms, all on the Version 2 board, none on a heart/start/centre', () => {
+    const v2 = BoardLayouts.get(2);
+    const special = new Set([...v2.startingLocations, ...v2.sideHeartLocations, v2.mountainHeartLocation]);
+    const rooms = DR.LOCAL_DEFAULT_ROOMS_V2;
+    assert.strictEqual(rooms.length, 32);
+    assert.strictEqual(new Set(rooms).size, 32, 'no duplicates');
+    for (const c of rooms) {
+        const [q, r] = c.match(/-?\d+/g).map(Number);
+        assert.ok(BoardLayouts.isValid(v2, q, r), c + ' is on the board');
+        assert.ok(!special.has(c), c + ' is not a heart, start or the centre');
+    }
 });
