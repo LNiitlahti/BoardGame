@@ -5,13 +5,31 @@
 // materials are tied to the fixed terrain art and are meant to eventually
 // be read by the live board renderer too, not just the cinematic.
 
+function resolveBoardLayouts() {
+    if (typeof window !== 'undefined' && window.BoardLayouts) return window.BoardLayouts;
+    if (typeof require === 'function') return require('../../../shared/scripts/board-layouts.js');
+    return null;
+}
+
 class CineMaterials {
     constructor(doc) {
         this.default = (doc && doc.default) || 'dust';
         this.materials = (doc && doc.materials) || {};
+        this.layout = null;
+    }
+
+    // Optional: make a hex take the material of the tile art it displays
+    // (mirrored outer hexes, swapped heart spots). Without it: by coord.
+    setLayout(layout) {
+        this.layout = layout || null;
     }
 
     materialFor(coord) {
+        if (this.layout) {
+            const BL = resolveBoardLayouts();
+            const art = BL && BL.artCoordFor(this.layout, coord);
+            return this.materials[art || coord] || this.default;
+        }
         return this.materials[coord] || this.default;
     }
 

@@ -521,6 +521,11 @@
         state.camera = new window.CineCamera(scene, rig);
         state.camera.applyPose(state.config.camera.dramatic);
 
+        // Glow follows the tile art each hex shows (mirrored outer rings on
+        // Version 2), so the layout must be set before tiles read materials.
+        const cineBoard = window.CineView.getBoardModule();
+        if (cineBoard && cineBoard.layout) state.materials.setLayout(cineBoard.layout);
+
         state.tiles = new window.CineTiles(
             document.getElementById('hexBoard'),
             state.config.tiles,

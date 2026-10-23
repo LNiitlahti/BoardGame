@@ -16,6 +16,13 @@
  *   - side hearts:        the midpoints of the sides of the
  *                         second-outermost ring (radius - 1)
  *
+ * Tile art: shared/images/hexes/coords/ holds one tile per hex of the
+ * radius-5 board. Until real art exists for a bigger board, its outer rings
+ * MIRROR the inner tiles (each side of the radius-5 hexagon acts as a
+ * mirror, see mirrorIntoArt). Raising `artRadius` to the board radius and
+ * adding the files makes the mirroring stop automatically. The art of the
+ * Legacy side-heart hexes moves to the Version 2 side hearts; see artSwaps.
+ *
  * Dual-export (window.BoardLayouts / module.exports) like board-module.js.
  */
 (function (root) {
@@ -25,11 +32,8 @@
     const DEFAULT_VERSION = 2; // what setup pre-selects for NEW tournaments
 
     // shared/images/hexes/coords/ holds sliced tiles for radius 5 only.
-    // Hexes beyond it (Version 2's outer two rings) get a placeholder
-    // style until real art is added.
+    // Hexes beyond it (Version 2's outer two rings) reuse them by mirroring.
     const ART_RADIUS = 5;
-
-    const PLACEHOLDER_BACKGROUND = 'linear-gradient(135deg, #4a5166 0%, #2c3140 100%)';
 
     function ringOf(q, r) {
         return Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
@@ -53,6 +57,56 @@
         return [`q${-k}r${h}`, `q${-h}r${-h}`, `q${h}r${-k}`, `q${k}r${-h}`, `q${h}r${h}`, `q${-h}r${k}`];
     }
 
+    // Cube-coordinate reflection of an outer hex back into the art area.
+    // Returns the coord string of the tile whose art the hex displays.
+    function mirrorIntoArt(layout, coord) {
+        const m = /^q(-?\d+)r(-?\d+)$/.exec(coord);
+        if (!m) return null;
+        const A = layout.artRadius;
+        let x = [parseInt(m[1], 10), parseInt(m[2], 10)];
+        x.push(-x[0] - x[1]);
+        for (let guard = 0; guard < 8 && Math.max(Math.abs(x[0]), Math.abs(x[1]), Math.abs(x[2])) > A; guard++) {
+            let i = 0;
+            for (let k = 1; k < 3; k++) if (Math.abs(x[k]) > Math.abs(x[i])) i = k;
+            const c0 = Math.sign(x[i]) * A;
+            const d = x[i] - c0;
+            x = x.map((v, k) => (k === i ? 2 * c0 - v : v + d));
+        }
+        return `q${x[0]}r${x[1]}`;
+    }
+
+    // Which tile file a hex displays: its own (ring <= artRadius, except
+    // spots listed in artSwaps), otherwise its mirror source.
+    function artCoordFor(layout, coord) {
+        const m = /^q(-?\d+)r(-?\d+)$/.exec(coord);
+        if (!m) return null;
+        if (ringOf(parseInt(m[1], 10), parseInt(m[2], 10)) <= layout.artRadius) {
+            return (layout.artSwaps && layout.artSwaps[coord]) || coord;
+        }
+        return mirrorIntoArt(layout, coord);
+    }
+
+    const DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+
+    // The Legacy side-heart tiles move to the Version 2 side hearts (they are
+    // reached by mirroring), so the old heart spots need another tile. This
+    // is a deliberate, easily changed choice: each old heart spot shows the
+    // tile of its inward neighbour (smallest ring, ties -> first direction).
+    function computeArtSwaps(legacyHearts) {
+        const swaps = {};
+        for (const h of legacyHearts) {
+            const m = /^q(-?\d+)r(-?\d+)$/.exec(h);
+            const q = parseInt(m[1], 10), r = parseInt(m[2], 10);
+            let best = null, bestRing = Infinity;
+            for (const [dq, dr] of DIRS) {
+                const ring = ringOf(q + dq, r + dr);
+                if (ring < bestRing) { bestRing = ring; best = `q${q + dq}r${r + dr}`; }
+            }
+            swaps[h] = best;
+        }
+        return Object.freeze(swaps);
+    }
+
     function makeLayout(spec) {
         return Object.freeze({
             version: spec.version,
@@ -66,6 +120,7 @@
             mountainHeartLocation: 'q0r0',
             sideHeartLocations: Object.freeze(sideHeartsOf(spec.radius)),
             artRadius: ART_RADIUS,
+            artSwaps: spec.artSwaps || Object.freeze({}),
             // Firestore doc id under config/ holding this board's default
             // rooms. One doc per board version: coordinates of one board are
             // not valid on the other, so they must never share a doc.
@@ -77,6 +132,7 @@
         version: 1, name: 'legacy', radius: 5, nativeHalf: 375, defaultRoomsDocId: 'defaultRooms'
     });
     const V2 = makeLayout({
+        artSwaps: computeArtSwaps(LEGACY.sideHeartLocations),
         version: 2, name: 'v2', radius: 7, nativeHalf: 500, defaultRoomsDocId: 'defaultRoomsV2'
     });
     const LAYOUTS = { 1: LEGACY, 2: V2 };
@@ -111,7 +167,7 @@
         return Math.abs(q) <= R && Math.abs(r) <= R && Math.abs(q + r) <= R;
     }
 
-    /** True when shared/images/hexes/coords/<coord>.png exists for this hex. */
+    /** True when this hex has its OWN tile file (shared/images/hexes/coords/<coord>.png). */
     function hasArt(layout, coord) {
         const m = /^q(-?\d+)r(-?\d+)$/.exec(coord);
         if (!m) return false;
@@ -120,17 +176,14 @@
 
     /**
      * CSS for the per-hex terrain art, scoped to body.effect-hex-images.
-     * Hexes with art get their tile image; hexes without get a flat
-     * placeholder, so no request is ever made for a file that doesn't exist.
+     * Every hex shows artCoordFor(): its own tile, or a mirrored/swapped one.
      * @param {Object} layout
      * @param {string} base - site base path, normally window.BOARDGAME_BASE || '.'
      */
     function hexImagesCss(layout, base) {
         return coordinates(layout).map(([q, r]) => {
             const coord = `q${q}r${r}`;
-            const background = hasArt(layout, coord)
-                ? `background-image: url('${base}/shared/images/hexes/coords/${coord}.png');`
-                : `background-image: ${PLACEHOLDER_BACKGROUND};`;
+            const background = `background-image: url('${base}/shared/images/hexes/coords/${artCoordFor(layout, coord)}.png');`;
             return `body.effect-hex-images .board-hex[data-coord="${coord}"]::before {\n    ${background}\n}`;
         }).join('\n');
     }
@@ -178,6 +231,8 @@
         isValid,
         ringOf,
         hasArt,
+        mirrorIntoArt,
+        artCoordFor,
         hexImagesCss,
         sync
     };
