@@ -205,6 +205,30 @@
         window.closeMatchDialog();
     };
 
+    /**
+     * ⚡ Queue next: generate the next balanced match and queue it in one
+     * click, through the same confirmAutoMatch path (and adapter tagging)
+     * as the pop-up, then offer Undo.
+     */
+    window.queueNextMatch = async function () {
+        if (typeof SmartMatchGenerator === 'undefined' || !gameState?.teams) {
+            showStatus('Load a tournament first', 'warning');
+            return;
+        }
+        if (!smartMatchGenerator) smartMatchGenerator = new SmartMatchGenerator(gameState);
+        smartMatchGenerator.gameState = gameState;
+        const result = smartMatchGenerator.generateNext();
+        if (result.error) { showStatus(result.message, 'error'); return; }
+
+        const before = new Set((gameState.gameQueue || []).map(e => e.id));
+        pendingAutoMatch = { result, gameName: getGameDisplayName(result.gameId) };
+        await window.confirmAutoMatch(); // adapter-wrapped: tags round/slot
+        const added = (gameState.gameQueue || []).filter(e => !before.has(e.id)).map(e => e.id);
+        if (added.length === 0) return;
+        const label = `${getGameDisplayName(result.gameId)} queued — ${result.splitDescription || ''}`;
+        showActionStatus(label, 'Undo', () => removeQueueEntriesSilently(added));
+    };
+
     // The old "Auto" entry point (also used by the adapter's slot cards):
     // open the pop-up and Auto-fill it.
     window.generateSuggestedMatches = async function () {

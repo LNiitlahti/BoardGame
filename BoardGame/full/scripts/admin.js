@@ -6816,14 +6816,63 @@ async function clearPendingHexWin(teamId) {
 // UI UTILITIES
 // =============================================================================
 
+// One hide timer for the status line, shared by showStatus and
+// showActionStatus, so an older message's timer can't hide a newer one.
+let _statusHideTimer = null;
+
 function showStatus(message, type = 'info') {
     const statusEl = document.getElementById('statusMessage');
+    if (!statusEl) return;
     statusEl.textContent = message;
     statusEl.className = `status-message ${type} visible`;
 
-    setTimeout(() => {
+    clearTimeout(_statusHideTimer);
+    _statusHideTimer = setTimeout(() => {
         statusEl.classList.remove('visible');
     }, 3000);
+}
+
+/**
+ * Like showStatus, plus one action button (e.g. Undo). Stays 8 s.
+ */
+function showActionStatus(message, actionLabel, onAction) {
+    const statusEl = document.getElementById('statusMessage');
+    if (!statusEl) return;
+    statusEl.textContent = message + ' ';
+    const btn = document.createElement('button');
+    btn.className = 'btn-small secondary status-action';
+    btn.textContent = actionLabel;
+    btn.onclick = async () => {
+        btn.disabled = true;
+        statusEl.classList.remove('visible');
+        await onAction();
+    };
+    statusEl.appendChild(btn);
+    statusEl.className = 'status-message success visible';
+    clearTimeout(_statusHideTimer);
+    _statusHideTimer = setTimeout(() => statusEl.classList.remove('visible'), 8000);
+}
+
+/**
+ * Remove queue entries without the per-entry confirm() (used by Undo after
+ * ⚡ Queue next). Only entries that are still pending are removed; a match
+ * that has already started is left alone.
+ */
+async function removeQueueEntriesSilently(ids) {
+    const idSet = new Set(ids);
+    const removable = (gameState.gameQueue || []).filter(g =>
+        idSet.has(g.id) && (g.status === 'pending' || g.status === undefined || g.status === 'queued'));
+    if (removable.length === 0) {
+        showStatus('Nothing to undo: the match has already started or is gone', 'warning');
+        return;
+    }
+    const removeIds = new Set(removable.map(g => g.id));
+    gameState.gameQueue = (gameState.gameQueue || []).filter(g => !removeIds.has(g.id));
+    await saveGameState();
+    removable.forEach(r => window.logAction?.('match_removed', 'match', {
+        matchId: r.id, matchNumber: r.matchNumber, game: r.game
+    }, { removedEntry: JSON.parse(JSON.stringify(r)) }));
+    showStatus(removable.length === 1 ? 'Queued match removed' : `${removable.length} queued matches removed`, 'success');
 }
 
 function logout() {

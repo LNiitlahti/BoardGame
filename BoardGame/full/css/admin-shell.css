@@ -157,3 +157,5 @@
     .match-dialog-body { grid-template-columns: 1fr; }
     .match-dialog-sides .sides-container { grid-template-columns: 1fr; }
 }
+.status-message:not(.visible) { pointer-events: none; }
+.status-message .status-action { margin-left: 8px; }
