@@ -115,3 +115,19 @@
 
 /* ── Match picker chips (inside the match pop-up) ── */
 .player-disambiguator { font-size: 0.7rem; color: var(--text-tertiary); margin-left: 4px; }
+
+/* ── Compact queue rows ── */
+.queue-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 6px 8px; margin-bottom: 4px; }
+.queue-row-main { min-width: 0; }
+.queue-row-title { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; color: var(--text-bright); }
+.queue-row-game { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue-row-teams { font-size: 12px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue-row .queue-row-teams .queue-vs { display: inline; margin: 0 4px; padding: 0; color: var(--text-tertiary); font-size: 11px; }
+.queue-row .queue-split { color: var(--text-tertiary); }
+.queue-row .matchup-players { margin-top: 6px; }
+.queue-row .match-actions { display: flex; gap: 2px; }
+.queue-row .match-actions button { min-width: 32px; min-height: 32px; }
+.admin-shell[data-mode="board"] .queue-row .match-actions .edit-btn,
+.admin-shell[data-mode="board"] .queue-row .match-actions .move-top-btn,
+.admin-shell[data-mode="board"] .queue-row .match-actions .delete-btn { display: none; }
+.admin-shell[data-mode="board"] .queue-row-teams { white-space: normal; }

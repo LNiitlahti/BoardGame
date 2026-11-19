@@ -4965,6 +4965,43 @@ function closeAutoMatchModal() {
  * modal. Previously this guard was duplicated inline in each branch's
  * onclick attribute; centralized here so there's one place to fix it.
  */
+/**
+ * "Tiimi 1 + Tiimi 3 vs Tiimi 2 + Tiimi 4 (split: Tiimi 5)" from the
+ * players actually on each side, so it works for every stored shape.
+ */
+function queueTeamsSummary(game) {
+    const sides = (game.teams || game.sides || []).map(team => {
+        const counts = new Map();
+        getMatchTeamPlayers(team).forEach(p => {
+            const id = String(p.originalTeamId ?? p.teamId);
+            counts.set(id, (counts.get(id) || 0) + 1);
+        });
+        return counts;
+    });
+    if (sides.length < 2) return '';
+    const name = id => escapeHtml(gameState?.teams?.find(t => String(t.id) === id)?.name || `Team ${id}`);
+    const splitIds = [...sides[0].keys()].filter(id => sides[1].has(id));
+    const full = counts => [...counts.keys()].filter(id => !splitIds.includes(id)).map(name).join(' + ');
+    const split = splitIds.length ? ` <span class="queue-split">(split: ${splitIds.map(name).join(', ')})</span>` : '';
+    return `${full(sides[0]) || '&mdash;'} <span class="queue-vs">vs</span> ${full(sides[1]) || '&mdash;'}${split}`;
+}
+
+const _expandedQueueRows = new Set();
+
+/** ▾ on a queue row shows that match's player list. */
+function toggleQueueRowDetails(gameId, event) {
+    event?.stopPropagation();
+    if (_expandedQueueRows.has(gameId)) _expandedQueueRows.delete(gameId);
+    else _expandedQueueRows.add(gameId);
+    // The adapter adds the NEXT badge (.next-up) after a full updateDisplay;
+    // carry it across this local re-render instead of running all of that.
+    const nextUp = new Set([...document.querySelectorAll('#matchQueue .queue-item.next-up')].map(el => el.dataset.queueId));
+    renderMatchQueue();
+    document.querySelectorAll('#matchQueue .queue-item').forEach(el => {
+        if (nextUp.has(el.dataset.queueId)) el.classList.add('next-up');
+    });
+}
+
 function handleQueueItemClick(event, queueId) {
     if (event.target.closest('.drag-handle')) return;
     openQuickConfirm(queueId);
@@ -5092,8 +5129,9 @@ function renderMatchQueue() {
             tagBadge = `<span class="tag-badge" title="Round / match slot tag">R${game.roundNumber !== undefined ? game.roundNumber : '?'}${game.slot !== undefined ? '·M' + game.slot : ''}</span>`;
         }
 
+        const expanded = _expandedQueueRows.has(game.id);
         return `
-            <div class="queue-item ${isOngoing ? 'ongoing' : ''} ${isChallenge ? 'challenge' : ''}${isFutureRound(game) ? ' future-round' : ''}"
+            <div class="queue-item queue-row ${isOngoing ? 'ongoing' : ''} ${isChallenge ? 'challenge' : ''}${isFutureRound(game) ? ' future-round' : ''}${expanded ? ' expanded' : ''}"
                  draggable="${!isOngoing}"
                  data-queue-id="${game.id}"
                  onclick="handleQueueItemClick(event, ${game.id})"
@@ -5103,17 +5141,17 @@ function renderMatchQueue() {
                  ondrop="dropQueueItem(event, ${game.id})"
                  ondragend="endQueueDrag(event)">
                 <span class="drag-handle" title="${isOngoing ? 'Ongoing matches can\'t be reordered' : 'Drag to reorder, or tap this handle and another to swap'}">${isOngoing ? ICON_SVGS.play : ICON_SVGS.menu}</span>
-                <div class="game-info">
-                    <div class="game-type-row">
-                        <div class="game-type">${tagBadge}${challengeBadge}${matchNumber}${gameName}${playType ? ' (' + playType + ')' : ''}</div>
-                        <div class="match-actions">
-                            ${!isOngoing ? `<button class="start-btn" onclick="event.stopPropagation(); startMatch(${game.id})" title="Start match">${ICON_SVGS.play}</button>` : ''}
-                            ${!isOngoing ? `<button class="edit-btn" onclick="event.stopPropagation(); openEditMatchModal(${game.id})" title="Edit match">${ICON_SVGS.settings}</button>` : ''}
-                            ${!isOngoing ? `<button class="move-top-btn" onclick="event.stopPropagation(); moveMatchToTop(${game.id})" title="Play next">${ICON_SVGS.arrowUpToLine}</button>` : ''}
-                            <button class="delete-btn" onclick="event.stopPropagation(); removeFromQueue(${game.id})" title="Remove">${ICON_SVGS.x}</button>
-                        </div>
-                    </div>
-                    <div class="matchup-players">${matchupHtml || fallbackMatchup || 'TBD'}</div>
+                <div class="queue-row-main">
+                    <div class="queue-row-title">${tagBadge}${challengeBadge}<span class="queue-row-game" title="${escapeHtml(gameName)}">${matchNumber}${escapeHtml(gameName)}${playType ? ' (' + playType + ')' : ''}</span></div>
+                    <div class="queue-row-teams">${queueTeamsSummary(game) || fallbackMatchup || 'TBD'}</div>
+                    ${expanded ? `<div class="matchup-players">${matchupHtml}</div>` : ''}
+                </div>
+                <div class="match-actions">
+                    <button class="expand-btn" onclick="toggleQueueRowDetails(${game.id}, event)" title="${expanded ? 'Hide players' : 'Show players'}">${expanded ? '&#x25B4;' : '&#x25BE;'}</button>
+                    ${!isOngoing ? `<button class="start-btn" onclick="event.stopPropagation(); startMatch(${game.id})" title="Start match">${ICON_SVGS.play}</button>` : ''}
+                    ${!isOngoing ? `<button class="edit-btn" onclick="event.stopPropagation(); openEditMatchModal(${game.id})" title="Edit match">${ICON_SVGS.settings}</button>` : ''}
+                    ${!isOngoing ? `<button class="move-top-btn" onclick="event.stopPropagation(); moveMatchToTop(${game.id})" title="Play next">${ICON_SVGS.arrowUpToLine}</button>` : ''}
+                    <button class="delete-btn" onclick="event.stopPropagation(); removeFromQueue(${game.id})" title="Remove">${ICON_SVGS.x}</button>
                 </div>
             </div>
         `;
