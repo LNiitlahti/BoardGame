@@ -670,8 +670,20 @@
      * time, looking like it would never reach scoring.
      */
     async function _tagNewQueueEntries(beforeIds) {
-        const { roundNumber, slot } = _computeCurrentSlot();
-        if (slot === null) return; // ambiguous phase — leave untagged, treated as "always relevant"
+        let { roundNumber, slot } = _computeCurrentSlot();
+        if (slot === null) {
+            // Outside matches_in_progress and the challenge phases (board
+            // phases, setup) there is no slot to infer. An untagged match
+            // counts toward BOTH slots (_belongsToCurrentSlot's createdAt
+            // fallback), so give the new match(es) the next free slot
+            // instead. Every entry from this one creation call (a 3v3+2v2
+            // pair) gets the same tag: a simultaneous pair is ONE slot.
+            const existing = (gameState.gameQueue || []).filter(e => beforeIds.has(e.id));
+            const tag = window.MatchSlotTags?.nextFreeSlotTag(existing, roundNumber);
+            if (!tag) return;
+            roundNumber = tag.roundNumber;
+            slot = tag.slot;
+        }
 
         let changed = false;
         (gameState.gameQueue || []).forEach(entry => {
