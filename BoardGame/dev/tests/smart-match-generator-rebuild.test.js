@@ -95,3 +95,43 @@ test('a simultaneous 3v3+2v2 pair counts as one set with one split', () => {
     assert.strictEqual(gen.optimizer.totalMatches['3v3'], 1);
     assert.strictEqual(gen.optimizer.totalMatches['2v2'], 1);
 });
+
+test('generateNext never splits the team that was split in the previous match (manual match)', () => {
+    // The optimizer breaks ties randomly, so check the property over many runs.
+    for (let run = 0; run < 25; run++) {
+        const gen = new SmartMatchGenerator(makeGameState([manualSplitTeam1()]));
+        const result = gen.generateNext();
+        assert.strictEqual(result.error, false);
+        assert.notStrictEqual(Number(result.splitTeamId), 1, `run ${run} split Tiimi 1 twice in a row`);
+    }
+});
+
+test('generateNext has no hidden memory: two calls without queueing start from the same state', () => {
+    const gen = new SmartMatchGenerator(makeGameState([manualSplitTeam1()]));
+    gen.generateNext();
+    const afterFirst = gen.optimizer.currentMatchNumber;
+    gen.generateNext();
+    assert.strictEqual(gen.optimizer.currentMatchNumber, afterFirst);
+});
+
+test('generateNext ignores a stale persisted smartMatchState', () => {
+    const gs = makeGameState([]);
+    gs.smartMatchState = { optimizer: { splitCounts: { 1: 99, 2: 0, 3: 0, 4: 0, 5: 0 } } };
+    const gen = new SmartMatchGenerator(gs);
+    gen.rebuildFromQueue();
+    assert.strictEqual(gen.optimizer.splitCounts[1], 0);
+});
+
+test('previewNext returns N distinct steps and leaves state rebuilt from the queue', () => {
+    const gen = new SmartMatchGenerator(makeGameState([manualSplitTeam1()]));
+    const previews = gen.previewNext(3);
+    assert.strictEqual(previews.length, 3);
+    assert.strictEqual(gen.optimizer.currentMatchNumber, 1);
+});
+
+test('generateNext still refuses anything other than 5 teams of 2', () => {
+    const gs = makeGameState([]);
+    gs.teams = gs.teams.slice(0, 4);
+    const result = new SmartMatchGenerator(gs).generateNext();
+    assert.strictEqual(result.error, true);
+});

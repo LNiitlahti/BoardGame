@@ -4863,10 +4863,6 @@ async function confirmAutoMatch() {
     assignDiscordAndLobby(addedMatches.map(m => m.entry));
     addedMatches.forEach(m => gameState.gameQueue.push(m.entry));
 
-    // Save smart match generator state for session continuity
-    if (smartMatchGenerator) {
-        gameState.smartMatchState = smartMatchGenerator.getState();
-    }
 
     await saveGameState();
 

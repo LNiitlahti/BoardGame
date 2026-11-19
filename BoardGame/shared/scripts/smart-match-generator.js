@@ -40,8 +40,10 @@ class SmartMatchGenerator {
             'rocketleague': '3v3'
         };
 
-        // Restore state from gameState if available
-        this.restoreState();
+        // All state is derived from gameState.gameQueue (see rebuildFromQueue);
+        // nothing is persisted between generations.
+        this.initializeGameRotation();
+        this.rebuildFromQueue();
     }
 
     /**
@@ -72,85 +74,6 @@ class SmartMatchGenerator {
                 repeatCount: 3
             };
         });
-    }
-
-    /**
-     * Restore optimizer and rotation state from gameState
-     */
-    restoreState() {
-        const saved = this.gameState?.smartMatchState;
-
-        if (saved) {
-            // Restore optimizer matrices
-            if (saved.optimizer) {
-                this.optimizer.W = saved.optimizer.W || {};
-                this.optimizer.A = saved.optimizer.A || {};
-                this.optimizer.splitCounts = saved.optimizer.splitCounts || {};
-                this.optimizer.lastSplitMatch = saved.optimizer.lastSplitMatch || {};
-                this.optimizer.currentMatchNumber = saved.optimizer.currentMatchNumber || 0;
-                this.optimizer.totalMatches = saved.optimizer.totalMatches || { '5v5': 0, '3v3': 0, '2v2': 0 };
-            }
-
-            // Restore game rotation
-            if (saved.gameRotation) {
-                this.gameRotation = saved.gameRotation;
-                // Normalize repeatCount to 3 for all games (may have old values)
-                for (const game of this.gameRotation.games) {
-                    game.repeatCount = 3;
-                }
-            } else {
-                this.initializeGameRotation();
-            }
-        } else {
-            // First time - initialize from scratch
-            this.initializeGameRotation();
-
-            // Rebuild optimizer state from existing match history
-            this.rebuildFromHistory();
-        }
-    }
-
-    /**
-     * Rebuild optimizer matrices from existing match history
-     */
-    rebuildFromHistory() {
-        const gameQueue = this.gameState?.gameQueue || [];
-
-        // Find completed matches to rebuild state
-        const completedMatches = gameQueue.filter(m => m.status === 'completed' && !m.isChallenge && !m.isBreak);
-
-        if (completedMatches.length > 0) {
-            console.log(`SmartMatchGenerator: Rebuilding state from ${completedMatches.length} completed matches`);
-
-            completedMatches.forEach(match => {
-                // Try to extract player assignments from match
-                if (match.teams && match.teams.length >= 2) {
-                    const sideAPlayers = this.extractPlayerIds(match.teams[0]);
-                    const sideBPlayers = this.extractPlayerIds(match.teams[1]);
-
-                    if (sideAPlayers.length > 0 && sideBPlayers.length > 0) {
-                        this.optimizer.applyPartition(sideAPlayers, sideBPlayers);
-                    }
-                }
-
-                // Track split team
-                if (match.splitTeamId) {
-                    this.optimizer.splitCounts[match.splitTeamId] =
-                        (this.optimizer.splitCounts[match.splitTeamId] || 0) + 1;
-                }
-
-                // Track match type
-                if (match.playType) {
-                    this.optimizer.totalMatches[match.playType] =
-                        (this.optimizer.totalMatches[match.playType] || 0) + 1;
-                }
-            });
-
-            this.optimizer.currentMatchNumber = completedMatches.length;
-        }
-
-        // Rebuild rotation position from ALL queue matches (not just completed)
-        this.rebuildRotationPosition(gameQueue);
     }
 
     /**
@@ -317,52 +240,6 @@ class SmartMatchGenerator {
     }
 
     /**
-     * Extract player IDs from a match team in various formats
-     */
-    extractPlayerIds(matchTeam) {
-        if (!matchTeam) return [];
-
-        // Format 1: players array with originalTeamId
-        if (matchTeam.players && Array.isArray(matchTeam.players)) {
-            return matchTeam.players.map(p => {
-                // Convert to optimizer format: "1a", "1b", "2a", etc.
-                const teamId = p.originalTeamId || p.teamId;
-                const playerIdx = this.getPlayerIndexInTeam(p, teamId);
-                return `${teamId}${String.fromCharCode(97 + playerIdx)}`;
-            }).filter(id => /^\d[a-z]$/.test(id));
-        }
-
-        // Format 2: playerIds array
-        if (matchTeam.playerIds && Array.isArray(matchTeam.playerIds)) {
-            return matchTeam.playerIds.map(pid => {
-                const player = this.gameState?.players?.[pid];
-                if (player) {
-                    const teamId = player.teamId;
-                    const team = this.teams.find(t => t.id === teamId);
-                    const playerIdx = team?.players?.findIndex(p => p.id === pid) || 0;
-                    return `${teamId}${String.fromCharCode(97 + playerIdx)}`;
-                }
-                return null;
-            }).filter(Boolean);
-        }
-
-        return [];
-    }
-
-    /**
-     * Get player index within their team (0 or 1)
-     */
-    getPlayerIndexInTeam(player, teamId) {
-        const team = this.teams.find(t => String(t.id) === String(teamId));
-        if (!team || !team.players) return 0;
-
-        const idx = team.players.findIndex(p =>
-            p.id === player.id || p.name === player.name
-        );
-        return Math.max(0, idx);
-    }
-
-    /**
      * Get the current game in the rotation
      */
     getCurrentGame() {
@@ -390,10 +267,20 @@ class SmartMatchGenerator {
     }
 
     /**
-     * Generate the next match using smart optimization
-     * Returns match data ready for the queue
+     * Generate the next match. Rebuilds from the live queue first, so the
+     * suggestion always reflects manual, edited and deleted matches.
      */
     generateNext() {
+        this.rebuildFromQueue();
+        return this._generateFromCurrentState();
+    }
+
+    /**
+     * Generate the next match from the generator's current in-memory state
+     * (used by generateNext after a rebuild, and by previewNext to step
+     * forward several matches). Returns match data ready for the queue.
+     */
+    _generateFromCurrentState() {
         // Validate teams
         if (this.teams.length < 5) {
             return {
@@ -679,17 +566,15 @@ class SmartMatchGenerator {
     }
 
     /**
-     * Preview the next N matches without applying them
+     * Preview the next N matches without changing anything. Steps forward
+     * from the current queue N times, then rebuilds so no state leaks.
      */
     previewNext(count = 5) {
-        // Save current state
-        const savedState = JSON.parse(JSON.stringify(this.getState()));
-
+        this.rebuildFromQueue();
         const previews = [];
         for (let i = 0; i < count; i++) {
-            const result = this.generateNext();
+            const result = this._generateFromCurrentState();
             if (result.error) break;
-
             previews.push({
                 index: i + 1,
                 gameId: result.gameId,
@@ -698,16 +583,7 @@ class SmartMatchGenerator {
                 matchCount: result.matches.length
             });
         }
-
-        // Restore state
-        this.optimizer.W = savedState.optimizer.W;
-        this.optimizer.A = savedState.optimizer.A;
-        this.optimizer.splitCounts = savedState.optimizer.splitCounts;
-        this.optimizer.lastSplitMatch = savedState.optimizer.lastSplitMatch;
-        this.optimizer.currentMatchNumber = savedState.optimizer.currentMatchNumber;
-        this.optimizer.totalMatches = savedState.optimizer.totalMatches;
-        this.gameRotation = savedState.gameRotation;
-
+        this.rebuildFromQueue();
         return previews;
     }
 }
