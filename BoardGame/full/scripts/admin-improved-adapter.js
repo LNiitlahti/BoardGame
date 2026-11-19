@@ -1692,14 +1692,16 @@
         // God-only Set Phase corrector button
         let setPhaseBtn = document.getElementById('setPhaseBtn');
         const isGod = typeof currentUserRole !== 'undefined' && currentUserRole === 'god';
-        if (isGod && !setPhaseBtn && breakBtn && breakBtn.parentElement) {
+        const moreMenu = document.getElementById('cbMoreMenu');
+        if (isGod && !setPhaseBtn && (moreMenu || (breakBtn && breakBtn.parentElement))) {
             setPhaseBtn = document.createElement('button');
             setPhaseBtn.id = 'setPhaseBtn';
-            setPhaseBtn.className = 'btn-small secondary';
+            setPhaseBtn.className = moreMenu ? 'cb-menu-item danger' : 'btn-small secondary';
             setPhaseBtn.title = 'Set phase directly (god-only recovery tool)';
             setPhaseBtn.innerHTML = ICON_SVGS.settings + ' Set Phase';
             setPhaseBtn.onclick = () => window.openSetPhaseModal();
-            breakBtn.parentElement.appendChild(setPhaseBtn);
+            if (moreMenu) moreMenu.appendChild(setPhaseBtn);
+            else breakBtn.parentElement.appendChild(setPhaseBtn);
         }
         if (setPhaseBtn) setPhaseBtn.style.display = isGod ? '' : 'none';
 
@@ -1984,57 +1986,10 @@
 
     function _restoreFlowPanelDOM() {
         const panel = document.getElementById('flowPanel');
-        if (!panel) return;
-        panel.innerHTML =
-            '<!-- Phase Timeline Track -->' +
-            '<div class="flow-timeline" id="flowTimeline"></div>' +
-            '<!-- Main Flow Content -->' +
-            '<div class="flow-body">' +
-                '<div class="flow-current">' +
-                    '<div class="flow-phase-header">' +
-                        '<span id="flowPhaseIcon" class="flow-phase-icon"></span>' +
-                        '<div class="flow-phase-info">' +
-                            '<span class="flow-phase-label">CURRENT PHASE</span>' +
-                            '<span id="flowPhaseName" class="flow-phase-name">---</span>' +
-                        '</div>' +
-                        '<span id="flowRoundBadge" class="flow-round-badge" style="display: none;"></span>' +
-                    '</div>' +
-                '</div>' +
-                '<div class="flow-next-step">' +
-                    '<span class="next-step-label">Next Step</span>' +
-                    '<p id="flowGuidance" class="next-step-text"></p>' +
-                    '<div class="flow-actions" id="flowActions"></div>' +
-                '</div>' +
-                '<div class="flow-controls">' +
-                    '<button class="btn primary flow-primary-btn" id="flowPrimaryBtn" onclick="runFlowPrimaryAction()" disabled>---</button>' +
-                    '<div class="flow-controls-secondary">' +
-                        '<button class="btn-small secondary" id="advancePhaseBtn" onclick="advancePhase()" disabled>Next Phase ' + ICON_SVGS.play + '</button>' +
-                        '<span id="phaseExtraControls" style="display: none;"></span>' +
-                        '<span id="lobbyAdminControls" style="display: none;"></span>' +
-                        '<span id="spellWindowControls" style="display: none;"></span>' +
-                        '<button class="btn-small secondary" id="forceAdvanceBtn" onclick="forceAdvancePhase()" title="Force advance (skip requirements)">' + ICON_SVGS.triangleAlert + ' Force Advance</button>' +
-                        '<button class="btn-small secondary" id="insertBreakBtn" onclick="insertBreak()" title="Insert break">' + ICON_SVGS.pause + ' Break</button>' +
-                        '<button class="btn-small secondary" id="broadcastToggleBtn" onclick="toggleBroadcastBar()" title="Broadcast a message to view screens">' + ICON_SVGS.megaphone + '</button>' +
-                        '<span id="breakIntervalBadge" class="break-interval-badge" onclick="openBreakSettings()" title="Break interval settings" style="display: none;"></span>' +
-                    '</div>' +
-                '</div>' +
-            '</div>' +
-            '<div class="broadcast-bar" id="broadcastBar" style="display: none;">' +
-                '<span style="font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;">Broadcast</span>' +
-                '<input type="text" id="broadcastInput" placeholder="Message shown on view page..." maxlength="200" ' +
-                    'style="flex: 1; padding: 6px 12px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 6px; color: white; font-size: 0.85rem;">' +
-                '<button class="btn-small primary" onclick="setBroadcastMessage()">Send</button>' +
-                '<button class="btn-small secondary" onclick="clearBroadcastMessage()">Clear</button>' +
-            '</div>' +
-            '<div class="broadcast-bar" id="spellLogBar" style="display: none;">' +
-                '<span style="font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;">Spell Log</span>' +
-                '<div class="spell-log-teams" id="spellLogTeams"></div>' +
-                '<input type="text" id="spellLogSpellInput" placeholder="Spell name..." maxlength="60" ' +
-                    'onkeydown="if (event.key === \'Enter\') addSpellLogEntry()" ' +
-                    'style="flex: 1; min-width: 220px; padding: 8px 12px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 6px; color: white; font-size: 0.95rem;">' +
-                '<button class="btn-small primary" onclick="addSpellLogEntry()">+ Add</button>' +
-            '</div>' +
-            '<div class="spell-log-entries" id="spellLogEntries" style="display: none;"></div>';
+        const template = document.getElementById('flowPanelTemplate');
+        if (!panel || !template) return;
+        // admin.html's <template> is the single source of this markup.
+        panel.replaceChildren(template.content.cloneNode(true));
     }
 
     // ══════════════════════════════════════════════════════════════

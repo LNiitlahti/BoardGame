@@ -39,7 +39,7 @@
 .shell-center .board-section { flex: 1; min-height: 0; }
 
 /* ── Command bar ── */
-.flow-panel.command-bar { margin: 0; padding: 6px 12px; border: 1px solid var(--border-gold); border-radius: var(--radius-lg); background: var(--bg-panel); }
+.flow-panel.command-bar { position: relative; z-index: 20; overflow: visible; margin: 0; padding: 6px 12px; border: 1px solid var(--border-gold); border-radius: var(--radius-lg); background: var(--bg-panel); }
 .cb-row { display: flex; align-items: center; gap: 14px; min-height: 48px; }
 .cb-phase { display: flex; align-items: center; gap: 8px; min-width: 200px; flex: 0 0 auto; }
 .cb-phase-text { display: flex; flex-direction: column; gap: 2px; }
@@ -56,7 +56,7 @@
 
 /* ── Popover menus (admin-command-bar.js) ── */
 .cb-menu-wrap { position: relative; }
-.cb-menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 900; min-width: 230px; padding: 6px 0; background: var(--bg-elevated); border: 1px solid var(--border-gold); border-radius: var(--radius-md); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.cb-menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 900; min-width: 230px; padding: 6px 0; background: var(--dialog-solid-bg, #15171f); border: 1px solid var(--border-gold); border-radius: var(--radius-md); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
 .cb-menu-heading { padding: 8px 14px 4px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-tertiary); }
 .cb-menu-item { display: block; width: 100%; padding: 7px 14px; text-align: left; background: none; border: 0; color: var(--text-primary); font: inherit; font-size: 13px; cursor: pointer; }
 .cb-menu-item:hover, .cb-menu-item:focus-visible { background: var(--gold-dim); outline: none; }

@@ -60,3 +60,22 @@ test('admin.html loads admin-layout.js and admin-shell.css', () => {
     assert.ok(scriptIndex('admin-layout.js') !== -1);
     assert.ok(ADMIN_HTML.includes('css/admin-shell.css'));
 });
+
+test('every id the adapter looks up exists in admin.html (page or template)', () => {
+    const src = fs.readFileSync(path.resolve(__dirname, '../../full/scripts/admin-improved-adapter.js'), 'utf8');
+    const ids = new Set([...src.matchAll(/getElementById\('([A-Za-z0-9_-]+)'\)/g)].map(m => m[1]));
+    // Elements the adapter creates itself, or that only exist on god.html.
+    const createdAtRuntime = new Set(['setPhaseBtn', 'phaseInitPrompt', 'matchSlotCards', 'challengeSlotCards', 'forceConsequenceNote']);
+    const missing = [...ids].filter(id => !createdAtRuntime.has(id) && !ADMIN_HTML.includes(`id="${id}"`));
+    assert.deepStrictEqual(missing, []);
+});
+
+test('the adapter no longer carries a hand-copied flow panel HTML string', () => {
+    const src = fs.readFileSync(path.resolve(__dirname, '../../full/scripts/admin-improved-adapter.js'), 'utf8');
+    assert.ok(src.includes("getElementById('flowPanelTemplate')"));
+    assert.ok(!src.includes("'<div class=\"flow-timeline\" id=\"flowTimeline\"></div>'"));
+});
+
+test('admin.html loads admin-command-bar.js', () => {
+    assert.ok(scriptIndex('admin-command-bar.js') !== -1);
+});
