@@ -1,0 +1,103 @@
+/* BoardGame/full/css/admin-dialog.css
+ * Shared admin pop-up shell. Applies to the existing .modal-content and
+ * .phase-modal-content boxes plus a size class on the same element:
+ *   dialog-sm  confirms (undo, force advance, win condition, ...)
+ *   dialog-md  forms (result confirm, import, spell cast, ...)
+ *   dialog-lg  match/challenge/edit/seating/game manager
+ * The box never exceeds 90vh; only the middle scrolls; the title stays
+ * pinned at the top and .dialog-footer (the button row) at the bottom.
+ *
+ * Pinned parts need an OPAQUE background (--bg-panel is translucent and
+ * would let scrolled content show through), hence --dialog-solid-bg.
+ */
+:root {
+    --dialog-solid-bg: #15171f;
+}
+
+.modal-content.dialog-sm, .phase-modal-content.dialog-sm,
+.modal-content.dialog-md, .phase-modal-content.dialog-md,
+.modal-content.dialog-lg, .phase-modal-content.dialog-lg {
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: none;
+}
+
+/* .modal-content boxes pad themselves; .phase-modal-content boxes pad
+   their own header/body, so they keep padding: 0. */
+.modal-content.dialog-sm, .modal-content.dialog-md, .modal-content.dialog-lg {
+    padding: 0 24px;
+    background: var(--dialog-solid-bg);
+}
+
+:is(.modal-content, .phase-modal-content).dialog-sm { width: min(480px, 92vw); }
+:is(.modal-content, .phase-modal-content).dialog-md { width: min(760px, 92vw); }
+:is(.modal-content, .phase-modal-content).dialog-lg { width: min(1200px, 92vw); }
+
+/* Pinned title: the first heading of a .modal-content box, the
+   .phase-modal-header of a phase modal, or an explicit .dialog-header */
+.modal-content:is(.dialog-sm, .dialog-md, .dialog-lg) > :is(h3, h4):first-child,
+.phase-modal-content:is(.dialog-sm, .dialog-md, .dialog-lg) > .phase-modal-header,
+.dialog-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--dialog-solid-bg);
+}
+.modal-content:is(.dialog-sm, .dialog-md, .dialog-lg) > :is(h3, h4):first-child,
+.dialog-header {
+    margin: 0;
+    padding: 20px 0 12px;
+}
+
+/* Content rendered by JS with no heading still needs top breathing room */
+.modal-content:is(.dialog-sm, .dialog-md, .dialog-lg) > :not(h3, h4):first-child {
+    padding-top: 20px;
+}
+
+/* Pinned button row */
+.dialog-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: auto;
+    padding: 12px 0 20px;
+    background: var(--dialog-solid-bg);
+    border-top: 1px solid var(--border-gold, rgba(200, 179, 126, 0.3));
+}
+.dialog-footer[hidden] { display: none; }
+
+/* Inside a phase modal the footer sits in .phase-modal-body; make the body
+   a flex column so margin-top: auto pushes the footer to the bottom. */
+.phase-modal-content:is(.dialog-sm, .dialog-md, .dialog-lg) > .phase-modal-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 0 auto;
+}
+
+.dialog-footer .dialog-status {
+    margin-right: auto;
+    font-size: 12px;
+    color: var(--accent-warning, #f7ba32);
+}
+
+/* Side-by-side columns for big forms */
+.dialog-columns {
+    display: grid;
+    grid-template-columns: repeat(var(--dialog-cols, 2), minmax(0, 1fr));
+    gap: 12px;
+    align-items: start;
+}
+
+@media (max-width: 900px) {
+    .dialog-columns { grid-template-columns: 1fr; }
+}

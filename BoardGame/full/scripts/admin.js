@@ -4651,7 +4651,7 @@ function build5v5Modal(result, gameName) {
             ${splitInfo}
         </div>
 
-        <div class="auto-match-actions">
+        <div class="auto-match-actions dialog-footer">
             <button class="btn primary" onclick="confirmAutoMatch()">Add to Queue</button>
             <button class="btn secondary" onclick="closeAutoMatchModal()">Cancel</button>
         </div>
@@ -4752,7 +4752,7 @@ function buildSplitFormatModal(result, gameName) {
             ${splitInfo}
         </div>
 
-        <div class="auto-match-actions">
+        <div class="auto-match-actions dialog-footer">
             <button class="btn primary" onclick="confirmAutoMatch()">Add Both to Queue</button>
             <button class="btn secondary" onclick="closeAutoMatchModal()">Cancel</button>
         </div>
@@ -5473,7 +5473,7 @@ function openQuickConfirm(gameId) {
             <h4>${isOngoing ? 'Complete Break' : 'Start Break'}</h4>
             <div class="confirm-game-name"><span class="break-badge" style="margin-right: 8px;">BREAK</span>${breakDef.emoji} ${breakDef.label}</div>
 
-            <div class="confirm-actions">
+            <div class="confirm-actions dialog-footer">
                 ${isOngoing
                     ? `<button class="btn primary" onclick="completeBreak(${gameId})">Break Over</button>`
                     : `<button class="btn primary" onclick="startMatch(${gameId}); closeResultConfirm();">Start Break</button>`
@@ -5586,7 +5586,7 @@ function openQuickConfirm(gameId) {
             ${teamCardsHtml}
         </div>
 
-        <div class="confirm-actions">
+        <div class="confirm-actions dialog-footer">
             ${!isOngoing ? `<button class="btn secondary" onclick="startMatch(${gameId}); closeResultConfirm();">Start Match (No Result Yet)</button>` : ''}
             <button class="btn secondary" onclick="closeResultConfirm()">Cancel</button>
         </div>

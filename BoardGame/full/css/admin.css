@@ -250,10 +250,6 @@ h1, h2, h3, h4, h5, h6 {
     border: 1px solid #7c3aed;
 }
 
-/* State change modal */
-.state-change-modal {
-    max-width: 360px;
-}
 .state-options {
     display: flex;
     flex-direction: column;
@@ -1570,8 +1566,6 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
     border: 1px solid var(--border-gold);
     border-radius: var(--radius-lg);
     padding: 24px;
-    min-width: 300px;
-    max-width: 400px;
     box-shadow: 0 0 40px rgba(0,0,0,0.6), 0 0 2px var(--gold-dim);
 }
 
@@ -1647,8 +1641,6 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
 
 /* Result Confirmation Modal */
 .result-confirm-modal {
-    min-width: 400px;
-    max-width: 600px;
 }
 
 .result-confirm-modal h4 {
@@ -1740,9 +1732,6 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
 
 /* Player Manager Modal */
 .player-manager-modal {
-    min-width: 500px;
-    max-width: 600px;
-    max-height: 80vh;
     display: flex;
     flex-direction: column;
 }
@@ -1854,8 +1843,6 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
 
 /* Next Round Modal */
 .next-round-modal {
-    min-width: 400px;
-    max-width: 500px;
     text-align: center;
 }
 
@@ -1938,8 +1925,6 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
 
 /* Clear Queue Modal */
 .clear-queue-modal {
-    min-width: 400px;
-    max-width: 500px;
     text-align: center;
 }
 
@@ -1963,12 +1948,6 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
 .clear-queue-actions .btn {
     width: 100%;
     padding: 12px 16px;
-}
-
-/* Auto Match Modal */
-.auto-match-modal {
-    min-width: 500px;
-    max-width: 650px;
 }
 
 .auto-match-modal h4 {
@@ -2211,12 +2190,6 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
     border: 1px solid rgba(247,186,50,0.15);
 }
 
-/* Mass Import Modal */
-.mass-import-modal {
-    min-width: 450px;
-    max-width: 550px;
-}
-
 .mass-import-modal h4 {
     text-align: center;
     font-size: 16px;
@@ -2330,12 +2303,6 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
     text-transform: uppercase;
     letter-spacing: 2px;
     margin: 0 0 8px 0;
-}
-
-/* Challenge Setup Modal */
-.challenge-setup-modal {
-    min-width: 450px;
-    max-width: 550px;
 }
 
 .challenge-sides-container {
@@ -2496,8 +2463,6 @@ body.spell-hex-picking .challenge-hex-pick-banner#spellHexPickBanner {
 
 /* Edit Match Modal */
 .edit-match-modal {
-    min-width: 400px;
-    max-width: 500px;
 }
 
 .edit-match-form {
@@ -2630,9 +2595,6 @@ body.spell-hex-picking .challenge-hex-pick-banner#spellHexPickBanner {
 
 /* Game Manager Modal */
 .game-manager-modal {
-    min-width: 450px;
-    max-width: 550px;
-    max-height: 85vh;
     display: flex;
     flex-direction: column;
 }
@@ -2801,9 +2763,6 @@ body.spell-hex-picking .challenge-hex-pick-banner#spellHexPickBanner {
 
 /* Seating Order Modal */
 .seating-order-modal {
-    min-width: 550px;
-    max-width: 650px;
-    max-height: 80vh;
     display: flex;
     flex-direction: column;
 }
@@ -3150,29 +3109,9 @@ body.effect-hex-images .hex-label { z-index: 1; }
         max-height: 250px;
     }
 
-    .result-confirm-modal {
-        min-width: 300px;
-        max-width: 95vw;
-    }
 
     .confirm-matchup .confirm-team { min-width: 100px; }
 
-    /* Every other action modal (400-550px min-width, no override) is
-       wider than a phone and, being position:fixed, produces no
-       scrollbar to reach the clipped content -- same fix pattern as
-       .result-confirm-modal above, just applied to the rest of them. */
-    .player-manager-modal,
-    .next-round-modal,
-    .clear-queue-modal,
-    .auto-match-modal,
-    .mass-import-modal,
-    .challenge-setup-modal,
-    .edit-match-modal,
-    .game-manager-modal,
-    .seating-order-modal {
-        min-width: unset;
-        max-width: 95vw;
-    }
 }
 
 @media (prefers-reduced-motion: reduce) {

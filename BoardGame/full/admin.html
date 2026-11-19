@@ -63,6 +63,7 @@
     <link rel="stylesheet" href="../shared/css/fantasy-mountain-theme.css">
     <link rel="stylesheet" href="../shared/css/void-gold-theme.css">
     <link rel="stylesheet" href="css/admin.css">
+    <link rel="stylesheet" href="css/admin-dialog.css">
     <link rel="stylesheet" href="css/phase-indicator.css">
     <link rel="stylesheet" href="css/admin-improved.css">
     <link rel="stylesheet" href="css/styles.css">
@@ -331,23 +332,27 @@
 
     <!-- Team Picker Modal -->
     <div class="modal-overlay" id="teamPickerModal">
-        <div class="modal-content">
+        <div class="modal-content dialog-sm">
             <h4>Assign Hex: <span id="pickerHexCoord"></span></h4>
             <div class="team-picker-options" id="teamPickerOptions"></div>
-            <button class="btn secondary modal-cancel" onclick="closeTeamPicker()">Cancel</button>
+            <div class="dialog-footer">
+                <button class="btn secondary modal-cancel" onclick="closeTeamPicker()">Cancel</button>
+            </div>
         </div>
     </div>
 
     <!-- Result Confirmation Modal -->
     <div class="modal-overlay" id="resultConfirmModal">
-        <div class="modal-content result-confirm-modal">
+        <div class="modal-content result-confirm-modal dialog-md">
             <div id="resultConfirmContent"></div>
+            <!-- Buttons are rendered by JS inside resultConfirmContent (.confirm-actions.dialog-footer) -->
+            <div class="dialog-footer" hidden></div>
         </div>
     </div>
 
     <!-- Player Manager Modal -->
     <div class="modal-overlay" id="playerManagerModal">
-        <div class="modal-content player-manager-modal">
+        <div class="modal-content player-manager-modal dialog-lg">
             <h4>Manage Players</h4>
             <p class="modal-hint">Players are managed locally - no login required for them.</p>
 
@@ -355,7 +360,7 @@
                 <!-- Teams and players rendered here -->
             </div>
 
-            <div class="player-manager-actions">
+            <div class="player-manager-actions dialog-footer">
                 <button class="btn secondary" onclick="closePlayerManager()">Close</button>
             </div>
         </div>
@@ -363,7 +368,7 @@
 
     <!-- Seating Order Modal -->
     <div class="modal-overlay" id="seatingOrderModal">
-        <div class="modal-content seating-order-modal">
+        <div class="modal-content seating-order-modal dialog-lg">
             <h4>Seating Order</h4>
             <p class="modal-hint">Drag players to rearrange physical seating, or tap/click one seat then tap/click another to swap them (tap the same seat again, or tap empty space, to cancel). Left wall = seats 1-5, right wall = seats 6-10.</p>
 
@@ -378,7 +383,7 @@
                 </div>
             </div>
 
-            <div class="seating-order-actions">
+            <div class="seating-order-actions dialog-footer">
                 <button class="btn-small secondary" onclick="resetSeatingOrder()">Reset to Default</button>
                 <button class="btn secondary" onclick="closeSeatingOrder()">Close</button>
             </div>
@@ -387,7 +392,7 @@
 
     <!-- Next Round Confirmation Modal (legacy flow only — phase mode uses the Flow Confirm modal) -->
     <div class="modal-overlay" id="nextRoundModal">
-        <div class="modal-content next-round-modal">
+        <div class="modal-content next-round-modal dialog-md">
             <h4>Advance to Next Round?</h4>
             <p class="modal-warning">This will add hex control points to corresponding teams.</p>
             <p class="modal-danger">YOU CANNOT GO BACK IN ROUNDS!</p>
@@ -396,7 +401,7 @@
                 <!-- Points preview rendered here -->
             </div>
 
-            <div class="next-round-actions">
+            <div class="next-round-actions dialog-footer">
                 <button class="btn primary" onclick="confirmAdvanceRound(this)">Yes, Advance Round</button>
                 <button class="btn secondary" onclick="closeNextRoundModal()">Cancel</button>
             </div>
@@ -405,21 +410,23 @@
 
     <!-- Auto Match Confirmation Modal -->
     <div class="modal-overlay" id="autoMatchModal">
-        <div class="modal-content auto-match-modal">
+        <div class="modal-content auto-match-modal dialog-lg">
             <div id="autoMatchContent">
                 <!-- Auto match preview rendered here -->
             </div>
+            <!-- Buttons are rendered by JS inside autoMatchContent (.auto-match-actions.dialog-footer) -->
+            <div class="dialog-footer" hidden></div>
         </div>
     </div>
 
     <!-- Mass Import Modal -->
     <div class="modal-overlay" id="massImportModal">
-        <div class="modal-content mass-import-modal">
+        <div class="modal-content mass-import-modal dialog-md">
             <h4>Mass Import Matches</h4>
             <div id="importPreview">
                 <!-- Import preview rendered here -->
             </div>
-            <div class="import-actions">
+            <div class="import-actions dialog-footer">
                 <button class="btn primary" onclick="confirmMassImport(this)">Import All</button>
                 <button class="btn secondary" onclick="closeMassImport()">Cancel</button>
             </div>
@@ -428,7 +435,7 @@
 
     <!-- Clear Queue Confirmation Modal -->
     <div class="modal-overlay" id="clearQueueModal">
-        <div class="modal-content clear-queue-modal">
+        <div class="modal-content clear-queue-modal dialog-md">
             <h4>Clear All Matches from Queue?</h4>
             <p class="modal-warning">Removes this round's <strong>pending</strong> matches and breaks from the queue.</p>
             <p class="modal-warning">Kept: completed match history, currently <strong>live</strong> matches, and matches scheduled for <strong>future rounds</strong>.</p>
@@ -443,7 +450,7 @@
                 <!-- Match count preview rendered here -->
             </div>
 
-            <div class="clear-queue-actions">
+            <div class="clear-queue-actions dialog-footer">
                 <button class="btn danger" onclick="confirmClearQueue(this)">Yes, Clear All Matches</button>
                 <button class="btn secondary" onclick="closeClearQueueModal()">Cancel</button>
             </div>
@@ -452,10 +459,10 @@
 
     <!-- Spell Process Modal (Process button on a pending spellHistory entry) -->
     <div class="modal-overlay" id="spellProcessModal">
-        <div class="modal-content">
+        <div class="modal-content dialog-md">
             <h3 id="spellProcessTitle">Process Spell</h3>
             <div id="spellProcessBody"></div>
-            <div class="challenge-setup-actions">
+            <div class="challenge-setup-actions dialog-footer">
                 <button type="button" class="btn-small secondary" onclick="closeSpellProcessModal()">Cancel</button>
                 <button type="button" class="btn-small primary" id="spellProcessSubmitBtn" onclick="submitSpellProcessModal()">Submit</button>
             </div>
@@ -464,7 +471,7 @@
 
     <!-- Challenge Setup Modal -->
     <div class="modal-overlay" id="challengeSetupModal">
-        <div class="modal-content challenge-setup-modal">
+        <div class="modal-content challenge-setup-modal dialog-lg">
             <h4>Create Challenge Match</h4>
             <p class="modal-hint">Select teams disputing hexes. Up to 2 disputes can be resolved in one match.</p>
 
@@ -514,7 +521,7 @@
                 <p class="modal-hint" style="margin-top: 4px;">Points for this hex are frozen until the challenge is resolved.</p>
             </div>
 
-            <div class="challenge-setup-actions">
+            <div class="challenge-setup-actions dialog-footer">
                 <button class="btn primary" onclick="confirmChallengeSetup(this)">Create Challenge</button>
                 <button class="btn secondary" onclick="toggleChallengeBundleMode()">Bundle Multiple Disputes…</button>
                 <button class="btn secondary" onclick="closeChallengeSetupModal()">Cancel</button>
@@ -557,7 +564,7 @@
 
     <!-- Edit Match Modal -->
     <div class="modal-overlay" id="editMatchModal">
-        <div class="modal-content edit-match-modal">
+        <div class="modal-content edit-match-modal dialog-lg">
             <h4>Edit Match <span id="editMatchNumber"></span></h4>
 
             <div class="edit-match-form">
@@ -594,7 +601,7 @@
                 </div>
             </div>
 
-            <div class="edit-match-actions">
+            <div class="edit-match-actions dialog-footer">
                 <button class="btn primary" onclick="saveMatchEdits(this)">Save Changes</button>
                 <button class="btn secondary" onclick="closeEditMatchModal()">Cancel</button>
             </div>
@@ -603,7 +610,7 @@
 
     <!-- Tournament State Change Modal -->
     <div class="modal-overlay" id="stateChangeModal">
-        <div class="modal-content state-change-modal">
+        <div class="modal-content state-change-modal dialog-sm">
             <h4>Change Tournament State</h4>
             <p class="modal-hint">Select the new state for this tournament.</p>
             <div class="state-options" id="stateOptions">
@@ -625,7 +632,7 @@
                 </button>
             </div>
             <p class="archived-warning" id="archivedWarning" style="display: none;">This tournament is archived. Only God users can change its state.</p>
-            <div class="state-change-actions">
+            <div class="state-change-actions dialog-footer">
                 <button class="btn secondary" onclick="closeStateChangeModal()">Cancel</button>
             </div>
         </div>
@@ -633,7 +640,7 @@
 
     <!-- Game Manager Modal -->
     <div class="modal-overlay" id="gameManagerModal">
-        <div class="modal-content game-manager-modal">
+        <div class="modal-content game-manager-modal dialog-lg">
             <h4>Manage Tournament Games</h4>
             <p class="modal-hint">Enable/disable games or add new ones. Changes apply to all pages immediately.</p>
 
@@ -698,7 +705,7 @@
                 </div>
             </div>
 
-            <div class="gm-actions">
+            <div class="gm-actions dialog-footer">
                 <button class="btn secondary" onclick="closeGameManager()">Close</button>
             </div>
         </div>
@@ -706,7 +713,7 @@
 
     <!-- Force Advance Modal (phase-modal pattern to avoid conflict with lightweight .modal-overlay) -->
     <div id="forceAdvanceModal" class="phase-modal" style="display: none;">
-        <div class="phase-modal-content" style="max-width: 500px;">
+        <div class="phase-modal-content dialog-sm">
             <div class="phase-modal-header">
                 <h2 style="color: var(--accent-danger, #ef4444);">&#x26A0; Force Advance Phase</h2>
                 <button onclick="closeForceAdvanceModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
@@ -719,7 +726,7 @@
                     Advancing to: <strong id="forceAdvanceNextPhase" style="color: var(--accent-primary);">---</strong>
                 </p>
                 <div id="forceAdvanceRequirements" style="margin-bottom: 20px;"></div>
-                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <div class="dialog-footer">
                     <button class="btn secondary" onclick="closeForceAdvanceModal()">Cancel</button>
                     <button class="btn danger" onclick="confirmForceAdvance()">Force Advance</button>
                 </div>
@@ -729,7 +736,7 @@
 
     <!-- Undo Confirmation Modal (undo-manager.js reads/writes these element ids directly) -->
     <div id="undoConfirmModal" class="phase-modal" style="display: none;">
-        <div class="phase-modal-content" style="max-width: 480px;">
+        <div class="phase-modal-content dialog-sm">
             <div class="phase-modal-header">
                 <h2 style="color: var(--accent-danger, #ef4444);">&#x21B6; Undo Action</h2>
                 <button onclick="closeUndoConfirmModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
@@ -739,7 +746,7 @@
                 <div id="undoActionDesc" style="font-weight: 600; color: var(--text-primary); margin-bottom: 16px; font-size: 0.9rem;"></div>
                 <div id="undoChangesPreview" style="margin-bottom: 12px;"></div>
                 <div id="undoWarnings" style="display: none; margin-bottom: 12px;"></div>
-                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <div class="dialog-footer">
                     <button class="btn secondary" onclick="closeUndoConfirmModal()">Cancel</button>
                     <button class="btn danger" onclick="confirmUndoAction()">Undo</button>
                 </div>
@@ -749,7 +756,7 @@
 
     <!-- Set Phase Modal (god-only corrector) -->
     <div id="setPhaseModal" class="phase-modal" style="display: none;">
-        <div class="phase-modal-content" style="max-width: 420px;">
+        <div class="phase-modal-content dialog-sm">
             <div class="phase-modal-header">
                 <h2>Set Phase (God)</h2>
                 <button onclick="closeSetPhaseModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
@@ -768,7 +775,7 @@
                         </label>
                     </div>
                 </div>
-                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+                <div class="dialog-footer">
                     <button class="btn secondary" onclick="closeSetPhaseModal()">Cancel</button>
                     <button class="btn danger" onclick="confirmSetPhase()">Set Phase</button>
                 </div>
@@ -778,7 +785,7 @@
 
     <!-- Break Settings Modal -->
     <div id="breakSettingsModal" class="phase-modal" style="display: none;">
-        <div class="phase-modal-content" style="max-width: 400px;">
+        <div class="phase-modal-content dialog-sm">
             <div class="phase-modal-header">
                 <h2>Break Settings</h2>
                 <button onclick="closeBreakSettings()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
@@ -796,7 +803,7 @@
                     <button class="btn-small secondary" onclick="resetBreakCounter()">Reset Counter</button>
                     <button class="btn-small secondary" onclick="skipNextBreak()">Skip Next Break</button>
                 </div>
-                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <div class="dialog-footer">
                     <button class="btn secondary" onclick="closeBreakSettings()">Cancel</button>
                     <button class="btn primary" onclick="saveBreakSettings(this)">Save</button>
                 </div>
@@ -806,7 +813,7 @@
 
     <!-- Win Condition Modal (experimental — no equivalent on the original admin.html) -->
     <div id="winConditionModal" class="phase-modal" style="display: none;">
-        <div class="phase-modal-content" style="max-width: 400px;">
+        <div class="phase-modal-content dialog-sm">
             <div class="phase-modal-header">
                 <h2>Win Condition</h2>
                 <button onclick="closeWinConditionModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
@@ -821,7 +828,7 @@
                            style="width: 100px; padding: 8px 12px; background: rgba(11, 13, 16, 0.6); border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08)); border-radius: 8px; color: white; font-size: 1rem; margin-top: 6px;">
                 </div>
                 <p style="color: var(--text-tertiary); font-size: 0.85rem; margin: 12px 0;" id="winConditionLeaderNote"></p>
-                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <div class="dialog-footer">
                     <button class="btn secondary" onclick="closeWinConditionModal()">Cancel</button>
                     <button class="btn primary" onclick="saveWinCondition(this)">Save</button>
                 </div>
@@ -831,7 +838,7 @@
 
     <!-- Spells Active Modal -->
     <div id="spellsActiveModal" class="phase-modal" style="display: none;">
-        <div class="phase-modal-content" style="max-width: 400px;">
+        <div class="phase-modal-content dialog-sm">
             <div class="phase-modal-header">
                 <h2>Spells</h2>
                 <button onclick="closeSpellsActiveModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
@@ -846,7 +853,7 @@
                         Spells active (players see digital spell UI)
                     </label>
                 </div>
-                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+                <div class="dialog-footer">
                     <button class="btn secondary" onclick="closeSpellsActiveModal()">Cancel</button>
                     <button class="btn primary" onclick="saveSpellsActive(this)">Save</button>
                 </div>
@@ -858,7 +865,7 @@
          cross-referencing board actions against spell timing later.
          Logging aid only; does not resolve any spell effect. -->
     <div id="spellCastModal" class="phase-modal" style="display: none;">
-        <div class="phase-modal-content" style="max-width: 440px;">
+        <div class="phase-modal-content dialog-md">
             <div class="phase-modal-header">
                 <h2>Log Spell Cast</h2>
                 <button onclick="closeSpellCastModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
@@ -881,7 +888,7 @@
                         <option value="">— None —</option>
                     </select>
                 </div>
-                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+                <div class="dialog-footer">
                     <button class="btn secondary" onclick="closeSpellCastModal()">Cancel</button>
                     <button class="btn primary" onclick="logSpellCast(this)">Log Cast</button>
                 </div>
@@ -892,14 +899,14 @@
     <!-- Flow Confirm Modal (generic prompt used by the guided flow:
          points preview, skip-lobby warning, skip-challenges, desync warning) -->
     <div id="flowConfirmModal" class="phase-modal" style="display: none;">
-        <div class="phase-modal-content" style="max-width: 460px;">
+        <div class="phase-modal-content dialog-sm">
             <div class="phase-modal-header">
                 <h2 id="flowConfirmTitle">Confirm</h2>
                 <button onclick="closeFlowConfirm()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
             </div>
             <div class="phase-modal-body">
                 <div id="flowConfirmBody"></div>
-                <div class="flow-confirm-actions">
+                <div class="flow-confirm-actions dialog-footer">
                     <button class="btn secondary" onclick="closeFlowConfirm()">Cancel</button>
                     <button class="btn secondary" id="flowConfirmSecondaryBtn" style="display:none;">Secondary</button>
                     <button class="btn primary" id="flowConfirmBtn">Confirm</button>
