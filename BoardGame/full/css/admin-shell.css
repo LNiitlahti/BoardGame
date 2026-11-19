@@ -71,8 +71,11 @@
 .stats-strip .status-message { margin-left: auto; }
 
 /* ── Board: effects toggles float in the corner ── */
-.shell-center #effectsPanel { position: absolute; top: 8px; left: 8px; z-index: 5; display: flex; gap: 4px; opacity: .55; transition: opacity var(--transition-fast); }
-.shell-center #effectsPanel:hover { opacity: 1; }
+.shell-center .board-effects { position: absolute; top: 8px; left: 8px; z-index: 5; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.shell-center .board-effects-toggle { opacity: .6; transition: opacity var(--transition-fast); }
+.shell-center .board-effects-toggle:hover, .shell-center .board-effects-toggle[aria-expanded="true"] { opacity: 1; }
+.shell-center #effectsPanel { position: static; display: flex; flex-wrap: wrap; gap: 4px; }
+.shell-center #effectsPanel[hidden] { display: none; }
 
 /* ── Panels ── */
 .shell-left > section, .shell-right > section { background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 10px; }
