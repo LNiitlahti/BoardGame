@@ -1,18 +1,14 @@
 /**
- * Admin Improved — experimental overrides
+ * Admin Improved — guided flow styling for full/admin.html
  *
- * Loaded LAST on full/admin_improved.html only.
- * Fixes the viewport overflow (flow panel + admin container now share
- * the viewport via flexbox instead of overflowing it), compacts the
- * flow panel, and styles the guided NEXT STEP prompt.
+ * Styles the guided flow panel's pieces (timeline, phase name, NEXT STEP
+ * text, requirement pills, controls). The page grid itself lives in
+ * admin-shell.css, which loads after this file.
  */
 
 /* ==================== LAYOUT SHELL ====================
-   Old bug: .admin-container was hard-sized to calc(100vh - 60px) while
-   #flowPanel sat above it as a sibling, pushing the page ~190px past the
-   viewport with body overflow hidden — the bottom of every column was
-   clipped. Fix: body becomes a flex column; the flow panel is a natural-
-   height row and the container flexes into whatever height remains. */
+   body is a flex column under the navbar; .admin-shell (admin-shell.css)
+   flexes into the remaining height. */
 
 body {
     display: flex;
@@ -22,13 +18,6 @@ body {
 .flow-panel {
     flex-shrink: 0;
     margin: 8px 12px 0;
-}
-
-.admin-container {
-    flex: 1 1 auto;
-    height: auto;
-    min-height: 0;
-    width: 100%;
 }
 
 /* ==================== COMPACT FLOW PANEL ==================== */
@@ -54,14 +43,6 @@ body {
 
 /* ==================== NEXT STEP PROMPT ==================== */
 
-.flow-next-step {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
 .next-step-label {
     font-size: 0.55rem;
     font-weight: 700;
@@ -83,10 +64,6 @@ body {
     color: var(--accent-gold, #c8b37e);
 }
 
-.flow-next-step .flow-actions {
-    margin-top: 2px;
-}
-
 /* ==================== CONTROLS ==================== */
 
 .flow-primary-btn {
@@ -103,12 +80,6 @@ body {
 
 .flow-controls {
     max-width: 340px;
-}
-
-.flow-controls-secondary {
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    row-gap: 4px;
 }
 
 /* Broadcast toggle lights up while a broadcast message is live */

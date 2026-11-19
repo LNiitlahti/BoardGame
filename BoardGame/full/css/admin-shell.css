@@ -163,3 +163,48 @@
 /* ── Edit pop-up ── */
 #editMatchModal .edit-match-form { gap: 12px; margin-bottom: 0; }
 #editMatchModal .dialog-columns > * { min-width: 0; }
+
+/* ── Smaller screens ── */
+/* iPad landscape (901-1194px): two columns, teams move under the board */
+@media (max-width: 1194px) and (min-width: 901px) {
+    .admin-shell,
+    .admin-shell[data-mode="board"],
+    .admin-shell[data-mode="match"] {
+        grid-template-columns: minmax(0, 1fr) 380px;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        grid-template-areas:
+            "top    top"
+            "center right"
+            "left   right";
+    }
+    /* Teams become a short wrapping strip under the board */
+    .shell-left { flex-direction: row; overflow: auto; max-height: 130px; }
+    .shell-left > section { flex: 1 0 260px; padding: 6px 8px; }
+    .shell-left .teams-panel .panel-header { display: none; }
+    .shell-left .teams-list { flex-direction: row; flex-wrap: wrap; }
+    .shell-left .team-row { flex: 1 1 150px; width: auto; grid-template-columns: minmax(0, 1fr) auto; }
+    .shell-left .team-row-stat:not(.team-row-points) { display: none; }
+    .cb-row { flex-wrap: wrap; }
+    .cb-controls { flex-wrap: wrap; }
+    .stats-strip { flex-wrap: wrap; white-space: normal; }
+}
+
+/* Phones / narrow (≤900px): one column, the page scrolls */
+@media (max-width: 900px) {
+    body { height: auto; overflow: auto; }
+    .admin-shell,
+    .admin-shell[data-mode="board"],
+    .admin-shell[data-mode="match"] {
+        display: flex;
+        flex-direction: column;
+        height: auto;
+        overflow: visible;
+        padding: 8px;
+    }
+    .shell-center { min-height: 90vw; }
+    .shell-left, .shell-right { overflow: visible; }
+    .shell-right .live-panel { max-height: none; }
+    .cb-row, .cb-controls { flex-wrap: wrap; }
+    .cb-phase { min-width: 0; }
+    .stats-strip { flex-wrap: wrap; white-space: normal; }
+}

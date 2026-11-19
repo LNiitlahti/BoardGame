@@ -2765,38 +2765,9 @@ const BREAK_TYPES = {
     sleep:     { label: 'Sleep',            emoji: iconSvg('moon', '#818cf8') }
 };
 
-let _breakMenuCloseHandler = null;
-
-function toggleBreakMenu() {
-    const menu = document.getElementById('breakMenu');
-    if (!menu) return;
-
-    // Clean up previous listener if any
-    if (_breakMenuCloseHandler) {
-        document.removeEventListener('click', _breakMenuCloseHandler);
-        _breakMenuCloseHandler = null;
-    }
-
-    menu.classList.toggle('active');
-
-    if (menu.classList.contains('active')) {
-        // Close on outside click
-        _breakMenuCloseHandler = (e) => {
-            if (!e.target.closest('.break-dropdown')) {
-                menu.classList.remove('active');
-                document.removeEventListener('click', _breakMenuCloseHandler);
-                _breakMenuCloseHandler = null;
-            }
-        };
-        setTimeout(() => document.addEventListener('click', _breakMenuCloseHandler), 0);
-    }
-}
-
 async function addBreakToQueue(breakType) {
     const def = BREAK_TYPES[breakType];
     if (!def) return;
-
-    document.getElementById('breakMenu')?.classList.remove('active');
 
     const breakEntry = {
         id: Date.now(),
@@ -4614,140 +4585,8 @@ function closeEditMatchModal() {
     };
 }
 
-/**
- * Generate suggested matches using SmartMatchGenerator
- * Uses BalanceOptimizer with greedy variance minimization for perfect balance
- *
- * Features:
- * - Minimizes pairing variance (all pairs play with/against equally)
- * - No team split twice in a row (heavy penalty)
- * - Game rotation with smart repeat counts (1-3 per game)
- * - Supports both 5v5 and 3v3+2v2 formats
- */
-async function generateSuggestedMatches() {
-    if (!gameState || !gameState.teams) {
-        showStatus('Load a tournament first', 'warning');
-        return;
-    }
-
-    // Check if SmartMatchGenerator is available
-    if (typeof SmartMatchGenerator === 'undefined') {
-        showStatus('SmartMatchGenerator not loaded', 'error');
-        return;
-    }
-
-    try {
-        // Initialize or update the smart generator
-        if (!smartMatchGenerator) {
-            smartMatchGenerator = new SmartMatchGenerator(gameState);
-        } else {
-            // Update with latest gameState (teams may have changed)
-            smartMatchGenerator.gameState = gameState;
-            smartMatchGenerator.teams = gameState.teams || [];
-        }
-
-        // Generate the next optimized match(es)
-        const result = smartMatchGenerator.generateNext();
-
-        // Check for errors (e.g., not enough teams/players)
-        if (result.error) {
-            showStatus(result.message, 'error');
-            return;
-        }
-
-        const gameName = getGameDisplayName(result.gameId);
-
-        // Store pending match for confirmation
-        pendingAutoMatch = {
-            result,
-            gameName
-        };
-
-        // Build modal content based on format
-        let modalContent;
-
-        if (result.format === '3v3+2v2') {
-            modalContent = buildSplitFormatModal(result, gameName);
-        } else {
-            modalContent = build5v5Modal(result, gameName);
-        }
-
-        document.getElementById('autoMatchContent').innerHTML = modalContent;
-        document.getElementById('autoMatchModal').classList.add('active');
-
-    } catch (error) {
-        console.error('Error generating matches:', error);
-        showStatus('Error generating matches: ' + error.message, 'error');
-    }
-}
-
-/**
- * Build modal content for 5v5 match
- */
-function build5v5Modal(result, gameName) {
-    const match = result.matches[0];
-
-    const sideAHtml = match.teams[0].players.map(p => {
-        const color = p.originalTeamColor || getTeamColor(p.originalTeamId) || '#666';
-        const splitBadge = p.isSplit ? '<span class="split-badge">SPLIT</span>' : '';
-        return `<div class="auto-match-player" style="--player-color: ${color}">
-            <span class="player-name">${escapeHtml(p.name)}</span>
-            <span class="player-team">${escapeHtml(p.originalTeamName)}</span>
-            ${splitBadge}
-        </div>`;
-    }).join('');
-
-    const sideBHtml = match.teams[1].players.map(p => {
-        const color = p.originalTeamColor || getTeamColor(p.originalTeamId) || '#666';
-        const splitBadge = p.isSplit ? '<span class="split-badge">SPLIT</span>' : '';
-        return `<div class="auto-match-player" style="--player-color: ${color}">
-            <span class="player-name">${escapeHtml(p.name)}</span>
-            <span class="player-team">${escapeHtml(p.originalTeamName)}</span>
-            ${splitBadge}
-        </div>`;
-    }).join('');
-
-    // Build balance stats display
-    const balanceInfo = result.balanceStats ? buildBalanceInfo(result.balanceStats) : '';
-    const splitInfo = result.splitStats ? buildSplitInfo(result.splitStats) : '';
-
-    return `
-        <h4>Auto-Generated Match</h4>
-        <div class="auto-match-header">
-            <span class="rotation-badge">Match #${result.rotationInfo?.totalGenerated || '?'}</span>
-            <span class="format-badge">${result.format}</span>
-        </div>
-        <div class="auto-match-game">
-            <span class="game-name">${gameName}</span>
-            <span class="play-type">${result.format}</span>
-        </div>
-
-        <div class="auto-match-sides">
-            <div class="auto-match-side">
-                <div class="side-label">Side A</div>
-                <div class="side-desc">${result.sideADescription}</div>
-                <div class="side-players">${sideAHtml}</div>
-            </div>
-            <div class="auto-match-vs">VS</div>
-            <div class="auto-match-side">
-                <div class="side-label">Side B</div>
-                <div class="side-desc">${result.sideBDescription}</div>
-                <div class="side-players">${sideBHtml}</div>
-            </div>
-        </div>
-
-        <div class="auto-match-info">
-            <div class="split-info">${result.splitDescription}</div>
-            ${balanceInfo}
-            ${splitInfo}
-        </div>
-
-        <div class="auto-match-actions dialog-footer">
-            <button class="btn primary" onclick="confirmAutoMatch()">Add to Queue</button>
-            <button class="btn secondary" onclick="closeAutoMatchModal()">Cancel</button>
-        </div>
-    `;
-}
+// generateSuggestedMatches() — the old "Auto" button — now lives in
+// match-dialog.js: it opens the match pop-up and Auto-fills it.
 
 /**
  * Build modal content for 3v3+2v2 split format match
@@ -4975,9 +4814,9 @@ async function confirmAutoMatch() {
  * Close the auto match modal
  */
 function closeAutoMatchModal() {
-    // The auto-match preview now lives in the match pop-up (#autoMatchContent
-    // inside #matchDialog), so there is no #autoMatchModal any more.
-    document.getElementById('autoMatchModal')?.classList.remove('active');
+    // The auto-match preview lives in the match pop-up (#autoMatchContent
+    // inside #matchDialog, closed by match-dialog.js); only the pending
+    // suggestion needs clearing here.
     pendingAutoMatch = null;
 }
 

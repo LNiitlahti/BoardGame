@@ -181,40 +181,6 @@ h1, h2, h3, h4, h5, h6 {
 /* ============================================================
    6. TOP BAR
    ============================================================ */
-.admin-container {
-    display: grid;
-    grid-template-rows: auto 1fr;
-    height: calc(100vh - 60px);
-    gap: 10px;
-    padding: 10px;
-    max-width: 1920px;
-    margin: 0 auto;
-    overflow: hidden;
-    box-sizing: border-box;
-    position: relative;
-    z-index: 2;
-}
-
-.top-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 8px 16px;
-    background: rgba(5, 7, 16, 0.85);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid var(--border-gold);
-    border-radius: var(--radius-lg);
-    flex-shrink: 0;
-}
-
-.tournament-selector {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-shrink: 0;
-}
 
 /* Tournament state button */
 .tournament-state-btn {
@@ -305,11 +271,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Stat badges (gold numbers with dim labels) */
-.stat-badges {
-    display: flex;
-    gap: 16px;
-    align-items: center;
-}
 
 .stat-badge {
     display: flex;
@@ -333,63 +294,7 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--gold);
 }
 
-.stat-sep {
-    width: 1px;
-    height: 18px;
-    background: var(--border-faint);
-}
-
 /* Top bar actions */
-.top-bar-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-}
-
-.top-bar-actions .btn-group-separator {
-    width: 1px;
-    height: 20px;
-    background: var(--border-color);
-    margin: 0 2px;
-}
-
-.top-bar-actions .btn-group {
-    display: flex;
-    gap: 0;
-}
-
-.top-bar-actions .btn-group .btn {
-    border-radius: 0;
-    border-right-width: 0;
-}
-
-.top-bar-actions .btn-group .btn:first-child {
-    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
-}
-
-.top-bar-actions .btn-group .btn:last-child {
-    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-    border-right-width: 1px;
-}
-
-.top-bar-center {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.top-bar-center span {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.85rem;
-}
-
-.top-bar-center strong {
-    color: var(--gold);
-    font-family: 'Quantico', sans-serif;
-}
 
 .round-info {
     display: flex;
@@ -412,16 +317,8 @@ h1, h2, h3, h4, h5, h6 {
 /* ============================================================
    7. ADMIN LAYOUT (3-column grid)
    ============================================================ */
-.admin-layout {
-    display: grid;
-    grid-template-columns: 280px 1fr 360px;
-    gap: 10px;
-    min-height: 0;
-    overflow: hidden;
-}
 
 /* Shared column panel styles */
-.teams-column,
 .queue-column {
     background: var(--bg-panel);
     backdrop-filter: blur(10px);
@@ -454,16 +351,6 @@ h1, h2, h3, h4, h5, h6 {
 /* ============================================================
    8. TEAMS COLUMN (Left)
    ============================================================ */
-.teams-column .teams-list,
-.teams-column .teams-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    overflow-y: auto;
-    padding: 8px;
-    flex: 1;
-    min-height: 0;
-}
 
 .team-card {
     background: rgba(255,255,255,0.015);
@@ -648,13 +535,6 @@ h1, h2, h3, h4, h5, h6 {
 /* ============================================================
    9. CENTER COLUMN
    ============================================================ */
-.center-column {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    min-height: 0;
-    overflow: hidden;
-}
 
 /* ============================================================
    10. BOARD SECTION
@@ -747,25 +627,6 @@ h1, h2, h3, h4, h5, h6 {
 /* ============================================================
    11. MATCH CREATION PANEL
    ============================================================ */
-.create-match-panel {
-    background: var(--bg-panel);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid var(--border-gold);
-    border-radius: var(--radius-lg);
-    padding: 12px;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-height: 0;
-}
-
-.create-match-panel .panel-header {
-    padding: 0 0 8px 0;
-    border-bottom: 1px solid var(--border-gold);
-    margin-bottom: 8px;
-}
 
 .create-match-actions-bar {
     display: flex;
@@ -1177,40 +1038,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Break dropdown menu */
-.break-dropdown { vertical-align: middle; }
-
-.break-menu {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    z-index: 100;
-    background: var(--bg-secondary, #1e1e1e);
-    border: 1px solid var(--border-color, #333);
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-    min-width: 160px;
-    padding: 4px 0;
-}
-
-.break-menu.active { display: block; }
-
-.break-menu button {
-    display: block;
-    width: 100%;
-    padding: 8px 14px;
-    border: none;
-    background: none;
-    color: var(--text-primary, #eee);
-    font-family: 'Quantico', sans-serif;
-    font-size: 12px;
-    text-align: left;
-    cursor: pointer;
-}
-
-.break-menu button:hover {
-    background: rgba(247,186,50,0.15);
-}
 
 .btn-small.break {
     background: rgba(247,186,50,0.15);
@@ -3035,18 +2862,9 @@ body.effect-hex-images .hex-label { z-index: 1; }
 /* ============================================================
    19. RESPONSIVE
    ============================================================ */
-@media (max-width: 1400px) {
-    .admin-layout {
-        grid-template-columns: 240px 1fr 300px;
-    }
-}
 
 @media (max-width: 1200px) {
-    .admin-layout {
-        grid-template-columns: 200px 1fr 280px;
-    }
 
-    .stat-badges { gap: 10px; }
     .stat-value { font-size: 18px; }
 }
 
@@ -3056,27 +2874,17 @@ body.effect-hex-images .hex-label { z-index: 1; }
    padding/type scale so nothing overlaps or gets clipped, without going
    all the way to the 900px single-column collapse. */
 @media (max-width: 1194px) and (min-width: 901px) {
-    .admin-layout {
-        grid-template-columns: 170px 1fr 250px;
-        gap: 10px;
-    }
 
-    .teams-column,
     .queue-column,
     .queue-panel {
         padding: 10px;
     }
 
-    .stat-badges { gap: 6px; }
     .stat-value { font-size: 16px; }
     .stat-badge { padding: 6px 8px; }
 }
 
 @media (max-width: 900px) {
-    .admin-layout {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto 1fr auto;
-    }
 
     /* At 375px this wraps to 2 rows and covers ~20 of the Legacy board's
        91 hexes including the entire top row (measured), blocking taps on them. A single
@@ -3088,18 +2896,6 @@ body.effect-hex-images .hex-label { z-index: 1; }
         flex-wrap: nowrap;
         overflow-x: auto;
         max-width: calc(100% - 20px);
-    }
-
-    .teams-column {
-        max-height: 150px;
-    }
-
-    .teams-column .teams-list,
-    .teams-column .teams-grid {
-        flex-direction: row;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        overflow-y: hidden;
     }
 
     .team-card { min-width: 200px; flex-shrink: 0; }
@@ -3185,7 +2981,6 @@ body.effect-hex-images .hex-label { z-index: 1; }
 }
 
 .teams-panel { flex: 1.2; }
-.create-match-panel.old-layout { width: 800px; flex-shrink: 0; }
 
 /* Team color select styling */
 .team-color-select option { padding: 6px 8px; }

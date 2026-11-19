@@ -259,12 +259,6 @@
   white-space: nowrap;
 }
 
-.flow-controls-secondary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
 /* ==================== PHASE INDICATOR BAR (god.html compat) ==================== */
 
 .phase-indicator-bar {
