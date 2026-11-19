@@ -219,6 +219,104 @@ class SmartMatchGenerator {
     }
 
     /**
+     * The team with players on both sides is the split ("hajotettu") team.
+     * Optimizer ids are "<teamId><a|b>", e.g. "3a".
+     */
+    static deriveSplitTeamId(sideAIds, sideBIds) {
+        const teamsA = new Set(sideAIds.map(id => id.charAt(0)));
+        const both = [...new Set(sideBIds.map(id => id.charAt(0)))].filter(t => teamsA.has(t));
+        return both.length === 1 ? parseInt(both[0], 10) : null;
+    }
+
+    /**
+     * Map one side of a queue entry to optimizer ids. Handles both stored
+     * shapes: `players` objects (auto-generated matches) and `playerIds`
+     * (manual and imported matches, resolved via gameState.players).
+     * Players that can't be resolved are skipped, never mapped to a bogus id.
+     */
+    resolveOptimizerIds(matchTeam) {
+        if (!matchTeam) return [];
+        const out = [];
+        const teamOf = (teamId) => this.teams.find(t => String(t.id) === String(teamId));
+        const push = (team, idx) => {
+            if (!team || idx < 0) return;
+            const id = `${team.id}${String.fromCharCode(97 + idx)}`;
+            if (/^\d[a-z]$/.test(id)) out.push(id);
+        };
+
+        if (Array.isArray(matchTeam.players)) {
+            matchTeam.players.forEach(p => {
+                const team = teamOf(p.originalTeamId ?? p.teamId);
+                if (!team) return;
+                const idx = (team.players || []).findIndex(tp =>
+                    (p.id && tp.id === p.id) || (p.name && tp.name === p.name));
+                push(team, idx);
+            });
+        } else if (Array.isArray(matchTeam.playerIds)) {
+            matchTeam.playerIds.forEach(pid => {
+                const reg = this.gameState?.players?.[pid];
+                const team = reg
+                    ? teamOf(reg.teamId)
+                    : this.teams.find(t => (t.players || []).some(tp => tp.id === pid));
+                if (!team) return;
+                push(team, (team.players || []).findIndex(tp => tp.id === pid));
+            });
+        }
+        return out;
+    }
+
+    /**
+     * Rebuild ALL generator state from gameState.gameQueue: pairing matrices
+     * (W/A), split counts, last-split positions and the game-rotation
+     * position. Counts every non-challenge, non-break entry whatever its
+     * status, so manual, edited and deleted matches are always reflected.
+     * A simultaneous pair (3v3+2v2) is one set, i.e. one optimizer match.
+     */
+    rebuildFromQueue() {
+        this.teams = this.gameState?.teams || [];
+        this.optimizer.reset();
+        this.initializeGameRotation();
+        this.gameRotation.currentIndex = 0;
+        this.gameRotation.currentRepeat = 0;
+        this.gameRotation.totalMatchesGenerated = 0;
+
+        const queue = this.gameState?.gameQueue || [];
+        const normal = queue.filter(m => !m.isChallenge && !m.isBreak);
+
+        let i = 0;
+        while (i < normal.length) {
+            const set = [normal[i]];
+            const next = normal[i + 1];
+            if (normal[i].isSimultaneous && next && next.isSimultaneous && next.game === normal[i].game) {
+                set.push(next);
+                i++;
+            }
+            i++;
+
+            this.optimizer.advanceMatch();
+            let splitTeam = null;
+            set.forEach(match => {
+                const sides = match.teams || [];
+                if (sides.length < 2) return;
+                const a = this.resolveOptimizerIds(sides[0]);
+                const b = this.resolveOptimizerIds(sides[1]);
+                if (a.length === 0 || b.length === 0) return;
+                this.optimizer.applyPartition(a, b);
+                if (match.playType && this.optimizer.totalMatches[match.playType] !== undefined) {
+                    this.optimizer.totalMatches[match.playType]++;
+                }
+                const s = match.splitTeamId ?? SmartMatchGenerator.deriveSplitTeamId(a, b);
+                if (s !== null && s !== undefined && splitTeam === null) splitTeam = s;
+            });
+            if (splitTeam !== null && this.optimizer.splitCounts[splitTeam] !== undefined) {
+                this.optimizer.recordSplit(splitTeam);
+            }
+        }
+
+        this.rebuildRotationPosition(queue);
+    }
+
+    /**
      * Extract player IDs from a match team in various formats
      */
     extractPlayerIds(matchTeam) {
