@@ -73,6 +73,15 @@
     <title>Board Game - Infoscreen</title>
 
     <script>
+        // Layout: the "frame" layout is the default; ?layout=classic keeps the
+        // pre-2026-11-19 layout as a fallback (spec:
+        // docs/superpowers/specs/2026-11-19-view-frame-design.md). All frame
+        // CSS is scoped under html[data-layout="frame"], so classic renders
+        // exactly as before.
+        document.documentElement.dataset.layout =
+            new URLSearchParams(location.search).get('layout') === 'classic' ? 'classic' : 'frame';
+    </script>
+    <script>
         // Cinematic mode: blacken the page BEFORE first paint so the navigation
         // from view-onboarding-layout.html is a black-to-black invisible cut.
         (function () {
@@ -1995,6 +2004,285 @@
             font-size: 12px; margin-bottom: 2px;
         }
         .dm-results-large .dm-dual-winner-label svg { width: 13px; height: 13px; }
+
+        /* =============================================================
+           FRAME LAYOUT (default; ?layout=classic opts out)
+           Spec: docs/superpowers/specs/2026-11-19-view-frame-design.md
+           Everything here is scoped under html[data-layout="frame"] so the
+           classic layout above renders exactly as before.
+           Regions: header | message slot (docked broadcast) | stage (left)
+           + rail (right) | score strip. body[data-scene] = board | match |
+           full is set by DisplayManager._applyFrameScene().
+           ============================================================= */
+        .h-frame { display: none; }
+
+        html[data-layout="frame"] body {
+            --fh: 100px;          /* header */
+            --fmsg: 0px;          /* message slot: 64px while a broadcast is docked */
+            --fsc: 128px;         /* score strip: team head + one row of players */
+            --fgap: 16px;
+            --ftop: calc(var(--fh) + var(--fmsg) + var(--fgap));
+            --fbot: calc(var(--fsc) + var(--fgap));
+            --stage-l: 24px;
+            --stage-w: 1176px;
+            --rail-l: 1220px;
+            --rail-board-h: 330px;
+            --score-strip-h: var(--fsc);
+        }
+        html[data-layout="frame"] body.has-broadcast-dock { --fmsg: 64px; }
+
+        /* Header: phase + Now sentence + clock */
+        html[data-layout="frame"] .header { height: var(--fh); padding: 0 32px; gap: 32px; }
+        html[data-layout="frame"] .h-left,
+        html[data-layout="frame"] .h-stats { display: none; }
+        html[data-layout="frame"] .h-frame { display: flex; align-items: center; gap: 36px; flex: 1; min-width: 0; }
+        html[data-layout="frame"] .hf-phase-block { display: flex; flex-direction: column; flex-shrink: 0; }
+        html[data-layout="frame"] .hf-round {
+            font-family: 'Quantico', sans-serif; font-size: 20px; font-weight: 700;
+            color: var(--text-muted); letter-spacing: 3px; text-transform: uppercase;
+        }
+        html[data-layout="frame"] .hf-phase {
+            font-family: 'Russo One', sans-serif; font-size: 30px; color: var(--gold-bright);
+            text-transform: uppercase; letter-spacing: 1px; white-space: nowrap;
+        }
+        html[data-layout="frame"] .hf-now {
+            flex: 1; min-width: 0; padding-left: 32px; border-left: 2px solid var(--border-gold);
+            font-family: 'Quantico', sans-serif; font-size: 42px; font-weight: 700;
+            color: var(--text-bright); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        html[data-layout="frame"] .h-clock { font-size: 34px; }
+
+        /* Classic-only pieces the frame replaces */
+        html[data-layout="frame"] .status-strip,
+        html[data-layout="frame"] .dual-arena,
+        html[data-layout="frame"] .results-panel,
+        html[data-layout="frame"] .territory-map { display: none; }
+        html[data-layout="frame"] #hexPhaseOverlay,
+        html[data-layout="frame"] #phaseBanner,
+        html[data-layout="frame"] #activeConditionsBanner { display: none !important; }
+
+        /* Stage + rail */
+        html[data-layout="frame"] .bottom-zone { display: block; top: 0; }
+        html[data-layout="frame"] .board-area {
+            position: absolute; padding: 0;
+            top: var(--ftop); bottom: var(--fbot);
+            left: var(--stage-l); width: var(--stage-w);
+        }
+        html[data-layout="frame"] .board-area::before { display: none; }
+        html[data-layout="frame"] .queue-panel {
+            position: absolute; top: var(--ftop); bottom: var(--fbot);
+            left: var(--rail-l); right: 24px;
+            display: flex; flex-direction: column; gap: 12px;
+            padding: 0; background: none; border: 0;
+        }
+        html[data-layout="frame"] .queue-panel::after { display: none; }
+        html[data-layout="frame"] .queue-panel .panel-title {
+            font-size: 20px; letter-spacing: 4px; margin: 0; padding: 0 0 6px;
+            color: var(--text-muted);
+        }
+        html[data-layout="frame"] .queue-panel .panel-list {
+            gap: 0; overflow: hidden;
+            /* a row that doesn't fit fades out instead of being sliced */
+            -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 60px), transparent);
+            mask-image: linear-gradient(to bottom, #000 calc(100% - 60px), transparent);
+        }
+
+        /* Match scene: slide content takes the stage, board shrinks into the rail */
+        html[data-layout="frame"] body[data-scene="match"] .board-area {
+            left: var(--rail-l); width: auto; right: 24px;
+            bottom: auto; height: var(--rail-board-h);
+        }
+        html[data-layout="frame"] body[data-scene="match"] .queue-panel {
+            top: calc(var(--ftop) + var(--rail-board-h) + var(--fgap));
+        }
+        html[data-layout="frame"] .display-primary {
+            top: var(--ftop); bottom: var(--fbot);
+            left: var(--stage-l); right: auto; width: var(--stage-w);
+            padding: 0; background: transparent; overflow: hidden;
+        }
+        html[data-layout="frame"] .display-primary.active { padding-top: 0; justify-content: safe center; }
+        /* Full scene: spell window / break / winner cover everything but the
+           message slot and score strip (as today's takeovers do). */
+        html[data-layout="frame"] body[data-scene="full"] .display-primary {
+            top: var(--fmsg); bottom: var(--fsc); left: 0; right: 0; width: auto;
+            background: var(--bg-void); padding: 30px;
+        }
+        html[data-layout="frame"] body[data-scene="full"] .display-primary.active { padding-top: 60px; justify-content: flex-start; }
+
+        /* Slides re-fitted for the 1176px stage */
+        /* Scoped to .dm-matches-dual: the results slide reuses the dm-dual-*
+           classes with its own compact sizing, which must stay untouched. */
+        html[data-layout="frame"] .dm-matches-dual { gap: 20px; height: 100%; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-slot-panel { padding: 24px; overflow: hidden; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-slot-header { margin-bottom: 12px; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-slot-title { font-size: 36px; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-game-name { font-size: 30px; margin-bottom: 12px; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-ready-sides { gap: 10px; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-ready-side { gap: 8px; min-width: 0; width: 100%; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-ready-row { padding: 8px 14px; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-vs { font-size: 28px; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-live-match { padding: 8px 0; }
+        /* A slot holding two matches (split pair, e.g. 3v3 + 2v2): compact both so
+           they fit one card -- up to 10 rows plus two game titles. */
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-slot-panel:has(.dm-dual-live-match + .dm-dual-live-match) .dm-dual-live-match { padding: 2px 0; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-slot-panel:has(.dm-dual-live-match + .dm-dual-live-match) .dm-dual-game-name { font-size: 24px; margin-bottom: 4px; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-slot-panel:has(.dm-dual-live-match + .dm-dual-live-match) .dm-dual-ready-side { gap: 3px; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-slot-panel:has(.dm-dual-live-match + .dm-dual-live-match) .dm-dual-ready-row { padding: 1px 12px; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-slot-panel:has(.dm-dual-live-match + .dm-dual-live-match) .dm-dual-ready-name { font-size: 26px; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-slot-panel:has(.dm-dual-live-match + .dm-dual-live-match) .dm-dual-ready-indicator svg { width: 20px; height: 20px; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-slot-panel:has(.dm-dual-live-match + .dm-dual-live-match) .dm-dual-vs { font-size: 20px; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-slot-panel:has(.dm-dual-live-match + .dm-dual-live-match) .dm-dual-ready-sides { gap: 4px; }
+        /* Big rosters (4-5 a side, e.g. a 5v5): tighter rows so all ten names fit */
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-ready-side:has(> .dm-dual-ready-row:nth-child(4)) { gap: 4px; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-ready-side:has(> .dm-dual-ready-row:nth-child(4)) .dm-dual-ready-row { padding: 3px 14px; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-ready-side:has(> .dm-dual-ready-row:nth-child(4)) .dm-dual-ready-name { font-size: 32px; }
+        html[data-layout="frame"] .dm-matches-dual .dm-dual-ready-side:has(> .dm-dual-ready-row:nth-child(4)) .dm-dual-ready-indicator svg { width: 24px; height: 24px; }
+        html[data-layout="frame"] .dm-matches-dual--focus .dm-dual-slot-panel--focus { padding: 28px; }
+        html[data-layout="frame"] .dm-matches-dual--focus .dm-dual-slot-panel--focus .dm-dual-ready-name { font-size: 46px; }
+        html[data-layout="frame"] .dm-matches-dual--focus .dm-dual-slot-panel--minor { flex: 0 0 340px; max-width: 340px; }
+        html[data-layout="frame"] .dm-live-matches-wrapper { max-width: 100%; gap: 24px; }
+        /* Challenge / live card: a 5v5 must fit the stage height */
+        html[data-layout="frame"] .dm-live-match-large { max-width: 100%; }
+        html[data-layout="frame"] .dm-live-match-large .dm-game-header { margin-bottom: 8px; }
+        html[data-layout="frame"] .dm-live-match-large .dm-game-name { font-size: 34px; }
+        html[data-layout="frame"] .dm-live-match-large .dm-sides { gap: 20px; }
+        html[data-layout="frame"] .dm-live-match-large .dm-side { gap: 8px; }
+        html[data-layout="frame"] .dm-live-match-large .dm-side-team-names { margin-bottom: 4px; }
+        html[data-layout="frame"] .dm-live-match-large .dm-side-team-name { font-size: 24px; padding: 4px 16px; }
+        html[data-layout="frame"] .dm-live-match-large .dm-player-name { font-size: 36px; padding: 6px 18px; }
+        html[data-layout="frame"] .dm-live-match-large--challenge .dm-side-players { gap: 8px; }
+        html[data-layout="frame"] .dm-live-match-large--challenge .dm-side-team-group { gap: 8px; padding: 4px; }
+        html[data-layout="frame"] .dm-live-match-large--challenge .dm-player-name { font-size: 30px; }
+        html[data-layout="frame"] .dm-results-large { max-width: 100%; }
+        html[data-layout="frame"] .dm-results-large .dm-result-game { font-size: 24px; }
+        html[data-layout="frame"] .dm-results-large .dm-dual-ready-name { font-size: 22px; }
+        html[data-layout="frame"] .dm-results-large .dm-dual-ready-row { padding: 4px 12px; }
+        html[data-layout="frame"] .dm-results-large .dm-dual-ready-side { min-width: 220px; }
+        html[data-layout="frame"] .dm-results-large .dm-dual-vs { font-size: 22px; }
+        html[data-layout="frame"] .dm-results-large .dm-dual-winner-label { font-size: 15px; }
+
+        /* Rail: side box (phase info + active effects) */
+        html[data-layout="frame"] .frame-side {
+            flex-shrink: 0; padding: 16px 20px; border-radius: 12px;
+            background: var(--bg-glass); border: 1px solid var(--border-gold);
+        }
+        html[data-layout="frame"] .frame-side .dm-hex-score-title {
+            justify-content: flex-start; font-size: 22px; margin-bottom: 10px;
+        }
+        html[data-layout="frame"] .frame-side .dm-hex-score-rows { flex-direction: column; flex-wrap: nowrap; gap: 8px; }
+        html[data-layout="frame"] .frame-side .dm-hex-score-row,
+        html[data-layout="frame"] .frame-side .dm-hex-placement-row { min-width: 0; border-left-width: 6px; }
+        html[data-layout="frame"] .frame-side .dm-hex-placement-team,
+        html[data-layout="frame"] .frame-side .dm-hex-score-team { font-size: 28px; }
+        html[data-layout="frame"] .frame-side .dm-hex-placement-match,
+        html[data-layout="frame"] .frame-side .dm-hex-score-breakdown { font-size: 18px; }
+        html[data-layout="frame"] .frame-side .dm-hex-placement-badge { font-size: 15px; }
+        html[data-layout="frame"] .frame-side .dm-hex-score-pts { font-size: 28px; }
+        html[data-layout="frame"] .frame-side .dm-hex-score-empty { font-size: 20px; text-align: left; }
+        html[data-layout="frame"] .fs-phase + .fs-title { margin-top: 14px; }
+        html[data-layout="frame"] .fs-title {
+            display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+            font-family: 'Russo One', sans-serif; font-size: 20px; color: #b58cff;
+            text-transform: uppercase; letter-spacing: 2px;
+        }
+        html[data-layout="frame"] .fs-title svg { width: 22px; height: 22px; }
+        html[data-layout="frame"] .fs-effect {
+            font-size: 22px; font-weight: 600; color: var(--text-bright);
+            padding: 6px 12px; margin-top: 6px; border-left: 5px solid var(--c, #a855f7);
+            background: rgba(168,85,247,0.07); border-radius: 4px;
+        }
+        html[data-layout="frame"] .fs-dim { color: var(--text-muted); font-size: 17px; }
+
+        /* Rail: Up next */
+        html[data-layout="frame"] .un-row { padding: 12px 14px; border-top: 1px solid var(--border-faint); }
+        html[data-layout="frame"] .un-row:first-child { border-top: 0; }
+        html[data-layout="frame"] .un-next {
+            background: rgba(247,186,50,0.08); border: 1px solid rgba(247,186,50,0.3); border-radius: 10px;
+        }
+        html[data-layout="frame"] .un-challenge { border-left: 4px solid var(--danger); }
+        html[data-layout="frame"] .un-top { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+        html[data-layout="frame"] .un-num { font-size: 20px; font-weight: 700; color: var(--text-muted); }
+        html[data-layout="frame"] .un-game {
+            font-size: 28px; font-weight: 800; color: var(--text-bright);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+        }
+        html[data-layout="frame"] .un-game svg { width: 22px; height: 22px; vertical-align: -2px; }
+        html[data-layout="frame"] .un-meta { font-size: 18px; color: var(--text-muted); white-space: nowrap; }
+        html[data-layout="frame"] .un-badge {
+            margin-left: auto; font-size: 15px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase;
+            background: #f7ba32; color: #1a1300; padding: 3px 10px; border-radius: 20px;
+        }
+        html[data-layout="frame"] .un-sides { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+        html[data-layout="frame"] .un-side { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; }
+        html[data-layout="frame"] .un-pl { font-size: 24px; font-weight: 700; }
+        html[data-layout="frame"] .un-vs { font-size: 18px; font-weight: 700; color: var(--text-muted); padding: 0 4px; }
+        html[data-layout="frame"] .un-divider {
+            display: flex; align-items: center; justify-content: center; gap: 10px; margin: 10px 0;
+            padding: 8px; border: 2px dashed rgba(181,140,255,0.5); border-radius: 8px;
+            font-family: 'Russo One', sans-serif; font-size: 20px; letter-spacing: 3px;
+            color: #b58cff; text-transform: uppercase;
+        }
+        html[data-layout="frame"] .un-divider svg { width: 20px; height: 20px; }
+        html[data-layout="frame"] .un-break,
+        html[data-layout="frame"] .un-more,
+        html[data-layout="frame"] .un-empty {
+            padding: 12px 14px; font-size: 22px; color: var(--text-muted);
+            border-top: 1px solid var(--border-faint);
+        }
+        html[data-layout="frame"] .un-break { color: var(--gold-bright); }
+        html[data-layout="frame"] .un-break svg { width: 22px; height: 22px; vertical-align: -3px; }
+
+        /* Score strip: big totals + player status icons */
+        html[data-layout="frame"] .score-strip { gap: 3px; }
+        html[data-layout="frame"] .fsc {
+            flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px;
+            padding: 6px 18px; position: relative;
+            background: linear-gradient(180deg, color-mix(in srgb, var(--c) 32%, var(--bg-deep)), color-mix(in srgb, var(--c) 16%, var(--bg-deep)));
+            border-top: 6px solid var(--c);
+        }
+        html[data-layout="frame"] .fsc-lead { box-shadow: inset 0 0 0 3px var(--gold-bright); }
+        html[data-layout="frame"] .fsc-left { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+        html[data-layout="frame"] .fsc-name {
+            font-family: 'Russo One', sans-serif; font-size: 30px; color: var(--text-bright);
+            text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        html[data-layout="frame"] .fsc-split { font-size: 17px; color: rgba(255,255,255,0.65); }
+        html[data-layout="frame"] .fsc-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        /* Players on one row (teams have at most 2): status icon, name, ★ match wins.
+           A bigger roster still stays on the row, each name just gets narrower. */
+        html[data-layout="frame"] .fsc-players {
+            display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 1px 14px;
+            padding-top: 5px; border-top: 1px solid rgba(255,255,255,0.12);
+        }
+        html[data-layout="frame"] .fsc-player {
+            display: flex; align-items: center; gap: 5px; min-width: 0;
+            font-size: 18px; font-weight: 700; color: var(--text-bright); line-height: 22px;
+        }
+        html[data-layout="frame"] .fsc-pname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+        html[data-layout="frame"] .fsc-pwins { margin-left: auto; padding-left: 4px; color: #f7d27a; flex-shrink: 0; }
+        html[data-layout="frame"] .fsc-status { display: inline-flex; flex-shrink: 0; }
+        html[data-layout="frame"] .fsc-status svg { width: 18px; height: 18px; }
+        html[data-layout="frame"] .fsc-total {
+            font-family: 'Russo One', sans-serif; font-size: 60px; line-height: 1; color: #fff;
+            text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+        }
+
+        /* Broadcast: arrive band between header and score strip, then docked */
+        html[data-layout="frame"] #broadcastTicker { top: var(--fh); bottom: var(--fsc); height: auto; }
+        html[data-layout="frame"] #broadcastTicker.bt-long { font-size: 48px; }
+        html[data-layout="frame"] #broadcastTicker.bt-xlong { font-size: 36px; }
+        html[data-layout="frame"] #broadcastTicker.bt-docked {
+            bottom: auto; height: 64px; padding: 0 40px;
+            justify-content: flex-start; text-align: left;
+            font-size: 32px; text-shadow: none; overflow: hidden;
+            background: rgba(4,14,24,0.97); border-top: 0; border-bottom: 3px solid #00d4ff;
+        }
+        html[data-layout="frame"] #broadcastTicker.bt-docked .bt-text {
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+        }
+        html[data-layout="frame"] body[data-scene="full"] #broadcastTicker.bt-docked { top: 0; background: #040e18; }
+        /* The full scene covers the header, so don't let it show through the slot */
+        html[data-layout="frame"] body[data-scene="full"].has-broadcast-dock .header { visibility: hidden; }
     </style>
     <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -2030,6 +2318,14 @@
             <div class="h-stat"><span class="h-stat-lbl">Games</span><span class="h-stat-val" id="hGames">0</span></div>
             <div class="h-sep"></div>
             <div class="h-stat"><span class="h-stat-lbl">Queue</span><span class="h-stat-val" id="hQueue">0</span></div>
+        </div>
+        <!-- Frame layout only (hidden in classic): phase + "who acts now" -->
+        <div class="h-frame">
+            <div class="hf-phase-block">
+                <span class="hf-round" id="hfRound"></span>
+                <span class="hf-phase" id="hfPhase"></span>
+            </div>
+            <div class="hf-now" id="hfNow"></div>
         </div>
         <div class="h-right">
             <div class="h-dot"></div>
@@ -2124,6 +2420,8 @@
         <!-- UPCOMING QUEUE — Right panel -->
         <!-- Rendered by DisplayManager.onFirebaseSnapshot() -->
         <div class="side-panel queue-panel">
+            <!-- Frame layout only: phase info + active effects (DisplayManager._renderFrameSide) -->
+            <div class="frame-side" id="frameSide" style="display:none;"></div>
             <div class="panel-title">Upcoming</div>
             <div class="panel-list" id="queueList">
             </div>
@@ -2539,9 +2837,20 @@
         onboardingListener = window.firebaseOnSnapshot(onboardingRef, (docSnapshot) => {
             onboardingState = docSnapshot.exists ? docSnapshot.data() : null;
             renderStatusStrip();
+            // Frame layout shows statuses in the score strip instead.
+            if (displayManager && gameState) displayManager._renderScoreStrip(gameState);
         }, (error) => {
             console.error('Onboarding listener error:', error);
         });
+    }
+
+    /** Active status icon(s) for one player, '' when none. */
+    function getPlayerStatusIcon(playerId) {
+        const statuses = onboardingState?.players?.[playerId]?.statuses || {};
+        return Object.entries(STATUS_EMOJIS)
+            .filter(([key]) => statuses[key])
+            .map(([, icon]) => icon)
+            .join('');
     }
 
     function renderStatusStrip() {
@@ -2598,7 +2907,9 @@
             // Provide diff state
             prevArenaSignatures: prevArenaSignatures,
             prevQueueSignature: { value: null },
-            prevResultIds: { value: [] }
+            prevResultIds: { value: [] },
+            // Frame layout: status icon (no text) shown in the score strip
+            getPlayerStatusIcon: getPlayerStatusIcon
         });
         displayManager.setTournamentId(tournamentId);
     }
@@ -2620,6 +2931,15 @@
     window.__devPreviewSnapshot = function (mockData) {
         if (!displayManager) initDisplayManager();
         window.__devLastPreviewData = mockData;
+        // renderBoard() reads the page's gameState (board version, hex
+        // owners), so mirror the mock into it -- lets the harness preview a
+        // Version 2 board. Dev-only path; real snapshots set gameState in
+        // setupTournamentListener().
+        // Mocks written before this used `rooms: {}`; real docs hold an array.
+        gameState = Object.assign({}, mockData, {
+            rooms: Array.isArray(mockData && mockData.rooms) ? mockData.rooms : []
+        });
+        displayManager._prevBoardSignature = null;
         displayManager.onFirebaseSnapshot(mockData);
     };
 
@@ -2631,6 +2951,13 @@
     // has something to read via getResultLogCache().
     window.__devSetResultLog = function (events) {
         resultLogCache = events || [];
+    };
+
+    // Dev-only hook for dev/view-preview.html: fake the onboarding doc so the
+    // player-status icons (status strip / frame score strip) can be previewed.
+    window.__devSetOnboarding = function (state) {
+        onboardingState = state || null;
+        renderStatusStrip();
     };
 
     // Dev-only hook for dev/view-preview.html and
