@@ -37,6 +37,7 @@
     let _primaryAction = null;
     let _broadcastOpen = false;
     let _spellLogOpen = false;
+    let _spellLogAutoOpenedFor = null; // spell window the log was auto-opened for
     let _spellLogTeamId = null;
     let _flowConfirmAction = null;
 
@@ -276,12 +277,11 @@
 
         // Spell phase hooks — mirrors god-app.js:204-208 exactly. Now that
         // SpellEngine is actually constructed above, admin.html can drive
-        // the same digital spell-casting flow god.html always could: an
-        // admin clicks "Begin Spells" during a spell window to open
-        // turn-based casting on team.html (only matters when the
-        // tournament's spellsActive flag is on — otherwise spells stay
-        // physical and this hook is simply never triggered by a click,
-        // since the button only renders during a spell window).
+        // the same digital spell-casting flow god.html always could: with
+        // the tournament's spellsActive flag on, phase-manager.js calls this
+        // hook on entering a spell window to start turn-based casting on
+        // team.html (⋯ More → Start spell turns restarts it). With spells
+        // off they stay physical and the hook never runs.
         if (typeof SpellEngine !== 'undefined') {
             _phaseManager._onSpellPhaseEntered = () => _spellEngine?.beginSpellPhase();
         }
@@ -303,7 +303,7 @@
             _phaseManager._onRoundStartSpells = () => {
                 // expireConditions() used to be a god.html-only concern
                 // (admin.html could never have active digital spell effects
-                // without a working Begin Spells button) — now that the
+                // before the spell-start hook was wired) — now that the
                 // hook above lets admin.html start real spell phases too,
                 // timed effects (temporary_capture, forced_removal_condition,
                 // etc.) need the same round-boundary expiry god.html gets,
@@ -1492,8 +1492,8 @@
                 }
                 return {
                     text: (gs.spellsActive === true
-                        ? 'Spell window — click Begin Spells to open digital casting on team.html, or give teams time to cast at the table, then continue.'
-                        : 'Spell window — give teams time to cast at the table, then continue.') + extra,
+                        ? 'Spell window — digital spell turns are done (or no team holds a spell). Continue when ready.'
+                        : 'Spell window — teams cast at the table. Log each used spell in the Spell Log, then continue.') + extra,
                     primary: { label: 'Continue ▶', action: advance },
                     primaryIsAdvance: true
                 };
@@ -1769,7 +1769,7 @@
             lobbyControls.innerHTML = '';
         }
 
-        // Spell window controls (Begin Spells + Loop)
+        // Spell window controls (Loop, Spell Log toggle)
         _renderSpellWindowControls(phase);
 
         // Spell phase turn indicator + Skip Turn / End Spell Phase —
@@ -1818,17 +1818,19 @@
         container.style.display = '';
         let html = '';
 
-        // "Begin Spells" — mirrors phase-manager.js's own built-in
-        // renderPhaseIndicator() button (same markup, same onclick). Used
-        // to be omitted here because the _onSpellPhaseEntered hook was
-        // never wired on admin.html, making the button a silent no-op.
-        // Now that SpellEngine is constructed above and the hook is wired
-        // to it, this works the same as god.html: only relevant when the
-        // tournament's spellsActive flag is on — otherwise nobody clicks
-        // it and spells stay physical, per _computeNextStep's spell_window
-        // Continue guidance.
-        if (!gameState.spellPhase?.isActive) {
-            html += `<button class="btn-small primary" onclick="beginSpells()" title="Start spell casting phase">${ICON_SVGS.sparkles} Begin Spells</button>`;
+        // Digital spells start their turns automatically on entering the
+        // window (phase-manager.js). "Start spell turns" stays in ⋯ More as
+        // a recovery tool only (e.g. after Set Phase landed in a window).
+        const startItem = document.getElementById('beginSpellsMenuItem');
+        if (startItem) startItem.hidden = !(gameState.spellsActive === true && !gameState.spellPhase?.isActive);
+
+        // Physical spells: the admin logs every used spell, so the Spell Log
+        // opens by itself once per spell window (closing it is respected
+        // until the next window).
+        const windowKey = `${gameState.currentPhase?.roundNumber}:${phase}:${gameState.currentPhase?.startedAt}`;
+        if (gameState.spellsActive !== true && _spellLogAutoOpenedFor !== windowKey) {
+            _spellLogAutoOpenedFor = windowKey;
+            _spellLogOpen = true;
         }
 
         const loopInfo = _phaseManager.getLoopInfo();

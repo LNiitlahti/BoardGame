@@ -28,7 +28,8 @@
  * Spell windows:
  *   Optional phases where admin can begin spell casting or skip.
  *   If spellPhase.isActive, requirements track turn completion.
- *   Admin calls beginSpells() to start, or just advances to skip.
+ *   With digital spells (spellsActive) the turns start automatically on
+ *   entering the window; beginSpells() remains as a manual restart.
  */
 
 // ── Phase constants ──────────────────────────────────────────────
@@ -618,6 +619,15 @@ class PhaseManager {
         // Round start hooks (expire conditions, auto-backup)
         if (nextPhase === 'scoring_vp' && newRound > 0) {
             if (this._onRoundStartSpells) this._onRoundStartSpells();
+        }
+
+        // Digital spells (tournament Spells: On): the spell turns start on
+        // their own when a spell window opens — no "Begin Spells" click.
+        // Runs only on the client that advanced the phase, so two open
+        // admin tabs can't both (re)start the turn order. Physical spells
+        // (Off): nothing to start; the admin logs used spells in the Spell Log.
+        if (this.isSpellWindow(nextPhase) && gs.spellsActive === true && this._onSpellPhaseEntered) {
+            this._onSpellPhaseEntered();
         }
 
         // Keep top-level status in sync
