@@ -547,6 +547,10 @@ async function runMatchSlot(page, slot, round, { screenshots = true } = {}) {
     const btnSel = `button[onclick="runSlotPrimaryAction(${slot})"]`;
     const btn = await page.$(btnSel);
     if (!btn) {
+      // While games are live the card has no primary button — e.g. both
+      // halves of a 3v3+2v2 pair started together with "Start both".
+      // Record a live game's result, as the admin would from the card.
+      if (sub === 'playing' && await confirmAnyOngoingMatch(page, round, slot)) continue;
       await sleep(900);
       continue;
     }
@@ -556,6 +560,7 @@ async function runMatchSlot(page, slot, round, { screenshots = true } = {}) {
     // 'playing' with everything confirmed still needs the result recorded
     // first; the slot card only offers "Mark Done" once nothing is ongoing.
     if (sub === 'playing' && /start/i.test(label) === false && /done/i.test(label) === false) {
+      if (await confirmAnyOngoingMatch(page, round, slot)) continue;
       await sleep(900);
       continue;
     }

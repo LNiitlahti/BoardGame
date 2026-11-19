@@ -152,6 +152,8 @@
             pair.querySelectorAll('.auto-match-actions').forEach(n => n.remove());
             pair.hidden = false;
             el('matchDialogBuilder').hidden = true;
+            const fmt = el('autoFormat');
+            if (fmt) { fmt.textContent = result.format || ''; fmt.style.color = ''; }
             pairMode = true;
             suggestion = null;
             renderTab();
