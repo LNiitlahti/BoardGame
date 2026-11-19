@@ -77,7 +77,12 @@
     </div>
     <div class="frame-wrap">
         <div class="status" id="status">loading iframe…</div>
-        <iframe id="previewFrame" src="../full/view.html?tournamentId=__dev_preview__"></iframe>
+        <iframe id="previewFrame"></iframe>
+        <script>
+            // ?layout=classic on this harness previews view.html's fallback layout.
+            document.getElementById('previewFrame').src = '../full/view.html?tournamentId=__dev_preview__' +
+                (new URLSearchParams(location.search).get('layout') === 'classic' ? '&layout=classic' : '');
+        </script>
     </div>
 </div>
 
@@ -93,7 +98,7 @@ const TEAM_NAMES = ['Tiimi 1', 'Tiimi 2', 'Tiimi 3', 'Tiimi 4', 'Tiimi 5'];
 const MOUNTAIN_HEART = 'q0r0';
 const SIDE_HEARTS = ['q-4r2', 'q-2r-2', 'q2r-4', 'q4r-2', 'q2r2', 'q-2r4'];
 
-function makePlayerRegistry() {
+function makePlayerRegistry(rosterSizes) {
     // uid set only on the first two players of Team 1 (mirrors this
     // tournament's real "Inffi (GOD)"/"E2ePlayer6" linked-account setup) --
     // everyone else is an unlinked placeholder (uid: null), same as most
@@ -104,7 +109,9 @@ function makePlayerRegistry() {
     // scenario can do a real 5v5 (a challenge is whole-team vs whole-team,
     // not a 2v2 sample of it), while 3/4/5 stay smaller/uneven to keep
     // testing asymmetric-roster edge cases elsewhere.
-    const ROSTER_SIZES = [5, 5, 4, 3, 2];
+    // Real teams have at most 2 players; the realistic scenarios pass
+    // [2,2,2,2,2]. The default keeps the old uneven rosters for edge cases.
+    const ROSTER_SIZES = rosterSizes || [5, 5, 4, 3, 2];
     TEAM_NAMES.forEach((_, teamIdx) => {
         const teamId = teamIdx + 1;
         const count = ROSTER_SIZES[teamIdx];
@@ -180,6 +187,9 @@ function baseData(overrides = {}) {
     const teams = makeTeams(players);
     return Object.assign({
         name: 'scratch-tournament1 (PREVIEW)',
+        // Version 2 (169 hexes) is the board events use; the "Legacy board"
+        // scenario overrides this with boardVersion: 1.
+        boardVersion: 2,
         players,
         teams,
         gameQueue: [],
@@ -190,6 +200,48 @@ function baseData(overrides = {}) {
         gameHistory: [],
         gamesPlayed: 8
     }, overrides);
+}
+
+const REAL_ROSTERS = [2, 2, 2, 2, 2];
+
+// Pending matches for the rest of round 4 (slot 1 + slot 2) and the first
+// of round 5 -- the frame layout's Up next shows a spell-window divider
+// before the round 5 match.
+function upcoming(p, firstNumber, round = 4) {
+    return [
+        makeMatch(p, { teamsSides: [2, 1], slot: 1, roundNumber: round, matchNumber: firstNumber, game: 'aoe4' }),
+        makeMatch(p, { teamsSides: [[3, 5], [4, 5]], playType: '3v3', slot: 2, roundNumber: round, matchNumber: firstNumber + 1, game: 'cs2' }),
+        makeMatch(p, { teamsSides: [5, 3], slot: 1, roundNumber: round + 1, matchNumber: firstNumber + 2, game: 'aoe4' }),
+        makeMatch(p, { teamsSides: [[1, 2], [4, 3]], playType: '3v3', slot: 2, roundNumber: round + 1, matchNumber: firstNumber + 3, game: 'cs2' }),
+        makeMatch(p, { teamsSides: [2, 5], slot: 1, roundNumber: round + 2, matchNumber: firstNumber + 4, game: 'aoe4' }),
+    ];
+}
+
+// A mid-tournament state: real scores, owned hexes, an active spell effect,
+// a full upcoming queue and three players with an onboarding status.
+function realistic(overrides, players) {
+    const p = players || makePlayerRegistry(REAL_ROSTERS);
+    const teams = makeTeams(p).map((t, i) => Object.assign(t, {
+        points: [14, 11, 9, 9, 6][i], gamesWon: [6, 5, 4, 5, 3][i]
+    }));
+    const ids = Object.keys(p);
+    window.__mockOnboarding = { players: {
+        [ids[2]]: { statuses: { eating: true } },
+        [ids[6]]: { statuses: { smoking: true } },
+        [ids[7]]: { statuses: { sleeping: true } }
+    } };
+    // Per-player match wins for the score strip's ★ counts.
+    const gameHistory = [
+        { winningPlayerIds: [ids[0], ids[1]] }, { winningPlayerIds: [ids[0], ids[2]] },
+        { winningPlayerIds: [ids[3], ids[4]] }, { winningPlayerIds: [ids[5], ids[6], ids[8]] },
+        { winningPlayerIds: [ids[7], ids[9]] }, { winningPlayerIds: [ids[0], ids[6]] }
+    ];
+    return baseData(Object.assign({
+        players: p, teams, gameHistory,
+        board: { 'q0r0': 1, 'q-4r2': 1, 'q-2r-2': 2, 'q2r-4': 2, 'q4r-2': 3, 'q2r2': 4, 'q1r1': 4, 'q-1r0': 5 },
+        gameQueue: upcoming(p, 12),
+        activeEffects: [{ spellName: 'Kilpi', displayText: 'Kilpi: Tiimi 3 hearts cannot be challenged', castByTeamId: 3, expiresAfterRound: 5 }]
+    }, overrides));
 }
 
 // ============================================================
@@ -371,6 +423,48 @@ const SCENARIOS = [
         teams: makeTeams(makePlayerRegistry()).map((t, i) => Object.assign(t, { points: [50, 38, 30, 22, 14][i] }))
     }) },
 ]},
+{ group: 'Realistic (queue, statuses, effects)', items: [
+    { label: 'Hex placement + queue + statuses + effect', build: () => realistic({
+        currentPhase: { name: 'hex_placement_1', roundNumber: 4 },
+        pendingHexWins: [
+            { matchNumber: 6, teamNames: ['Tiimi 2'], teamIds: [2], slot: 1 },
+            { matchNumber: 7, teamNames: ['Tiimi 4'], teamIds: [4], slot: 1 },
+        ]
+    }) },
+    { label: 'Legacy board (91 hexes), challenges', build: () => realistic({
+        boardVersion: 1,
+        currentPhase: { name: 'challenges', roundNumber: 4 }
+    }) },
+    { label: 'Lobby 5v5 + 2v2 with queue', build: () => {
+        const p = makePlayerRegistry(REAL_ROSTERS);
+        const uid1 = Object.values(p).find(pl => pl.teamId === 1 && pl.uid)?.uid;
+        return realistic({
+            currentPhase: { name: 'matches_in_progress', roundNumber: 4, slots: { 1: 'lobby', 2: 'playing' } },
+            gameQueue: [
+                makeMatch(p, { teamsSides: [[1, 2, 5], [3, 4, 5]], playType: '5v5', slot: 1, roundNumber: 4, status: 'pending', matchNumber: 20 }),
+                makeMatch(p, { teamsSides: [5, 2], playType: '2v2', slot: 2, roundNumber: 4, status: 'ongoing', matchNumber: 21, game: 'cs2' }),
+                ...upcoming(p, 22, 5)
+            ],
+            lobbyReady: uid1 ? { [uid1]: { discord: true, gameLobby: true } } : {}
+        }, p);
+    }},
+    { label: 'Spell window + queue (full-screen)', build: () => realistic({
+        currentPhase: { name: 'spell_window_4', roundNumber: 4, startedAt: '2026-08-06T12:00:00.000Z' },
+        spellWindowLog: [{ id: 'sl_1', teamId: 3, teamName: 'Tiimi 3', spellName: 'Kilpi', addedAt: '2026-08-06T12:01:00.000Z' }]
+    }) },
+    { label: 'Broadcast arriving (just sent)', build: () => realistic({
+        currentPhase: { name: 'hex_placement_2', roundNumber: 4 },
+        broadcastMessage: { text: 'Pizza is here! Break after this match', sentAt: new Date().toISOString() }
+    }) },
+    { label: 'Broadcast docked (sent a minute ago)', build: () => realistic({
+        currentPhase: { name: 'hex_placement_2', roundNumber: 4 },
+        broadcastMessage: { text: 'Pizza is here! Break after this match', sentAt: new Date(Date.now() - 60000).toISOString() }
+    }) },
+    { label: 'Broadcast docked on spell window', build: () => realistic({
+        currentPhase: { name: 'spell_window_1', roundNumber: 4, startedAt: '2026-08-06T12:00:00.000Z' },
+        broadcastMessage: { text: 'Remember: one spell per team this window', sentAt: new Date(Date.now() - 60000).toISOString() }
+    }) },
+]},
 { group: 'Reset', items: [
     { label: 'Clear (idle / no phase)', build: () => baseData({ currentPhase: { name: null, roundNumber: 4 } }) },
 ]},
@@ -408,13 +502,16 @@ function send(data) {
     if (typeof frame.contentWindow.__devSetResultLog === 'function') {
         frame.contentWindow.__devSetResultLog(window.__mockResultLog || []);
     }
+    if (typeof frame.contentWindow.__devSetOnboarding === 'function') {
+        frame.contentWindow.__devSetOnboarding(window.__mockOnboarding || null);
+    }
     frame.contentWindow.__devPreviewSnapshot(data);
 }
 
 function setBroadcast() {
     const text = document.getElementById('broadcastText').value.trim();
     if (!text || !currentData) return;
-    send(Object.assign({}, currentData, { broadcastMessage: { text } }));
+    send(Object.assign({}, currentData, { broadcastMessage: { text, sentAt: new Date().toISOString() } }));
 }
 function clearBroadcast() {
     if (!currentData) return;
@@ -449,6 +546,7 @@ SCENARIOS.forEach(group => {
             // set this, so a leftover value from a previous pick must not
             // leak into an unrelated scenario.
             window.__mockResultLog = [];
+            window.__mockOnboarding = null;
             send(item.build());
         };
         g.appendChild(btn);

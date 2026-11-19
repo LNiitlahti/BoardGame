@@ -90,6 +90,45 @@ const DISPLAY_MODES = {
     }
 };
 
+// Frame layout (view.html default; ?layout=classic keeps the old one).
+// Which region layout each display mode uses -- see
+// docs/superpowers/specs/2026-11-19-view-frame-design.md §3.
+//   board: board fills the stage, side box + Up next in the rail
+//   match: #displayPrimary fills the stage, small board + Up next in the rail
+//   full:  #displayPrimary covers everything but the score strip
+const FRAME_SCENE_BY_SLIDE = {
+    board_focus: 'board',
+    matches_dual_slot: 'match',
+    live_matches_large: 'match',
+    results_large: 'match',
+    standings_large: 'match',
+    spell_window: 'full',
+    break_screen: 'full',
+    winner_celebration: 'full'
+};
+
+const FRAME_PHASE_TITLES = {
+    pre_game_setup: 'Pre-game setup',
+    scoring_vp: 'Scoring · Victory points',
+    scoring_hex: 'Scoring · Hearts',
+    hex_placement_1: 'Hex placement · Match 1',
+    hex_placement_2: 'Hex placement · Match 2',
+    spell_window_1: 'Spell window 1',
+    spell_window_2: 'Spell window 2',
+    spell_window_3: 'Spell window 3',
+    spell_window_4: 'Spell window 4',
+    challenges: 'Challenges',
+    challenge_game: 'Challenge game',
+    board_resolved: 'Board resolved',
+    matches_in_progress: 'Matches',
+    round_advance: 'Round advance',
+    break: 'Break',
+    tournament_end: 'Tournament end'
+};
+
+const BROADCAST_ARRIVE_MS = 10000;
+const UP_NEXT_MAX_MATCHES = 4;
+
 class DisplayManager {
 
     /**
@@ -114,7 +153,13 @@ class DisplayManager {
         this._prevArenaSignatures = options.prevArenaSignatures || { match1: null, match2: null };
         this._prevQueueSignature = options.prevQueueSignature || { value: null };
         this._prevResultIds = options.prevResultIds || { value: [] };
+        this._getPlayerStatusIcon = options.getPlayerStatusIcon || (() => '');
         this._gameData = null;
+
+        // Frame layout is opted into by view.html's head script
+        // (<html data-layout="frame">). Unit tests have no document -> classic.
+        this._frame = typeof document !== 'undefined' &&
+            document.documentElement?.dataset?.layout === 'frame';
 
         // Display mode state
         this._currentMode = null;
@@ -156,7 +201,11 @@ class DisplayManager {
 
         // 5. Arena matches + queue
         this._renderArenaMatches(gameData);
-        this._renderQueue(gameData);
+        if (this._frame) {
+            this._renderUpNext(gameData);
+        } else {
+            this._renderQueue(gameData);
+        }
 
         // 6. Results (from result log cache)
         this._renderResults();
@@ -203,6 +252,13 @@ class DisplayManager {
         this.renderPhaseDisplay(gameData);
         this._renderActiveConditions(gameData);
         this.renderBroadcastMessage(gameData);
+
+        // 14. Frame layout: header "Now" line, rail side box, scene
+        if (this._frame) {
+            this._renderFrameHeader(gameData);
+            this._renderFrameSide(gameData);
+            this._applyFrameScene();
+        }
     }
 
     setTournamentId(id) {
@@ -1004,6 +1060,10 @@ class DisplayManager {
     // ==================================================================
 
     _renderScoreStrip(data) {
+        if (this._frame) {
+            this._renderFrameScoreStrip(data);
+            return;
+        }
         const teams = data.teams || [];
         const container = document.getElementById('scoreStrip');
         if (!container) return;
@@ -1188,6 +1248,11 @@ class DisplayManager {
         const isOpen = ticker.classList.contains('bt-open');
 
         clearTimeout(this._broadcastTimer);
+
+        if (this._frame) {
+            this._renderFrameBroadcast(ticker, textEl, msg, newText, isOpen);
+            return;
+        }
 
         if (newText && !isOpen) {
             // Opening: line -> expand -> fade text in (500ms matches the
@@ -2121,6 +2186,340 @@ class DisplayManager {
         if (progressBar && cs.totalSteps > 0) {
             const pct = ((cs.currentStepIndex + 1) / cs.totalSteps) * 100;
             progressBar.style.width = `${pct}%`;
+        }
+    }
+
+    // ==================================================================
+    // Frame layout (spec: docs/superpowers/specs/2026-11-19-view-frame-design.md)
+    // Everything below runs only when this._frame is true; classic
+    // (?layout=classic) never reaches it.
+    // ==================================================================
+
+    /** Region layout for a display mode key (phase name or override). Pure. */
+    _frameSceneFor(modeKey) {
+        const slide = modeKey ? DISPLAY_MODES[modeKey]?.slide : null;
+        return (slide && FRAME_SCENE_BY_SLIDE[slide]) || 'board';
+    }
+
+    /**
+     * Sets body[data-scene]. A slide that decided it has nothing to show
+     * (live_matches_large with no ongoing match deactivates #displayPrimary)
+     * falls back to the board scene instead of leaving an empty stage --
+     * the same thing classic does by revealing the dashboard underneath.
+     */
+    _applyFrameScene() {
+        if (!this._container) return;
+        const primary = document.getElementById('displayPrimary');
+        const primaryShowing = !!primary && primary.classList.contains('active');
+        let scene = this._frameSceneFor(this._currentMode);
+        if (scene !== 'board' && !primaryShowing) scene = 'board';
+        this._container.setAttribute('data-scene', scene);
+    }
+
+    /** Players (with uid) in a queue entry, flattened across sides. */
+    _matchPlayers(m) {
+        return (m.teams || m.sides || []).flatMap(t => this._getMatchTeamPlayers(t));
+    }
+
+    /** Same readiness rule as _renderMatchGroup: game lobby AND Discord. */
+    _countUnready(matches, lobbyReady) {
+        let n = 0;
+        for (const m of matches) {
+            for (const p of this._matchPlayers(m)) {
+                const r = (p.uid && lobbyReady[p.uid]) || {};
+                const gl = r.gameLobby === true || r.ready === true;
+                const dc = r.discord === true || r.ready === true;
+                if (!(gl && dc)) n++;
+            }
+        }
+        return n;
+    }
+
+    /**
+     * The header's "who acts now" sentence. Pure over `data`.
+     * Returns { text, teamId? } -- `{team}` in text is replaced by the
+     * coloured team name when rendering.
+     */
+    _buildNowLine(data) {
+        const phase = data?.currentPhase?.name || null;
+        const plural = n => `${n} player${n === 1 ? '' : 's'}`;
+        const fixed = {
+            pre_game_setup: 'Tournament starts soon',
+            scoring_vp: 'Scoring victory points',
+            scoring_hex: 'Scoring heart hexes',
+            challenges: 'Teams may challenge heart hexes',
+            board_resolved: 'Board resolved: admin is checking',
+            round_advance: 'Round complete',
+            break: 'On break',
+            tournament_end: 'Tournament over'
+        };
+        if (!phase) return { text: '' };
+        if (fixed[phase]) return { text: fixed[phase] };
+        if (phase.startsWith('spell_window')) return { text: 'Spell window open: gather at the board' };
+
+        if (phase === 'hex_placement_1' || phase === 'hex_placement_2') {
+            const slot = phase === 'hex_placement_1' ? 1 : 2;
+            // Same selection as _buildHexPlacementHTML: first entry is next.
+            const next = (data.pendingHexWins || [])
+                .filter(w => w.teamIds && w.teamIds.length > 0)
+                .find(w => w.slot === undefined || w.slot === slot);
+            if (!next) return { text: 'All hexes placed' };
+            return { text: '{team} places a hex', teamId: next.teamIds[0] };
+        }
+
+        const queue = data.gameQueue || [];
+        const lobbyReady = data.lobbyReady || {};
+
+        if (phase === 'challenge_game') {
+            const state = data.currentPhase?.challengeLobbyState;
+            if (state === 'lobby') {
+                const active = queue.filter(m => m.isChallenge === true && m.status !== 'completed');
+                return { text: `Challenge: waiting for ${plural(this._countUnready(active, lobbyReady))}` };
+            }
+            if (state === 'ready') return { text: 'Challenge: starting shortly' };
+            return { text: queue.some(m => m.isChallenge === true && m.status === 'ongoing')
+                ? 'Challenge live' : 'Challenge game' };
+        }
+
+        if (phase === 'matches_in_progress') {
+            const slots = data.currentPhase?.slots || {};
+            const round = data.currentPhase?.roundNumber;
+            const startedAt = data.currentPhase?.startedAt;
+            const parts = [];
+            for (const slot of [1, 2]) {
+                const sub = slots[slot] || 'setup';
+                if (sub === 'done') continue;
+                if (sub === 'playing') { parts.push(`Match ${slot} live`); continue; }
+                if (sub === 'lobby') {
+                    const active = queue.filter(m => m.status !== 'completed' &&
+                        this._matchBelongsToSlot(m, slot, round, startedAt));
+                    const n = this._countUnready(active, lobbyReady);
+                    parts.push(n > 0 ? `Match ${slot} waiting for ${plural(n)}` : `Match ${slot} ready`);
+                    continue;
+                }
+                parts.push(`Match ${slot} being set up`);
+            }
+            return { text: parts.length > 0 ? parts.join(' · ') : 'Matches complete' };
+        }
+
+        return { text: '' };
+    }
+
+    /**
+     * Rows for the rail's Up next list. Pure over `data`.
+     * rows: { kind: 'match', match, isNext } | { kind: 'break', match }
+     *       | { kind: 'divider' }
+     * A divider goes before the first match of a later round than the
+     * first pending match: spell windows open every round before its
+     * matches, so that is where "plan spells up to here" ends.
+     */
+    _buildUpNextModel(data) {
+        const pending = (data?.gameQueue || [])
+            .filter(m => m.status !== 'ongoing' && m.status !== 'completed');
+        const rows = [];
+        let matchCount = 0;
+        let more = 0;
+        let firstRound;
+        let dividerDone = false;
+        for (const m of pending) {
+            if (m.isBreak === true) {
+                if (matchCount < UP_NEXT_MAX_MATCHES) rows.push({ kind: 'break', match: m });
+                continue;
+            }
+            if (matchCount >= UP_NEXT_MAX_MATCHES) { more++; continue; }
+            if (firstRound === undefined) firstRound = m.roundNumber;
+            if (!dividerDone && typeof firstRound === 'number' &&
+                typeof m.roundNumber === 'number' && m.roundNumber > firstRound) {
+                rows.push({ kind: 'divider' });
+                dividerDone = true;
+            }
+            rows.push({ kind: 'match', match: m, isNext: matchCount === 0 });
+            matchCount++;
+        }
+        return { rows, more };
+    }
+
+    /** ms the broadcast stays in the big "arrive" band. Pure. */
+    _broadcastDockDelay(sentAt, now) {
+        const t = sentAt ? Date.parse(sentAt) : NaN;
+        if (!Number.isFinite(t)) return BROADCAST_ARRIVE_MS;
+        const elapsed = now - t;
+        if (elapsed < 0) return BROADCAST_ARRIVE_MS;
+        return Math.max(0, BROADCAST_ARRIVE_MS - elapsed);
+    }
+
+    _renderFrameHeader(data) {
+        const phaseEl = document.getElementById('hfPhase');
+        const roundEl = document.getElementById('hfRound');
+        const nowEl = document.getElementById('hfNow');
+        const phase = data.currentPhase?.name;
+        const round = data.currentPhase?.roundNumber || data.currentRound;
+        if (roundEl) roundEl.textContent = round ? `Round ${round}` : '';
+        if (phaseEl) phaseEl.textContent = (phase && FRAME_PHASE_TITLES[phase]) || data.name || '';
+        if (nowEl) {
+            const line = this._buildNowLine(data);
+            let html = this._escapeText(line.text);
+            if (line.teamId != null) {
+                const name = this._escapeText(this._getCurrentTeamName(line.teamId) || `Team ${line.teamId}`);
+                html = html.replace('{team}', `<span style="color:${this._getTeamColor(line.teamId)}">${name}</span>`);
+            }
+            nowEl.innerHTML = html;
+        }
+    }
+
+    _renderFrameSide(data) {
+        const side = document.getElementById('frameSide');
+        if (!side) return;
+        const phase = data.currentPhase?.name;
+        let phaseHTML = '';
+        if (phase === 'scoring_hex') phaseHTML = this._buildHexScoringHTML(data);
+        else if (phase === 'hex_placement_1' || phase === 'hex_placement_2') phaseHTML = this._buildHexPlacementHTML(data, phase);
+
+        const effects = (data.activeEffects || []).filter(e => !e.isExpired);
+        const effectsHTML = effects.length === 0 ? '' : `
+            <div class="fs-title">${ICON_SVGS.wandSparkles} Active effects</div>
+            ${effects.map(eff => {
+                const color = this._getTeamColor(eff.castByTeamId);
+                const text = this._escapeText(eff.displayText || eff.spellName || '');
+                const until = eff.expiresAfterRound != null ? ` <span class="fs-dim">until R${eff.expiresAfterRound}</span>` : '';
+                return `<div class="fs-effect" style="--c:${color};">${text}${until}</div>`;
+            }).join('')}`;
+
+        const html = (phaseHTML ? `<div class="fs-phase">${phaseHTML}</div>` : '') + effectsHTML;
+        side.innerHTML = html;
+        side.style.display = html ? '' : 'none';
+    }
+
+    _renderUpNext(data) {
+        const container = document.getElementById('queueList');
+        if (!container) return;
+        const { rows, more } = this._buildUpNextModel(data);
+
+        if (rows.length === 0) {
+            container.innerHTML = '<div class="un-empty">No upcoming matches</div>';
+            return;
+        }
+
+        const sideHTML = (t) => this._getMatchTeamPlayers(t).map(p =>
+            `<span class="un-pl" style="color:${this._getPlayerCurrentColor(p)}">${this._escapeText(this._getPlayerCurrentName(p))}</span>`
+        ).join('');
+
+        const html = rows.map(row => {
+            if (row.kind === 'divider') {
+                return `<div class="un-divider">${ICON_SVGS.sparkles} Spell windows</div>`;
+            }
+            const m = row.match;
+            if (row.kind === 'break') {
+                return `<div class="un-break">${m.breakEmoji || ICON_SVGS.pause} ${this._escapeText(m.breakLabel || 'Break')}</div>`;
+            }
+            const sides = (m.teams || m.sides || []).map(sideHTML)
+                .map(s => `<span class="un-side">${s}</span>`)
+                .join('<span class="un-vs">vs</span>');
+            const meta = [m.playType, m.slot ? `Match ${m.slot}` : ''].filter(Boolean).join(' · ');
+            return `
+                <div class="un-row${row.isNext ? ' un-next' : ''}${m.isChallenge ? ' un-challenge' : ''}">
+                    <div class="un-top">
+                        <span class="un-num">${m.matchNumber ? '#' + m.matchNumber : ''}</span>
+                        <span class="un-game">${m.isChallenge ? ICON_SVGS.swords + ' ' : ''}${this._escapeText(this._getGameDisplayName(m.game || m.gameType))}</span>
+                        <span class="un-meta">${this._escapeText(meta)}</span>
+                        ${row.isNext ? '<span class="un-badge">Next</span>' : ''}
+                    </div>
+                    <div class="un-sides">${sides}</div>
+                </div>`;
+        }).join('') + (more > 0 ? `<div class="un-more">+${more} more queued</div>` : '');
+
+        container.innerHTML = html;
+        this._prevQueueSignature.value = null; // classic diff cache is not ours
+    }
+
+    _renderFrameScoreStrip(data) {
+        const container = document.getElementById('scoreStrip');
+        if (!container) return;
+        const teams = data.teams || [];
+        const totals = teams.map(t => this._getTeamTotalPoints(t));
+        const best = Math.max(0, ...totals);
+        const leaders = totals.filter(p => p === best).length;
+        // Per-player contribution = match wins (each win is +1 to the team);
+        // heart income is team-level and stays on the split line.
+        const playerWins = this._getPlayerWinCounts();
+
+        container.innerHTML = teams.map((team, i) => {
+            const color = team.color || (window.TEAM_COLORS || {})[team.id];
+            const total = totals[i];
+            const wins = Math.min(team.gamesWon || 0, total);
+            const hearts = Math.max(0, total - wins);
+            const isLeader = best > 0 && total === best && leaders === 1;
+            const playersHTML = (team.players || []).map(p => {
+                const icon = p.id ? this._getPlayerStatusIcon(p.id) : '';
+                const w = p.id ? (playerWins[p.id] || 0) : 0;
+                return `<span class="fsc-player">${icon ? `<span class="fsc-status">${icon}</span>` : ''}<span class="fsc-pname">${this._escapeText(p.name || 'Player')}</span><span class="fsc-pwins">★${w}</span></span>`;
+            }).join('');
+            return `
+                <div class="fsc${isLeader ? ' fsc-lead' : ''}" style="--c:${color};">
+                    <div class="fsc-head">
+                        <div class="fsc-left">
+                            <span class="fsc-name">${this._escapeText(team.name || 'Team ' + team.id)}</span>
+                            <span class="fsc-split">${wins} wins · ${hearts} hearts</span>
+                        </div>
+                        <span class="fsc-total">${total}</span>
+                    </div>
+                    ${playersHTML ? `<div class="fsc-players">${playersHTML}</div>` : ''}
+                </div>`;
+        }).join('');
+    }
+
+    /**
+     * Frame broadcast: today's band for the first BROADCAST_ARRIVE_MS after
+     * sentAt ("arrive"), then a one-line strip under the header ("docked")
+     * until cleared. Timed from sentAt so a reloaded TV docks at once.
+     */
+    _renderFrameBroadcast(ticker, textEl, msg, newText, isOpen) {
+        const body = document.body;
+        const key = newText ? `${newText}\u0000${msg?.sentAt || ''}` : null;
+
+        if (!newText) {
+            clearTimeout(this._broadcastDockTimer);
+            this._broadcastKey = null;
+            if (isOpen) {
+                ticker.classList.remove('bt-text-visible');
+                this._broadcastTimer = setTimeout(() => {
+                    ticker.classList.remove('bt-open', 'bt-docked');
+                    body.classList.remove('has-broadcast-dock');
+                }, 350);
+            }
+            return;
+        }
+
+        const dock = () => {
+            ticker.classList.add('bt-open', 'bt-docked', 'bt-text-visible');
+            body.classList.add('has-broadcast-dock');
+        };
+
+        if (key !== this._broadcastKey) {
+            this._broadcastKey = key;
+            clearTimeout(this._broadcastDockTimer);
+            textEl.textContent = newText;
+            const len = newText.length;
+            ticker.classList.toggle('bt-long', len > 90 && len <= 200);
+            ticker.classList.toggle('bt-xlong', len > 200);
+
+            const delay = this._broadcastDockDelay(msg?.sentAt, Date.now());
+            if (delay === 0) { dock(); return; }
+
+            // Arrive: undock, play today's open sequence, dock later.
+            body.classList.remove('has-broadcast-dock');
+            ticker.classList.remove('bt-docked', 'bt-text-visible');
+            ticker.classList.add('bt-open');
+            this._broadcastTimer = setTimeout(() => ticker.classList.add('bt-text-visible'), 500);
+            this._broadcastDockTimer = setTimeout(dock, Math.max(delay, 600));
+            return;
+        }
+
+        // Same message as before (an unrelated snapshot): make sure the
+        // text is visible -- the shared clearTimeout above may have
+        // cancelled the fade-in.
+        if (!ticker.classList.contains('bt-text-visible')) {
+            ticker.classList.add('bt-text-visible');
         }
     }
 }
