@@ -99,3 +99,19 @@
 /* ── Drop targets are always comfortably tappable ── */
 .drop-zone, .queue-row { min-height: 44px; }
 .drag-over, .tap-target-hint { outline: 2px dashed var(--gold); outline-offset: 2px; }
+
+/* ── Compact team rows ── */
+.teams-list { display: flex; flex-direction: column; gap: 4px; }
+.team-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto auto; align-items: center; gap: 8px; width: 100%; padding: 7px 8px 7px 10px; text-align: left; font: inherit; font-size: 13px; color: var(--text-primary); background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-left: 3px solid var(--team-color); border-radius: var(--radius-md); cursor: pointer; }
+.team-row:hover, .team-row:focus-visible { border-color: var(--gold-dim); outline: none; }
+.team-row-name { color: var(--team-color); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-row-stat { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+.team-row-points { font-size: 14px; color: var(--text-bright); font-weight: 700; }
+.team-details-players { margin: 8px 0 0; padding-left: 18px; color: var(--text-primary); }
+#teamDetailsBody .team-points-row { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; }
+#teamDetailsBody .team-split-count { color: var(--text-secondary); font-size: 13px; }
+.admin-shell[data-mode="match"] .team-row { grid-template-columns: minmax(0, 1fr) auto; }
+.admin-shell[data-mode="match"] .team-row-stat:not(.team-row-points) { display: none; }
+
+/* ── Match picker chips (inside the match pop-up) ── */
+.player-disambiguator { font-size: 0.7rem; color: var(--text-tertiary); margin-left: 4px; }

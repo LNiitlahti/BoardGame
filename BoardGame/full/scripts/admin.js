@@ -870,26 +870,26 @@ function initConnectionMonitor() {
 // TEAMS DISPLAY
 // =============================================================================
 
-function renderTeamsList() {
-    const container = document.getElementById('teamsList');
-
+/**
+ * Draggable/tappable team + player chips for building a match. Same
+ * classes and data-* attributes the drag-and-drop and tap-to-select code
+ * already uses (.team-header / .player-item with data-team-id,
+ * data-player-index), so dragTeam/dragPlayer/assignTeamToSide work as before.
+ * Rendered inside the match pop-up (match-dialog.js).
+ */
+function buildMatchPickerHTML() {
     if (!gameState?.teams || gameState.teams.length === 0) {
-        container.innerHTML = '<p class="queue-empty">No teams found</p>';
-        return;
+        return '<p class="queue-empty">No teams found</p>';
     }
-
     const duplicateNames = getDuplicateRosterNames(gameState.teams);
-
-    container.innerHTML = gameState.teams.map(team => {
+    return gameState.teams.map(team => {
         const teamColor = team.color || getTeamColor(team.id);
         const players = team.players || [];
-
-        // Build player items for individual dragging
         const playerItems = players.map((p, idx) => {
             const isDuplicate = duplicateNames.has((p.name || '').trim().toLowerCase());
             const disambiguator = isDuplicate ? getPlayerDisambiguator(p) : '';
             const disambiguatorHtml = disambiguator
-                ? `<span class="player-disambiguator" title="Shown because another player in this tournament has the same name" style="font-size:0.7rem;color:var(--text-tertiary);margin-left:4px;">(${escapeHtml(disambiguator)})</span>`
+                ? `<span class="player-disambiguator" title="Shown because another player in this tournament has the same name">(${escapeHtml(disambiguator)})</span>`
                 : '';
             return `
             <div class="player-item"
@@ -901,41 +901,89 @@ function renderTeamsList() {
                  ondragend="dragEnd(event)">
                 <span class="player-drag-handle">${ICON_SVGS.gripVertical}</span>
                 <span class="player-name">${escapeHtml(p.name)}</span>${disambiguatorHtml}
-            </div>
-        `;
+            </div>`;
         }).join('');
-
-        const splitCount = team.splitCount || 0;
-        const challengeSplitCount = team.challengeSplitCount || 0;
-
         return `
-            <div class="team-card" style="--team-color: ${teamColor}">
+            <div class="picker-team" style="--team-color: ${teamColor}">
                 <div class="team-header"
                      draggable="true"
                      data-team-id="${team.id}"
                      ondragstart="dragTeam(event, ${team.id})"
                      ondragend="dragEnd(event)"
                      title="Drag to add entire team, or tap this and a side (either one first)">
-                    <span class="team-name" style="color: ${teamColor}">${team.name || 'Team ' + team.id}</span>
-                    <span class="team-wins">${team.gamesWon || 0} wins</span>
-                </div>
-                <div class="team-points-row">
-                    <label>Points:</label>
-                    <button class="btn secondary points-btn" onclick="adjustTeamPoints(${team.id}, -1, event)">-</button>
-                    <input type="number" class="points-input" value="${team.points || 0}"
-                           onchange="setTeamPoints(${team.id}, this.value)"
-                           onclick="event.stopPropagation()">
-                    <button class="btn secondary points-btn" onclick="adjustTeamPoints(${team.id}, 1, event)">+</button>
-                </div>
-                <div class="team-split-count">
-                    <span title="Times this team has been split in matches"><span class="split-label">Split:</span> <span class="split-value">${splitCount}</span></span>
-                    <span class="split-separator">|</span>
-                    <span title="Times this team has been involved in challenges"><span class="challenge-split-label">Challenge:</span> <span class="challenge-split-value">${challengeSplitCount}</span></span>
+                    <span class="team-name" style="color: ${teamColor}">${escapeHtml(team.name || 'Team ' + team.id)}</span>
                 </div>
                 <div class="team-players-list">${playerItems}</div>
-            </div>
-        `;
+            </div>`;
     }).join('');
+}
+
+/**
+ * Left column: one compact row per team, sorted by points. Point
+ * corrections and the roster live in the team details pop-up.
+ */
+function renderTeamsList() {
+    const container = document.getElementById('teamsList');
+    if (!container) return;
+    if (!gameState?.teams || gameState.teams.length === 0) {
+        container.innerHTML = '<p class="queue-empty">No teams found</p>';
+        return;
+    }
+    const board = gameState.board || {};
+    const hearts = gameState.heartHexControl || {};
+    const sorted = [...gameState.teams].sort((a, b) => (b.points || 0) - (a.points || 0));
+    container.innerHTML = sorted.map(team => {
+        const color = team.color || getTeamColor(team.id);
+        const hexes = Object.values(board).filter(t => String(t) === String(team.id)).length;
+        // heartHexControl maps coord -> teamId
+        const heartCount = Object.values(hearts).filter(h => String(h) === String(team.id)).length;
+        return `
+            <button type="button" class="team-row" style="--team-color: ${color}"
+                    onclick="openTeamDetails(${team.id})" title="Details and point corrections">
+                <span class="team-row-name">${escapeHtml(team.name || 'Team ' + team.id)}</span>
+                <span class="team-row-stat team-row-points" title="Points">${team.points || 0}</span>
+                <span class="team-row-stat" title="Hexes">&#x2B22; ${hexes}</span>
+                <span class="team-row-stat" title="Hearts">&#x2665; ${heartCount}</span>
+                <span class="team-row-stat" title="Wins">${team.gamesWon || 0}W</span>
+            </button>`;
+    }).join('');
+    if (_teamDetailsOpenId !== null) renderTeamDetails(_teamDetailsOpenId);
+}
+
+// ── Team details pop-up (opened from a team row) ──
+let _teamDetailsOpenId = null;
+
+function openTeamDetails(teamId) {
+    _teamDetailsOpenId = teamId;
+    renderTeamDetails(teamId);
+    document.getElementById('teamDetailsModal')?.classList.add('active');
+}
+
+function closeTeamDetails() {
+    _teamDetailsOpenId = null;
+    document.getElementById('teamDetailsModal')?.classList.remove('active');
+}
+
+function renderTeamDetails(teamId) {
+    const team = gameState?.teams?.find(t => String(t.id) === String(teamId));
+    const body = document.getElementById('teamDetailsBody');
+    const title = document.getElementById('teamDetailsTitle');
+    if (!team || !body) return;
+    const color = team.color || getTeamColor(team.id);
+    if (title) { title.textContent = team.name || `Team ${team.id}`; title.style.color = color; }
+    const players = (team.players || []).map(p => `<li>${escapeHtml(p.name)}</li>`).join('');
+    body.innerHTML = `
+        <div class="team-points-row">
+            <label>Points:</label>
+            <button class="btn secondary points-btn" onclick="adjustTeamPoints(${team.id}, -1, event)">-</button>
+            <input type="number" class="points-input" value="${team.points || 0}"
+                   onchange="setTeamPoints(${team.id}, this.value)">
+            <button class="btn secondary points-btn" onclick="adjustTeamPoints(${team.id}, 1, event)">+</button>
+        </div>
+        <p class="team-split-count">
+            Split: <b>${team.splitCount || 0}</b> &middot; Challenge: <b>${team.challengeSplitCount || 0}</b> &middot; Wins: <b>${team.gamesWon || 0}</b>
+        </p>
+        <ul class="team-details-players">${players}</ul>`;
 }
 
 function getTeamColor(teamId) {
@@ -6795,6 +6843,7 @@ document.addEventListener('keydown', (e) => {
         closeSeatingOrder();
         closeNextRoundModal();
         closeAutoMatchModal();
+        closeTeamDetails();
     }
 });
 
@@ -6806,7 +6855,8 @@ const modalDismissMap = {
     'seatingOrderModal': closeSeatingOrder,
     'nextRoundModal': closeNextRoundModal,
     'autoMatchModal': closeAutoMatchModal,
-    'clearQueueModal': closeClearQueueModal
+    'clearQueueModal': closeClearQueueModal,
+    'teamDetailsModal': closeTeamDetails
 };
 
 Object.entries(modalDismissMap).forEach(([id, closeFn]) => {
