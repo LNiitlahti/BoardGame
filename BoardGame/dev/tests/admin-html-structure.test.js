@@ -79,3 +79,15 @@ test('the adapter no longer carries a hand-copied flow panel HTML string', () =>
 test('admin.html loads admin-command-bar.js', () => {
     assert.ok(scriptIndex('admin-command-bar.js') !== -1);
 });
+
+test('the match pop-up holds the match-building fields', () => {
+    const block = blockFor('matchDialog');
+    for (const id of ['gameType', 'autoFormat', 'sidesContainer', 'matchDialogPicker', 'autoMatchContent', 'matchDialogStatus']) {
+        assert.ok(block.includes(`id="${id}"`), `#${id} must be inside #matchDialog`);
+    }
+    assert.ok(!ADMIN_HTML.includes('id="autoMatchModal"'), '#autoMatchModal should be gone');
+});
+
+test('admin.html loads match-dialog.js after admin.js', () => {
+    assert.ok(scriptIndex('match-dialog.js') > scriptIndex('scripts/admin.js'));
+});

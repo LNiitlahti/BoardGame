@@ -131,3 +131,29 @@
 .admin-shell[data-mode="board"] .queue-row .match-actions .move-top-btn,
 .admin-shell[data-mode="board"] .queue-row .match-actions .delete-btn { display: none; }
 .admin-shell[data-mode="board"] .queue-row-teams { white-space: normal; }
+
+/* ── Match pop-up (match-dialog.js) and challenge pop-up header ── */
+.match-dialog-header { display: flex; align-items: center; gap: 12px; }
+.match-dialog-header h4 { margin: 0; }
+.dialog-tabs { display: flex; gap: 4px; margin-right: auto; }
+.dialog-tab { padding: 4px 12px; border-radius: 14px; border: 1px solid var(--border-color); background: none; color: var(--text-secondary); font: inherit; font-size: 12px; cursor: pointer; }
+.dialog-tab.active { background: var(--gold); border-color: var(--gold); color: #111; cursor: default; }
+.match-dialog-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.match-dialog-top select { flex: 1; min-width: 0; }
+.match-dialog-reason { font-size: 12px; color: var(--gold); }
+.match-dialog-challenge-hint { margin: 0 0 10px; }
+.match-dialog-body { display: grid; grid-template-columns: minmax(220px, 26%) minmax(0, 1fr); gap: 12px; align-items: start; }
+.match-dialog-body[hidden], .match-dialog-pair[hidden] { display: none; }
+.match-dialog-picker { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 8px; }
+.match-dialog-picker h5 { margin: 0 0 6px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-tertiary); }
+.match-dialog-picker .picker-team { border-left: 3px solid var(--team-color); padding-left: 6px; margin-bottom: 6px; }
+.match-dialog-picker .team-header { cursor: grab; padding: 3px 0; }
+.match-dialog-picker .player-item { cursor: grab; }
+.match-dialog-sides .sides-container { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: start; }
+.match-dialog-sides .drop-zone { min-height: 220px; }
+.match-dialog-sides .sides-actions { margin-top: 8px; display: flex; gap: 6px; }
+.match-dialog-pair { margin-bottom: 8px; }
+@media (max-width: 900px) {
+    .match-dialog-body { grid-template-columns: 1fr; }
+    .match-dialog-sides .sides-container { grid-template-columns: 1fr; }
+}

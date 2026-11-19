@@ -329,6 +329,52 @@
         </div>
     </div>
 
+    <!-- Match pop-up: build a match (picker + sides), Auto-fill it from the
+         balance generator, or preview a generated 3v3+2v2 pair. On the
+         Challenge tab the same builder picks the challenge game's players
+         (step 1), then "Next" opens #challengeSetupModal for the disputes
+         (step 2). See match-dialog.js. -->
+    <div class="modal-overlay" id="matchDialog">
+        <div class="modal-content dialog-lg match-dialog">
+            <div class="dialog-header match-dialog-header">
+                <h4 id="matchDialogTitle">Create match</h4>
+                <div class="dialog-tabs" role="tablist">
+                    <button class="dialog-tab active" role="tab" aria-selected="true" data-match-tab="match" onclick="switchMatchDialogTab('match')">Match</button>
+                    <button class="dialog-tab" role="tab" aria-selected="false" data-match-tab="challenge" onclick="switchMatchDialogTab('challenge')">Challenge</button>
+                </div>
+                <button class="btn-icon" onclick="closeMatchDialog()" title="Close (Esc)">&#x2715;</button>
+            </div>
+            <div class="match-dialog-top">
+                <select id="gameType"><option value="">Load tournament first...</option></select>
+                <span class="auto-format" id="autoFormat">--</span>
+                <span class="match-dialog-reason" id="matchDialogReason"></span>
+            </div>
+            <p class="modal-hint match-dialog-challenge-hint" id="matchDialogChallengeHint" hidden>Step 1 of 2: pick the game and the players who play the challenge game. Next you choose the disputed hexes.</p>
+            <div class="match-dialog-body" id="matchDialogBuilder">
+                <div class="match-dialog-picker">
+                    <h5>Teams &amp; players</h5>
+                    <div id="matchDialogPicker"></div>
+                    <p class="modal-hint">Drag a team or a player onto a side, or tap one and then a side.</p>
+                </div>
+                <div class="match-dialog-sides">
+                    <div class="sides-container" id="sidesContainer"></div>
+                    <div class="sides-actions">
+                        <button class="btn-small secondary" onclick="addMatchSide()" title="Add another team side">+ Side</button>
+                        <button class="btn-small secondary" onclick="removeMatchSide()" title="Remove last side">- Side</button>
+                    </div>
+                </div>
+            </div>
+            <div class="match-dialog-pair" id="autoMatchContent" hidden></div>
+            <div class="dialog-footer">
+                <span class="dialog-status" id="matchDialogStatus"></span>
+                <button class="btn secondary" id="matchDialogAutoFillBtn" onclick="matchDialogAutoFill()" title="Fill the sides with the next balanced match">&#x26A1; Auto-fill</button>
+                <button class="btn secondary" onclick="clearMatchSetup(); matchDialogResetPair();">Clear</button>
+                <button class="btn secondary" onclick="closeMatchDialog()">Cancel</button>
+                <button class="btn primary" id="matchDialogAddBtn" onclick="matchDialogSubmit(this)">Add to queue</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Result Confirmation Modal -->
     <div class="modal-overlay" id="resultConfirmModal">
         <div class="modal-content result-confirm-modal dialog-md">
@@ -396,17 +442,6 @@
         </div>
     </div>
 
-    <!-- Auto Match Confirmation Modal -->
-    <div class="modal-overlay" id="autoMatchModal">
-        <div class="modal-content auto-match-modal dialog-lg">
-            <div id="autoMatchContent">
-                <!-- Auto match preview rendered here -->
-            </div>
-            <!-- Buttons are rendered by JS inside autoMatchContent (.auto-match-actions.dialog-footer) -->
-            <div class="dialog-footer" hidden></div>
-        </div>
-    </div>
-
     <!-- Mass Import Modal -->
     <div class="modal-overlay" id="massImportModal">
         <div class="modal-content mass-import-modal dialog-md">
@@ -460,8 +495,15 @@
     <!-- Challenge Setup Modal -->
     <div class="modal-overlay" id="challengeSetupModal">
         <div class="modal-content challenge-setup-modal dialog-lg">
-            <h4>Create Challenge Match</h4>
-            <p class="modal-hint">Select teams disputing hexes. Up to 2 disputes can be resolved in one match.</p>
+            <div class="dialog-header match-dialog-header">
+                <h4>Create challenge</h4>
+                <div class="dialog-tabs" role="tablist">
+                    <button class="dialog-tab" role="tab" aria-selected="false" onclick="switchMatchDialogTab('match')">Match</button>
+                    <button class="dialog-tab active" role="tab" aria-selected="true">Challenge</button>
+                </div>
+                <button class="btn-icon" onclick="closeChallengeSetupModal()" title="Close (Esc)">&#x2715;</button>
+            </div>
+            <p class="modal-hint">Step 2 of 2: select the teams disputing hexes. Up to 2 disputes can be resolved in one match.</p>
 
             <div class="challenge-sides-container">
                 <!-- Side A -->
@@ -510,6 +552,7 @@
             </div>
 
             <div class="challenge-setup-actions dialog-footer">
+                <button class="btn secondary" onclick="matchDialogBackToPlayers()" title="Back to the game and players (step 1)">&larr; Players</button>
                 <button class="btn primary" onclick="confirmChallengeSetup(this)">Create Challenge</button>
                 <button class="btn secondary" onclick="toggleChallengeBundleMode()">Bundle Multiple Disputes…</button>
                 <button class="btn secondary" onclick="closeChallengeSetupModal()">Cancel</button>
@@ -939,6 +982,7 @@
     <script defer src="scripts/admin-layout.js"></script>
     <script defer src="scripts/admin-command-bar.js"></script>
     <script defer src="scripts/admin.js"></script>
+    <script defer src="scripts/match-dialog.js"></script>
     <!-- Phase system (OOP modules + improved guided adapter) -->
     <script defer src="scripts/discord-commands.js"></script>
     <script defer src="scripts/phase-manager.js"></script>

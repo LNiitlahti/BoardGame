@@ -825,11 +825,15 @@ function updateGameTypeDropdown() {
         return;
     }
 
-    // Build options from tournament's selected games
+    // Build options from tournament's selected games. Keep the admin's
+    // current choice: this runs on every live update, including while the
+    // match pop-up is open.
+    const previous = select.value;
     select.innerHTML = selectedGames.map(gameId => {
         const displayName = getGameDisplayName(gameId);
         return `<option value="${gameId}">${displayName}</option>`;
     }).join('');
+    if (previous && selectedGames.includes(previous)) select.value = previous;
 }
 
 function updateConnectionStatus(status) {
@@ -2693,6 +2697,16 @@ function removeMatchSide() {
     renderMatchCreationZones();
 }
 
+/** The one team with players on both sides of a 2-sided match, else null. */
+function deriveSplitTeamIdFromSides(sides) {
+    if (!sides || sides.length !== 2) return null;
+    const teamsA = new Set(sides[0].map(p => String(p.originalTeamId)));
+    const both = [...new Set(sides[1].map(p => String(p.originalTeamId)))].filter(id => teamsA.has(id) && id !== 'undefined');
+    if (both.length !== 1) return null;
+    const team = gameState?.teams?.find(t => String(t.id) === both[0]);
+    return team ? team.id : null;
+}
+
 async function addMatchToQueue(triggerBtn) {
     // Check all sides have at least one player
     const emptySides = manualGameSetup.sides.filter(s => s.length === 0);
@@ -2721,6 +2735,15 @@ async function addMatchToQueue(triggerBtn) {
         status: 'pending',
         createdAt: new Date().toISOString()
     };
+
+    // A two-sided match with exactly one team on both sides splits that
+    // team. Record it like auto-generated matches do, so the team's Split
+    // count (incremented on result) and the generator see it.
+    const splitTeamId = deriveSplitTeamIdFromSides(manualGameSetup.sides);
+    if (splitTeamId !== null) {
+        queueEntry.splitTeamId = splitTeamId;
+        queueEntry.splitTeamName = gameState.teams?.find(t => String(t.id) === String(splitTeamId))?.name || null;
+    }
 
     gameState.gameQueue = gameState.gameQueue || [];
     assignDiscordAndLobby([queueEntry]);
@@ -4949,7 +4972,9 @@ async function confirmAutoMatch() {
  * Close the auto match modal
  */
 function closeAutoMatchModal() {
-    document.getElementById('autoMatchModal').classList.remove('active');
+    // The auto-match preview now lives in the match pop-up (#autoMatchContent
+    // inside #matchDialog), so there is no #autoMatchModal any more.
+    document.getElementById('autoMatchModal')?.classList.remove('active');
     pendingAutoMatch = null;
 }
 
@@ -6890,7 +6915,7 @@ document.addEventListener('keydown', (e) => {
         closePlayerManager();
         closeSeatingOrder();
         closeNextRoundModal();
-        closeAutoMatchModal();
+        window.closeMatchDialog?.();
         closeTeamDetails();
         closeSpellHistory();
     }
@@ -6903,7 +6928,7 @@ const modalDismissMap = {
     'playerManagerModal': closePlayerManager,
     'seatingOrderModal': closeSeatingOrder,
     'nextRoundModal': closeNextRoundModal,
-    'autoMatchModal': closeAutoMatchModal,
+    'matchDialog': () => window.closeMatchDialog?.(),
     'clearQueueModal': closeClearQueueModal,
     'teamDetailsModal': closeTeamDetails,
     'spellHistoryModal': closeSpellHistory
