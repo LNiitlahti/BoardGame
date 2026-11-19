@@ -24,17 +24,19 @@
          a spell window, next-up highlight on the queue, and the duplicate
          top-bar "Next Round" button hidden while the phase system is active.
 
-    LAYOUT:
+    LAYOUT (one 1920x1080 screen; see admin-shell.css / admin-layout.js):
     ┌──────────────────────────────────────────────────────┐
-    │  NAVBAR — Logo, tournament name, connection, user    │
+    │  NAVBAR                                              │
     ├──────────────────────────────────────────────────────┤
-    │  FLOW PANEL — timeline / phase / NEXT STEP / actions │
-    ├──────────────────────────────────────────────────────┤
-    │  TOP BAR — Selector | Stats | Actions                │
+    │  COMMAND BAR — phase | next step | primary + menus   │
+    │  STATS STRIP — state, round, games, hearts, ...      │
     ├──────────┬──────────────────────┬────────────────────┤
-    │  TEAMS   │  HEX BOARD           │ MATCH QUEUE        │
-    │  (left)  │  + MATCH CREATION    │ (right)            │
-    ├──────────┴──────────────────────┴────────────────────┤
+    │ CURRENT  │  HEX BOARD           │ LIVE MATCHES       │
+    │ TASK +   │                      │ + QUEUE            │
+    │ TEAMS    │                      │ (always right)     │
+    └──────────┴──────────────────────┴────────────────────┘
+    Board mode widens the board; Match mode widens the right column.
+    Creating/editing matches happens in pop-ups (match-dialog.js).
 
     USAGE:
     - URL parameter: full/admin.html?tournamentId=xxx
@@ -57,16 +59,18 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
 
-    <!-- CSS: navbar base → fantasy atmosphere → toast → void/gold overrides → v2 admin → phase UI → improved overrides (final authority) -->
+    <!-- CSS: navbar base → fantasy atmosphere → toast → void/gold overrides → v2 admin → phase UI → improved overrides → dialog + page shell (final authority) -->
     <link rel="stylesheet" href="../shared/css/navbar.css">
     <link rel="stylesheet" href="../shared/css/toast.css">
     <link rel="stylesheet" href="../shared/css/fantasy-mountain-theme.css">
     <link rel="stylesheet" href="../shared/css/void-gold-theme.css">
     <link rel="stylesheet" href="css/admin.css">
-    <link rel="stylesheet" href="css/admin-dialog.css">
     <link rel="stylesheet" href="css/phase-indicator.css">
     <link rel="stylesheet" href="css/admin-improved.css">
     <link rel="stylesheet" href="css/styles.css">
+    <!-- Page shell + pop-up shell (final authority for layout) -->
+    <link rel="stylesheet" href="css/admin-dialog.css">
+    <link rel="stylesheet" href="css/admin-shell.css">
 </head>
 <body>
     <!-- Atmosphere Layers -->
@@ -85,51 +89,59 @@
     <div id="navbar-container"></div>
     <script defer src="../shared/scripts/navbar.js"></script>
 
-    <!-- Flow Panel (driven by admin-improved-adapter.js) -->
-    <div id="flowPanel" class="flow-panel" style="display: none;">
-        <!-- Phase Timeline Track -->
-        <div class="flow-timeline" id="flowTimeline"></div>
-
-        <!-- Main Flow Content -->
-        <div class="flow-body">
-            <!-- Left: Current phase identity -->
-            <div class="flow-current">
-                <div class="flow-phase-header">
-                    <span id="flowPhaseIcon" class="flow-phase-icon"></span>
-                    <div class="flow-phase-info">
-                        <span class="flow-phase-label">CURRENT PHASE</span>
-                        <span id="flowPhaseName" class="flow-phase-name">---</span>
-                    </div>
+    <!-- Command bar content. Cloned into #flowPanel below at parse time and
+         again by admin-improved-adapter.js's _restoreFlowPanelDOM(). This is
+         the ONLY copy of this markup. -->
+    <template id="flowPanelTemplate">
+        <div class="cb-row">
+            <div class="cb-phase">
+                <span id="flowPhaseIcon" class="flow-phase-icon"></span>
+                <div class="cb-phase-text">
                     <span id="flowRoundBadge" class="flow-round-badge" style="display: none;"></span>
+                    <span id="flowPhaseName" class="flow-phase-name">---</span>
+                    <div class="flow-timeline" id="flowTimeline"></div>
                 </div>
             </div>
-
-            <!-- Center: NEXT STEP prompt (guidance + requirement/action pills) -->
-            <div class="flow-next-step">
-                <span class="next-step-label">Next Step</span>
+            <div class="cb-next">
                 <p id="flowGuidance" class="next-step-text"></p>
                 <div class="flow-actions" id="flowActions"></div>
             </div>
-
-            <!-- Right: Controls — one contextual primary action + secondaries -->
-            <div class="flow-controls">
+            <div class="cb-controls">
+                <span id="phaseExtraControls" style="display: none;"></span>
+                <span id="lobbyAdminControls" style="display: none;"></span>
+                <span id="spellWindowControls" style="display: none;"></span>
+                <span id="spellPhaseAdminControls" style="display: none;"></span>
+                <button class="btn-small secondary" id="insertBreakBtn" onclick="insertBreak()" title="Insert break">&#x23F8; Break</button>
                 <button class="btn primary flow-primary-btn" id="flowPrimaryBtn" onclick="runFlowPrimaryAction()" disabled>---</button>
-                <div class="flow-controls-secondary">
-                    <button class="btn-small secondary" id="advancePhaseBtn" onclick="advancePhase()" disabled>Next Phase &#x25B6;</button>
-                    <span id="phaseExtraControls" style="display: none;"></span>
-                    <span id="lobbyAdminControls" style="display: none;"></span>
-                    <span id="spellWindowControls" style="display: none;"></span>
-                    <span id="spellPhaseAdminControls" style="display: none;"></span>
-                    <button class="btn-small secondary" id="forceAdvanceBtn" onclick="forceAdvancePhase()" title="Force advance (skip requirements)">&#x26A0; Force Advance</button>
-                    <button class="btn-small danger" id="undoLastActionBtn" onclick="undoLastAction()" title="Undo the most recent undoable action (result, points, or hex placement)">&#x21B6; Undo Last Action</button>
-                    <button class="btn-small secondary" id="insertBreakBtn" onclick="insertBreak()" title="Insert break">&#x23F8; Break</button>
-                    <button class="btn-small secondary" id="logSpellCastBtn" onclick="openSpellCastModal()" title="Log which team cast which spell, and when (for cross-referencing against board actions later)">&#x1FA84; Log Spell Cast</button>
-                    <button class="btn-small secondary" id="broadcastToggleBtn" onclick="toggleBroadcastBar()" title="Broadcast a message to view screens">&#x1F4E2;</button>
-                    <span id="breakIntervalBadge" class="break-interval-badge" onclick="openBreakSettings()" title="Break interval settings" style="display: none;"></span>
+                <button class="btn-small danger" id="undoLastActionBtn" onclick="undoLastAction()" title="Undo the most recent undoable action (result, points, or hex placement)">&#x21B6; Undo</button>
+                <button class="btn-small secondary" id="broadcastToggleBtn" onclick="toggleBroadcastBar()" title="Broadcast a message to view screens">&#x1F4E2;</button>
+                <div class="cb-menu-wrap">
+                    <button class="btn-small secondary" data-menu-toggle="cbMoreMenu" aria-haspopup="true" aria-expanded="false">&#x22EF; More</button>
+                    <div class="cb-menu" id="cbMoreMenu" role="menu" hidden>
+                        <div class="cb-menu-heading">During the round</div>
+                        <button class="cb-menu-item" id="logSpellCastBtn" onclick="openSpellCastModal()" title="Log which team cast which spell, and when">&#x1FA84; Log spell cast</button>
+                        <button class="cb-menu-item" onclick="openSpellHistory()">Spell history</button>
+                        <span id="breakIntervalBadge" class="break-interval-badge cb-menu-item" onclick="openBreakSettings()" title="Break interval settings" style="display: none;"></span>
+                        <div class="cb-menu-heading">Corrections</div>
+                        <button class="cb-menu-item danger" id="forceAdvanceBtn" onclick="forceAdvancePhase()" title="Force advance (skip requirements)">&#x26A0; Force advance</button>
+                        <button class="cb-menu-item" id="advancePhaseBtn" onclick="advancePhase()" disabled>Next phase &#x25B6;</button>
+                    </div>
                 </div>
+                <div class="cb-menu-wrap">
+                    <button class="btn-small secondary" data-menu-toggle="cbScreensMenu" aria-haspopup="true" aria-expanded="false">Screens &#x25BE;</button>
+                    <div class="cb-menu" id="cbScreensMenu" role="menu" hidden>
+                        <button class="cb-menu-item" onclick="openViewWindow()">View (spectator) &#x2197;</button>
+                        <button class="cb-menu-item" onclick="openStatsWindow()">Stats &#x2197;</button>
+                        <button class="cb-menu-item" onclick="openOnboardingWindow()">Onboarding &#x2197;</button>
+                        <button class="cb-menu-item" onclick="openOnboardingViewWindow()">Onboarding TV &#x2197;</button>
+                        <button class="cb-menu-item" onclick="openMatchQueuePage()">Match list &#x2197;</button>
+                        <button class="cb-menu-item" onclick="openSeatingOrder()">Seating order&hellip;</button>
+                    </div>
+                </div>
+                <button class="btn-small secondary" id="modeToggleBtn" onclick="AdminLayout.toggle()" title="Switch Board / Match layout (M)">&#x21C4;</button>
+                <button class="btn-small mode-hint" id="modeHint" onclick="AdminLayout.applyPendingNow()" hidden></button>
             </div>
         </div>
-
         <!-- Broadcast Message Bar (collapsed behind the 📢 toggle) -->
         <div class="broadcast-bar" id="broadcastBar" style="display: none;">
             <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;">Broadcast</span>
@@ -153,78 +165,63 @@
             <button class="btn-small primary" onclick="addSpellLogEntry()">+ Add</button>
         </div>
         <div class="spell-log-entries" id="spellLogEntries" style="display: none;"></div>
-    </div>
+    </template>
 
-    <div class="admin-container">
-        <!-- Top Bar -->
-        <div class="top-bar">
-            <!-- Left: Tournament state + refresh (switching now happens via the navbar) -->
-            <div class="tournament-selector">
+    <div class="admin-shell" id="adminShell" data-mode="match">
+        <header class="shell-top">
+            <div id="flowPanel" class="flow-panel command-bar" style="display: none;"></div>
+            <script>
+                document.getElementById('flowPanel').appendChild(
+                    document.getElementById('flowPanelTemplate').content.cloneNode(true));
+            </script>
+            <div class="stats-strip" id="statsStrip">
                 <button class="btn-small tournament-state-btn" id="tournamentStateBtn" onclick="openStateChangeModal()" title="Change tournament state">setup</button>
                 <button class="btn secondary" onclick="refreshCurrentTournament()">Refresh</button>
-            </div>
-
-            <!-- Center: Gold stat badges -->
-            <div class="stat-badges">
                 <div class="stat-badge">
                     <span class="stat-label">Round</span>
                     <span class="stat-value" id="currentRound">0</span>
                 </div>
-                <div class="stat-sep"></div>
                 <div class="stat-badge">
                     <span class="stat-label">Games</span>
                     <span class="stat-value" id="gamesPlayed">0</span>
                 </div>
-                <div class="stat-sep"></div>
                 <div class="stat-badge">
                     <span class="stat-label">Hearts</span>
                     <span class="stat-value" id="heartsControlled">0</span>
                 </div>
-                <div class="stat-sep"></div>
                 <div class="stat-badge">
                     <span class="stat-label">Hexes</span>
                     <span class="stat-value" id="hexCount">0</span>
                 </div>
-                <div class="stat-sep"></div>
                 <div class="stat-badge stat-badge-editable" onclick="openWinConditionModal()" title="Change the tournament win condition (victory points needed)">
                     <span class="stat-label">Win At</span>
                     <span class="stat-value" id="winConditionValue">50</span>
                     <span class="stat-edit-icon">&#9998;</span>
                 </div>
-                <div class="stat-sep"></div>
                 <div class="stat-badge" id="winPaceBadge" style="display:none;" title="Rounds until the front-runner reaches the win target on heart income alone. Match wins and future heart captures are not counted, so the real pace is faster.">
                     <span class="stat-label">Pace</span>
                     <span class="stat-value" id="winPaceValue">&mdash;</span>
                 </div>
-                <div class="stat-sep"></div>
                 <div class="stat-badge stat-badge-editable" onclick="openSpellsActiveModal()" title="Toggle whether players see digital spell cards on team.html">
                     <span class="stat-label">Spells</span>
                     <span class="stat-value" id="spellsActiveValue">Off</span>
                     <span class="stat-edit-icon">&#9998;</span>
                 </div>
-            </div>
-
-            <!-- Right: Actions + Status -->
-            <div class="top-bar-actions">
-                <div class="status-message" id="statusMessage"></div>
-                <!-- Hidden by the adapter while the phase system is active (Flow Panel owns advancement) -->
                 <button class="btn primary" id="legacyNextRoundBtn" onclick="advanceRound()">Next Round</button>
-                <button class="btn secondary" onclick="openViewWindow()" title="Open digital signage view in new window">View</button>
-                <button class="btn secondary" onclick="openStatsWindow()" title="Open tournament statistics">Stats</button>
-                <div class="btn-group-separator"></div>
-                <div class="btn-group onboarding-group">
-                    <button class="btn secondary" onclick="openOnboardingWindow()" title="Open player onboarding checklist">Onboard</button>
-                    <button class="btn secondary" onclick="openOnboardingViewWindow()" title="Open onboarding TV display">OB TV</button>
-                    <button class="btn secondary" onclick="openSeatingOrder()" title="Configure player seating positions">Seating</button>
-                </div>
+                <div class="status-message" id="statusMessage"></div>
             </div>
-        </div>
+        </header>
 
-        <!-- 3-Column Layout -->
-        <div class="admin-layout">
-
-            <!-- LEFT COLUMN: Teams -->
-            <aside class="teams-column">
+        <aside class="shell-left" id="shellLeft">
+            <section class="current-task-card" id="currentTaskCard" hidden>
+                <h3 class="panel-title">Current task</h3>
+                <div id="currentTaskBody"></div>
+                <div class="current-task-effects" id="currentTaskEffects" hidden>
+                    <h4>Active effects</h4>
+                    <div id="activeEffectsAdmin"></div>
+                </div>
+            </section>
+            <section class="teams-panel">
                 <div class="panel-header">
                     <h3 class="panel-title">Teams</h3>
                     <button class="btn-icon" onclick="openPlayerManager()" title="Manage Players">&#9998;</button>
@@ -232,100 +229,70 @@
                 <div class="teams-list" id="teamsList">
                     <p class="queue-empty">Load a tournament to see teams</p>
                 </div>
-            </aside>
+            </section>
+        </aside>
 
-            <!-- CENTER COLUMN -->
-            <div class="center-column">
-                <!-- Board Section -->
-                <section class="board-section">
-                    <!-- Effects Panel -->
-                    <div class="effects-panel" id="effectsPanel">
-                        <button class="effect-btn active" data-effect="hex-images" title="Hex Terrain Images">Map</button>
-                        <button class="effect-btn active" data-effect="heart-glow" title="Heart Glow">Glow</button>
-                        <button class="effect-btn active" data-effect="pulse-hearts" title="Pulse Hearts">Pulse</button>
-                        <button class="effect-btn active" data-effect="rooms" title="Show Rooms">Rooms</button>
-                        <button class="effect-btn active" data-effect="heart-images" title="Heart Images">Hearts</button>
-                    </div>
-                    <!-- Shown only while picking the challenge's contested hex directly on the board -->
-                    <div class="challenge-hex-pick-banner" id="challengeHexPickBanner">
-                        <span>Click a heart hex below to set it as the contested hex</span>
-                        <button type="button" class="btn-small secondary" onclick="cancelChallengeHexPickMode()">Cancel (Esc)</button>
-                    </div>
-                    <!-- Shown only while picking a hex for a spell Process/Active-Effects field -->
-                    <div class="challenge-hex-pick-banner" id="spellHexPickBanner">
-                        <span id="spellHexPickBannerText">Click a hex on the board</span>
-                        <button type="button" class="btn-small secondary" onclick="cancelSpellHexPickMode()">Cancel (Esc)</button>
-                    </div>
-                    <div id="hexBoard"></div>
-                </section>
+        <main class="shell-center" id="shellCenter">
+            <section class="board-section">
+                <!-- Effects Panel -->
+                <div class="effects-panel" id="effectsPanel">
+                    <button class="effect-btn active" data-effect="hex-images" title="Hex Terrain Images">Map</button>
+                    <button class="effect-btn active" data-effect="heart-glow" title="Heart Glow">Glow</button>
+                    <button class="effect-btn active" data-effect="pulse-hearts" title="Pulse Hearts">Pulse</button>
+                    <button class="effect-btn active" data-effect="rooms" title="Show Rooms">Rooms</button>
+                    <button class="effect-btn active" data-effect="heart-images" title="Heart Images">Hearts</button>
+                </div>
+                <!-- Shown only while picking the challenge's contested hex directly on the board -->
+                <div class="challenge-hex-pick-banner" id="challengeHexPickBanner">
+                    <span>Click a heart hex below to set it as the contested hex</span>
+                    <button type="button" class="btn-small secondary" onclick="cancelChallengeHexPickMode()">Cancel (Esc)</button>
+                </div>
+                <!-- Shown only while picking a hex for a spell Process/Active-Effects field -->
+                <div class="challenge-hex-pick-banner" id="spellHexPickBanner">
+                    <span id="spellHexPickBannerText">Click a hex on the board</span>
+                    <button type="button" class="btn-small secondary" onclick="cancelSpellHexPickMode()">Cancel (Esc)</button>
+                </div>
+                <div id="hexBoard"></div>
+            </section>
+        </main>
 
-                <!-- Spell processing (SpellEngine wiring — see admin-improved-adapter.js) -->
-                <section class="panel spell-processing-panel">
-                    <h4>Active Effects</h4>
-                    <div id="activeEffectsAdmin" style="max-height: 300px; overflow-y: auto;"></div>
-                    <h4>Spell History</h4>
-                    <div id="spellHistory" style="max-height: 300px; overflow-y: auto;"></div>
-                </section>
-
-                <!-- Match Creation Panel -->
-                <div class="panel create-match-panel">
-                    <h4>Create Match
-                        <button class="btn-small secondary" onclick="generateSuggestedMatches()" title="Auto-generate matches based on rotation">Auto</button>
-                        <button class="btn-small challenge" onclick="addChallengeToQueue()" title="Create a challenge match (hex dispute)">Challenge</button>
-                        <div class="break-dropdown" style="display:inline-block;position:relative;">
-                            <button class="btn-small break" onclick="toggleBreakMenu()" title="Add a break to the queue">Queue Break ▾</button>
-                            <div class="break-menu" id="breakMenu">
-                                <button onclick="addBreakToQueue('piss')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 12h13a1 1 0 0 1 1 1 5 5 0 0 1-5 5h-.598a.5.5 0 0 0-.424.765l1.544 2.47a.5.5 0 0 1-.424.765H5.402a.5.5 0 0 1-.424-.765L7 18"/><path d="M8 18a5 5 0 0 1-5-5V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8"/></svg> Piss Break</button>
-                                <button onclick="addBreakToQueue('cigarette')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17 12H3a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h14"/><path d="M18 8c0-2.5-2-2.5-2-5"/><path d="M21 16a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M22 8c0-2.5-2-2.5-2-5"/><path d="M7 12v4"/></svg> Cigarette Break</button>
-                                <button onclick="addBreakToQueue('food')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14-1 1"/><path d="m13.75 18.25-1.25 1.42"/><path d="M17.775 5.654a15.68 15.68 0 0 0-12.121 12.12"/><path d="M18.8 9.3a1 1 0 0 0 2.1 7.7"/><path d="M21.964 20.732a1 1 0 0 1-1.232 1.232l-18-5a1 1 0 0 1-.695-1.232A19.68 19.68 0 0 1 15.732 2.037a1 1 0 0 1 1.232.695z"/></svg> Food Break</button>
-                                <button onclick="addBreakToQueue('sleep')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg> Sleep</button>
+        <aside class="shell-right" id="shellRight">
+            <section class="live-panel">
+                <h3 class="panel-title">Live</h3>
+                <div id="matchSlotCards" class="match-slot-panels" style="display: none;"></div>
+                <div id="challengeSlotCards" class="match-slot-panels" style="display: none;"></div>
+                <div id="ongoingMatchesList"></div>
+            </section>
+            <section class="queue-panel">
+                <div class="queue-header">
+                    <h3 class="panel-title">Queue <span class="count" id="queueCount">0</span></h3>
+                    <div class="queue-header-actions">
+                        <button class="btn-small primary" onclick="openMatchDialog('match')" title="Create a match">+ Match</button>
+                        <button class="btn-small challenge" onclick="openMatchDialog('challenge')" title="Create a challenge match (hex dispute)">&#x2694; Challenge</button>
+                        <button class="btn-small secondary" onclick="queueNextMatch()" title="Generate and queue the next balanced match">&#x26A1; Queue next</button>
+                        <div class="cb-menu-wrap">
+                            <button class="btn-small secondary" data-menu-toggle="queueMoreMenu" aria-haspopup="true" aria-expanded="false">&#x22EF;</button>
+                            <div class="cb-menu cb-menu-right" id="queueMoreMenu" role="menu" hidden>
+                                <div class="cb-menu-heading">Queue a break</div>
+                                <button class="cb-menu-item" onclick="addBreakToQueue('piss')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 12h13a1 1 0 0 1 1 1 5 5 0 0 1-5 5h-.598a.5.5 0 0 0-.424.765l1.544 2.47a.5.5 0 0 1-.424.765H5.402a.5.5 0 0 1-.424-.765L7 18"/><path d="M8 18a5 5 0 0 1-5-5V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8"/></svg> Piss Break</button>
+                                <button class="cb-menu-item" onclick="addBreakToQueue('cigarette')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17 12H3a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h14"/><path d="M18 8c0-2.5-2-2.5-2-5"/><path d="M21 16a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M22 8c0-2.5-2-2.5-2-5"/><path d="M7 12v4"/></svg> Cigarette Break</button>
+                                <button class="cb-menu-item" onclick="addBreakToQueue('food')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14-1 1"/><path d="m13.75 18.25-1.25 1.42"/><path d="M17.775 5.654a15.68 15.68 0 0 0-12.121 12.12"/><path d="M18.8 9.3a1 1 0 0 0 2.1 7.7"/><path d="M21.964 20.732a1 1 0 0 1-1.232 1.232l-18-5a1 1 0 0 1-.695-1.232A19.68 19.68 0 0 1 15.732 2.037a1 1 0 0 1 1.232.695z"/></svg> Food Break</button>
+                                <button class="cb-menu-item" onclick="addBreakToQueue('sleep')"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg> Sleep</button>
+                                <div class="cb-menu-heading">Matches</div>
+                                <button class="cb-menu-item" onclick="openMassImport()">Import&hellip;</button>
+                                <button class="cb-menu-item" onclick="openMatchSchedulerWindow()">Match scheduler &#x2197;</button>
+                                <button class="cb-menu-item" onclick="openGameManager()">Games&hellip;</button>
+                                <button class="cb-menu-item danger" onclick="openClearQueueModal()">Clear queue&hellip;</button>
                             </div>
                         </div>
-                        <button class="btn-small secondary" onclick="openMassImport()" title="Import matches from JSON file">Import</button>
-                        <button class="btn-small secondary" onclick="openMatchSchedulerWindow()" title="Open the Match Scheduler dev tool">Match Scheduler ↗</button>
-                        <button class="btn-small secondary" onclick="openGameManager()" title="Add, remove, or edit tournament games">Games</button>
                         <input type="file" id="importFileInput" accept=".json" style="display:none" onchange="handleImportFile(event)">
-                    </h4>
-
-                    <div class="game-selects">
-                        <select id="gameType">
-                            <option value="">Load tournament first...</option>
-                        </select>
-                        <span class="auto-format" id="autoFormat">--</span>
-                    </div>
-
-                    <div class="sides-container" id="sidesContainer">
-                        <!-- Dynamic sides rendered by JS -->
-                    </div>
-                    <div class="sides-actions">
-                        <button class="btn-small secondary" onclick="addMatchSide()" title="Add another team side">+ Side</button>
-                        <button class="btn-small secondary" onclick="removeMatchSide()" title="Remove last side">- Side</button>
-                    </div>
-
-                    <div class="match-buttons">
-                        <button class="btn primary" onclick="addMatchToQueue(this)">Add to Queue</button>
-                        <button class="btn secondary" onclick="clearMatchSetup()">Clear</button>
                     </div>
                 </div>
-            </div>
-
-            <!-- RIGHT COLUMN: Queue -->
-            <aside class="queue-panel">
-                <h3>Match Queue <span class="count" id="queueCount">0</span>
-                    <button class="btn-small secondary" onclick="openMatchQueuePage()" title="Open match list in new tab">View All</button>
-                    <button class="btn-small danger" onclick="openClearQueueModal()" title="Clear all matches from queue">Clear All</button>
-                </h3>
-
-                <!-- Ongoing Matches -->
-                <div id="ongoingMatchesList"></div>
-
-                <!-- Queued Matches -->
                 <div class="queue-list" id="matchQueue">
                     <p class="queue-empty">No matches in queue</p>
                 </div>
-            </aside>
-
-        </div>
+            </section>
+        </aside>
     </div>
 
     <!-- ==================== MODALS ==================== -->
@@ -948,6 +915,7 @@
          (tournament never loads; commit e1d9aea introduced the eager
          ActionLogger instantiation without also moving this script tag). -->
     <script defer src="scripts/action-logger.js"></script>
+    <script defer src="scripts/admin-layout.js"></script>
     <script defer src="scripts/admin.js"></script>
     <!-- Phase system (OOP modules + improved guided adapter) -->
     <script defer src="scripts/discord-commands.js"></script>

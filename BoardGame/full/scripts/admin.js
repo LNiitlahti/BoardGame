@@ -802,8 +802,13 @@ function updateDisplay() {
     // Render match creation zones (in case sides changed)
     renderMatchCreationZones();
 
+    // Board / Match layout follows the phase (admin-layout.js)
+    window.AdminLayout?.onPhase(gameState.currentPhase?.name || null);
+
     // Hook for phase adapter (full/admin.html)
     if (window._onAdminDisplayUpdate) window._onAdminDisplayUpdate();
+
+    updateCurrentTaskCard();
 }
 
 /**
@@ -811,6 +816,7 @@ function updateDisplay() {
  */
 function updateGameTypeDropdown() {
     const select = document.getElementById('gameType');
+    if (!select) return;
     const selectedGames = gameState?.selectedGames || [];
 
     // If no games defined, show placeholder
@@ -2447,8 +2453,8 @@ function assignPlayerToSide(player, sideIndex) {
  * it -- tap a team header or player item to arm it, then tap a side's
  * drop-zone to complete the same assignment dropToSide would perform.
  *
- * Delegated on `.admin-layout`, the stable ancestor of both the teams list
- * (#teamsList) and the sides container (#sidesContainer). Both of those are
+ * Delegated on `#matchDialog` (the match pop-up), the stable ancestor of both
+ * its team/player picker and the sides container (#sidesContainer). Both are
  * rebuilt via innerHTML on every render, but the delegated listener lives on
  * their unchanging parent, so -- unlike setupSeatingDragDrop(), which has to
  * re-run after every render of a modal that's opened fresh each time -- this
@@ -2465,7 +2471,7 @@ function assignPlayerToSide(player, sideIndex) {
 let _matchAssignTapAbort = null;
 
 function setupMatchAssignmentTapToSelect() {
-    const container = document.querySelector('.admin-layout');
+    const container = document.getElementById('matchDialog') || document.getElementById('adminShell');
     if (!container) return;
 
     if (_matchAssignTapAbort) _matchAssignTapAbort.abort();
@@ -2566,6 +2572,7 @@ function renderMatchCreationZones() {
  */
 function updateAutoFormat() {
     const formatDisplay = document.getElementById('autoFormat');
+    if (!formatDisplay) return;
     const counts = manualGameSetup.sides.map(s => s.length);
     const allEmpty = counts.every(c => c === 0);
     const allEqual = counts.every(c => c === counts[0]);
@@ -2592,7 +2599,7 @@ function getCalculatedPlayType() {
 
 function removeFromSide(sideIndex, playerIndex, event) {
     // Stop the click from bubbling up to the tap-to-select delegated
-    // listener on .admin-layout, which would otherwise treat it as a tap
+    // listener on #matchDialog, which would otherwise treat it as a tap
     // on the enclosing .drop-zone and arm it as a (nonsensical) source.
     event?.stopPropagation();
     manualGameSetup.sides[sideIndex].splice(playerIndex, 1);
@@ -6566,6 +6573,7 @@ function updatePendingHexNotification() {
 
     if (pendingHexWins.length === 0) {
         if (banner) banner.remove();
+        updateCurrentTaskCard();
         return;
     }
 
@@ -6575,11 +6583,8 @@ function updatePendingHexNotification() {
         banner.id = 'pendingHexBanner';
         banner.className = 'pending-hex-banner';
 
-        // Insert after the top bar
-        const topBar = document.querySelector('.top-bar');
-        if (topBar) {
-            topBar.after(banner);
-        }
+        // Lives in the Current task card (left column)
+        document.getElementById('currentTaskBody')?.appendChild(banner);
     }
 
     // Build banner content with team colors
@@ -6602,6 +6607,25 @@ function updatePendingHexNotification() {
         <span class="pending-hex-text">Pending hex placement:</span>
         ${pendingList}
     `;
+    updateCurrentTaskCard();
+}
+
+/**
+ * The Current task card shows only when it has something in it: the
+ * pending-hex banner, or active spell effects during spell windows.
+ */
+function updateCurrentTaskCard() {
+    const card = document.getElementById('currentTaskCard');
+    if (!card) return;
+    const hasBanner = !!document.getElementById('pendingHexBanner');
+    const effects = document.getElementById('currentTaskEffects');
+    const inSpellWindow = /^spell_window_/.test(gameState?.currentPhase?.name || '');
+    const effectsList = document.getElementById('activeEffectsAdmin');
+    // spell-engine.js renders a lone <p>No active effects</p> when empty
+    const hasEffects = inSpellWindow && !!effectsList &&
+        effectsList.textContent.trim() !== '' && !/^No active effects$/.test(effectsList.textContent.trim());
+    if (effects) effects.hidden = !hasEffects;
+    card.hidden = !(hasBanner || hasEffects);
 }
 
 /**

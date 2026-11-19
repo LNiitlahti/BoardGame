@@ -1,0 +1,101 @@
+/* BoardGame/full/css/admin-shell.css — admin page grid and modes.
+ * Loaded LAST (after admin-improved.css/styles.css), so it is the final
+ * authority for the page layout. body is already a flex column below the
+ * 60px navbar (admin.css + admin-improved.css); the shell fills the rest.
+ *
+ *   Board mode: board big, right column (live + queue) narrow
+ *   Match mode: right column wide
+ * data-mode is set by admin-layout.js from the current phase.
+ */
+.admin-shell {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-columns: var(--col-left) minmax(0, 1fr) var(--col-right);
+    grid-template-areas:
+        "top    top    top"
+        "left   center right";
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    max-width: 1920px;
+    margin: 0 auto;
+    /* Above the fixed .atmo background layers (z-index 0) */
+    position: relative;
+    z-index: 2;
+    gap: 10px;
+    padding: 8px 12px 12px;
+    box-sizing: border-box;
+    overflow: hidden;
+    transition: grid-template-columns var(--transition-base);
+}
+.admin-shell[data-mode="board"] { --col-left: 15%; --col-right: 21%; }
+.admin-shell[data-mode="match"] { --col-left: 15%; --col-right: 40%; }
+
+.shell-top    { grid-area: top; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.shell-left   { grid-area: left;   display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; }
+.shell-center { grid-area: center; display: flex; min-height: 0; min-width: 0; position: relative; }
+.shell-right  { grid-area: right;  display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: hidden; }
+
+.shell-center .board-section { flex: 1; min-height: 0; }
+
+/* ── Command bar ── */
+.flow-panel.command-bar { margin: 0; padding: 6px 12px; border: 1px solid var(--border-gold); border-radius: var(--radius-lg); background: var(--bg-panel); }
+.cb-row { display: flex; align-items: center; gap: 14px; min-height: 48px; }
+.cb-phase { display: flex; align-items: center; gap: 8px; min-width: 200px; flex: 0 0 auto; }
+.cb-phase-text { display: flex; flex-direction: column; gap: 2px; }
+.cb-phase-text .flow-round-badge { align-self: flex-start; margin: 0; padding: 0; background: none; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-tertiary); }
+.cb-phase-text .flow-phase-name { font-family: 'Russo One', sans-serif; font-size: 15px; color: var(--gold-bright); }
+.cb-phase-text .flow-timeline { display: flex; gap: 3px; margin: 0; padding: 0; border: 0; font-size: 0; }
+.cb-next { flex: 1 1 auto; min-width: 0; }
+.cb-next .next-step-text { margin: 0; font-size: 13px; color: var(--text-primary); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.cb-next .flow-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.cb-controls { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; flex-wrap: nowrap; }
+.cb-controls .flow-primary-btn { min-width: 160px; }
+.mode-hint { border-color: var(--accent-warning); color: var(--accent-warning); animation: modeHintPulse 1.6s ease-in-out infinite; }
+@keyframes modeHintPulse { 50% { box-shadow: 0 0 10px var(--gold-glow); } }
+
+/* ── Popover menus (admin-command-bar.js) ── */
+.cb-menu-wrap { position: relative; }
+.cb-menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 900; min-width: 230px; padding: 6px 0; background: var(--bg-elevated); border: 1px solid var(--border-gold); border-radius: var(--radius-md); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.cb-menu-heading { padding: 8px 14px 4px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-tertiary); }
+.cb-menu-item { display: block; width: 100%; padding: 7px 14px; text-align: left; background: none; border: 0; color: var(--text-primary); font: inherit; font-size: 13px; cursor: pointer; }
+.cb-menu-item:hover, .cb-menu-item:focus-visible { background: var(--gold-dim); outline: none; }
+.cb-menu-item.danger { color: var(--accent-danger); }
+.cb-menu-item[disabled] { opacity: .4; cursor: default; }
+
+/* ── Stats strip ── */
+.stats-strip { display: flex; align-items: center; gap: 14px; padding: 0 6px; font-size: 12px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; }
+.stats-strip .stat-badge { display: inline-flex; align-items: baseline; gap: 5px; padding: 0; background: none; border: 0; }
+.stats-strip .stat-value { font-size: 14px; color: var(--text-bright); }
+.stats-strip #winPaceValue { max-width: 240px; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: bottom; }
+.stats-strip .status-message { margin-left: auto; }
+
+/* ── Board: effects toggles float in the corner ── */
+.shell-center #effectsPanel { position: absolute; top: 8px; left: 8px; z-index: 5; display: flex; gap: 4px; opacity: .55; transition: opacity var(--transition-fast); }
+.shell-center #effectsPanel:hover { opacity: 1; }
+
+/* ── Panels ── */
+.shell-left > section, .shell-right > section { background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 10px; }
+.shell-right .queue-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.shell-right .queue-list { flex: 1; min-height: 0; overflow-y: auto; }
+.shell-right .live-panel { flex: 0 0 auto; max-height: 45%; overflow-y: auto; }
+.queue-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+/* Narrow right column (Board mode): the buttons drop under the title */
+.queue-header { flex-wrap: wrap; }
+.admin-shell[data-mode="board"] .queue-header-actions { width: 100%; justify-content: flex-start; }
+.queue-header-actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.shell-right .queue-header h3 { margin: 0; }
+.shell-right .queue-header h3 .count { margin-left: 6px; }
+.shell-left .panel-title, .shell-right .panel-title { margin: 0 0 8px; font-size: 12px; letter-spacing: 3px; }
+.shell-left .panel-header { padding: 0 0 8px; margin-bottom: 8px; }
+.shell-left .panel-header .panel-title { margin: 0; }
+.cb-menu-item .icon { width: 15px; height: 15px; vertical-align: -3px; margin-right: 6px; }
+
+.current-task-card[hidden] { display: none; }
+.current-task-card .pending-hex-banner { margin: 0; }
+.current-task-effects { margin-top: 10px; }
+.current-task-effects h4 { margin: 0 0 6px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-tertiary); }
+
+/* ── Drop targets are always comfortably tappable ── */
+.drop-zone, .queue-row { min-height: 44px; }
+.drag-over, .tap-target-hint { outline: 2px dashed var(--gold); outline-offset: 2px; }

@@ -48,3 +48,15 @@ test('every admin pop-up has a dialog size class and a .dialog-footer', () => {
     });
     assert.deepStrictEqual(missing, []);
 });
+
+test('admin.html has the shell, a flow panel template and the three columns', () => {
+    for (const id of ['adminShell', 'flowPanelTemplate', 'flowPanel', 'statsStrip', 'shellLeft', 'shellCenter', 'shellRight', 'currentTaskCard', 'modeToggleBtn', 'modeHint']) {
+        assert.ok(ADMIN_HTML.includes(`id="${id}"`), `missing #${id}`);
+    }
+    assert.ok(!ADMIN_HTML.includes('class="admin-container"'), 'old .admin-container still present');
+});
+
+test('admin.html loads admin-layout.js and admin-shell.css', () => {
+    assert.ok(scriptIndex('admin-layout.js') !== -1);
+    assert.ok(ADMIN_HTML.includes('css/admin-shell.css'));
+});

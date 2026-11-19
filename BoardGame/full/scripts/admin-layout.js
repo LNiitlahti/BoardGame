@@ -59,6 +59,56 @@
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
-    // ── Browser wiring is added in Task 7 ──
-    window.AdminLayout = api;
+    let state = { mode: 'match', override: null, lastPhase: undefined, pendingMode: null };
+    let currentPhase = null;
+
+    /** Is the admin in the middle of something a layout jump would disrupt? */
+    function isBusy() {
+        if (document.querySelector('.dragging, .tap-armed, .modal-overlay.active, .cb-menu:not([hidden])')) return true;
+        if (document.body.classList.contains('challenge-hex-picking') ||
+            document.body.classList.contains('spell-hex-picking')) return true;
+        return [...document.querySelectorAll('.phase-modal')].some(m => m.style.display && m.style.display !== 'none');
+    }
+
+    function render() {
+        const shell = document.getElementById('adminShell');
+        if (shell) shell.dataset.mode = state.mode;
+        const toggle = document.getElementById('modeToggleBtn');
+        if (toggle) toggle.textContent = state.mode === 'board' ? '⇄ Match' : '⇄ Board';
+        const hint = document.getElementById('modeHint');
+        if (hint) {
+            hint.hidden = !state.pendingMode;
+            hint.textContent = state.pendingMode
+                ? `Phase changed → ${state.pendingMode === 'board' ? 'Board' : 'Match'} mode`
+                : '';
+        }
+        const card = document.getElementById('currentTaskCard');
+        if (card) card.dataset.mode = state.mode;
+    }
+
+    function update() {
+        state = decideMode(state, { phase: currentPhase, busy: isBusy() });
+        render();
+    }
+
+    window.AdminLayout = {
+        ...api,
+        onPhase(phase) { currentPhase = phase; update(); },
+        refresh: update,
+        toggle() { state = toggleOverride(state); render(); },
+        applyPendingNow() { state = applyPending(state); render(); },
+        getMode() { return state.mode; }
+    };
+
+    // Re-check a held switch when an interaction ends.
+    ['dragend', 'drop', 'click', 'keyup'].forEach(type =>
+        document.addEventListener(type, () => { if (state.pendingMode) setTimeout(update, 0); }, true));
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'm' && e.key !== 'M') return;
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        const t = e.target;
+        if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+        window.AdminLayout.toggle();
+    });
 })();
