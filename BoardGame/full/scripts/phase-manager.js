@@ -176,6 +176,26 @@ function _warnUntaggedSlotMatch(m) {
 class PhaseManager {
 
     /**
+     * Player ids in a queue entry, from either stored shape: `playerIds`
+     * (manual / imported matches) or `players` objects (auto-generated
+     * matches). Breaks have none. Used by the shared-player slot rule and
+     * by the admin's "already in a live game" check.
+     * @returns {Set<string>}
+     */
+    static matchPlayerIds(match) {
+        const ids = new Set();
+        if (!match || match.isBreak) return ids;
+        for (const side of (match.teams || match.sides || [])) {
+            for (const pid of (side.playerIds || [])) if (pid) ids.add(String(pid));
+            for (const p of (side.players || [])) {
+                const pid = p && (p.id ?? p.uid);
+                if (pid) ids.add(String(pid));
+            }
+        }
+        return ids;
+    }
+
+    /**
      * @param {Object} gameState  Shared mutable game state reference
      * @param {Object} deps
      * @param {UIManager}  deps.uiManager
@@ -1211,17 +1231,17 @@ class PhaseManager {
      * _warnUntaggedSlotMatch above) fires the first time each untagged
      * match is encountered, for dev visibility into the ambiguity.
      */
-    getSlotRequirements(slot) {
+    /**
+     * Predicate: does queue entry `m` belong to `slot` this round? Tagged
+     * entries by their slot/round tag; untagged ones only if created since
+     * the current phase began (they then count for EVERY slot of their kind).
+     */
+    _belongsToSlotFn(slot, { warn = false } = {}) {
         const gs = this._gameState;
-        const queue = gs.gameQueue || [];
-        const sub = this.getSlotSubPhase(slot);
         const currentRoundNumber = gs.currentPhase?.roundNumber;
         const phaseStartedAt = gs.currentPhase?.startedAt;
         const wantChallenge = _isChallengeSlotId(slot);
-        const noun = wantChallenge ? 'challenge' : 'match';
-        const plural = wantChallenge ? 'challenges' : 'matches';
-
-        const belongsToSlot = m => {
+        return m => {
             if (m.isBreak) return false;
             if (wantChallenge ? m.isChallenge !== true : m.isChallenge === true) return false;
             if (m.slot !== undefined) {
@@ -1230,11 +1250,74 @@ class PhaseManager {
             }
             if (!m.createdAt || !phaseStartedAt) return false;
             if (m.createdAt >= phaseStartedAt) {
-                _warnUntaggedSlotMatch(m);
+                if (warn) _warnUntaggedSlotMatch(m);
                 return true;
             }
             return false;
         };
+    }
+
+    /** Player ids in a slot's not-yet-completed matches. */
+    _slotActivePlayerIds(slot) {
+        const belongs = this._belongsToSlotFn(slot);
+        const ids = new Set();
+        for (const m of (this._gameState.gameQueue || [])) {
+            if (!belongs(m) || m.status === 'completed') continue;
+            PhaseManager.matchPlayerIds(m).forEach(id => ids.add(id));
+        }
+        return ids;
+    }
+
+    /**
+     * Shared-player rule: a slot may open its lobby only when none of its
+     * players is in another slot (of the same kind) that is in its lobby or
+     * playing stage, or in any live match outside this slot. With 5 teams x
+     * 2 players Match 1 and Match 2 share everyone, so Match 2 waits for
+     * Match 1; slots with disjoint players still run in parallel.
+     * @returns {Array<{slot: (number|string|null), label: string}>} what blocks
+     *          this slot; empty when it may open its lobby.
+     */
+    getSlotPlayerConflicts(slot) {
+        const gs = this._gameState;
+        const mine = this._slotActivePlayerIds(slot);
+        if (mine.size === 0) return [];
+        const shares = ids => [...ids].some(id => mine.has(id));
+        const blockers = [];
+
+        const siblings = _isChallengeSlotId(slot) ? CHALLENGE_SLOT_IDS : [1, 2];
+        for (const other of siblings) {
+            if (String(other) === String(slot)) continue;
+            const sub = this.getSlotSubPhase(other);
+            if (sub !== 'lobby' && sub !== 'playing') continue;
+            if (shares(this._slotActivePlayerIds(other))) {
+                blockers.push({ slot: other, label: `${_slotLabel(other)} (${sub === 'lobby' ? 'in its lobby' : 'being played'})` });
+            }
+        }
+
+        // Live matches outside this slot (e.g. a stray match started from
+        // elsewhere) block too, unless already covered by a sibling above.
+        const belongs = this._belongsToSlotFn(slot);
+        const blockedSlots = new Set(blockers.map(b => String(b.slot)));
+        const liveElsewhere = (gs.gameQueue || []).filter(m =>
+            m.status === 'ongoing' && !m.isBreak && !belongs(m) &&
+            !siblings.some(s => blockedSlots.has(String(s)) && this._belongsToSlotFn(s)(m)) &&
+            shares(PhaseManager.matchPlayerIds(m)));
+        liveElsewhere.forEach(m => blockers.push({
+            slot: null,
+            label: `live match ${m.matchNumber ? '#' + m.matchNumber : ''}`.trim()
+        }));
+        return blockers;
+    }
+
+    getSlotRequirements(slot) {
+        const gs = this._gameState;
+        const queue = gs.gameQueue || [];
+        const sub = this.getSlotSubPhase(slot);
+        const wantChallenge = _isChallengeSlotId(slot);
+        const noun = wantChallenge ? 'challenge' : 'match';
+        const plural = wantChallenge ? 'challenges' : 'matches';
+
+        const belongsToSlot = this._belongsToSlotFn(slot, { warn: true });
         const pendingMatches = () => queue.filter(m => belongsToSlot(m) &&
             (m.status === 'pending' || m.status === undefined || m.status === 'queued'));
         const ongoingMatches = () => queue.filter(m => belongsToSlot(m) && m.status === 'ongoing');
@@ -1242,12 +1325,22 @@ class PhaseManager {
         switch (sub) {
             case 'setup': {
                 const pending = pendingMatches();
-                return [{
+                const reqs = [{
                     label: pending.length > 0
                         ? `${pending.length} ${pending.length !== 1 ? plural : noun} queued`
                         : `Create a ${noun} for ${_slotLabel(slot)}`,
                     met: pending.length > 0
                 }];
+                if (pending.length > 0) {
+                    const blockers = this.getSlotPlayerConflicts(slot);
+                    if (blockers.length > 0) {
+                        reqs.push({
+                            label: `Waiting for ${blockers.map(b => b.label).join(', ')}: same players`,
+                            met: false
+                        });
+                    }
+                }
+                return reqs;
             }
 
             case 'lobby': {

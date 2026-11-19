@@ -451,13 +451,15 @@
     // BREAK_TYPES` once both scripts share admin.html's global scope.
 
     /** Set of player IDs currently on ANY ongoing/live match in the queue. */
-    function getPlayersInLiveMatches(gameQueue) {
+    // Reads both stored shapes (playerIds and auto-generated players
+    // objects) — the playerIds-only version missed auto-generated matches.
+    const _matchPlayerIds = (m) => window.PhaseManager.matchPlayerIds(m);
+
+    function getPlayersInLiveMatches(gameQueue, excludeIds = new Set()) {
         const liveIds = new Set();
         for (const match of gameQueue || []) {
-            if (match.status !== 'ongoing') continue;
-            for (const team of match.teams || []) {
-                for (const pid of (team.playerIds || [])) liveIds.add(pid);
-            }
+            if (match.status !== 'ongoing' || excludeIds.has(match.id)) continue;
+            _matchPlayerIds(match).forEach(pid => liveIds.add(pid));
         }
         return liveIds;
     }
@@ -472,9 +474,7 @@
     function _excludeLiveConflicts(matches) {
         const liveIds = getPlayersInLiveMatches(gameState.gameQueue);
         if (liveIds.size === 0) return matches;
-        return matches.filter(m =>
-            !(m.teams || []).some(team => (team.playerIds || []).some(pid => liveIds.has(pid)))
-        );
+        return matches.filter(m => ![..._matchPlayerIds(m)].some(pid => liveIds.has(pid)));
     }
 
     function _matchShortLabel(game) {
@@ -840,6 +840,21 @@
      * slot's own sub-phase (setup/lobby/playing/done) instead of a global
      * phase name.
      */
+    /**
+     * The other half of a simultaneous 3v3+2v2 pair, if it is also waiting
+     * in `candidates`: same game, both isSimultaneous, linked by
+     * linkedMatch when present, and no shared players.
+     */
+    function _pairPartner(match, candidates) {
+        if (!match?.isSimultaneous) return null;
+        const mine = _matchPlayerIds(match);
+        return candidates.find(m =>
+            m.id !== match.id && m.isSimultaneous && m.game === match.game &&
+            (match.linkedMatch == null || match.linkedMatch === m.matchNumber || m.linkedMatch === match.matchNumber) &&
+            ![..._matchPlayerIds(m)].some(pid => mine.has(pid))
+        ) || null;
+    }
+
     function _computeSlotStep(slot) {
         const sub = _phaseManager.getSlotSubPhase(slot);
         const pendingSlot = _pendingSlotMatches(slot);
@@ -854,6 +869,14 @@
                 return {
                     text: `Create a match for Match ${slot} — drag players into sides, or auto-generate.`,
                     primary: { label: '⚡ Auto-Generate', action: () => { _setTargetSlot(slot); window.generateSuggestedMatches(); } }
+                };
+            }
+            const blockers = _phaseManager.getSlotPlayerConflicts(slot);
+            if (blockers.length > 0) {
+                return {
+                    text: `${pendingSlot.length} match${pendingSlot.length !== 1 ? 'es' : ''} queued. ` +
+                          `Waiting for ${_esc(blockers.map(b => b.label).join(', '))} — the same players are in it.`,
+                    primary: null
                 };
             }
             return {
@@ -885,9 +908,22 @@
         const available = _excludeLiveConflicts(pendingSlot);
         if (available.length > 0) {
             const next = available[0];
-            const label = _matchShortLabel(next);
             const liveNote = ongoingSlot.length > 0
                 ? `${ongoingSlot.length} live · ` : '';
+            // Both halves of a 3v3+2v2 pair start together.
+            const partner = _pairPartner(next, available);
+            if (partner) {
+                const gameName = _matchShortLabel(next).replace(/^#\d+ /, '');
+                const formats = [next.playType, partner.playType].filter(Boolean).join(' + ');
+                return {
+                    text: `${liveNote}Next up: ${_esc(gameName)} pair (#${next.matchNumber} + #${partner.matchNumber}).`,
+                    primary: {
+                        label: `▶ Start both${formats ? ' (' + formats + ')' : ''}`,
+                        action: () => window.startMatchGroup([next.id, partner.id])
+                    }
+                };
+            }
+            const label = _matchShortLabel(next);
             return {
                 text: `${liveNote}Next up: ${_esc(label)}.`,
                 primary: { label: `▶ Start ${label}`, action: () => window.startMatch(next.id) }
@@ -2570,8 +2606,42 @@
 
     const _origStartMatch = window.startMatch;
 
-    async function _startMatchThenAdvance(gameId) {
-        await _origStartMatch(gameId);
+    /** Start every match in `ids` (a single match, or both halves of a pair). */
+    async function _startAll(ids) {
+        for (const id of ids) await _origStartMatch(id);
+    }
+
+    /**
+     * Why a match (or pair) may not start right now during the matches /
+     * challenge segment, or null. Matches start only when their own slot is
+     * in its Playing stage (after the lobby), and never while one of their
+     * players is in another live game.
+     */
+    function _slotStartProblem(games, phase) {
+        for (const g of games) {
+            const label = _matchShortLabel(g);
+            if (phase === 'challenge_game' && g.isChallenge === true) {
+                const slotId = (!g.slot || g.slot === 'challenge') ? 'challenge1' : g.slot;
+                const sub = _phaseManager.getSlotSubPhase(slotId);
+                if (sub !== 'playing') {
+                    return `${label} belongs to Challenge ${String(slotId).replace('challenge', '')}, which is in ${sub}. It starts from that card once its lobby is ready.`;
+                }
+            } else if (phase === 'matches_in_progress' && g.isChallenge !== true) {
+                const slots = [1, 2].filter(s => _belongsToCurrentSlot(g, s));
+                if (slots.length > 0 && !slots.some(s => _phaseManager.getSlotSubPhase(s) === 'playing')) {
+                    const s = slots[0];
+                    return `${label} belongs to Match ${s}, which is in ${_phaseManager.getSlotSubPhase(s)}. It starts from the Match ${s} card once its lobby is ready.`;
+                }
+            }
+        }
+        const liveIds = getPlayersInLiveMatches(gameState.gameQueue, new Set(games.map(g => g.id)));
+        const busy = games.find(g => [..._matchPlayerIds(g)].some(pid => liveIds.has(pid)));
+        if (busy) return `${_matchShortLabel(busy)} has players who are still in a live game. Record that result first.`;
+        return null;
+    }
+
+    async function _startMatchThenAdvance(ids) {
+        await _startAll(ids);
         if (!_phaseManager || !gameState.currentPhase) return;
         showStatus('Match started — advancing to playing phase...', 'success');
         // Advance until we reach a playing phase, break, or tournament end
@@ -2585,12 +2655,22 @@
     }
 
     window.startMatch = async function (gameId, skipPlacementCheck) {
+        return _guardedStart([gameId], skipPlacementCheck);
+    };
+
+    /** Start both halves of a 3v3+2v2 pair together (slot card "Start both"). */
+    window.startMatchGroup = async function (ids) {
+        return _guardedStart(ids, false);
+    };
+
+    async function _guardedStart(ids, skipPlacementCheck) {
         if (!_initialized) _initPhaseAdapter();
-        const game = (gameState?.gameQueue || []).find(g => g.id === gameId);
+        const games = ids.map(id => (gameState?.gameQueue || []).find(g => g.id === id)).filter(Boolean);
+        const game = games[0];
 
         // Queue breaks and non-phase tournaments keep the original behavior
         if (!game || game.isBreak === true || !_phaseManager || !gameState.currentPhase) {
-            return _origStartMatch(gameId);
+            return _startAll(ids);
         }
 
         // Hex placement is deliberately DEFERRED to next round: hex_placement_1/2
@@ -2616,18 +2696,20 @@
                 bodyHtml: `<p><strong>${overduePlacements}</strong> hex placement${overduePlacements !== 1 ? 's are' : ' is'} still pending from an earlier round — teams should place ${overduePlacements !== 1 ? 'those' : 'that'} tile${overduePlacements !== 1 ? 's' : ''} before the next match starts.</p>`,
                 confirmLabel: 'Start Anyway ' + ICON_SVGS.play,
                 danger: true,
-                onConfirm: () => window.startMatch(gameId, true)
+                onConfirm: () => _guardedStart(ids, true)
             });
             return;
         }
 
         const phase = _phaseManager.getCurrentPhase();
+        const matchLabel = games.map(_matchShortLabel).join(' + ');
 
         // Slot-aware guard: during the matches segment, a match belonging to
         // NEITHER current slot (future-round import, stale tag) used to start
         // silently just because some slot was in 'playing'. It can play, but
         // it won't count toward Match 1 or Match 2 — say so first.
         if (phase === 'matches_in_progress' && game.isChallenge !== true &&
+            games.length === 1 &&
             !_belongsToCurrentSlot(game, 1) && !_belongsToCurrentSlot(game, 2)) {
             const foreignLabel = _matchShortLabel(game);
             const tagDesc = game.roundNumber !== undefined
@@ -2639,18 +2721,25 @@
                           `<p>It can play, but it will <strong>not</strong> count toward Match 1 or Match 2. To play it as this round’s match, retag it first (Edit Match → Round/Slot).</p>`,
                 confirmLabel: 'Start Anyway',
                 danger: true,
-                onConfirm: () => _origStartMatch(gameId)
+                onConfirm: () => _origStartMatch(game.id)
             });
             return;
         }
 
-        // Playing phases: this is the expected place to start matches
-        if (_phaseManager.isPlayingPhase(phase)) {
-            return _origStartMatch(gameId);
+        // Matches / challenge segment: only from the match's own slot, once
+        // that slot is in Playing, and never over a player who is still in a
+        // live game. No "start anyway" here: the slot cards are the way in,
+        // and per-slot Force Advance is the explicit override.
+        if (phase === 'matches_in_progress' || phase === 'challenge_game') {
+            const problem = _slotStartProblem(games, phase);
+            if (problem) {
+                showStatus(problem, 'warning');
+                return;
+            }
+            return _startAll(ids);
         }
 
         const phaseLabel = PHASE_LABELS[phase] || phase;
-        const matchLabel = _matchShortLabel(game);
 
         // Setup phases: starting now jumps ahead — tell the admin what gets skipped
         if (SETUP_PHASES.includes(phase)) {
@@ -2661,7 +2750,7 @@
                 title: 'Start Match Early?',
                 bodyHtml: `<p>You are in <strong>${_esc(phaseLabel)}</strong>. Starting <strong>${_esc(matchLabel)}</strong> now skips ${skips} and jumps straight to the playing phase.</p>`,
                 confirmLabel: 'Start & Skip ' + ICON_SVGS.play,
-                onConfirm: () => _startMatchThenAdvance(gameId)
+                onConfirm: () => _startMatchThenAdvance(ids)
             });
             return;
         }
@@ -2675,7 +2764,7 @@
                 bodyHtml: `<p>Lobby status: <strong>${summary || 'unknown'}</strong>.</p>` +
                           `<p>Start <strong>${_esc(matchLabel)}</strong> anyway? The remaining ready checks will be skipped.</p>`,
                 confirmLabel: 'Start Anyway ' + ICON_SVGS.play,
-                onConfirm: () => _startMatchThenAdvance(gameId)
+                onConfirm: () => _startMatchThenAdvance(ids)
             });
             return;
         }
@@ -2688,9 +2777,9 @@
                       `<p><strong>${_esc(matchLabel)}</strong> will start, but the phase will <strong>not</strong> advance. The Flow Panel may no longer match reality.</p>`,
             confirmLabel: 'Start Anyway',
             danger: true,
-            onConfirm: () => _origStartMatch(gameId)
+            onConfirm: () => _startAll(ids)
         });
-    };
+    }
 
     // ══════════════════════════════════════════════════════════════
     //  WIN CONDITION — editable after setup (experimental)

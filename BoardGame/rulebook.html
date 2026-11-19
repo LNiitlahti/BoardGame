@@ -1213,9 +1213,15 @@
 
                 <p>
                     Each round runs <strong>two matches</strong>, called <strong>Match 1</strong> and
-                    <strong>Match 2</strong>. They are deliberately built so that no player appears in
-                    both, which means they run <strong>independently and in parallel</strong> — Match 2
-                    can still be in setup while Match 1 is already being played, and vice versa.
+                    <strong>Match 2</strong>. A match can only open its lobby when none of its players is
+                    still in the other match's lobby or game. With five teams of two, every match uses
+                    all ten players, so the two are played <strong>one after the other</strong>: Match 2
+                    opens its lobby once Match 1 is finished. (If the two matches ever have no players in
+                    common, they run in parallel.)
+                </p>
+                <p>
+                    In a <strong>3v3 + 2v2</strong> match, both games start together, and the match is only
+                    finished when both results are in.
                 </p>
 
                 <p>Each slot walks its own four stages:</p>

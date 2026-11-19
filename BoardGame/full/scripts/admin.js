@@ -5015,7 +5015,6 @@ function renderMatchQueue() {
                 </div>
                 <div class="match-actions">
                     <button class="expand-btn" onclick="toggleQueueRowDetails(${game.id}, event)" title="${expanded ? 'Hide players' : 'Show players'}">${expanded ? '&#x25B4;' : '&#x25BE;'}</button>
-                    ${!isOngoing ? `<button class="start-btn" onclick="event.stopPropagation(); startMatch(${game.id})" title="Start match">${ICON_SVGS.play}</button>` : ''}
                     ${!isOngoing ? `<button class="edit-btn" onclick="event.stopPropagation(); openEditMatchModal(${game.id})" title="Edit match">${ICON_SVGS.settings}</button>` : ''}
                     ${!isOngoing ? `<button class="move-top-btn" onclick="event.stopPropagation(); moveMatchToTop(${game.id})" title="Play next">${ICON_SVGS.arrowUpToLine}</button>` : ''}
                     <button class="delete-btn" onclick="event.stopPropagation(); removeFromQueue(${game.id})" title="Remove">${ICON_SVGS.x}</button>
@@ -5533,10 +5532,10 @@ function openQuickConfirm(gameId) {
             <div class="confirm-team" style="${borderStyle}">
                 <div class="confirm-team-label">Team ${label}</div>
                 <div class="confirm-team-players">${teamNames}</div>
-                <button class="btn confirm-win-btn" style="${buttonStyle}"
+                ${isOngoing ? `<button class="btn confirm-win-btn" style="${buttonStyle}"
                         onclick="quickConfirmResult(${gameId}, ${idx})">
                     Team ${label} Wins
-                </button>
+                </button>` : ''}
             </div>
         `;
     }).join('<div class="confirm-vs">VS</div>');
@@ -5548,17 +5547,26 @@ function openQuickConfirm(gameId) {
     const matchNumDisplay = game.matchNumber ? `Match #${game.matchNumber} - ` : '';
     const challengeBadgeHtml = isChallenge ? '<span class="challenge-badge" style="margin-right: 8px;">CHALLENGE</span>' : '';
 
+    // A match that hasn't started can't be started or scored from here:
+    // it starts from its slot card in the Live panel once its lobby is
+    // ready (the slot flow's ready check and Discord pull), and only a live
+    // match has a result to record.
+    const curRound = gameState?.currentPhase?.roundNumber;
+    const roundNote = (game.roundNumber !== undefined && game.roundNumber !== curRound) ? ` in Round ${game.roundNumber}` : '';
+    const slotHint = (isChallenge ? 'its Challenge card' : (game.slot ? `the Match ${game.slot} card` : 'its slot card')) + roundNote;
     content.innerHTML = `
-        <h4>${isOngoing ? 'Confirm Result' : 'Start & Confirm Result'}</h4>
+        <h4>${isOngoing ? 'Confirm Result' : 'Queued match'}</h4>
         <div class="confirm-game-name">${challengeBadgeHtml}${matchNumDisplay}${gameName} ${game.playType ? '(' + game.playType + ')' : ''}</div>
 
         <div class="confirm-matchup ${teams.length > 2 ? 'multi-team' : ''}">
             ${teamCardsHtml}
         </div>
 
+        ${!isOngoing ? `<p class="modal-hint">Not started yet. It starts from ${slotHint} in the Live panel once its lobby is ready.</p>` : ''}
+
         <div class="confirm-actions dialog-footer">
-            ${!isOngoing ? `<button class="btn secondary" onclick="startMatch(${gameId}); closeResultConfirm();">Start Match (No Result Yet)</button>` : ''}
-            <button class="btn secondary" onclick="closeResultConfirm()">Cancel</button>
+            ${!isOngoing ? `<button class="btn secondary" onclick="closeResultConfirm(); openEditMatchModal(${gameId});">Edit&hellip;</button>` : ''}
+            <button class="btn secondary" onclick="closeResultConfirm()">${isOngoing ? 'Cancel' : 'Close'}</button>
         </div>
     `;
 
