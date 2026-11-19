@@ -2131,7 +2131,7 @@
         (gameState.teams || []).forEach(team => {
             const pts = byTeam[team.id]?.points || 0;
             total += pts;
-            rows.push({ team, pts });
+            rows.push({ team, pts, hearts: byTeam[team.id]?.hearts || [] });
         });
 
         return { rows, frozenCount, total, matchesPlayed };
@@ -2142,11 +2142,20 @@
         const round = gameState.currentPhase?.roundNumber || 0;
 
         let body = '<p>Territory points from controlled heart hexes will be added to team totals. <strong>This cannot be undone.</strong></p>';
-        body += rows.map(({ team, pts }) => {
+        // Where each team's points come from: every paid heart, with how
+        // many matches it was held through. A wrong hex is easy to spot here
+        // (Cancel, fix it on the board, award again).
+        const heartLabel = h => {
+            const kind = h.type === 'mountain-heart' ? 'Mountain heart' : 'Side heart';
+            return `${kind} ${_esc(h.coord)}${h.matches > 1 ? ` &times;${h.matches}` : ''}`;
+        };
+        body += rows.map(({ team, pts, hearts }) => {
             const color = team.color || '#888';
+            const why = hearts.length ? hearts.map(heartLabel).join(', ') : 'no hearts';
             return `<div class="points-preview-row">` +
                    `<span class="team-cell"><span class="dot" style="background:${color}"></span>${_esc(team.name || ('Team ' + team.id))}</span>` +
                    `<span class="pts ${pts > 0 ? '' : 'zero'}">+${pts}</span>` +
+                   `<span class="points-preview-hearts">${why}</span>` +
                    `</div>`;
         }).join('');
         if (frozenCount > 0) {

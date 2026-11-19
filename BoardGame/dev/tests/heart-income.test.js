@@ -349,3 +349,30 @@ test('HEART_INCOME is the single source of the values, and getHexValue reads it'
     assert.strictEqual(boardModule.getHexValue(-4, 2), 1);
     assert.strictEqual(boardModule.getHexValue(3, 0), 0);
 });
+
+test('byTeam lists each paid heart with its type and how many matches it paid for', () => {
+    // Ravens hold the mountain through both matches and capture side heart
+    // q2r2 before match 2; Wolves hold nothing.
+    const gs = makeState({
+        heartHexControl: { q0r0: 1, q2r2: 1 },
+        gameHistory: [
+            { roundNumber: 3, heartControlSnapshot: { q0r0: 1 } },
+            { roundNumber: 3, heartControlSnapshot: { q0r0: 1, q2r2: 1 } }
+        ]
+    });
+    const { byTeam } = calculateHeartIncome(gs, boardModule, 3);
+    assert.deepStrictEqual(byTeam[1].hearts, [
+        { coord: 'q0r0', type: 'mountain-heart', matches: 2, points: 4 },
+        { coord: 'q2r2', type: 'side-heart', matches: 1, points: 1 }
+    ]);
+    assert.deepStrictEqual(byTeam[2].hearts, []);
+});
+
+test('a frozen (contested) heart is not listed', () => {
+    const gs = makeState({
+        heartHexControl: { q2r2: 1 },
+        gameHistory: [{ roundNumber: 3, heartControlSnapshot: { q2r2: 1 } }],
+        gameQueue: [{ isChallenge: true, challengeHexCoord: 'q2r2', status: 'pending' }]
+    });
+    assert.deepStrictEqual(calculateHeartIncome(gs, boardModule, 3).byTeam[1].hearts, []);
+});

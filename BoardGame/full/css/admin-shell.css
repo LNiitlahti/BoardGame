@@ -214,3 +214,7 @@
 .shell-right .live-match-card .live-match-info { flex: 1 1 100%; min-width: 0; }
 .live-match-actions { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
 .ongoing-offflow-note { margin: 4px 0; font-size: 11px; color: var(--accent-warning, #f7ba32); }
+
+/* ── Award-points preview: team, points, and the hearts that pay them ── */
+.points-preview-row { flex-wrap: wrap; }
+.points-preview-row .points-preview-hearts { flex: 1 1 100%; font-size: 12px; color: var(--text-secondary); }

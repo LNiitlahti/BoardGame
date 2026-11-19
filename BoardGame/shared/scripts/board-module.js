@@ -370,16 +370,19 @@ function countScoringMatchesInRound(gameState, roundNumber) {
  * @returns {{
  *   roundPlayed: boolean,
  *   matchesPlayed: number,
- *   byTeam: Object<string, {points: number, mountainCount: number, sideCount: number}>
+ *   byTeam: Object<string, {points: number, mountainCount: number, sideCount: number,
+ *            hearts: Array<{coord: string, type: string, matches: number, points: number}>}>
  * }}
  * byTeam counts are heart-match credits: a mountain heart held through two
- * matches is mountainCount 2 (and +4 points).
+ * matches is mountainCount 2 (and +4 points). `hearts` lists each paid
+ * heart once (sorted by coord) with the matches it paid for, so previews
+ * can show where a team's points come from.
  */
 function calculateHeartIncome(gameState, boardModule, roundNumber) {
     const teams = gameState?.teams || [];
     const byTeam = {};
     teams.forEach(team => {
-        byTeam[team.id] = { points: 0, mountainCount: 0, sideCount: 0 };
+        byTeam[team.id] = { points: 0, mountainCount: 0, sideCount: 0, hearts: [] };
     });
 
     // Collapse split slots: one heart-match per slot, represented by the
@@ -431,8 +434,17 @@ function calculateHeartIncome(gameState, boardModule, roundNumber) {
             entry.points += value;
             if (hexType === 'mountain-heart') entry.mountainCount++;
             else entry.sideCount++;
+
+            let heart = entry.hearts.find(h => h.coord === coord);
+            if (!heart) {
+                heart = { coord, type: hexType, matches: 0, points: 0 };
+                entry.hearts.push(heart);
+            }
+            heart.matches++;
+            heart.points += value;
         });
     });
+    Object.values(byTeam).forEach(e => e.hearts.sort((a, b) => a.coord.localeCompare(b.coord)));
 
     return { roundPlayed, matchesPlayed, byTeam };
 }
