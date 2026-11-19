@@ -823,10 +823,13 @@ async function ch7Undo(page) {
 
   // Click the real "+" button — a points adjustment is the cleanest undo
   // subject (single scalar, no cascade into history/queue). It lives in the
-  // team details pop-up, opened from the team's row in the left column.
+  // team details pop-up (team row in the left column → Correct points…).
   const rowSel = `button.team-row[onclick="openTeamDetails(${before.id})"]`;
   await page.waitForSelector(rowSel, { timeout: 15000 });
   await page.click(rowSel);
+  // ± is a correction tool, tucked behind "Correct points…".
+  await page.waitForSelector('#teamDetailsModal .points-correction > summary', { visible: true, timeout: 15000 });
+  await page.click('#teamDetailsModal .points-correction > summary');
   const plusSel = `#teamDetailsModal button[onclick="adjustTeamPoints(${before.id}, 1, event)"]`;
   await page.waitForSelector(plusSel, { visible: true, timeout: 15000 });
   await page.click(plusSel);

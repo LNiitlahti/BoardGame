@@ -969,8 +969,15 @@ function closeSpellHistory() {
 // ── Team details pop-up (opened from a team row) ──
 let _teamDetailsOpenId = null;
 
+// Point corrections are tucked behind "Correct points…": the flow awards
+// points itself (match results, territory points), so ± is a correction
+// tool, not the normal way to change a score. Remembered while the pop-up
+// is open, because live updates re-render it.
+let _teamPointsCorrectionOpen = false;
+
 function openTeamDetails(teamId) {
     _teamDetailsOpenId = teamId;
+    _teamPointsCorrectionOpen = false;
     renderTeamDetails(teamId);
     document.getElementById('teamDetailsModal')?.classList.add('active');
 }
@@ -989,13 +996,18 @@ function renderTeamDetails(teamId) {
     if (title) { title.textContent = team.name || `Team ${team.id}`; title.style.color = color; }
     const players = (team.players || []).map(p => `<li>${escapeHtml(p.name)}</li>`).join('');
     body.innerHTML = `
-        <div class="team-points-row">
-            <label>Points:</label>
-            <button class="btn secondary points-btn" onclick="adjustTeamPoints(${team.id}, -1, event)">-</button>
-            <input type="number" class="points-input" value="${team.points || 0}"
-                   onchange="setTeamPoints(${team.id}, this.value)">
-            <button class="btn secondary points-btn" onclick="adjustTeamPoints(${team.id}, 1, event)">+</button>
-        </div>
+        <p class="team-details-points"><span>Points</span> <strong>${team.points || 0}</strong></p>
+        <details class="points-correction" ${_teamPointsCorrectionOpen ? 'open' : ''}
+                 ontoggle="_teamPointsCorrectionOpen = this.open">
+            <summary>Correct points&hellip;</summary>
+            <p class="modal-hint">Points are awarded by the flow (match results and territory points). Use this only to fix a mistake; every change is logged and can be undone.</p>
+            <div class="team-points-row">
+                <button class="btn secondary points-btn" onclick="adjustTeamPoints(${team.id}, -1, event)">-</button>
+                <input type="number" class="points-input" value="${team.points || 0}"
+                       onchange="setTeamPoints(${team.id}, this.value)">
+                <button class="btn secondary points-btn" onclick="adjustTeamPoints(${team.id}, 1, event)">+</button>
+            </div>
+        </details>
         <p class="team-split-count">
             Split: <b>${team.splitCount || 0}</b> &middot; Challenge: <b>${team.challengeSplitCount || 0}</b> &middot; Wins: <b>${team.gamesWon || 0}</b>
         </p>
