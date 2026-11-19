@@ -122,6 +122,10 @@ async function part1_adminHtml(browser, baseUrl, tournamentId) {
   console.log('\n========== PART 1: admin.html — per-slot Force Advance parity ==========\n');
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 900 });
+  // forceAdvanceSlot() asks for a native confirm() since 13ef6e4; an
+  // unhandled dialog blocks every later page.evaluate. Accept it, as the
+  // admin confirming the force would.
+  page.on('dialog', d => d.accept());
   await login(page, baseUrl, process.env.TD_EMAIL, process.env.TD_PASSWORD);
   await gotoTournamentPage(page, baseUrl, 'full/admin.html', tournamentId);
 

@@ -575,13 +575,14 @@ async function runMatchSlot(page, slot, round, { screenshots = true } = {}) {
     await page.click(btnSel);
     await sleep(900);
 
-    // Auto-Generate opens the balance-preview modal
-    if (await isModalOpen(page, 'autoMatchModal')) {
+    // Auto-Generate opens the match pop-up already Auto-filled (5v5 sides,
+    // or a 3v3+2v2 pair preview); its primary button queues it.
+    if (await isModalOpen(page, 'matchDialog')) {
       if (screenshots && guard === 0) await shot(page, `r${round}-slot${slot}-automatch-preview`);
-      await page.evaluate(() => window.confirmAutoMatch());
+      await page.click('#matchDialogAddBtn');
       await sleep(1600);
     } else if (/auto-generate/i.test(label)) {
-      // No preview modal means generateSuggestedMatches() bailed via
+      // No pop-up means generateSuggestedMatches() bailed via
       // showStatus() — surface the real reason instead of silently retrying.
       // The most common cause is SmartMatchGenerator's hard "exactly 5 teams"
       // requirement (smart-match-generator.js:302).
@@ -820,10 +821,14 @@ async function ch7Undo(page) {
   });
   assert(before, 'no team available for the undo test');
 
-  // Click the real "+" button on the team card — a points adjustment is the
-  // cleanest undo subject (single scalar, no cascade into history/queue).
-  const plusSel = `button[onclick="adjustTeamPoints(${before.id}, 1, event)"]`;
-  await page.waitForSelector(plusSel, { timeout: 15000 });
+  // Click the real "+" button — a points adjustment is the cleanest undo
+  // subject (single scalar, no cascade into history/queue). It lives in the
+  // team details pop-up, opened from the team's row in the left column.
+  const rowSel = `button.team-row[onclick="openTeamDetails(${before.id})"]`;
+  await page.waitForSelector(rowSel, { timeout: 15000 });
+  await page.click(rowSel);
+  const plusSel = `#teamDetailsModal button[onclick="adjustTeamPoints(${before.id}, 1, event)"]`;
+  await page.waitForSelector(plusSel, { visible: true, timeout: 15000 });
   await page.click(plusSel);
 
   const expectPoints = before.points + 1;
@@ -841,6 +846,7 @@ async function ch7Undo(page) {
     });
   const bumped = await teamPoints(page, before.id);
   log(`  points ${before.points} -> ${bumped}`);
+  await page.evaluate(() => window.closeTeamDetails());
   await shot(page, 'undo-before');
 
   await page.evaluate(() => window.undoLastAction());
