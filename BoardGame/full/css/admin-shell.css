@@ -208,3 +208,9 @@
     .cb-phase { min-width: 0; }
     .stats-strip { flex-wrap: wrap; white-space: normal; }
 }
+
+/* ── Live match on a slot card: result + edit + back to queue ── */
+.shell-right .live-match-card { flex-wrap: wrap; }
+.shell-right .live-match-card .live-match-info { flex: 1 1 100%; min-width: 0; }
+.live-match-actions { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.ongoing-offflow-note { margin: 4px 0; font-size: 11px; color: var(--accent-warning, #f7ba32); }

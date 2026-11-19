@@ -796,8 +796,10 @@ function updateDisplay() {
     // Update board
     renderBoard();
 
-    // Update queue
+    // Update queue (not-started entries) and the live list (live breaks and
+    // any live match that isn't on a Match/Challenge card)
     renderMatchQueue();
+    renderOngoingMatches();
 
     // Render match creation zones (in case sides changed)
     renderMatchCreationZones();
@@ -4893,15 +4895,17 @@ function renderMatchQueue() {
     const isFutureRound = g => !g.isBreak && curRound !== undefined &&
         g.roundNumber !== undefined && g.roundNumber > curRound;
 
+    // The queue is for planning: only entries that haven't started. Live
+    // matches are run from their Match/Challenge card in the Live panel
+    // (result, edit, back to queue); live breaks from the ongoing list.
     if (curRound !== undefined) {
-        const thisRound = allGames.filter(g => !isFutureRound(g)).length;
-        countEl.textContent = `${thisRound} now · ${allGames.length} total`;
+        const thisRound = queuedGames.filter(g => !isFutureRound(g)).length;
+        countEl.textContent = `${thisRound} now · ${queuedGames.length} total`;
     } else {
-        countEl.textContent = allGames.length;
+        countEl.textContent = queuedGames.length;
     }
 
-    // Render ongoing matches first, then queued
-    const allToRender = [...ongoingGames, ...queuedGames];
+    const allToRender = queuedGames;
 
     if (allToRender.length === 0) {
         container.innerHTML = '<p class="queue-empty">No matches in queue</p>';
@@ -5318,10 +5322,14 @@ function renderOngoingMatches() {
     const container = document.getElementById('ongoingMatchesList');
     if (!container) return;
 
-    const ongoing = (gameState?.gameQueue || []).filter(g => g.status === 'ongoing');
+    // Live matches on a Match/Challenge card are run from that card. This
+    // list keeps live breaks, plus any live match that is on no card (only
+    // possible after a forced phase change) so it can still be resolved.
+    const ongoing = (gameState?.gameQueue || []).filter(g =>
+        g.status === 'ongoing' && !(window.isOnFlowCard?.(g)));
 
     if (ongoing.length === 0) {
-        container.innerHTML = '<p class="queue-empty">No matches in progress</p>';
+        container.innerHTML = '';
         return;
     }
 
@@ -5376,6 +5384,7 @@ function renderOngoingMatches() {
         return `
             <div class="ongoing-match ${isChallenge ? 'challenge' : ''}" onclick="openQuickConfirm(${game.id})">
                 <div class="ongoing-game-name">${challengeBadge}${matchNumDisplay}${gameName}</div>
+                <div class="modal-hint ongoing-offflow-note">Live, but not on a Match card (a phase was forced past it). Record its result or move it back to the queue.</div>
                 <div class="ongoing-teams">${teamNamesHtml}</div>
                 <div class="ongoing-actions">${winButtonsHtml}</div>
             </div>

@@ -1075,7 +1075,11 @@
                                 <span class="live-match-game">${_esc(game.matchNumber ? '#' + game.matchNumber + ' ' : '')}${_esc(gameName)}</span>
                                 <span class="live-match-players">${_esc(matchup)}</span>
                             </div>
-                            <button class="btn-small primary" onclick="event.stopPropagation(); openQuickConfirm(${game.id})">${ICON_SVGS.check} Confirm Game Result</button>
+                            <div class="live-match-actions">
+                                <button class="btn-small primary" onclick="event.stopPropagation(); openQuickConfirm(${game.id})">${ICON_SVGS.check} Confirm Game Result</button>
+                                <button class="btn-small secondary" onclick="event.stopPropagation(); openEditMatchModal(${game.id})" title="Edit live match (players / game)">${ICON_SVGS.settings}</button>
+                                <button class="btn-small secondary" onclick="event.stopPropagation(); revertMatchToQueue(${game.id})" title="Move back to queue (undo start)">${ICON_SVGS.rewind}</button>
+                            </div>
                         </div>
                         ${voteButtonsHtml}`;
                 }).join('')
@@ -1241,7 +1245,11 @@
                                 <span class="live-match-game">${_esc(game.matchNumber ? '#' + game.matchNumber + ' ' : '')}${_esc(gameName)}</span>
                                 <span class="live-match-players">${_esc(matchup)}</span>
                             </div>
-                            <button class="btn-small primary" onclick="event.stopPropagation(); openQuickConfirm(${game.id})">${ICON_SVGS.check} Confirm Game Result</button>
+                            <div class="live-match-actions">
+                                <button class="btn-small primary" onclick="event.stopPropagation(); openQuickConfirm(${game.id})">${ICON_SVGS.check} Confirm Game Result</button>
+                                <button class="btn-small secondary" onclick="event.stopPropagation(); openEditMatchModal(${game.id})" title="Edit live match (players / game)">${ICON_SVGS.settings}</button>
+                                <button class="btn-small secondary" onclick="event.stopPropagation(); revertMatchToQueue(${game.id})" title="Move back to queue (undo start)">${ICON_SVGS.rewind}</button>
+                            </div>
                         </div>
                         ${voteButtonsHtml}`;
                 }).join('')
@@ -3298,6 +3306,26 @@
         document.getElementById('editMatchModal').classList.add('active');
     };
 
+    /**
+     * Is this live match shown on a flow card (Match 1/2 or Challenge 1-4
+     * in its Playing stage)? Those cards own its controls; admin.js's
+     * ongoing list only shows live matches that are NOT on a card (left
+     * live by a forced phase change), as a recovery entry.
+     */
+    window.isOnFlowCard = function (game) {
+        if (!_initialized) _initPhaseAdapter();
+        if (!_phaseManager || !gameState.currentPhase || !game || game.isBreak) return false;
+        const phase = _phaseManager.getCurrentPhase();
+        if (phase === 'matches_in_progress' && game.isChallenge !== true) {
+            return [1, 2].some(s => _belongsToCurrentSlot(game, s) && _phaseManager.getSlotSubPhase(s) === 'playing');
+        }
+        if (phase === 'challenge_game' && game.isChallenge === true) {
+            const slotId = (!game.slot || game.slot === 'challenge') ? 'challenge1' : game.slot;
+            return _phaseManager.getSlotSubPhase(slotId) === 'playing';
+        }
+        return false;
+    };
+
     /** Send a mis-started match back to the queue as not started. */
     window.revertMatchToQueue = function (gameId) {
         const game = (gameState?.gameQueue || []).find(g => g.id === gameId);
@@ -3316,33 +3344,11 @@
     };
 
     /**
-     * The shared renderers omit edit controls on ongoing matches — inject
-     * ⚙ (edit live) and ⏪ (back to queue) after every display update.
+     * Live matches on a Match/Challenge card get ⚙/⏪ from the card itself;
+     * the ongoing list (live matches on no card) gets them injected here
+     * after every display update.
      */
     function _injectLiveMatchControls() {
-        // Ongoing entries in the queue list (have data-queue-id)
-        document.querySelectorAll('#matchQueue .queue-item.ongoing').forEach(el => {
-            const actions = el.querySelector('.match-actions');
-            if (!actions || actions.querySelector('.live-edit-btn')) return;
-            const game = (gameState?.gameQueue || []).find(g => String(g.id) === String(el.dataset.queueId));
-            if (!game || game.isBreak === true) return;
-
-            const editBtn = document.createElement('button');
-            editBtn.className = 'edit-btn live-edit-btn';
-            editBtn.title = 'Edit live match (players / game)';
-            editBtn.innerHTML = ICON_SVGS.settings;
-            editBtn.onclick = (e) => { e.stopPropagation(); window.openEditMatchModal(game.id); };
-
-            const revertBtn = document.createElement('button');
-            revertBtn.className = 'move-top-btn live-revert-btn';
-            revertBtn.title = 'Move back to queue (undo start)';
-            revertBtn.innerHTML = ICON_SVGS.rewind;
-            revertBtn.onclick = (e) => { e.stopPropagation(); window.revertMatchToQueue(game.id); };
-
-            actions.insertBefore(revertBtn, actions.firstChild);
-            actions.insertBefore(editBtn, actions.firstChild);
-        });
-
         // Ongoing match cards above the queue (id only available via onclick attr)
         document.querySelectorAll('#ongoingMatchesList .ongoing-match').forEach(el => {
             if (el.querySelector('.live-edit-btn')) return;
@@ -3359,6 +3365,13 @@
             editBtn.innerHTML = ICON_SVGS.settings;
             editBtn.onclick = (e) => { e.stopPropagation(); window.openEditMatchModal(game.id); };
             actions.appendChild(editBtn);
+
+            const revertBtn = document.createElement('button');
+            revertBtn.className = 'btn-small secondary live-revert-btn';
+            revertBtn.title = 'Move back to queue (undo start)';
+            revertBtn.innerHTML = ICON_SVGS.rewind;
+            revertBtn.onclick = (e) => { e.stopPropagation(); window.revertMatchToQueue(game.id); };
+            actions.appendChild(revertBtn);
         });
     }
 

@@ -91,3 +91,27 @@ test('the match pop-up holds the match-building fields', () => {
 test('admin.html loads match-dialog.js after admin.js', () => {
     assert.ok(scriptIndex('match-dialog.js') > scriptIndex('scripts/admin.js'));
 });
+
+// ── The queue is for planning; live actions belong to the flow cards ──
+const ADMIN_JS = fs.readFileSync(path.resolve(__dirname, '../../full/scripts/admin.js'), 'utf8');
+function fnSource(src, name) {
+    const plain = src.indexOf(`\nfunction ${name}(`);
+    const start = plain !== -1 ? plain : src.indexOf(`\nasync function ${name}(`);
+    assert.ok(start !== -1, `${name} not found`);
+    const next = src.slice(start + 1).search(/\n(async )?function \w+\(/);
+    return src.slice(start, next === -1 ? undefined : start + 1 + next);
+}
+
+test('queue rows cannot start or score a match (only breaks keep Start)', () => {
+    const src = fnSource(ADMIN_JS, 'renderMatchQueue');
+    assert.ok(!/quickConfirmResult/.test(src), 'queue rows must not record results');
+    const starts = src.match(/startMatch\(/g) || [];
+    assert.strictEqual(starts.length, 1, 'only the break row may have a Start button');
+    assert.ok(/const allToRender = queuedGames;/.test(src), 'live matches are not listed in the queue');
+});
+
+test('the result buttons in the match pop-up exist only for a live match', () => {
+    const src = fnSource(ADMIN_JS, 'openQuickConfirm');
+    assert.ok(/\$\{isOngoing \? `<button class="btn confirm-win-btn"/.test(src));
+    assert.ok(!/Start Match \(No Result Yet\)/.test(src));
+});
