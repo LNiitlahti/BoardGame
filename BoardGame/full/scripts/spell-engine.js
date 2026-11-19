@@ -2820,6 +2820,8 @@ class SpellEngine {
 
         if (effects.length === 0) {
             container.innerHTML = '<p style="text-align: center; opacity: 0.7;">No active effects</p>';
+            // admin.html shows/hides its Current task card from this list
+            if (typeof updateCurrentTaskCard === 'function') updateCurrentTaskCard();
             return;
         }
 
@@ -2850,6 +2852,7 @@ class SpellEngine {
                 </div>
             `;
         }).join('');
+        if (typeof updateCurrentTaskCard === 'function') updateCurrentTaskCard();
     }
 
     /** Render spell phase controls in the phase indicator bar */

@@ -950,6 +950,16 @@ function renderTeamsList() {
     if (_teamDetailsOpenId !== null) renderTeamDetails(_teamDetailsOpenId);
 }
 
+// ── Spell history pop-up (⋯ More → Spell history) ──
+// spell-engine.js renders the list into #spellHistory whenever state changes.
+function openSpellHistory() {
+    document.getElementById('spellHistoryModal')?.classList.add('active');
+}
+
+function closeSpellHistory() {
+    document.getElementById('spellHistoryModal')?.classList.remove('active');
+}
+
 // ── Team details pop-up (opened from a team row) ──
 let _teamDetailsOpenId = null;
 
@@ -6844,6 +6854,7 @@ document.addEventListener('keydown', (e) => {
         closeNextRoundModal();
         closeAutoMatchModal();
         closeTeamDetails();
+        closeSpellHistory();
     }
 });
 
@@ -6856,7 +6867,8 @@ const modalDismissMap = {
     'nextRoundModal': closeNextRoundModal,
     'autoMatchModal': closeAutoMatchModal,
     'clearQueueModal': closeClearQueueModal,
-    'teamDetailsModal': closeTeamDetails
+    'teamDetailsModal': closeTeamDetails,
+    'spellHistoryModal': closeSpellHistory
 };
 
 Object.entries(modalDismissMap).forEach(([id, closeFn]) => {
