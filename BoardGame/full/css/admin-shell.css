@@ -159,3 +159,7 @@
 }
 .status-message:not(.visible) { pointer-events: none; }
 .status-message .status-action { margin-left: 8px; }
+
+/* ── Edit pop-up ── */
+#editMatchModal .edit-match-form { gap: 12px; margin-bottom: 0; }
+#editMatchModal .dialog-columns > * { min-width: 0; }

@@ -4348,7 +4348,9 @@ function populateEditGameTypeDropdown() {
 function renderEditMatchModal() {
     const container = document.getElementById('editSidesContainer');
 
-    container.innerHTML = editMatchState.sides.map((side, sideIdx) => {
+    // Sides sit next to each other (admin-dialog.css .dialog-columns), so a
+    // 5v5 fits the pop-up without scrolling at 1920x1080.
+    const sidesHtml = editMatchState.sides.map((side, sideIdx) => {
         const label = SIDE_LABELS[sideIdx] || (sideIdx + 1);
 
         // Render players in this side
@@ -4400,6 +4402,7 @@ function renderEditMatchModal() {
             </div>
         `;
     }).join('');
+    container.innerHTML = `<div class="dialog-columns" style="--dialog-cols: ${Math.min(editMatchState.sides.length, 3)}">${sidesHtml}</div>`;
 }
 
 /**
