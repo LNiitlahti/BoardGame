@@ -2143,8 +2143,10 @@
 
         let body = '<p>Territory points from controlled heart hexes will be added to team totals. <strong>This cannot be undone.</strong></p>';
         // Where each team's points come from: every paid heart, with how
-        // many matches it was held through. A wrong hex is easy to spot here
-        // (Cancel, fix it on the board, award again).
+        // many matches it was held through (judged by the control snapshot
+        // taken when each match result was confirmed, not the board now).
+        // A wrong entry is easy to spot here; correct the board for future
+        // matches and the team's points with the team pop-up's +/-.
         const heartLabel = h => {
             const kind = h.type === 'mountain-heart' ? 'Mountain heart' : 'Side heart';
             return `${kind} ${_esc(h.coord)}${h.matches > 1 ? ` &times;${h.matches}` : ''}`;
