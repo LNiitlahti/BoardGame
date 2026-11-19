@@ -56,6 +56,20 @@ def _apply_points_corrected(state, payload):
         team['points'] = team.get('points', 0) + payload['delta']
 
 
+def _apply_match_result_confirmed(state, payload):
+    # result-manager.js's confirmResult() awards +1 point directly to each
+    # fully-credited team as a side effect of confirming a match win
+    # (result-manager.js:438-445) -- this is NOT routed through a
+    # points_awarded action, so it needs its own handler here. Challenge
+    # matches never affect points (`if (!isChallenge)` guard in the source).
+    if payload.get('isChallenge'):
+        return
+    for team_id in payload.get('teamsWithFullCredit') or []:
+        team = _find_team(state['teams'], team_id=team_id)
+        if team:
+            team['points'] = team.get('points', 0) + 1
+
+
 def apply_action(state, action):
     """Mutate `state` for the action types the video cares about. Returns a
     dict describing side effects the caller needs (`tile_changes`, `toast`),
@@ -91,6 +105,10 @@ def apply_action(state, action):
 
     if action_type == 'points_corrected':
         _apply_points_corrected(state, payload)
+        return None
+
+    if action_type == 'match_result_confirmed':
+        _apply_match_result_confirmed(state, payload)
         return None
 
     if action_type == 'team_renamed':
@@ -182,6 +200,14 @@ class SpellToastQueue:
         return None
 
 
+def _team_ids_with_logged_color_change(actions):
+    return {
+        str(a['payload']['teamId'])
+        for a in actions
+        if a.get('actionType') == 'team_color_changed' and (a.get('payload') or {}).get('teamId') is not None
+    }
+
+
 def build_initial_state(bundle):
     """The starting state for a full linear render: the nearest backup
     snapshot at-or-before the first action's sequence number, or the
@@ -206,16 +232,83 @@ def build_initial_state(bundle):
     state = copy.deepcopy(best_backup['snapshot'])
     state.setdefault('board', {})
     state.setdefault('teams', [])
+
+    # Team colors are assigned by a raw Firestore write at tournament setup
+    # (setup.html's addTeam()), not a logged action -- team_color_changed is
+    # only ever logged for a later admin recolor. A backup's captured color
+    # is only trustworthy for a team that has a logged change (forward-replay
+    # will correct it at the right moment); otherwise there's no action that
+    # will ever fix a stale/wrong backup color, so the final tournamentDoc
+    # (the color this team actually had for its whole game) wins instead.
+    changed_team_ids = _team_ids_with_logged_color_change(actions)
+    doc_teams_by_id = {
+        str(t.get('id')): t for t in (bundle.get('tournamentDoc', {}).get('teams') or [])
+    }
+    for team in state['teams']:
+        team_id = str(team.get('id'))
+        if team_id in changed_team_ids:
+            continue
+        doc_color = doc_teams_by_id.get(team_id, {}).get('color')
+        if doc_color:
+            team['color'] = doc_color
+
     return state
+
+
+def _sorted_backups(bundle):
+    return sorted(
+        (b for b in (bundle.get('backups') or []) if b.get('mappedSeq') is not None),
+        key=lambda b: b['mappedSeq'],
+    )
+
+
+def _resync_team_points_from_backup(state, backup_snapshot):
+    """Snap each team's points to a backup's captured value, by id.
+
+    Real-world finding: at least one tournament's territory/heart-income
+    points were never logged as a points_awarded (or any other) action at
+    all -- team.points still jumped by dozens between two backup snapshots
+    with no corresponding action anywhere in between to explain it (some
+    scoring path writes straight to Firestore without going through
+    _logAction). Forward-replay from actions alone has no way to see a jump
+    like that; resyncing against every backup as the timeline crosses it
+    means points self-correct at each checkpoint regardless of whether the
+    mechanism that changed them was ever logged. Deliberately points-only:
+    color has its own resolution rule in build_initial_state() that a
+    blanket resync here would undo.
+    """
+    backup_points_by_id = {
+        str(t.get('id')): t.get('points')
+        for t in (backup_snapshot.get('teams') or [])
+        if t.get('points') is not None
+    }
+    for team in state['teams']:
+        team_id = str(team.get('id'))
+        if team_id in backup_points_by_id:
+            team['points'] = backup_points_by_id[team_id]
 
 
 def iter_frames_state(bundle):
     """Yield (action, state_after_action, effect) for every action in the
     bundle, in order, forward-applying against one running state. `effect`
     is whatever apply_action() returned for that action, or None.
+
+    Also resyncs team points against every backup as its mappedSeq is
+    crossed (see _resync_team_points_from_backup) -- not just the one
+    build_initial_state() used to seed the starting state.
     """
     state = build_initial_state(bundle)
+    backups = _sorted_backups(bundle)
+    backup_idx = 0
+
     for action in bundle.get('actions') or []:
+        seq = action.get('sequenceNumber')
+        while (backup_idx < len(backups)
+               and seq is not None
+               and backups[backup_idx]['mappedSeq'] <= seq):
+            _resync_team_points_from_backup(state, backups[backup_idx]['snapshot'])
+            backup_idx += 1
+
         if action.get('undone'):
             yield action, copy.deepcopy(state), None
             continue

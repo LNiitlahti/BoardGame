@@ -143,6 +143,66 @@ def test_points_awarded_bulk_shape_ignores_non_numeric_values():
     assert red['points'] == 0
 
 
+def test_match_result_confirmed_awards_one_point_per_full_credit_team():
+    # result-manager.js's confirmResult() awards +1 point directly as a side
+    # effect of teamsWithFullCredit (result-manager.js:438-445) -- NOT via a
+    # points_awarded action -- so this is a distinct action type apply_action
+    # must handle on its own. This is the majority source of a team's points
+    # over a tournament (one per match win), unlike the much rarer hex/round
+    # points_awarded events.
+    state = make_state()
+    apply_action(state, {
+        'actionType': 'match_result_confirmed',
+        'payload': {'teamsWithFullCredit': [1], 'teamsWithFullLoss': [2], 'isChallenge': False},
+    })
+    red = next(t for t in state['teams'] if t['id'] == 1)
+    blue = next(t for t in state['teams'] if t['id'] == 2)
+    assert red['points'] == 1
+    assert blue['points'] == 0  # a full loss does not deduct points
+
+
+def test_match_result_confirmed_awards_points_to_every_full_credit_team():
+    state = make_state()
+    apply_action(state, {
+        'actionType': 'match_result_confirmed',
+        'payload': {'teamsWithFullCredit': [1, 2], 'teamsWithFullLoss': [], 'isChallenge': False},
+    })
+    assert [t['points'] for t in state['teams']] == [1, 1]
+
+
+def test_match_result_confirmed_accumulates_across_multiple_wins():
+    state = make_state()
+    for _ in range(3):
+        apply_action(state, {
+            'actionType': 'match_result_confirmed',
+            'payload': {'teamsWithFullCredit': [1], 'teamsWithFullLoss': [2], 'isChallenge': False},
+        })
+    red = next(t for t in state['teams'] if t['id'] == 1)
+    assert red['points'] == 3
+
+
+def test_match_result_confirmed_for_a_challenge_match_awards_no_points():
+    # Challenge matches don't affect team win/loss records or points
+    # (result-manager.js:436-455's `if (!isChallenge)` guard).
+    state = make_state()
+    apply_action(state, {
+        'actionType': 'match_result_confirmed',
+        'payload': {'teamsWithFullCredit': [1], 'teamsWithFullLoss': [2], 'isChallenge': True},
+    })
+    assert [t['points'] for t in state['teams']] == [0, 0]
+
+
+def test_match_result_confirmed_for_a_split_team_match_awards_no_points():
+    # A match with no full-credit team (split roster on both sides) logs an
+    # empty teamsWithFullCredit -- nobody scores, matching the live app.
+    state = make_state()
+    apply_action(state, {
+        'actionType': 'match_result_confirmed',
+        'payload': {'teamsWithFullCredit': [], 'teamsWithFullLoss': [], 'isChallenge': False},
+    })
+    assert [t['points'] for t in state['teams']] == [0, 0]
+
+
 def test_unhandled_action_types_are_a_no_op():
     state = make_state()
     effect = apply_action(state, {'actionType': 'match_created', 'payload': {}})

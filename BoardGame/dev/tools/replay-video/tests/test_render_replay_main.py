@@ -43,6 +43,35 @@ def test_main_renders_expected_frame_count_and_reports_success(monkeypatch, caps
     assert 'Wrote' in capsys.readouterr().out
 
 
+def test_main_skips_redundant_redraws_when_no_toast_is_active(monkeypatch, capsys, tmp_path):
+    # Frames within an action's block are pixel-identical unless a spell
+    # toast is actively fading -- redrawing them is wasted CPU, not a
+    # quality tradeoff. The fixture has 10 actions * 10 frames/action = 100
+    # frames total, but only 2 spell_cast actions (each toast lasts exactly
+    # 2 of the 10 one-second action blocks at these settings, redrawing
+    # every frame while active) -- so most of the 8 non-toast actions
+    # collapse to a single render_frame() call each.
+    FakeEncoder.instances = []
+    monkeypatch.setattr(render_replay, 'VideoEncoder', FakeEncoder)
+
+    render_calls = []
+    original_render_frame = render_replay.render_frame
+    def counting_render_frame(*args, **kwargs):
+        render_calls.append(1)
+        return original_render_frame(*args, **kwargs)
+    monkeypatch.setattr(render_replay, 'render_frame', counting_render_frame)
+
+    output_path = str(tmp_path / 'out.mp4')
+    exit_code = render_replay.main([
+        FIXTURE_PATH, output_path,
+        '--fps', '10', '--seconds-per-action', '1.0', '--resolution', '320x240',
+    ])
+
+    assert exit_code == 0
+    assert FakeEncoder.instances[0].frame_count == 100  # unchanged: same video length/frame count
+    assert len(render_calls) == 37  # far fewer actual draws than frames written
+
+
 def test_main_reports_a_clean_error_when_ffmpeg_is_unavailable(monkeypatch, capsys, tmp_path):
     from encode import FFmpegNotFoundError
 

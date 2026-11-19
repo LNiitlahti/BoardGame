@@ -25,6 +25,7 @@ def build_ffmpeg_command(width, height, fps, output_path):
         '-framerate', str(fps),
         '-i', '-',
         '-c:v', 'libx264',
+        '-preset', 'ultrafast',  # default "medium" is needlessly slow for a private, throwaway replay video
         '-pix_fmt', 'yuv420p',
         output_path,
     ]

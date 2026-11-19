@@ -88,11 +88,28 @@ def main(argv=None):
                     requested_at = frame_index / config['fps']
                     toast_queue.add(toast['teamName'], toast['spellName'], requested_at)
 
+            # state and tile_tracker are fixed for every frame in this
+            # action's block (same objects for the whole inner loop) -- the
+            # only thing that can change frame-to-frame is an active spell
+            # toast's fade alpha. Stretches with no active toast are
+            # therefore pixel-identical frame to frame, so redraw only when
+            # the toast actually changes instead of re-running the full
+            # board/score-bar draw for every one of frames_per_action
+            # frames. Output is unchanged (same frame count, same pixels) --
+            # this only stops recomputing identical raster data.
+            cached_image = None
+            cached_toast_key = 'unset'
+
             for _ in range(frames_per_action):
                 t = frame_index / config['fps']
                 active_toast = toast_queue.active_toast_at(t)
-                image = render_frame(state, tile_tracker, active_toast, config)
-                encoder.write_frame(image)
+                toast_key = None if active_toast is None else (
+                    active_toast['teamName'], active_toast['spellName'], active_toast['elapsed']
+                )
+                if cached_image is None or toast_key != cached_toast_key:
+                    cached_image = render_frame(state, tile_tracker, active_toast, config)
+                    cached_toast_key = toast_key
+                encoder.write_frame(cached_image)
                 frame_index += 1
     finally:
         encoder.close()
