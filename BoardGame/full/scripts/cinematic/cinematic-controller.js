@@ -11,6 +11,10 @@
     'use strict';
     if (!window.CINE_MODE) return;
 
+    // render=1: offline frame-stepped render (dev/tools/cinematic-render).
+    // No audio, no names, no redirect; exposes progress on CINEMATIC.render.
+    const RENDER_MODE = new URLSearchParams(location.search).get('render') === '1';
+
     const state = {
         active: false,
         renderQueued: false,
@@ -36,12 +40,17 @@
         boardWrapEl: null,
         boardWrapParent: null,
         boardWrapNextSibling: null,
-        dimOverlayEl: null
+        dimOverlayEl: null,
+        nameWindows: null
     };
 
     window.CINEMATIC = {
         shouldDeferRenders: () => state.active,
-        queueRender: () => { state.renderQueued = true; }
+        queueRender: () => { state.renderQueued = true; },
+        // Read by dev/tools/cinematic-render/render.js. null outside render mode.
+        render: RENDER_MODE
+            ? { armed: false, done: false, error: null, durationMs: 0, nameWindows: [] }
+            : null
     };
 
     function makeCover() {
@@ -161,7 +170,8 @@
             // the most expensive primitives on Intel integrated graphics, and
             // the dashboard it was blurring is unreadable behind this much
             // black anyway. Opacity raised from 0.5 to compensate visually.
-            'position:fixed;inset:0;z-index:9998;background-color:rgba(0,0,0,0.72);' +
+            'position:fixed;inset:0;z-index:9998;background-color:' +
+            (RENDER_MODE ? '#000' : 'rgba(0,0,0,0.72)') + ';' +
             'transition:background-color 0.6s ease;pointer-events:none;';
         document.body.appendChild(el);
         state.dimOverlayEl = el;
@@ -339,34 +349,26 @@
             });
         }
 
-        // --- Vocal-synced text: title first, then cycles through
-        // team/player names on a fixed schedule, re-flickering on every
-        // vocal onset. Runs only during signage+outro (revealEnd → finalEnd).
-        const names = (window.CineView.getGameState()?.teams || [])
-            .flatMap(team => (team.players || []).map(p => p.name))
-            .filter(Boolean);
-        const cycle = [cfg.text.title, ...names]; // always at least the title
-
-        const textWindowStart = revealEnd;
-        const textWindowEnd = finalEnd;
-        const textInterval = cfg.text.displayIntervalMs;
-
-        for (let at = textWindowStart, i = 0; at < textWindowEnd; at += textInterval, i++) {
-            const displayText = cycle[i % cycle.length];
-            tl.add({
-                at, duration: 0,
-                onStart: () => state.text.setText(displayText)
+        // --- Vocal-synced text: title, then team/player names, re-flickering
+        // on every vocal onset. One window (revealEnd → finalEnd). The window
+        // list is also exported (state.nameWindows) so a pre-rendered video
+        // can replay the same schedule over itself (see cine-video.js).
+        const nameWindows = [{ startMs: revealEnd, endMs: finalEnd }];
+        state.nameWindows = nameWindows;
+        if (!RENDER_MODE) {
+            const nameEvents = window.CineNames.schedule({
+                windows: nameWindows,
+                intervalMs: cfg.text.displayIntervalMs,
+                title: cfg.text.title,
+                names: window.CineNames.namesFromGameState(window.CineView.getGameState()),
+                vocalBeats: state.musicVocals.beats
             });
+            const speedAt = ms => window.CineTempo.computeTempo(tempoStems, ms, cfg.tempo);
+            nameEvents.forEach(ev => tl.add({
+                at: ev.at, duration: 0,
+                onStart: () => window.CineNames.apply(state.text, ev, speedAt)
+            }));
         }
-
-        state.musicVocals.beats.forEach(beatMs => {
-            if (beatMs < textWindowStart || beatMs > textWindowEnd) return;
-            tl.add({
-                at: beatMs, duration: 0,
-                onStart: () => state.text.triggerFlicker(
-                    window.CineTempo.computeTempo(tempoStems, beatMs, cfg.tempo))
-            });
-        });
 
         // --- Music sync: envelope pulse (effects 1+2) + beat-triggered hex
         // wave (effect 3) / color wash (effect 4). Same shared clock as
@@ -504,7 +506,9 @@
             });
         }
 
-        tl.onFinished = teardown;
+        tl.onFinished = RENDER_MODE
+            ? () => { window.CINEMATIC.render.done = true; }
+            : teardown;
         return tl;
     }
 
@@ -538,8 +542,15 @@
         state.atmosphere = new window.CineAtmosphere(
             document.querySelector('.board-wrap'), state.config.atmosphere);
 
-        document.addEventListener('keydown', onKeydown);
-        window.addEventListener('error', bail);
+        if (RENDER_MODE) {
+            // Never silently bail mid-render: surface the error to render.js.
+            window.addEventListener('error', e => {
+                window.CINEMATIC.render.error = String((e && e.message) || e);
+            });
+        } else {
+            document.addEventListener('keydown', onKeydown);
+            window.addEventListener('error', bail);
+        }
 
         // Music starts right here so it plays through the void, exactly like
         // the timeline below (both share the same t=0). Autoplay may be
@@ -548,13 +559,23 @@
         // just means a silent light show, never a desynced one. The
         // rejection is caught and ignored (not retried/surfaced) for that
         // reason.
-        state.audioEl = new Audio('audio/cinematic-music.mp3');
-        state.audioEl.volume = getVolumeFromUrl();
-        state.audioEl.play().catch(() => {});
+        if (!RENDER_MODE) {
+            state.audioEl = new Audio('audio/cinematic-music.mp3');
+            state.audioEl.volume = getVolumeFromUrl();
+            state.audioEl.play().catch(() => {});
+        }
 
         state.timeline = buildTimeline();
         state.timeline.play();
         state.timeline.startRaf();
+        if (RENDER_MODE) {
+            Object.assign(window.CINEMATIC.render, {
+                armed: true,
+                durationMs: state.timeline.duration,
+                nameWindows: state.nameWindows || []
+            });
+            return; // no watchdog: the virtual clock only moves when render.js steps it
+        }
         // Watchdog: rAF must tick steadily; a 4s gap means we're wedged.
         state.watchdogId = setInterval(() => {
             if (state.timeline && state.timeline.lastTickAt !== null &&
@@ -613,9 +634,32 @@
         }
 
         // Arm on the first data-driven board render…
-        const onRendered = () => {
+        let started = false;
+        const onRendered = async () => {
+            if (started) return;
+            started = true;
             document.removeEventListener('view-board-rendered', onRendered);
             clearTimeout(state.dataWaitId);
+            // Pre-rendered video first (smooth on weak hardware); the live
+            // cinematic is the fallback. html.cine-pending keeps the screen
+            // black while the video loads.
+            if (!RENDER_MODE && window.CineVideo) {
+                const tempoStems = [
+                    state.musicDrums, state.musicVocals, state.musicBackingVocals,
+                    state.musicBass, state.musicPercussion, state.musicStrings,
+                    state.musicSynth, state.musicOther
+                ];
+                const tookOver = await window.CineVideo.tryStart({
+                    gameState: window.CineView.getGameState(),
+                    volume: getVolumeFromUrl(),
+                    config: state.config,
+                    vocalBeats: state.musicVocals.beats,
+                    tempoStems,
+                    onDone: redirectToCleanUrl,
+                    onFailMidPlay: arm
+                }).catch(e => { console.error('[Cinematic] video path failed:', e); return false; });
+                if (tookOver) return;
+            }
             arm();
         };
         document.addEventListener('view-board-rendered', onRendered);

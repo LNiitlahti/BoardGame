@@ -5,6 +5,7 @@ const path = require('path');
 const MIME = {
   '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
   '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml',
+  '.mp4': 'video/mp4', '.mp3': 'audio/mpeg', '.jpg': 'image/jpeg', '.webp': 'image/webp',
 };
 
 function startServer(rootDir, port = 8080) {

@@ -241,3 +241,8 @@ deprecated/
 
 # Old test files
 old_test_files/
+
+# ===========================
+# PRE-RENDERED CINEMATIC (uploaded by hand, see dev/tools/cinematic-render)
+# ===========================
+full/video/
