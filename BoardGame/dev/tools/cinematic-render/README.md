@@ -14,7 +14,17 @@ From `BoardGame/`:
 Needs ffmpeg on PATH and Google Chrome installed. A Chrome window opens and is driven automatically —
 leave it alone (or add `--headless`). A full render takes ~15 minutes. Output: `full/video/cinematic.mp4` + `full/video/cinematic-meta.json`.
 
-`--board=1` renders the Legacy board instead. Only one video can be live at a
+Useful flags:
+
+- `--motion-blur=4` — 4 sub-frames averaged per frame (real motion blur;
+  render takes ~4x longer). Use this for the final video.
+- `--from=195 --to=210` — render only that stretch of the song (seconds),
+  e.g. to review the break without a full render.
+- `--script=classic|expansion` — which choreography. Default for `--board=2`
+  is `expansion` (the old 91-hex board breaks open and rings 6-7 erupt on
+  the drop at 3:20.8; timings in `full/data/cinematic-scene-expansion.json`).
+
+`--board=1` renders the Legacy board instead (classic script). Only one video can be live at a
 time; a tournament whose board doesn't match the video uses the live cinematic.
 
 ## Upload
