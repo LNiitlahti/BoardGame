@@ -1,0 +1,71 @@
+{
+    "version": 1,
+    "_note": "The 'expansion' cinematic for the 169-hex board: the familiar 91-hex board builds, then on the song's drop the outer rings 6-7 erupt outward. Act times are ABSOLUTE song times in ms (cinematic-music.mp3, 287320 ms), so moving one act never shifts the others. Spec: docs/superpowers/specs/2026-11-20-prerendered-cinematic-design.md (Part 2).",
+    "acts": {
+        "void": 0,
+        "heartDrop": 33500,
+        "familiarDone": 79000,
+        "unrest": 138000,
+        "breath": 185000,
+        "break": 200800,
+        "settle": 267000,
+        "end": 287320
+    },
+    "drops": {
+        "heartFallMs": 1800,
+        "ring1FirstLandMs": 3200,
+        "ring1IntervalMs": 2400,
+        "ring1FallMs": 1200,
+        "cascadeGapMs": 1500,
+        "cascadeEndBeforeDoneMs": 3000,
+        "cascadeFallMs": 900,
+        "beatSnapMs": 350
+    },
+    "eruption": {
+        "staggerMs": 1500,
+        "flightMs": 1100,
+        "ring7DelayMs": 180,
+        "nearAngleDeg": 90,
+        "startDepthPx": -260,
+        "arcHeightPx": 240,
+        "spinDegrees": 200
+    },
+    "camera": {
+        "keys": [
+            { "at": 0,      "pose": { "fov": 2450, "tilt": 52, "spin": -32, "zoom": 1.7 } },
+            { "at": 33500,  "pose": { "fov": 2450, "tilt": 46, "spin": -24, "zoom": 1.55 } },
+            { "at": 79000,  "pose": { "fov": 1700, "tilt": 36, "spin": -6,  "zoom": 1.3 } },
+            { "at": 100000, "pose": { "fov": 1800, "tilt": 30, "spin": 18,  "zoom": 1.38 } },
+            { "at": 120000, "pose": { "fov": 2000, "tilt": 40, "spin": -14, "zoom": 1.45 } },
+            { "at": 138000, "pose": { "fov": 2200, "tilt": 28, "spin": 4,   "zoom": 1.32 } },
+            { "at": 185000, "pose": { "fov": 2100, "tilt": 36, "spin": -8,  "zoom": 1.42 } },
+            { "at": 200800, "pose": { "fov": 1800, "tilt": 54, "spin": -20, "zoom": 1.85 } },
+            { "at": 203600, "pose": { "fov": 1500, "tilt": 38, "spin": 6,   "zoom": 1.0 } },
+            { "at": 226000, "pose": { "fov": 1700, "tilt": 32, "spin": 24,  "zoom": 1.08 } },
+            { "at": 250000, "pose": { "fov": 1700, "tilt": 34, "spin": -20, "zoom": 1.08 } },
+            { "at": 267000, "pose": { "fov": 2400, "tilt": 16, "spin": -6,  "zoom": 1.05 } },
+            { "at": 285000, "pose": { "fov": 3500, "tilt": 0,  "spin": 0,   "zoom": 1 } }
+        ]
+    },
+    "effects": {
+        "voidGlowMax": 0.85,
+        "crackBrightnessUnrest": 0.55,
+        "crackBrightnessBreath": 1,
+        "tremorMaxPx": 7,
+        "tremorRing4Factor": 0.4,
+        "dustEveryMsUnrest": 420,
+        "dustEveryMsBreath": 160,
+        "shockwaveMs": 1800,
+        "breakFlashMs": 900,
+        "breakShake": { "durationMs": 1600, "tiltAmp": 6, "spinAmp": 7, "zoomAmp": 0.07 },
+        "waveRingDelayMs": 55
+    },
+    "render": {
+        "atmosphere": { "particleCount": 40, "emberCount": 15, "ghostLightCount": 6 },
+        "materialParticles": { "lava": 3, "magic": 4, "dust": 3, "water": 0 }
+    },
+    "nameWindows": [
+        { "startMs": 79000, "endMs": 185000 },
+        { "startMs": 200800, "endMs": 267000 }
+    ]
+}

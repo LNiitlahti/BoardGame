@@ -53,7 +53,8 @@ const meta = JSON.parse(fs.readFileSync(path.join(a, 'cinematic-meta.json'), 'ut
 assert.strictEqual(meta.version, 1);
 assert.strictEqual(meta.boardVersion, '2');
 assert.strictEqual(meta.preview, true);
-assert.ok(Array.isArray(meta.nameWindows) && meta.nameWindows.length === 1);
+assert.strictEqual(meta.script, 'expansion');
+assert.ok(Array.isArray(meta.nameWindows) && meta.nameWindows.length === 2);
 assert.match(meta.sourceHash, /^[0-9a-f]{64}$/);
 
 const psnrs = framePsnrs(base);

@@ -53,7 +53,12 @@ class CineTiles {
         const fx = document.createElement('div');
         fx.className = `material-fx mat-${material}`;
 
-        const particle = MATERIAL_PARTICLES[material];
+        // config.materialParticles (offline render only) overrides the
+        // per-material counts; the live default stays at the cheap values above.
+        const override = this.config && this.config.materialParticles;
+        const particle = override && MATERIAL_PARTICLES[material]
+            ? { ...MATERIAL_PARTICLES[material], count: override[material] || 0 }
+            : MATERIAL_PARTICLES[material];
         if (particle && particle.count > 0) {
             for (let i = 0; i < particle.count; i++) {
                 const p = document.createElement('div');

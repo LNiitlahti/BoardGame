@@ -2,6 +2,8 @@
 // Offline renderer for the view.html cinematic.
 //   node dev/tools/cinematic-render/render.js --board=2
 //   node dev/tools/cinematic-render/render.js --board=2 --preview=10
+//   node dev/tools/cinematic-render/render.js --board=2 --from=195 --to=210
+//   node dev/tools/cinematic-render/render.js --board=2 --motion-blur=4
 //   node dev/tools/cinematic-render/render.js --check
 // Output: full/video/cinematic.mp4 + full/video/cinematic-meta.json
 // (gitignored; upload both to the web host next to view.html's video/ dir).
@@ -45,6 +47,10 @@ async function main() {
     const board = String(arg('board', '2'));
     if (board !== '1' && board !== '2') die('--board must be 1 or 2');
     const previewS = arg('preview', false) ? Number(arg('preview')) : null;
+    const fromS = Number(arg('from', 0)) || 0;
+    const toArg = arg('to', false) ? Number(arg('to')) : null;
+    const blurN = Math.max(1, Math.round(Number(arg('motion-blur', 1)) || 1));
+    const script = arg('script', false);
     const headless = !!arg('headless', false);
     const port = Number(arg('port', 5531));
 
@@ -71,7 +77,8 @@ async function main() {
         await page.evaluateOnNewDocument(
             `${clockSrc}\nwindow.__cineClock = createVirtualClock(window, { seed: 1 });\nwindow.__cineClock.install();`);
 
-        const url = `http://localhost:${port}/full/view.html?tournamentId=__dev_preview__&cinematic=1&render=1`;
+        const url = `http://localhost:${port}/full/view.html?tournamentId=__dev_preview__&cinematic=1&render=1` +
+            (script ? `&script=${encodeURIComponent(script)}` : '');
         await page.goto(url, { waitUntil: 'domcontentloaded' });
 
         // The page's own timers are virtual now: keep stepping (and give real
@@ -101,20 +108,31 @@ async function main() {
 
         const info = await page.evaluate(() => window.CINEMATIC.render);
         const fullS = info.durationMs / 1000;
-        const lengthS = previewS ? Math.min(previewS, fullS) : fullS;
+        const endS = Math.min(fullS, toArg !== null ? toArg : (previewS ? fromS + previewS : fullS));
+        if (!(endS > fromS)) die('--to must be after --from');
+        const lengthS = endS - fromS;
+        const partial = fromS > 0 || endS < fullS;
         const totalFrames = Math.ceil(lengthS * FPS);
         const mp4 = path.join(outDir, 'cinematic.mp4');
-        console.log(`[render] board ${board}, ${lengthS.toFixed(1)} s, ${totalFrames} frames -> ${mp4}`);
+        console.log(`[render] board ${board}, script ${info.script}, ${fromS}-${endS.toFixed(1)} s, ` +
+            `${totalFrames} frames x${blurN} motion blur -> ${mp4}`);
 
-        const vf = previewS ? 'format=yuv420p'
-            : `fade=t=out:st=${(lengthS - FADE_S).toFixed(3)}:d=${FADE_S},format=yuv420p`;
+        // Fast-forward to --from without capturing.
+        for (let t = 0; t < fromS * 1000; t += 50) {
+            await page.evaluate(ms => window.__cineClock.step(ms), Math.min(50, fromS * 1000 - t));
+        }
+
+        // Motion blur: N sub-frames per output frame, averaged by ffmpeg.
+        const blurVf = blurN > 1 ? `tmix=frames=${blurN},framestep=${blurN},` : '';
+        const vf = blurVf + (partial ? 'format=yuv420p'
+            : `fade=t=out:st=${(lengthS - FADE_S).toFixed(3)}:d=${FADE_S},format=yuv420p`);
         ffmpeg = spawn('ffmpeg', [
             '-y', '-loglevel', 'error',
-            '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-',
-            '-i', path.join(ROOT, 'full/audio/cinematic-music.mp3'),
+            '-f', 'image2pipe', '-framerate', String(FPS * blurN), '-c:v', 'mjpeg', '-i', '-',
+            '-ss', fromS.toFixed(3), '-i', path.join(ROOT, 'full/audio/cinematic-music.mp3'),
             '-map', '0:v', '-map', '1:a', '-t', lengthS.toFixed(3),
             '-vf', vf,
-            '-c:v', 'libx264', '-preset', previewS ? 'veryfast' : 'slow', '-crf', '18',
+            '-c:v', 'libx264', '-preset', partial ? 'veryfast' : 'slow', '-crf', '18',
             '-r', String(FPS), '-c:a', 'aac', '-b:a', '192k',
             '-movflags', '+faststart', mp4
         ], { stdio: ['pipe', 'inherit', 'inherit'] });
@@ -122,8 +140,10 @@ async function main() {
 
         const cdp = await page.createCDPSession();
         const t0 = Date.now();
-        for (let f = 0; f < totalFrames; f++) {
-            if (f > 0) await page.evaluate(ms => window.__cineClock.step(ms), FRAME_MS);
+        const totalShots = totalFrames * blurN;
+        for (let i = 0; i < totalShots; i++) {
+            const f = Math.floor(i / blurN);
+            if (i > 0) await page.evaluate(ms => window.__cineClock.step(ms), FRAME_MS / blurN);
             const err = await page.evaluate(() => window.CINEMATIC.render.error);
             if (err) die(`page error during render at frame ${f}: ${err}`);
             const { data } = await cdp.send('Page.captureScreenshot',
@@ -131,9 +151,9 @@ async function main() {
             if (!ffmpeg.stdin.write(Buffer.from(data, 'base64'))) {
                 await new Promise(r => ffmpeg.stdin.once('drain', r));
             }
-            if (f % 60 === 0 || f === totalFrames - 1) {
+            if ((i % blurN === 0 && f % 60 === 0) || i === totalShots - 1) {
                 const el = (Date.now() - t0) / 1000;
-                const eta = f > 0 ? (el / f) * (totalFrames - f) : 0;
+                const eta = i > 0 ? (el / i) * (totalShots - i) : 0;
                 process.stdout.write(`\r[render] frame ${f + 1}/${totalFrames}  ${(f / Math.max(el, 0.001)).toFixed(1)} fps  ETA ${Math.round(eta)} s   `);
             }
         }
@@ -146,8 +166,10 @@ async function main() {
             boardVersion: board,
             durationMs: Math.round(lengthS * 1000),
             fps: FPS, width: W, height: H,
-            script: 'classic',
-            preview: !!previewS,
+            script: info.script || 'classic',
+            motionBlur: blurN,
+            preview: partial,
+            fromMs: Math.round(fromS * 1000),
             nameWindows: info.nameWindows,
             renderedAt: new Date().toISOString(),
             sourceHash: sourceHash(ROOT)

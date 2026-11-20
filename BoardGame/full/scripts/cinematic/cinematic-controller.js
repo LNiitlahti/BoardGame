@@ -41,7 +41,10 @@
         boardWrapParent: null,
         boardWrapNextSibling: null,
         dimOverlayEl: null,
-        nameWindows: null
+        nameWindows: null,
+        xcfg: null,
+        fx: null,
+        scriptName: 'classic'
     };
 
     window.CINEMATIC = {
@@ -113,6 +116,10 @@
         if (state.text) {
             try { state.text.remove(); } catch (e) { console.error('[Cinematic] text.remove failed:', e); }
             state.text = null;
+        }
+        if (state.fx) {
+            try { state.fx.remove(); } catch (e) { console.error('[Cinematic] fx.remove failed:', e); }
+            state.fx = null;
         }
         if (state.atmosphere) {
             try { state.atmosphere.remove(); } catch (e) { console.error('[Cinematic] atmosphere.remove failed:', e); }
@@ -214,6 +221,209 @@
         wash.classList.remove('flash');
         void wash.offsetWidth; // force reflow so re-adding the class restarts the animation
         wash.classList.add('flash');
+    }
+
+    // Music-reactive layers shared by both scripts: board pulse + music
+    // shake + atmosphere (drums), wash on strong beats, fog (backing vocals),
+    // bass scale, percussion sparks, strings drift, synth glow, other. `order`
+    // (landing order) enables the classic one-ring-per-beat pulse; the
+    // expansion script passes null and runs its own outward beat waves.
+    function addMusicSync(tl, cfg, finalEnd, tempoStems, order) {
+            const music = state.musicDrums;
+            const envelopeDuration = Math.min(music.durationMs, finalEnd);
+            if (envelopeDuration > 0) {
+                tl.add({
+                    at: 0,
+                    duration: envelopeDuration,
+                    onUpdate: p => {
+                        const amp = music.envelopeAt(p * envelopeDuration);
+                        state.camera.applyBoardPulse(amp);
+                        state.tiles.applyBeatIntensity(amp);
+                        state.camera.setShake('music', window.CineCamera.randomOffset(cfg.shake.music, amp));
+                        state.atmosphere.applyIntensity(amp);
+                    }
+                });
+            }
+
+            const maxRing = (order || []).reduce((m, e) => Math.max(m, e.ring), 0);
+            const hexesByRing = new Map();
+            for (const entry of (order || [])) {
+                if (!hexesByRing.has(entry.ring)) hexesByRing.set(entry.ring, []);
+                hexesByRing.get(entry.ring).push(entry.coord);
+            }
+            const washThreshold = cfg.music.washThreshold;
+            music.beats.forEach((beatMs, i) => {
+                // Past the cinematic's own end: it'll never fire (the timeline
+                // finishes and tears down the audio before reaching it), so
+                // don't schedule it — scheduling it anyway would silently
+                // stretch tl.duration (see the CineTimeline.duration getter)
+                // past the cinematic's real length, delaying its own finish.
+                if (beatMs > finalEnd) return;
+
+                if (order) {
+                    const ring = i % (maxRing + 1);
+                    const coords = hexesByRing.get(ring) || [];
+                    tl.add({
+                        at: beatMs,
+                        duration: 250,
+                        onStart: () => coords.forEach(coord => state.tiles.triggerBeatPulse(coord)),
+                        onUpdate: () => {}
+                    });
+                }
+
+                if (music.envelopeAt(beatMs) >= washThreshold) {
+                    tl.add({
+                        at: beatMs,
+                        duration: 250,
+                        onStart: () => triggerWash(),
+                        onUpdate: () => {}
+                    });
+                }
+            });
+
+            // --- Multi-stem effects: backing vocals, bass, percussion, strings,
+            // synth, other. Each stem is independently optional — a missing/
+            // failed load yields an inert CineMusic (empty envelope/beats, see
+            // cine-music.js), so guarding on envelope/beats length here is what
+            // makes a missing stem's effect not fire, without needing a separate
+            // null-check path. Continuous-envelope stems run 0..min(duration,
+            // finalEnd), same clamping pattern as the drums envelope block above.
+            if (state.musicBackingVocals.envelope.length > 0) {
+                const dur = Math.min(state.musicBackingVocals.durationMs, finalEnd);
+                tl.add({
+                    at: 0,
+                    duration: dur,
+                    onUpdate: p => state.atmosphere.applyFogIntensity(
+                        state.musicBackingVocals.envelopeAt(p * dur))
+                });
+            }
+
+            if (state.musicBass.envelope.length > 0) {
+                const dur = Math.min(state.musicBass.durationMs, finalEnd);
+                tl.add({
+                    at: 0,
+                    duration: dur,
+                    onUpdate: p => state.camera.applyBassScale(
+                        state.musicBass.envelopeAt(p * dur), cfg.bass.scaleAmp)
+                });
+            }
+
+            if (state.musicPercussion.beats.length > 0) {
+                state.musicPercussion.beats.forEach(beatMs => {
+                    if (beatMs > finalEnd) return; // never fires past the cinematic's own end, see the drums beat loop above
+                    tl.add({
+                        at: beatMs,
+                        duration: 0,
+                        onStart: () => state.atmosphere.triggerSpark(
+                            window.CineTempo.computeTempo(tempoStems, beatMs, cfg.tempo),
+                            cfg.percussion.sparkDurationMs)
+                    });
+                });
+            }
+
+            if (state.musicStrings.envelope.length > 0) {
+                const dur = Math.min(state.musicStrings.durationMs, finalEnd);
+                tl.add({
+                    at: 0,
+                    duration: dur,
+                    onUpdate: p => {
+                        const t = p * dur;
+                        const amp = state.musicStrings.envelopeAt(t);
+                        const speedFactor = window.CineTempo.computeTempo(tempoStems, t, cfg.tempo);
+                        state.camera.applyDrift(amp, speedFactor, t, {
+                            tiltAmp: cfg.strings.driftTiltAmp,
+                            spinAmp: cfg.strings.driftSpinAmp,
+                            periodBaseMs: cfg.strings.driftPeriodMs
+                        });
+                    }
+                });
+            }
+
+            if (state.musicSynth.envelope.length > 0) {
+                const dur = Math.min(state.musicSynth.durationMs, finalEnd);
+                tl.add({
+                    at: 0,
+                    duration: dur,
+                    onUpdate: p => state.atmosphere.applySynthGlow(
+                        state.musicSynth.envelopeAt(p * dur))
+                });
+            }
+
+            if (state.musicOther.envelope.length > 0) {
+                const dur = Math.min(state.musicOther.durationMs, finalEnd);
+                tl.add({
+                    at: 0,
+                    duration: dur,
+                    onUpdate: p => state.atmosphere.applyBaseIntensity(
+                        state.musicOther.envelopeAt(p * dur))
+                });
+            }
+    }
+
+    // Title + player names over the given windows (live runs only; a
+    // pre-rendered video is name-free and cine-video.js draws them instead).
+    function addNameTracks(tl, cfg, nameWindows, tempoStems) {
+        if (RENDER_MODE) return;
+        const nameEvents = window.CineNames.schedule({
+            windows: nameWindows,
+            intervalMs: cfg.text.displayIntervalMs,
+            title: cfg.text.title,
+            names: window.CineNames.namesFromGameState(window.CineView.getGameState()),
+            vocalBeats: state.musicVocals.beats
+        });
+        const speedAt = ms => window.CineTempo.computeTempo(tempoStems, ms, cfg.tempo);
+        nameEvents.forEach(ev => tl.add({
+            at: ev.at, duration: 0,
+            onStart: () => window.CineNames.apply(state.text, ev, speedAt)
+        }));
+    }
+
+    function allStems() {
+        return [
+            state.musicDrums, state.musicVocals, state.musicBackingVocals,
+            state.musicBass, state.musicPercussion, state.musicStrings,
+            state.musicSynth, state.musicOther
+        ];
+    }
+
+    // The "expansion" script (Version 2 boards): old board builds, rim
+    // cracks, outer rings erupt on the drop. See cine-script-expansion.js.
+    function buildExpansionTimeline() {
+        const cfg = state.config;
+        const xcfg = state.xcfg;
+        const tl = new window.CineTimeline();
+        const coords = window.CineView.getBoardModule().generateHexCoordinates();
+        const plan = window.CineExpansionPlan.planExpansion(xcfg, coords, state.musicDrums.beats);
+        state.fx = new window.CineExpansionFx(
+            document.getElementById('hexBoard'), document.querySelector('.board-wrap'), state.tiles, xcfg);
+        const finalEnd = window.CineScriptExpansion.build({
+            tl, xcfg, cfg, plan,
+            tiles: state.tiles, camera: state.camera, fx: state.fx,
+            drums: state.musicDrums, strings: state.musicStrings, triggerWash
+        });
+        const tempoStems = allStems();
+        addMusicSync(tl, cfg, finalEnd, tempoStems, null);
+        state.nameWindows = plan.nameWindows;
+        addNameTracks(tl, cfg, plan.nameWindows, tempoStems);
+        tl.onFinished = RENDER_MODE
+            ? () => { window.CINEMATIC.render.done = true; }
+            : teardown;
+        return tl;
+    }
+
+    // ?script=expansion|classic forces a script. Default: expansion for the
+    // offline render of a Version 2 board; classic for live playback (the
+    // expansion script is meant to be watched as the pre-rendered video).
+    function chooseScript() {
+        const wanted = new URLSearchParams(location.search).get('script');
+        const coords = window.CineView.getBoardModule().generateHexCoordinates();
+        const hasOuterRings = coords.some(([q, r]) =>
+            Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r)) >= 6);
+        const canExpand = !!state.xcfg && hasOuterRings &&
+            window.CineExpansionPlan.validateActs(state.xcfg.acts, state.musicDrums.durationMs).length === 0;
+        if (wanted === 'classic' || !canExpand) return 'classic';
+        if (wanted === 'expansion' || RENDER_MODE) return 'expansion';
+        return 'classic';
     }
 
     function buildTimeline() {
@@ -355,20 +565,7 @@
         // can replay the same schedule over itself (see cine-video.js).
         const nameWindows = [{ startMs: revealEnd, endMs: finalEnd }];
         state.nameWindows = nameWindows;
-        if (!RENDER_MODE) {
-            const nameEvents = window.CineNames.schedule({
-                windows: nameWindows,
-                intervalMs: cfg.text.displayIntervalMs,
-                title: cfg.text.title,
-                names: window.CineNames.namesFromGameState(window.CineView.getGameState()),
-                vocalBeats: state.musicVocals.beats
-            });
-            const speedAt = ms => window.CineTempo.computeTempo(tempoStems, ms, cfg.tempo);
-            nameEvents.forEach(ev => tl.add({
-                at: ev.at, duration: 0,
-                onStart: () => window.CineNames.apply(state.text, ev, speedAt)
-            }));
-        }
+        addNameTracks(tl, cfg, nameWindows, tempoStems);
 
         // --- Music sync: envelope pulse (effects 1+2) + beat-triggered hex
         // wave (effect 3) / color wash (effect 4). Same shared clock as
@@ -378,133 +575,7 @@
         // finalEnd just goes quiet for the remainder (envelopeAt clamps to
         // the last sample), and a track at or under finalEnd plays to
         // completion instead of being cut off.
-        const music = state.musicDrums;
-        const envelopeDuration = Math.min(music.durationMs, finalEnd);
-        if (envelopeDuration > 0) {
-            tl.add({
-                at: 0,
-                duration: envelopeDuration,
-                onUpdate: p => {
-                    const amp = music.envelopeAt(p * envelopeDuration);
-                    state.camera.applyBoardPulse(amp);
-                    state.tiles.applyBeatIntensity(amp);
-                    state.camera.setShake('music', window.CineCamera.randomOffset(cfg.shake.music, amp));
-                    state.atmosphere.applyIntensity(amp);
-                }
-            });
-        }
-
-        const maxRing = order.reduce((m, e) => Math.max(m, e.ring), 0);
-        const hexesByRing = new Map();
-        for (const entry of order) {
-            if (!hexesByRing.has(entry.ring)) hexesByRing.set(entry.ring, []);
-            hexesByRing.get(entry.ring).push(entry.coord);
-        }
-        const washThreshold = cfg.music.washThreshold;
-        music.beats.forEach((beatMs, i) => {
-            // Past the cinematic's own end: it'll never fire (the timeline
-            // finishes and tears down the audio before reaching it), so
-            // don't schedule it — scheduling it anyway would silently
-            // stretch tl.duration (see the CineTimeline.duration getter)
-            // past the cinematic's real length, delaying its own finish.
-            if (beatMs > finalEnd) return;
-
-            const ring = i % (maxRing + 1);
-            const coords = hexesByRing.get(ring) || [];
-            tl.add({
-                at: beatMs,
-                duration: 250,
-                onStart: () => coords.forEach(coord => state.tiles.triggerBeatPulse(coord)),
-                onUpdate: () => {}
-            });
-
-            if (music.envelopeAt(beatMs) >= washThreshold) {
-                tl.add({
-                    at: beatMs,
-                    duration: 250,
-                    onStart: () => triggerWash(),
-                    onUpdate: () => {}
-                });
-            }
-        });
-
-        // --- Multi-stem effects: backing vocals, bass, percussion, strings,
-        // synth, other. Each stem is independently optional — a missing/
-        // failed load yields an inert CineMusic (empty envelope/beats, see
-        // cine-music.js), so guarding on envelope/beats length here is what
-        // makes a missing stem's effect not fire, without needing a separate
-        // null-check path. Continuous-envelope stems run 0..min(duration,
-        // finalEnd), same clamping pattern as the drums envelope block above.
-        if (state.musicBackingVocals.envelope.length > 0) {
-            const dur = Math.min(state.musicBackingVocals.durationMs, finalEnd);
-            tl.add({
-                at: 0,
-                duration: dur,
-                onUpdate: p => state.atmosphere.applyFogIntensity(
-                    state.musicBackingVocals.envelopeAt(p * dur))
-            });
-        }
-
-        if (state.musicBass.envelope.length > 0) {
-            const dur = Math.min(state.musicBass.durationMs, finalEnd);
-            tl.add({
-                at: 0,
-                duration: dur,
-                onUpdate: p => state.camera.applyBassScale(
-                    state.musicBass.envelopeAt(p * dur), cfg.bass.scaleAmp)
-            });
-        }
-
-        if (state.musicPercussion.beats.length > 0) {
-            state.musicPercussion.beats.forEach(beatMs => {
-                if (beatMs > finalEnd) return; // never fires past the cinematic's own end, see the drums beat loop above
-                tl.add({
-                    at: beatMs,
-                    duration: 0,
-                    onStart: () => state.atmosphere.triggerSpark(
-                        window.CineTempo.computeTempo(tempoStems, beatMs, cfg.tempo),
-                        cfg.percussion.sparkDurationMs)
-                });
-            });
-        }
-
-        if (state.musicStrings.envelope.length > 0) {
-            const dur = Math.min(state.musicStrings.durationMs, finalEnd);
-            tl.add({
-                at: 0,
-                duration: dur,
-                onUpdate: p => {
-                    const t = p * dur;
-                    const amp = state.musicStrings.envelopeAt(t);
-                    const speedFactor = window.CineTempo.computeTempo(tempoStems, t, cfg.tempo);
-                    state.camera.applyDrift(amp, speedFactor, t, {
-                        tiltAmp: cfg.strings.driftTiltAmp,
-                        spinAmp: cfg.strings.driftSpinAmp,
-                        periodBaseMs: cfg.strings.driftPeriodMs
-                    });
-                }
-            });
-        }
-
-        if (state.musicSynth.envelope.length > 0) {
-            const dur = Math.min(state.musicSynth.durationMs, finalEnd);
-            tl.add({
-                at: 0,
-                duration: dur,
-                onUpdate: p => state.atmosphere.applySynthGlow(
-                    state.musicSynth.envelopeAt(p * dur))
-            });
-        }
-
-        if (state.musicOther.envelope.length > 0) {
-            const dur = Math.min(state.musicOther.durationMs, finalEnd);
-            tl.add({
-                at: 0,
-                duration: dur,
-                onUpdate: p => state.atmosphere.applyBaseIntensity(
-                    state.musicOther.envelopeAt(p * dur))
-            });
-        }
+        addMusicSync(tl, cfg, finalEnd, tempoStems, order);
 
         tl.onFinished = RENDER_MODE
             ? () => { window.CINEMATIC.render.done = true; }
@@ -530,9 +601,14 @@
         const cineBoard = window.CineView.getBoardModule();
         if (cineBoard && cineBoard.layout) state.materials.setLayout(cineBoard.layout);
 
+        state.scriptName = chooseScript();
+        const renderExtras = RENDER_MODE && state.scriptName === 'expansion' && state.xcfg.render;
+        if (renderExtras) document.body.classList.add('cine-render');
         state.tiles = new window.CineTiles(
             document.getElementById('hexBoard'),
-            state.config.tiles,
+            renderExtras
+                ? Object.assign({}, state.config.tiles, { materialParticles: renderExtras.materialParticles })
+                : state.config.tiles,
             state.materials
         );
         state.tiles.hideAll();
@@ -540,7 +616,10 @@
         state.text = new window.CineText(document.querySelector('.board-wrap'));
 
         state.atmosphere = new window.CineAtmosphere(
-            document.querySelector('.board-wrap'), state.config.atmosphere);
+            document.querySelector('.board-wrap'),
+            renderExtras
+                ? Object.assign({}, state.config.atmosphere, renderExtras.atmosphere)
+                : state.config.atmosphere);
 
         if (RENDER_MODE) {
             // Never silently bail mid-render: surface the error to render.js.
@@ -565,12 +644,13 @@
             state.audioEl.play().catch(() => {});
         }
 
-        state.timeline = buildTimeline();
+        state.timeline = state.scriptName === 'expansion' ? buildExpansionTimeline() : buildTimeline();
         state.timeline.play();
         state.timeline.startRaf();
         if (RENDER_MODE) {
             Object.assign(window.CINEMATIC.render, {
                 armed: true,
+                script: state.scriptName,
                 durationMs: state.timeline.duration,
                 nameWindows: state.nameWindows || []
             });
@@ -619,6 +699,9 @@
             ]);
             state.config = config;
             state.materials = materials;
+            // Optional: a missing/broken expansion config just means classic.
+            state.xcfg = await fetch('data/cinematic-scene-expansion.json')
+                .then(res => (res.ok ? res.json() : null)).catch(() => null);
             state.musicDrums = musicDrums;
             state.musicVocals = musicVocals;
             state.musicBackingVocals = musicBackingVocals;
