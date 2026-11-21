@@ -327,6 +327,15 @@
         }
 
         /* Print-friendly */
+        /* Phones: number + game on one line, the matchup on its own
+           full-width line beneath (one row pushed the page to ~460px). */
+        @media (max-width: 600px) {
+            .match-card { flex-wrap: wrap; row-gap: 6px; }
+            .match-game { min-width: 0; flex: 1; }
+            .matchup { flex-basis: 100%; min-width: 0; }
+            .side { min-width: 0; }
+        }
+
         @media print {
             .export-pdf-btn { display: none; }
             body { background: #fff; color: #222; padding: 10px; }
@@ -338,6 +347,8 @@
             .page-header h1 { color: #333; }
         }
     </style>
+  <meta name="theme-color" content="#050710">
+  <link rel="stylesheet" href="../shared/css/mobile.css">
 </head>
 <body>
     <button class="export-pdf-btn" id="exportPdfBtn" onclick="generateQueuePDF()" disabled>Export PDF</button>

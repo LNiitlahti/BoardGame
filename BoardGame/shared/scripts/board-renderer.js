@@ -55,6 +55,8 @@ class BoardRenderer {
         // Base dimensions (scaled)
         const hexW = Math.round(66 * s);
         const hexH = Math.round(58 * s);
+        this._hexW = hexW;
+        this._hexH = hexH;
         const hexBorder = Math.round(2 * s);
         const labelFont = Math.round(9 * s);
         const mountainHeartSize = Math.round(72 * s);
@@ -190,6 +192,12 @@ class BoardRenderer {
             const wrapper = this.container.parentElement;
             if (!wrapper) return;
 
+            if (this.isCompactViewport()) {
+                this.applyCompactScaling(wrapper);
+                return;
+            }
+
+            this._compactBase = null; // desktop: no pinch-zoom layer
             const wrapperWidth = wrapper.clientWidth;
             const wrapperHeight = wrapper.clientHeight;
 
@@ -244,6 +252,114 @@ class BoardRenderer {
         setTimeout(applyScaling, 100);
     }
     
+    /**
+     * Phones and small tablets (<= 900px, the shared navbar/admin breakpoint).
+     * There the board fits the wrapper's WIDTH and its layout box is sized to
+     * what is actually drawn. Wider screens keep the fixed Legacy footprint
+     * that desktop/TV layouts were tuned around.
+     */
+    isCompactViewport() {
+        if (this.options.compactFit === false) return false;
+        return typeof window !== 'undefined' && typeof window.matchMedia === 'function' &&
+            window.matchMedia('(max-width: 900px)').matches;
+    }
+
+    applyCompactScaling(wrapper) {
+        const boardSize = this.nativeBoardSize();
+        const centers = this.boardModule.generateHexCoordinates()
+            .map(([q, r]) => this.boardModule.hexToPixel(q, r));
+        const extent = BoardRenderer.computeVisualExtent(
+            centers, this._hexW || 66, this._hexH || 58, boardSize, BoardRenderer.ROTATION_DEG);
+
+        const cs = getComputedStyle(wrapper);
+        const availWidth = wrapper.clientWidth - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0);
+        if (availWidth <= 0) return;
+        // Landscape phone: don't let a width-fitted board run past the screen height.
+        const maxHeight = window.innerHeight * 0.9;
+        const fit = BoardRenderer.compactFit(extent, availWidth, boardSize, 2.2, maxHeight);
+
+        const st = this.container.style;
+        st.width = `${boardSize}px`;
+        st.height = `${boardSize}px`;
+        st.position = 'relative';
+        st.left = st.top = st.right = st.bottom = '';
+        this._compactBase = `translate(${fit.translateX}px, ${fit.translateY}px) scale(${fit.scale}) rotate(${BoardRenderer.ROTATION_DEG}deg)`;
+        this._compactDrawn = { width: extent.width * fit.scale, height: extent.height * fit.scale };
+        this._applyCompactTransform();
+        st.transformOrigin = 'center center';
+        st.margin = `${fit.marginY}px ${fit.marginX}px`;
+        st.flexShrink = '0';
+    }
+
+    /**
+     * Pinch-zoom on phones (board-zoom.js). The zoom is applied in screen
+     * px around the drawn board's centre, on top of the compact fit, so the
+     * renderer stays the only writer of the container's transform.
+     * @param {number} scale - 1 = fitted
+     * @param {number} x - pan in screen px
+     * @param {number} y
+     */
+    setUserZoom(scale, x, y) {
+        this._userZoom = { scale, x, y };
+        if (this._compactBase) this._applyCompactTransform();
+    }
+
+    /** Drawn board size in screen px at zoom 1, or null off the compact path. */
+    compactDrawnSize() {
+        return this.isCompactViewport() && this._compactDrawn ? this._compactDrawn : null;
+    }
+
+    _applyCompactTransform() {
+        const z = this._userZoom;
+        const zoom = z && z.scale !== 1 ? `translate(${z.x}px, ${z.y}px) scale(${z.scale}) ` : '';
+        this.container.style.transform = zoom + this._compactBase;
+    }
+
+    static get ROTATION_DEG() { return 30; }
+
+    /**
+     * Bounding box of the drawn hexes after the board's rotation, in
+     * unscaled container px. Hexes are flat-top, centred on their point.
+     * @param {Array<[number,number]>} centers - hex centres in container px
+     * @returns {{width:number, height:number, offsetX:number, offsetY:number}}
+     *   offsetX/Y: bbox centre relative to the container centre (the
+     *   transform origin), after rotation
+     */
+    static computeVisualExtent(centers, hexW, hexH, boardSize, rotationDeg) {
+        const a = rotationDeg * Math.PI / 180, cos = Math.cos(a), sin = Math.sin(a);
+        const c = boardSize / 2;
+        const corners = [[-hexW / 2, 0], [-hexW / 4, -hexH / 2], [hexW / 4, -hexH / 2],
+            [hexW / 2, 0], [hexW / 4, hexH / 2], [-hexW / 4, hexH / 2]];
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const [x, y] of centers) {
+            for (const [dx, dy] of corners) {
+                const px = x + dx - c, py = y + dy - c;
+                const rx = px * cos - py * sin, ry = px * sin + py * cos;
+                if (rx < minX) minX = rx; if (rx > maxX) maxX = rx;
+                if (ry < minY) minY = ry; if (ry > maxY) maxY = ry;
+            }
+        }
+        return { width: maxX - minX, height: maxY - minY, offsetX: (minX + maxX) / 2, offsetY: (minY + maxY) / 2 };
+    }
+
+    /**
+     * Scale/margins/translate so the board fills availWidth and its margin
+     * box equals what is drawn (no empty bands, no overflow).
+     * @param {number} [maxHeight] - optional cap on the drawn height
+     */
+    static compactFit(extent, availWidth, boardSize, maxScale, maxHeight) {
+        let scale = availWidth / extent.width;
+        if (maxHeight) scale = Math.min(scale, maxHeight / extent.height);
+        scale = Math.min(scale, maxScale);
+        return {
+            scale,
+            marginX: (extent.width * scale - boardSize) / 2,
+            marginY: (extent.height * scale - boardSize) / 2,
+            translateX: -extent.offsetX * scale,
+            translateY: -extent.offsetY * scale,
+        };
+    }
+
     /**
      * Native (unscaled) board box in px: twice the layout's half-extent,
      * times the hexScale option. 750 * hexScale for Legacy, as before.

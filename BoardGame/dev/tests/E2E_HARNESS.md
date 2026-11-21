@@ -52,6 +52,43 @@ Built once here; don't recreate it in future sessions, just reuse these files.
     and prints an explicit banner, because quota makes writes fail silently
     and looks exactly like a product bug. Repeated full runs WILL hit the
     daily quota on this project.
+- **`e2e-mobile-audit.js` — mobile layout regression test. Offline by default:
+  costs 0 Firestore reads/writes.** It renders 13 phone-facing pages at
+  360/390/820 px with touch emulation.
+  - It fails on: the layout widening past the device width, elements
+    overflowing the right edge, main-thread long tasks over 3 s, and (offline)
+    any request to a Firebase backend host.
+  - It warns on: tap targets < 44 px, text < 12 px, JS errors, and `alert()`
+    dialogs. It auto-dismisses dialogs, which would otherwise block the page
+    and look like a freeze.
+  - Screenshots go to `screenshots/mobile/<vp>/`.
+  ```bash
+  node dev/tests/e2e-mobile-audit.js                  # all pages, all viewports
+  node dev/tests/e2e-mobile-audit.js --page=team,admin --vp=390
+  node dev/tests/e2e-mobile-audit.js --live           # REAL Firestore, 390 only: phase gates only
+  ```
+- `e2e-board-touch.js` — real touch gestures (CDP touch events) on the board
+  at 390 px, offline. It covers pinch-zoom, pan, reset, tap-a-hex details and
+  double-tap on team, and checks that a pinch or pan on admin never fires a
+  hex click. Run it with `node dev/tests/e2e-board-touch.js`.
+- `mock-firebase.js` — the offline backend behind the audit; reuse it for any
+  UI test that doesn't need real data.
+  - `installMockFirebase(page, { uid })` intercepts the gstatic compat SDK
+    URLs that `firebase-loader.js` loads and serves an in-memory
+    Firestore/Auth/Functions fake (doc/collection get, set/update with
+    FieldValue, where/orderBy/limit, onSnapshot, batch, transactions), so page
+    code runs unchanged.
+  - Writes update the in-memory store and fire listeners, and nothing
+    persists.
+  - Firebase backend hosts are aborted and returned by
+    `blockedGoogleRequests()`. Google Fonts is allowed.
+  - `buildDemoStore()` is a synthetic 5-team Version 2 tournament (`demo`)
+    with deliberately long team names. Accounts: `demo-td` (admin/god) and
+    `demo-player` (team 1, player p1). Never paste production docs or real
+    emails into it.
+- `launchBrowser(options)` (in `e2e-harness.js`) — `puppeteer.launch` that
+  falls back to an installed Chrome/Edge when Puppeteer's bundled Chrome is
+  missing from `~/.cache/puppeteer`.
 - `e2e-smoke.js` — minimal script proving login works end-to-end; run it any time
   to sanity-check the harness still works (e.g. after a login.html change).
 - `e2e-create-players.js` — creates N disposable player accounts (auth user +

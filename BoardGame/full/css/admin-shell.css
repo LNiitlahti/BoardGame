@@ -204,12 +204,95 @@
         overflow: visible;
         padding: 8px;
     }
-    .shell-center { min-height: 90vw; }
+    /* The renderer sizes the board's box to what it draws on narrow
+       screens, so no reserved height; the effects toggle can't float over
+       a full-width board, so it sits above it instead. */
+    .shell-center { min-height: 0; }
+    .shell-center .board-section { flex-direction: column; }
+    .shell-center .board-effects { position: static; margin-bottom: 8px; align-self: flex-start; }
     .shell-left, .shell-right { overflow: visible; }
     .shell-right .live-panel { max-height: none; }
+    /* The page scrolls; no 250px box with its own scrollbar inside it */
+    .shell-right .queue-panel { max-height: none; flex: 0 0 auto; overflow: visible; }
+    .shell-right .queue-list { flex: 0 0 auto; overflow: visible; }
     .cb-row, .cb-controls { flex-wrap: wrap; }
     .cb-phase { min-width: 0; }
     .stats-strip { flex-wrap: wrap; white-space: normal; }
+
+    /* Command bar: each part takes a full row and may shrink; the phase
+       timeline is one long row, so it scrolls sideways on its own. */
+    .cb-row { gap: 8px; }
+    .cb-phase, .cb-next, .cb-controls { flex: 1 1 100%; min-width: 0; }
+    .cb-phase-text { min-width: 0; }
+    .cb-phase-text .flow-timeline {
+        overflow-x: auto; scrollbar-width: none;
+        -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
+        padding-bottom: 2px;
+    }
+    .cb-phase-text .flow-timeline::-webkit-scrollbar { display: none; }
+    .cb-controls .flow-primary-btn { min-width: 0; flex: 1 1 100%; }
+    .cb-controls > .btn-small, .cb-controls .cb-menu-wrap > .btn-small { min-height: 44px; min-width: 44px; }
+    .cb-menu { max-width: calc(100vw - 24px); }
+    .cb-menu-item { min-height: 44px; }
+
+    /* Status line: a toast above the bottom bar instead of an empty row
+       in the stats strip */
+    .stats-strip .status-message {
+        position: fixed; left: 12px; right: 12px; margin: 0;
+        bottom: calc(76px + var(--safe-bottom, 0px));
+        z-index: 1001; white-space: normal; text-align: center;
+        padding: 10px 14px; font-size: 13px;
+        background-color: var(--dialog-solid-bg, #15171f);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, .5);
+    }
+    .stats-strip { align-items: center; row-gap: 4px; }
+    .stats-strip .stat-badge { min-height: 44px; }
+    .amb-primary { letter-spacing: .04em; }
+
+    /* Queue rows: the icon buttons get their own line under the match,
+       sized for a thumb, so the game and teams keep the full width */
+    .queue-row { grid-template-columns: auto minmax(0, 1fr); row-gap: 4px; }
+    .queue-row .match-actions { grid-column: 1 / -1; justify-content: flex-end; gap: 6px; }
+    .queue-row .match-actions button,
+    .live-match-actions .btn-small { min-width: 44px; min-height: 44px; }
+    .queue-row-game, .queue-row-teams { white-space: normal; }
+    .shell-left .team-row { min-height: 44px; }
+    /* Match pop-up: players are picked by tapping on a phone */
+    .match-dialog-picker .player-item { min-height: 44px; display: inline-flex; align-items: center; }
+    .match-dialog-picker .team-header { min-height: 36px; display: flex; align-items: center; }
+    .match-dialog-sides .drop-zone { min-height: 120px; }
+
+    /* ── Bottom action bar (admin-mobile-bar.js) ── */
+    body.has-admin-mobile-bar { padding-bottom: calc(72px + var(--safe-bottom, 0px)); }
+    body.has-admin-mobile-bar .chat-module-wrap { bottom: calc(84px + var(--safe-bottom, 0px)); }
+    .admin-mobile-bar {
+        position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000;
+        display: flex; align-items: center; gap: 10px;
+        min-height: 64px; box-sizing: border-box;
+        padding: 8px max(12px, var(--safe-right, 0px)) calc(8px + var(--safe-bottom, 0px)) max(12px, var(--safe-left, 0px));
+        background: var(--dialog-solid-bg, #15171f);
+        border-top: 1px solid var(--border-gold);
+        box-shadow: 0 -8px 24px rgba(0, 0, 0, .45);
+    }
+    .admin-mobile-bar[hidden] { display: none; }
+    /* A pop-up owns the screen: no bar or chat bubble over its backdrop */
+    body:has(.modal-overlay.active) .admin-mobile-bar,
+    body:has(.modal-overlay.active) .chat-module-wrap { display: none; }
+    .amb-info {
+        flex: 1 1 auto; min-width: 0; min-height: 44px;
+        display: flex; flex-direction: column; justify-content: center; gap: 2px;
+        padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer;
+        font: inherit; text-transform: none; letter-spacing: normal; box-shadow: none;
+    }
+    .amb-phase {
+        font-family: 'Russo One', sans-serif; font-size: 13px; color: var(--gold-bright);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .amb-text {
+        font-size: 12px; line-height: 1.3; color: var(--text-secondary);
+        overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    }
+    .amb-primary { flex: 0 1 auto; max-width: 55%; min-height: 48px; white-space: normal; line-height: 1.2; }
 }
 
 /* ── Live match on a slot card: result + edit + back to queue ── */

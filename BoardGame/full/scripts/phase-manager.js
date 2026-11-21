@@ -1722,6 +1722,55 @@ class PhaseManager {
      * @returns {Array<{id, matchNumber, status, gameName,
      *   sides: Array<{teamId, teamName, discordChannel}>}>}
      */
+    /**
+     * "Red Dragons + Blue Owls": the distinct teams of a side's players, in
+     * order of first appearance, or '' when none resolve. Players resolve
+     * through the registry (gs.players[id].teamId), then the teams' own
+     * player lists, then a legacy side.players[].teamId.
+     * With opts.names: the side's player names instead ("Alice, Bob").
+     */
+    _sideTeamsLabel(side, teamById, opts = {}) {
+        const gs = this._gameState;
+        const registry = gs.players || {};
+        const teamOfPlayer = (pid) => {
+            const key = String(pid);
+            if (registry[key]?.teamId != null) return registry[key].teamId;
+            for (const t of (gs.teams || [])) {
+                if ((t.players || []).some(p => p && (String(p.id) === key || String(p.uid) === key))) return t.id;
+            }
+            return null;
+        };
+        if (opts.names) {
+            const nameOf = (pid) => {
+                const key = String(pid);
+                if (registry[key]?.name) return registry[key].name;
+                for (const t of (gs.teams || [])) {
+                    const p = (t.players || []).find(p => p && (String(p.id) === key || String(p.uid) === key));
+                    if (p?.name) return p.name;
+                }
+                return null;
+            };
+            // A side may store both playerIds and players[]: one name per id
+            const byId = new Map();
+            (side.playerIds || []).forEach(pid => { if (pid != null && !byId.has(String(pid))) byId.set(String(pid), nameOf(pid)); });
+            (side.players || []).forEach(p => {
+                const pid = p && (p.id ?? p.uid);
+                const key = pid != null ? String(pid) : `#${byId.size}`;
+                if (!byId.get(key)) byId.set(key, p?.name || (pid != null ? nameOf(pid) : null));
+            });
+            return [...byId.values()].filter(Boolean).join(', ');
+        }
+        const ids = [];
+        const add = (tid) => {
+            if (tid == null) return;
+            const k = String(tid);
+            if (teamById.has(k) && !ids.includes(k)) ids.push(k);
+        };
+        (side.playerIds || []).forEach(pid => add(teamOfPlayer(pid)));
+        (side.players || []).forEach(p => add(p && (p.teamId ?? p.originalTeamId ?? teamOfPlayer(p.id ?? p.uid))));
+        return ids.map(k => teamById.get(k).name).filter(Boolean).join(' + ');
+    }
+
     getSlotMatchDetails(slot) {
         const gs = this._gameState;
         const queue = gs.gameQueue || [];
@@ -1755,8 +1804,11 @@ class PhaseManager {
                 const team = teamById.get(String(teamId));
                 return {
                     teamId,
-                    teamName: team?.name || side.name ||
-                        (teamId !== undefined ? `Team ${teamId}` : 'TBD'),
+                    // Side ids are usually 'TEAM_A'/'TEAM_B', not team ids, and a
+                    // side can mix players from several teams: name it after
+                    // its players' teams ("Red Dragons + Blue Owls").
+                    teamName: team?.name || side.name || this._sideTeamsLabel(side, teamById) ||
+                        (teamId !== undefined && !/^TEAM_[A-Z]$/.test(String(teamId)) ? `Team ${teamId}` : 'TBD'),
                     // Resolved from the tournament's real Discord config
                     // (slot + side id -> channel), not the legacy
                     // match.discordChannels counter -- see
@@ -1764,7 +1816,20 @@ class PhaseManager {
                     discordChannel: this._resolveDiscordChannelName(m.slot, side.id)
                 };
             })
-        }));
+        })).map(d => {
+            // Fully split match (every team on both sides): identical team
+            // labels say nothing, so name each side by its players instead.
+            const names = d.sides.map(s => s.teamName);
+            if (names.length >= 2 && names[0] !== 'TBD' && names.every(n => n === names[0])) {
+                const match = queue.find(m => m.id === d.id);
+                const sides = match ? (match.teams || match.sides || []) : [];
+                d.sides.forEach((s, i) => {
+                    const players = sides[i] ? this._sideTeamsLabel(sides[i], teamById, { names: true }) : '';
+                    if (players) s.teamName = players;
+                });
+            }
+            return d;
+        });
     }
 
     /**
