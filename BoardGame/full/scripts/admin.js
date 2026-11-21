@@ -434,6 +434,9 @@ function initializeBoardModules() {
         responsive: true,
         showHeartImages: true
     });
+    // Phones: pinch-zoom/pan so hexes can be hit accurately. No double-tap:
+    // its first tap would already act on a hex (pick modes complete at once).
+    if (window.BoardZoom) window.BoardZoom.attach(boardRenderer, { doubleTap: false });
 
     // Initial empty render
     boardRenderer.render({});

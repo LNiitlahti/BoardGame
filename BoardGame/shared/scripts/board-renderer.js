@@ -197,6 +197,7 @@ class BoardRenderer {
                 return;
             }
 
+            this._compactBase = null; // desktop: no pinch-zoom layer
             const wrapperWidth = wrapper.clientWidth;
             const wrapperHeight = wrapper.clientHeight;
 
@@ -282,10 +283,36 @@ class BoardRenderer {
         st.height = `${boardSize}px`;
         st.position = 'relative';
         st.left = st.top = st.right = st.bottom = '';
-        st.transform = `translate(${fit.translateX}px, ${fit.translateY}px) scale(${fit.scale}) rotate(${BoardRenderer.ROTATION_DEG}deg)`;
+        this._compactBase = `translate(${fit.translateX}px, ${fit.translateY}px) scale(${fit.scale}) rotate(${BoardRenderer.ROTATION_DEG}deg)`;
+        this._compactDrawn = { width: extent.width * fit.scale, height: extent.height * fit.scale };
+        this._applyCompactTransform();
         st.transformOrigin = 'center center';
         st.margin = `${fit.marginY}px ${fit.marginX}px`;
         st.flexShrink = '0';
+    }
+
+    /**
+     * Pinch-zoom on phones (board-zoom.js). The zoom is applied in screen
+     * px around the drawn board's centre, on top of the compact fit, so the
+     * renderer stays the only writer of the container's transform.
+     * @param {number} scale - 1 = fitted
+     * @param {number} x - pan in screen px
+     * @param {number} y
+     */
+    setUserZoom(scale, x, y) {
+        this._userZoom = { scale, x, y };
+        if (this._compactBase) this._applyCompactTransform();
+    }
+
+    /** Drawn board size in screen px at zoom 1, or null off the compact path. */
+    compactDrawnSize() {
+        return this.isCompactViewport() && this._compactDrawn ? this._compactDrawn : null;
+    }
+
+    _applyCompactTransform() {
+        const z = this._userZoom;
+        const zoom = z && z.scale !== 1 ? `translate(${z.x}px, ${z.y}px) scale(${z.scale}) ` : '';
+        this.container.style.transform = zoom + this._compactBase;
     }
 
     static get ROTATION_DEG() { return 30; }

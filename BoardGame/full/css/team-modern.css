@@ -1981,3 +1981,15 @@ body.effect-hex-images .hex-label { z-index: 1; }
   .phase-banner-desc { order: 5; flex: 1 1 100%; white-space: normal; overflow: visible; }
   .phase-banner-action { margin-left: auto; }
 }
+
+/* Tap-a-hex sheet (BoardZoom.showSheet from showHexInfo) */
+.hex-info { display: grid; gap: 10px; padding-right: 40px; }
+.hex-info-title { font-family: 'Russo One', sans-serif; font-size: 1.1rem; color: #c8b37e; }
+.hex-info-coord { font-family: 'Quantico', sans-serif; font-size: 0.8rem; color: #9aa1ad; margin-left: 6px; }
+.hex-info-row { display: flex; align-items: center; gap: 12px; font-size: 1rem; }
+.hex-info-key { color: #9aa1ad; font-size: 0.85rem; min-width: 64px; }
+.hex-info-val { display: inline-flex; align-items: center; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.hex-info-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+.hex-info-you { white-space: nowrap; flex-shrink: 0; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 999px; background: rgba(200,179,126,.2); color: #e8d9a8; }
+.hex-info-muted { color: #9aa1ad; }
+.hex-info-note { margin: 0; font-size: 0.9rem; color: #d6d9df; }

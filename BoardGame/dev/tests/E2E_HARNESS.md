@@ -67,6 +67,10 @@ Built once here; don't recreate it in future sessions, just reuse these files.
   node dev/tests/e2e-mobile-audit.js --page=team,admin --vp=390
   node dev/tests/e2e-mobile-audit.js --live           # REAL Firestore, 390 only: phase gates only
   ```
+- `e2e-board-touch.js` — real touch gestures (CDP touch events) on the board
+  at 390 px, offline. It covers pinch-zoom, pan, reset, tap-a-hex details and
+  double-tap on team, and checks that a pinch or pan on admin never fires a
+  hex click. Run it with `node dev/tests/e2e-board-touch.js`.
 - `mock-firebase.js` — the offline backend behind the audit; reuse it for any
   UI test that doesn't need real data.
   - `installMockFirebase(page, { uid })` intercepts the gstatic compat SDK

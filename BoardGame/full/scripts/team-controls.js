@@ -1363,6 +1363,8 @@ function renderBoard() {
         });
         // Enable all effects by default (no toggle panel)
         document.body.classList.add('effect-hex-images', 'effect-heart-glow', 'effect-pulse-hearts', 'effect-rooms');
+        // Phones: pinch-zoom the board, tap a hex for its details
+        if (window.BoardZoom) window.BoardZoom.attach(boardRenderer, { onHexTap: showHexInfo });
     }
 
     // Switch to the tournament's board (Legacy / Version 2) before drawing.
@@ -1382,6 +1384,45 @@ function renderBoard() {
 
     boardRenderer.render(gameData);
     applyTeamColorsToBoard();
+}
+
+const HEX_TYPE_LABELS = {
+    'mountain-heart': 'Mountain heart',
+    'side-heart': 'Heart',
+    'starting-location': 'Starting hex',
+    'room': 'Room',
+    'normal': 'Hex',
+};
+
+/** Tap-a-hex details (phones, via BoardZoom). Reads gameData only. */
+function showHexInfo(hexEl) {
+    if (!window.BoardZoom || !boardModule) return;
+    const coord = hexEl.dataset.coord || '';
+    const m = /^q(-?\d+)r(-?\d+)$/.exec(coord);
+    if (!m) return;
+    const q = Number(m[1]), r = Number(m[2]);
+    const type = boardModule.getHexType(q, r);
+    const isRoom = type === 'room' || (gameData?.rooms || []).includes(coord);
+    const income = (window.HEART_INCOME || {})[type] || 0;
+    const ownerId = gameData?.board?.[coord];
+    const owner = ownerId != null ? gameData?.teams?.find(t => String(t.id) === String(ownerId)) : null;
+    const mine = owner && String(owner.id) === String(currentTeamId);
+
+    const label = HEX_TYPE_LABELS[type] || 'Hex';
+    const ownerHtml = owner
+        ? `<span class="hex-info-swatch" style="background:${_escapeHtmlSafe(owner.color || '#8a8fa0')}"></span>` +
+          `${_escapeHtmlSafe(owner.name || 'Team ' + owner.id)}${mine ? ' <span class="hex-info-you">YOU</span>' : ''}`
+        : '<span class="hex-info-muted">Unclaimed</span>';
+    const notes = [];
+    if (income) notes.push(`Pays its holder ${income} VP for every scoring match they hold it through.`);
+    if (isRoom && type !== 'room') notes.push('Room');
+
+    window.BoardZoom.showSheet(`
+        <div class="hex-info">
+            <div class="hex-info-title">${_escapeHtmlSafe(label)} <span class="hex-info-coord">${_escapeHtmlSafe(coord)}</span></div>
+            <div class="hex-info-row"><span class="hex-info-key">Held by</span><span class="hex-info-val">${ownerHtml}</span></div>
+            ${notes.map(n => `<p class="hex-info-note">${_escapeHtmlSafe(n)}</p>`).join('')}
+        </div>`);
 }
 
 /**
