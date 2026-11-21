@@ -161,3 +161,62 @@ test('getLobbyPlayerStatuses returns [] when no players must ready', () => {
     const pm = new PhaseManager(makeGs(), {});
     assert.deepStrictEqual(pm.getLobbyPlayerStatuses(1), []);
 });
+
+// Real queue entries use side ids 'TEAM_A'/'TEAM_B' (admin.js), and a side
+// can mix players from several teams. These used to render as
+// "Team TEAM_A vs Team TEAM_B" on the admin/god match cards.
+test('TEAM_A/TEAM_B sides are named after their players\' teams (registry)', () => {
+    const gs = makeGs({
+        teams: [
+            { id: 1, name: 'Red Dragons' }, { id: 2, name: 'Blue Owls' }, { id: 3, name: 'Green Foxes' }
+        ],
+        players: {
+            p1: { id: 'p1', name: 'Alice', teamId: 1 }, p2: { id: 'p2', name: 'Bob', teamId: 2 },
+            p3: { id: 'p3', name: 'Cid', teamId: 3 }, p4: { id: 'p4', name: 'Dee', teamId: 1 }
+        },
+        gameQueue: [{
+            id: 'm1', status: 'pending', slot: 1, roundNumber: 3, game: 'cs2',
+            teams: [{ id: 'TEAM_A', playerIds: ['p1', 'p2', 'p4'] }, { id: 'TEAM_B', playerIds: ['p3'] }]
+        }]
+    });
+    const details = new PhaseManager(gs, {}).getSlotMatchDetails(1);
+    assert.deepStrictEqual(details[0].sides.map(s => s.teamName), ['Red Dragons + Blue Owls', 'Green Foxes']);
+});
+
+test('TEAM_A sides resolve through teams[].players when the registry lacks them', () => {
+    const gs = makeGs({
+        gameQueue: [{
+            id: 'm1', status: 'pending', slot: 1, roundNumber: 3, game: 'cs2',
+            teams: [{ id: 'TEAM_A', playerIds: [101] }, { id: 'TEAM_B', playerIds: ['u2'] }]
+        }]
+    });
+    const details = new PhaseManager(gs, {}).getSlotMatchDetails(1);
+    assert.deepStrictEqual(details[0].sides.map(s => s.teamName), ['Red Dragons', 'Blue Owls']);
+});
+
+test('an unresolvable TEAM_A side shows TBD, never "Team TEAM_A"', () => {
+    const gs = makeGs({
+        gameQueue: [{
+            id: 'm1', status: 'pending', slot: 1, roundNumber: 3, game: 'cs2',
+            teams: [{ id: 'TEAM_A', playerIds: [] }, { id: 'TEAM_B', playerIds: ['nobody'] }]
+        }]
+    });
+    const details = new PhaseManager(gs, {}).getSlotMatchDetails(1);
+    assert.deepStrictEqual(details[0].sides.map(s => s.teamName), ['TBD', 'TBD']);
+});
+
+test('a fully split match (same teams on both sides) names each side by its players', () => {
+    const gs = makeGs({
+        teams: [{ id: 1, name: 'Red Dragons' }, { id: 2, name: 'Blue Owls' }],
+        players: {
+            p1: { id: 'p1', name: 'Alice', teamId: 1 }, p2: { id: 'p2', name: 'Bob', teamId: 2 },
+            p3: { id: 'p3', name: 'Cid', teamId: 1 }, p4: { id: 'p4', name: 'Dee', teamId: 2 }
+        },
+        gameQueue: [{
+            id: 'm1', status: 'pending', slot: 1, roundNumber: 3, game: 'cs2',
+            teams: [{ id: 'TEAM_A', playerIds: ['p1', 'p2'] }, { id: 'TEAM_B', playerIds: ['p3', 'p4'] }]
+        }]
+    });
+    const details = new PhaseManager(gs, {}).getSlotMatchDetails(1);
+    assert.deepStrictEqual(details[0].sides.map(s => s.teamName), ['Alice, Bob', 'Cid, Dee']);
+});
