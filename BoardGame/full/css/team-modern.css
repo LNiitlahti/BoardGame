@@ -1973,3 +1973,11 @@ body.effect-hex-images .hex-label { z-index: 1; }
   .rc-top { gap: 8px; }
   .rc-meta { font-size: 12px; }
 }
+
+/* Phone: the phase banner wraps; the description (what the player should
+   do now) gets a full line and is no longer cut to "..." */
+@media (max-width: 600px) {
+  .phase-banner { flex-wrap: wrap; gap: 6px 10px; padding: 10px 12px; }
+  .phase-banner-desc { order: 5; flex: 1 1 100%; white-space: normal; overflow: visible; }
+  .phase-banner-action { margin-left: auto; }
+}

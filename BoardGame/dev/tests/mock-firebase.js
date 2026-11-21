@@ -105,7 +105,8 @@ function buildDemoStore() {
     const tournament = {
         tournamentId: DEMO_TID, id: DEMO_TID,
         name: 'Demo Cup 2026', friendlyName: 'Demo Cup 2026',
-        status: 'playing', phase: 'matches_in_progress', currentPhase: 'matches_in_progress',
+        status: 'playing', phase: 'matches_in_progress',
+        currentPhase: { name: 'matches_in_progress', roundNumber: 3, startedAt: iso(10), slots: { 1: 'playing', 2: 'setup' } },
         currentRound: 3, gamesPlayed: 2, boardVersion: 2, winningPoints: 50,
         teams, players, playerRegistry, gameQueue, gameHistory,
         selectedGames: ['cs2', 'aoe4', 'valorant'],
