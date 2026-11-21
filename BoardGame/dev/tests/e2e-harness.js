@@ -8,6 +8,31 @@ const path = require('path');
 // screenshots taken at this size are usable as-is in manuals.
 const VIEWPORT = { width: 1920, height: 1080 };
 
+// Puppeteer's bundled Chrome is downloaded into ~/.cache/puppeteer on
+// `npm install`; when that cache is missing (cleared, or install skipped)
+// launch() throws "Could not find Chrome". Fall back to an installed
+// Chrome/Edge so the harness still runs without a re-download.
+const SYSTEM_BROWSERS = [
+  'C:/Program Files/Google/Chrome/Application/chrome.exe',
+  'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
+  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/usr/bin/google-chrome',
+  '/usr/bin/chromium',
+];
+
+async function launchBrowser(options = {}) {
+  try {
+    return await puppeteer.launch({ headless: 'new', ...options });
+  } catch (err) {
+    if (!/Could not find Chrome/i.test(err.message)) throw err;
+    const executablePath = SYSTEM_BROWSERS.find(p => fs.existsSync(p));
+    if (!executablePath) throw err;
+    console.log(`[harness] bundled Chrome missing, using ${executablePath}`);
+    return puppeteer.launch({ headless: 'new', ...options, executablePath });
+  }
+}
+
 function assert(condition, message) {
   if (!condition) throw new Error(`ASSERTION FAILED: ${message}`);
 }
@@ -102,6 +127,6 @@ async function gotoTournamentPage(page, baseUrl, pageName, tournamentId, extraPa
 }
 
 module.exports = {
-  login, newLoggedInPage, gotoTournamentPage, puppeteer,
+  login, newLoggedInPage, gotoTournamentPage, puppeteer, launchBrowser,
   assert, sleep, screenshot, screenshotDir, createDisposablePlayer, VIEWPORT
 };
