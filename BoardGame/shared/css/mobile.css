@@ -1,0 +1,84 @@
+/*
+ * mobile.css: shared phone/tablet layer. Load it LAST on every non-TV page
+ * (view.html / view-onboarding*.html are fixed 1920x1080 and don't load it).
+ *
+ * Breakpoints used across the site (rewrite others to these when touching a
+ * file):
+ *   <= 600px   phone
+ *   601-900px  large phone / small tablet   (navbar hamburger, admin one-column)
+ *   901-1194px tablet / iPad landscape
+ *   > 1194px   desktop
+ *
+ * Everything here is scoped to small screens or coarse pointers, so desktop
+ * and TV rendering is unchanged.
+ */
+
+:root {
+    --tap-min: 44px;
+    --gutter-mobile: 16px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+}
+
+/* Horizontal scroll container for content that can't reflow (wide tables,
+   matrices). Use the class directly, or rely on the table wrappers below. */
+.scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+}
+
+@media (max-width: 900px) {
+    /* Media never wider than its column */
+    img, video, canvas, svg {
+        max-width: 100%;
+    }
+
+    /* Wide data tables scroll inside their card instead of widening the
+       page (a too-wide element makes mobile browsers zoom the WHOLE page
+       out, pushing the navbar's menu button off-screen). */
+    .standings-table,
+    .tournament-breakdown-table,
+    .table-scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+        max-width: 100%;
+    }
+
+    /* Rows stay on one line and the table scrolls sideways; without this
+       the table squeezes long names down to one letter per line. */
+    .standings-table th,
+    .standings-table td,
+    .tournament-breakdown-table th,
+    .tournament-breakdown-table td {
+        white-space: nowrap;
+    }
+
+    /* Long names in headings wrap instead of pushing the page wider.
+       break-word (not anywhere) so table/flex min-content isn't affected. */
+    h1, h2, h3 {
+        overflow-wrap: break-word;
+    }
+}
+
+@media (max-width: 600px) {
+    /* iOS Safari zooms the page when a focused field's text is < 16px */
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+    select,
+    textarea {
+        font-size: 16px;
+    }
+
+    /* Form fields in flex rows: the default min-width:auto keeps a field at
+       its intrinsic (~20 characters) width, so the 16px font above would
+       push rows past the screen edge. Let them shrink. */
+    input,
+    select,
+    textarea {
+        min-width: 0;
+        max-width: 100%;
+    }
+}

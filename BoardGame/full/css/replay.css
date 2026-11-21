@@ -1067,6 +1067,16 @@ body.effect-hex-images .board-hex::before {
         min-height: 40px;
         padding: 8px 10px;
     }
+
+    /* Summary + four export buttons don't fit one phone row */
+    .replay-controls {
+        padding: 8px 12px;
+    }
+
+    .controls-right {
+        flex-wrap: wrap;
+        margin-left: 0;
+    }
 }
 
 body.effect-hex-images .hex-label { z-index: 1; }
