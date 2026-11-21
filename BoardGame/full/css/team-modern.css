@@ -1832,6 +1832,9 @@ body.effect-hex-images .hex-label { z-index: 1; }
 .drink-btn-count { font-size: 22px; font-weight: 700; }
 .drink-total { margin-top: 12px; text-align: center; opacity: 0.8; }
 
+/* Rank number: only shown in the phone standings list below */
+.sc-rank { display: none; }
+
 /* Phones / narrow (<=900px): BoardRenderer sizes #hexBoard's box to the
    drawn board, so the desktop 580px reservation only adds empty bands. */
 @media (max-width: 900px) {
@@ -1839,4 +1842,134 @@ body.effect-hex-images .hex-label { z-index: 1; }
   #hexBoard {
     min-height: 0;
   }
+
+  /* Vote cards: full width of their column, border and padding included
+     (min-width:100% plus padding pushed them past the card edge). */
+  .vote-option {
+    flex: 1 1 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+}
+
+/* Phones (<=600px) */
+@media (max-width: 600px) {
+  /* Score strip -> ranked standings list: one full-width row per team,
+     full names, your team marked. Two squeezed columns cut every name to
+     two or three letters. */
+  .score-strip {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 3px;
+    height: auto;
+    margin-bottom: 14px;
+  }
+
+  .sc {
+    order: var(--rank, 0);
+    flex: none;
+    min-width: 0;
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    padding: 7px 0;
+    min-height: 48px;
+  }
+
+  .sc-rank {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1 / 3;
+    align-items: center;
+    justify-content: center;
+    padding-left: 4px;
+    font-family: 'Russo One', sans-serif;
+    font-size: 15px;
+    color: rgba(255, 255, 255, 0.55);
+  }
+
+  .sc-tname-area { grid-column: 2; padding: 0 0 2px 4px; }
+  .sc-tname {
+    font-size: 15px;
+    white-space: normal;
+    line-height: 1.15;
+    overflow-wrap: break-word;
+  }
+
+  .sc.is-you .sc-tname::after {
+    content: 'YOU';
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--c);
+    color: #fff;
+    font-family: 'Quantico', sans-serif;
+    font-size: 11px;
+    letter-spacing: 1px;
+    vertical-align: 2px;
+    text-shadow: none;
+  }
+
+  .sc-players-area { grid-column: 2; padding: 3px 0 0 4px; flex-wrap: wrap; row-gap: 2px; }
+  .sc-pname { font-size: 13px; max-width: none; }
+  .sc-pstar .star { font-size: 12px; }
+  .sc-pstar .pcount { font-size: 13px; }
+
+  .sc-score-area { grid-column: 3; grid-row: 1 / 3; gap: 8px; padding: 0 10px; }
+  .sc-score-num.w,
+  .sc-score-num.pts { font-size: 17px; }
+  .sc-score-num.total { font-size: 26px; }
+
+  /* Recent events: winners, "vs" and losers on their own lines, and
+     player chips wrap (a 5v5 row was ~1000px wide on one line). */
+  .rc-matchup {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+
+  .rc-side,
+  .rc-side.rc-loser {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    row-gap: 4px;
+  }
+
+  /* Section order on a phone: what the player has to do now, then their
+     matches, then the board, then the rest. The two sidebars dissolve
+     (display: contents) so every section can be ordered on its own;
+     desktop keeps the three-column layout. */
+  .team-main-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .team-main-layout > div:first-child,
+  .team-main-layout > div:last-child {
+    display: contents;
+  }
+  .team-main-layout .team-section,
+  .team-main-layout .voting-section {
+    margin-bottom: 0;
+    /* Panels are 80-90% opaque: the blur is barely visible but costly
+       for a phone GPU on every scroll frame. */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  #votingSection          { order: 1; }
+  #matchPanelSection      { order: 2; }
+  #challengeSection       { order: 3; }
+  #currentMatchSection    { order: 4; }
+  #upcomingMatchesSection { order: 5; }
+  .team-board-wrapper     { order: 6; }
+  #teammatesSection       { order: 7; }
+  #spellCardsSection      { order: 8; }
+  #activeConditionsSection { order: 9; }
+  #drinkCounterSection    { order: 10; }
+  #recentEventsSection    { order: 11; }
+
+  .rc-vs { padding: 0 6px; align-self: flex-start; }
+  .rc-player { max-width: none; }
+  .rc-top { gap: 8px; }
+  .rc-meta { font-size: 12px; }
 }

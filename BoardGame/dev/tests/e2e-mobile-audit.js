@@ -107,7 +107,10 @@ function measure() {
         }
         if (el.matches('a[href],button,input:not([type=hidden]),select,textarea,[role=button],[onclick]') &&
             (r.width < 44 || r.height < 44)) small.push(desc(el));
-        if ([...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(cs.fontSize) < 12) tiny++;
+        // Board hexes carry coordinate labels drawn at board scale; they're
+        // part of the board graphic, not page text.
+        if (!el.closest('#hexBoard') &&
+            [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(cs.fontSize) < 12) tiny++;
     }
     return {
         deviceW, layoutW: Math.max(vw, document.documentElement.scrollWidth, window.innerWidth),

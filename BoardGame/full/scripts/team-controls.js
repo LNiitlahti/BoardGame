@@ -267,6 +267,11 @@ function renderScoreStrip() {
 
     const teams = gameData.teams || [];
     const playerWins = _getPlayerWinCounts();
+    // Rank by total points: phones show the strip as a standings list
+    // (CSS `order: var(--rank)`); desktop keeps the original team order.
+    const rankOf = new Map([...teams]
+        .sort((a, b) => (b.points || 0) - (a.points || 0))
+        .map((t, i) => [String(t.id), i + 1]));
 
     container.innerHTML = teams.map(team => {
         const color = getHexColor(team.color);
@@ -287,7 +292,8 @@ function renderScoreStrip() {
         }).join('');
 
         return `
-            <div class="sc ${isYou ? 'is-you' : ''}" style="--c: ${color};">
+            <div class="sc ${isYou ? 'is-you' : ''}" style="--c: ${color}; --rank: ${rankOf.get(String(team.id))};">
+                <span class="sc-rank">${rankOf.get(String(team.id))}</span>
                 <div class="sc-tname-area"><span class="sc-tname">${team.name || 'Team ' + team.id}</span></div>
                 <div class="sc-players-area">${playersHtml}</div>
                 <div class="sc-score-area">

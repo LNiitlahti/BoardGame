@@ -94,9 +94,12 @@ function buildDemoStore() {
         match(1005, 'aoe4', '3v3', 'pending', ['p3', 'p5', 'p9'], ['p4', 'p6', 'p10'], { slot: 2 }),
     ];
 
+    // Same shape the result flow writes (player IDs, tournamentRound).
     const gameHistory = gameQueue.filter(m => m.status === 'completed').map(m => ({
-        ...m, timestamp: m.completedAt, round: m.roundNumber,
+        ...m, gameId: m.game, timestamp: m.completedAt, round: m.roundNumber, tournamentRound: m.roundNumber,
+        winningPlayerIds: m.teams[m.winnerIndex].playerIds, losingPlayerIds: m.teams[1 - m.winnerIndex].playerIds,
         winningPlayers: m.teams[m.winnerIndex].players, losingPlayers: m.teams[1 - m.winnerIndex].players,
+        matchDuration: { durationMinutes: 25 },
     }));
 
     const tournament = {
