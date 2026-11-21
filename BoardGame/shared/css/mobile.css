@@ -57,6 +57,23 @@
         white-space: nowrap;
     }
 
+    /* Touch targets: the site's buttons are sized for a mouse (.btn-small
+       ~30px). 44px is the reliable minimum for a thumb. Width is left
+       alone so rows of buttons still fit; only height and the narrowest
+       icon buttons grow. */
+    .btn,
+    .btn-small,
+    .btn-icon,
+    .tab-btn,
+    .leaderboard-tab,
+    .speed-btn,
+    .transport-btn {
+        min-height: 44px;
+    }
+    .btn-icon {
+        min-width: 44px;
+    }
+
     /* Long names in headings wrap instead of pushing the page wider.
        break-word (not anywhere) so table/flex min-content isn't affected. */
     h1, h2, h3 {
@@ -70,6 +87,11 @@
     select,
     textarea {
         font-size: 16px;
+    }
+
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+    select {
+        min-height: 44px;
     }
 
     /* Form fields in flex rows: the default min-width:auto keeps a field at

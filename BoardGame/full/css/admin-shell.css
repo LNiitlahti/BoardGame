@@ -208,7 +208,8 @@
        screens, so no reserved height; the effects toggle can't float over
        a full-width board, so it sits above it instead. */
     .shell-center { min-height: 0; }
-    .shell-center .board-effects { position: static; margin-bottom: 8px; }
+    .shell-center .board-section { flex-direction: column; }
+    .shell-center .board-effects { position: static; margin-bottom: 8px; align-self: flex-start; }
     .shell-left, .shell-right { overflow: visible; }
     .shell-right .live-panel { max-height: none; }
     .cb-row, .cb-controls { flex-wrap: wrap; }

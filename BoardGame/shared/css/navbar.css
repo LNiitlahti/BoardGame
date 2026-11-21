@@ -883,6 +883,32 @@
     .navbar-tournament-name {
         max-width: 120px;
     }
+
+    /* Touch: every header control gets a 44px hit area (they measured
+       ~28-36px). The 60px bar has room for it. */
+    .navbar-status-btn,
+    .navbar-logout-btn,
+    .navbar-mobile-toggle,
+    .navbar-tournament-clear {
+        min-height: 44px;
+        min-width: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .navbar-mobile-toggle {
+        flex-direction: column;
+    }
+
+    /* A long menu (admins see many links) scrolls inside the panel
+       instead of running off the bottom of the screen. */
+    .navbar-nav {
+        max-height: calc(100vh - 60px);
+        max-height: calc(100dvh - 60px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
 }
 
 @media (max-width: 600px) {
