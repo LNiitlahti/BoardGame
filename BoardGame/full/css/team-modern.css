@@ -1831,3 +1831,12 @@ body.effect-hex-images .hex-label { z-index: 1; }
 .drink-btn-label { font-size: 13px; opacity: 0.8; }
 .drink-btn-count { font-size: 22px; font-weight: 700; }
 .drink-total { margin-top: 12px; text-align: center; opacity: 0.8; }
+
+/* Phones / narrow (<=900px): BoardRenderer sizes #hexBoard's box to the
+   drawn board, so the desktop 580px reservation only adds empty bands. */
+@media (max-width: 900px) {
+  .team-board-section,
+  #hexBoard {
+    min-height: 0;
+  }
+}

@@ -204,7 +204,11 @@
         overflow: visible;
         padding: 8px;
     }
-    .shell-center { min-height: 90vw; }
+    /* The renderer sizes the board's box to what it draws on narrow
+       screens, so no reserved height; the effects toggle can't float over
+       a full-width board, so it sits above it instead. */
+    .shell-center { min-height: 0; }
+    .shell-center .board-effects { position: static; margin-bottom: 8px; }
     .shell-left, .shell-right { overflow: visible; }
     .shell-right .live-panel { max-height: none; }
     .cb-row, .cb-controls { flex-wrap: wrap; }
